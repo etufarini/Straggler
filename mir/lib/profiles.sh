@@ -69,12 +69,12 @@ load_profile() {
 # Persist atomically and update tracking only after a successful write.
 # Return 2 for directory errors, 3 for temporary-file errors, 1 for write errors.
 write_profile() {
-    local file="$1" temporary
+    local file="$1" temporary data
     mkdir -p -- "$PROFILES_DIR" || return 2
     temporary=$(mktemp "$PROFILES_DIR/.profile.XXXXXXXX") || return 3
-    if profile_data > "$temporary" && mv -f -- "$temporary" "$file"; then
+    if data=$(profile_data) && printf '%s\n' "$data" > "$temporary" && mv -f -- "$temporary" "$file"; then
         CURRENT_PROFILE="$file"
-        SAVED_PROFILE=$(profile_data)
+        SAVED_PROFILE=$data
     else
         rm -f -- "$temporary"
         return 1
