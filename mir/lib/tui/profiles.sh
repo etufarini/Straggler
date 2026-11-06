@@ -20,7 +20,7 @@ save_profile() {
         fi
     fi
     if [[ ! -f "$MODEL" || "${MODEL,,}" != *.gguf ]]; then message 'Select an existing GGUF model before saving.'; return; fi
-    # One value per line; filenames containing line breaks cannot be stored.
+    # Line breaks would split values into extra profile fields.
     if [[ "$MODEL" == *$'\n'* || "$DEVICE" == *$'\n'* ]]; then
         message 'Cannot save values containing line breaks.'
         return

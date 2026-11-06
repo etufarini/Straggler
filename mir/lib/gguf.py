@@ -8,8 +8,6 @@ import sys
 def role(path):
     try:
         with open(path, "rb") as stream:
-            # Leave unknown or oversized metadata selectable.
-            # llama.cpp decides model compatibility.
             limit = min(os.fstat(stream.fileno()).st_size, 32 * 1024 * 1024)
             operations = 0
             endian = "<"
@@ -79,6 +77,7 @@ def role(path):
                     result = "component"
             return result
     except (OSError, ValueError, UnicodeError, struct.error):
+        # Inspection failures must not exclude potentially supported models.
         return "unknown"
 
 

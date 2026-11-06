@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# Source builds take precedence over package-manager layouts.
 server_path() {
     local folder=$1 candidate
     [[ -n "$folder" ]] || return 0

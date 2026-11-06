@@ -255,7 +255,7 @@ prepare_server() {
 build_model_args() {
     local setting flag
     MODEL_ARGS=(--model "$MODEL" --cache-type-k "$CACHE_TYPE_K" --cache-type-v "$CACHE_TYPE_V")
-    # Omit automatic settings so llama.cpp can adapt to the available hardware.
+    # Omit auto values to preserve native defaults and environment settings.
     if [[ "$CTX_SIZE" != auto ]]; then MODEL_ARGS+=(--ctx-size "$CTX_SIZE"); fi
     if [[ "$THREADS" != auto ]]; then MODEL_ARGS+=(--threads "$THREADS"); fi
     if [[ "$DEVICE" != auto ]]; then MODEL_ARGS+=(--device "$DEVICE"); fi
@@ -273,8 +273,7 @@ build_model_args() {
     esac
 }
 
-# Called by the EXIT trap.
-# shellcheck disable=SC2329
+# shellcheck disable=SC2329 # Invoked by the EXIT trap.
 cleanup() {
     if [[ -n "${SERVER_PID:-}" ]]; then
         kill -TERM "$SERVER_PID" 2>/dev/null || true

@@ -32,7 +32,6 @@ tracking=$SAVED_PROFILE
 cmp -s "$association" <(profile_data)
 cp "$association" "$work/profile.before"
 
-# Failed serialization or storage must keep the complete file and association.
 for failure in directory temporary serialization activation; do
     (
         expected=1

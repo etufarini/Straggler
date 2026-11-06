@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix='mir-architecture-') as temporary:
     for name in ('runtime.sh', 'platform.sh'):
         (work/'lib'/name).symlink_to(root/'lib'/name)
     (work/'lib/platform/linux.sh').symlink_to(root/'lib/platform/linux.sh')
-    # No macOS file exists in this checkout. Importing one must fail the test.
+    # Omit macOS files so accidental imports fail.
     command = '''source "$1/lib/runtime.sh"
 source "$1/lib/platform.sh"
 uname() { printf 'Linux\\n'; }

@@ -100,7 +100,6 @@ main() {
     WRAPPER=''
     platform_move "$LINK" "$INSTALL_DIR/current" replace
     LINK=''
-    # After activation, prune inactive install.* directories, never symlinks.
     ACTIVE="$STAGE"
     STAGE=''
     CLEAN=true
