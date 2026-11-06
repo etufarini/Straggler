@@ -12,7 +12,8 @@ Designed for Linux and macOS users who are comfortable with a terminal and want
 a simple, guided way to set up and run local language models.
 
 Mir.cpp supports Linux with CPU, Vulkan and CUDA builds, and macOS with CPU and Metal.
-CUDA still needs validation on NVIDIA hardware.
+CUDA smoke tests passed on RTX 2060/3060 with one llama.cpp build and model;
+compatibility with other configurations depends on the installed build and hardware.
 
 [<img src="mir/docs/screenshots/main-menu.png" alt="Main menu showing the current configuration and launch controls" width="640">](mir/docs/screenshots/main-menu.png)
 

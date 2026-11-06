@@ -61,6 +61,28 @@ memory_available
 DEVICE=none
 memory_available
 [[ $(memory_line) == 'Free GiB: RAM 16.0 | GPU off' ]]
+# Resolve native and trailing overrides just as startup does, without changing
+# the stored selection. CPU-only telemetry must not probe the GPU backend.
+(
+    server_devices() { printf 'Unexpected CPU-only GPU probe\n' >&2; exit 1; }
+    DEVICE=auto LLAMA_ARG_DEVICE=none PORT=9931 CACHE_TYPE_K=q4_0 CACHE_TYPE_V=q4_0
+    resolve_endpoint
+    memory_available
+    [[ $DEVICE == auto && ${#GPU_DEVICE_NAMES[@]} == 0 && ${#DEVICE_FREE[@]} == 0 ]]
+    [[ $(memory_line) == 'Free GiB: RAM 16.0 | GPU off' ]]
+    DEVICE=First LLAMA_ARG_DEVICE=First
+    resolve_endpoint --device none
+    memory_available
+    [[ $DEVICE == First && $(memory_line) == 'Free GiB: RAM 16.0 | GPU off' ]]
+)
+(
+    unset MEMORY_TEST_EXIT
+    DEVICE=none LLAMA_ARG_DEVICE=none PORT=9931 CACHE_TYPE_K=q4_0 CACHE_TYPE_V=q4_0
+    resolve_endpoint --device First
+    memory_available
+    [[ $DEVICE == none && ${GPU_DEVICE_NAMES[*]} == First ]]
+    [[ $(memory_line) == 'Free GiB: RAM 16.0 | GPU 10.0' ]]
+)
 # Missing memory never blocks telemetry or server controls.
 platform_memory_snapshot() { RAM_AVAILABLE=''; }
 memory_available
