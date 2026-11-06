@@ -137,8 +137,8 @@ platform_ensure_dependencies() {
     local -a tools packages missing=()
     case "$group" in
         launcher)
-            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ss ps find sort grep cut dirname sleep cp)
-            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux dialog iproute2 procps findutils coreutils grep coreutils coreutils coreutils coreutils) ;;
+            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ss ps find sort grep dirname sleep cp)
+            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux dialog iproute2 procps findutils coreutils grep coreutils coreutils coreutils) ;;
         build)
             tools=(git cmake make cc c++ python3 setsid timeout)
             packages=(git cmake build-essential build-essential build-essential python3 util-linux coreutils) ;;
@@ -258,7 +258,7 @@ check_dependencies() {
         platform_required_tools
         tools=("${REQUIRED_TOOLS[@]}")
         if [[ "$mode" == install ]]; then
-            tools+=(bash uname tar gzip mktemp chmod mkdir mv ln rm flock dialog ps find sort grep cut dirname sleep cp)
+            tools+=(bash uname tar gzip mktemp chmod mkdir mv ln rm flock dialog ps find sort grep dirname sleep cp)
         fi
     fi
     for tool in "${tools[@]}"; do

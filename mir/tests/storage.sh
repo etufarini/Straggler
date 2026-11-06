@@ -29,6 +29,29 @@ write_profile "$PROFILES_DIR/Saved.conf"
 profile_snapshot=$(profile_data)
 association=$CURRENT_PROFILE
 tracking=$SAVED_PROFILE
+cmp -s "$association" <(profile_data)
+cp "$association" "$work/profile.before"
+
+# Failed serialization or storage must keep the complete file and association.
+for failure in directory temporary serialization activation; do
+    (
+        expected=1
+        case "$failure" in
+            directory) mkdir() { return 1; }; expected=2 ;;
+            temporary) mktemp() { return 1; }; expected=3 ;;
+            serialization) profile_data() { printf 'model=partial\n'; return 1; } ;;
+            activation) mv() { return 1; } ;;
+        esac
+        status=0
+        write_profile "$PROFILES_DIR/Other.conf" || status=$?
+        [[ $status == "$expected" && $CURRENT_PROFILE == "$association" && $SAVED_PROFILE == "$tracking" ]]
+        [[ ! -e "$PROFILES_DIR/Other.conf" ]]
+        cmp -s "$association" "$work/profile.before"
+        temporary=("$PROFILES_DIR"/.profile.*)
+        [[ ! -e ${temporary[0]} ]]
+    )
+done
+printf 'PASS: exact profile bytes and unchanged files/tracking on directory, temporary-file, serialization and activation failures\n'
 
 # Malformed path files must not partially apply an earlier valid field.
 for data in \

@@ -22,7 +22,7 @@ check_dependencies() {
         platform_required_tools
         tools=("${REQUIRED_TOOLS[@]}")
         if [[ "$mode" == install ]]; then
-            tools+=(bash uname tar gzip mktemp chmod mkdir mv ln rm flock dialog ps find sort grep cut dirname sleep cp)
+            tools+=(bash uname tar gzip mktemp chmod mkdir mv ln rm flock dialog ps find sort grep dirname sleep cp)
         fi
     fi
     for tool in "${tools[@]}"; do

@@ -32,12 +32,17 @@ platform_memory_snapshot() {
     fi
 }
 platform_listeners() {
-    local pid
+    local remaining
     LISTENERS=$(ss -H -ltnp "sport = :$1") || return 1
     PIDS=()
-    while IFS= read -r pid; do
-        [[ -z "$pid" ]] || PIDS+=("$pid")
-    done < <(printf '%s' "$LISTENERS" | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -un)
+    remaining=$LISTENERS
+    while [[ "$remaining" =~ pid=([0-9]+) ]]; do
+        PIDS+=("${BASH_REMATCH[1]}")
+        remaining=${remaining#*"pid=${BASH_REMATCH[1]}"}
+    done
+    if (( ${#PIDS[@]} > 1 )); then
+        mapfile -t PIDS < <(printf '%s\n' "${PIDS[@]}" | sort -un)
+    fi
 }
 platform_dependency_hint() {
     local tool package
@@ -75,8 +80,8 @@ platform_ensure_dependencies() {
     local -a tools packages missing=()
     case "$group" in
         launcher)
-            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ss ps find sort grep cut dirname sleep cp)
-            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux dialog iproute2 procps findutils coreutils grep coreutils coreutils coreutils coreutils) ;;
+            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ss ps find sort grep dirname sleep cp)
+            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux dialog iproute2 procps findutils coreutils grep coreutils coreutils coreutils) ;;
         build)
             tools=(git cmake make cc c++ python3 setsid timeout)
             packages=(git cmake build-essential build-essential build-essential python3 util-linux coreutils) ;;

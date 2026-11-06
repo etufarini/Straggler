@@ -253,7 +253,7 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     # Control PATH completely so missing-command checks do not depend on the host.
     restricted = work / 'restricted-bin'
     restricted.mkdir()
-    tools = 'uname brew bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ps find sort grep cut dirname sleep cp'.split()
+    tools = 'uname brew bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ps find sort grep dirname sleep cp'.split()
     tools += ['gfind', 'gmv', 'lsof', 'netstat'] if target_os == 'Darwin' else ['ss']
     for tool in tools:
         source = bin_dir / tool
@@ -282,6 +282,7 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     (restricted / 'gzip').symlink_to(shutil.which('gzip'))
     executable(restricted / 'dialog', '#!/bin/sh\nexit 0\n')
     result = install({'PATH':str(restricted)})
+    assert not (restricted / 'cut').exists()
     assert ('WARNING: ' + ('open' if target_os == 'Darwin' else 'xdg-open') + ' is missing').encode() in result.stderr
     assert b'Open the server address manually' in result.stderr
     print('PASS: aggregated required dependencies before changes and optional browser warning')

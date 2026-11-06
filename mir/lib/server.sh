@@ -186,7 +186,7 @@ resolve_endpoint() {
 }
 
 prepare_server() {
-    local key flag name found types value
+    local key flag name types value
     LAUNCH_ERROR=''
     [[ -f "$SERVER" && -x "$SERVER" ]] || { launch_error 'llama-server not found. Set the llama.cpp folder in Folders, or use MIR_LLAMA_CPP_DIR.'; return 1; }
     [[ -z "$PATHS_WARNING" || "$TUI" == true ]] || printf '%s\n' "$PATHS_WARNING" >&2
@@ -238,10 +238,9 @@ prepare_server() {
     if [[ "$EFFECTIVE_DEVICE" != auto && "$EFFECTIVE_DEVICE" != none ]] && server_devices && [[ "$DEVICE_OUTPUT" == *'Available devices:'* ]]; then
         local -a selected_devices
         IFS=, read -r -a selected_devices <<< "$EFFECTIVE_DEVICE"
+        printf -v types '%s\n' "${DEVICE_NAMES[@]}"
         for key in "${selected_devices[@]}"; do
-            found=false
-            for name in "${DEVICE_NAMES[@]}"; do if [[ "$name" == "$key" ]]; then found=true; break; fi; done
-            if ! "$found"; then
+            if ! listed_value "$key" "$types"; then
                 launch_error "Device '$key' is unavailable in this llama.cpp build. Choose Auto, CPU only or a detected device under Performance."
                 return 1
             fi
