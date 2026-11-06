@@ -101,7 +101,7 @@ select_multiple_devices() {
     local -A selected_names=()
     IFS=, read -r -a names <<< "$DEVICE"
     names+=("${DEVICE_NAMES[@]}")
-    # Keep selected devices in their saved order: ratios follow this order.
+    # Preserve device order: proportions and fitting targets use positional values.
     for name in "${names[@]}"; do
         [[ " ${GPU_DEVICE_NAMES[*]} " == *" $name "* ]] || continue
         [[ ! -v "selected_names[$name]" ]] || continue

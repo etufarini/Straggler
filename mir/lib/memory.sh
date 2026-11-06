@@ -52,7 +52,7 @@ memory_line() {
     for ((index=0; index<${#items[@]}; index++)); do
         item=${items[(start + index) % ${#items[@]}]}
         if [[ "$line" == "$prefix" ]]; then item=" $item"; else item=" | $item"; fi
-        # The Next memory button exposes pools omitted from this page.
+        # Reserve space for the hidden-item count.
         if (( ${#line} + ${#item} + 4 > width )); then hidden=$((hidden + 1));
         else line+=$item; fi
     done

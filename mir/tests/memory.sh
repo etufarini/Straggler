@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Live memory measurements and compact pagination; no model allocation.
+# Simulated memory telemetry and pagination; no inference.
 set -euo pipefail
 MIR_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$MIR_ROOT/tests/helpers/core.sh"
@@ -43,7 +43,7 @@ MEMORY_PAGE=0
 memory_width() { printf 40; }
 memory_controls
 [[ ${MEMORY_BUTTONS[*]} == '--extra-button --extra-label Next memory' ]]
-# Duplicate, malformed, unavailable and zero-budget reports are not extra GPUs.
+# Duplicate, malformed, unavailable and zero-capacity reports are not extra GPUs.
 export MEMORY_TEST_DEVICES='Available devices:
   First: GPU (16384 MiB, 10240 MiB free)
   First: Duplicate (16384 MiB, 10240 MiB free)
@@ -83,7 +83,6 @@ memory_available
     [[ $DEVICE == none && ${GPU_DEVICE_NAMES[*]} == First ]]
     [[ $(memory_line) == 'Free GiB: RAM 16.0 | GPU 10.0' ]]
 )
-# Missing memory never blocks telemetry or server controls.
 platform_memory_snapshot() { RAM_AVAILABLE=''; }
 memory_available
 [[ $(memory_line) == 'Free GiB: RAM N/A | GPU off' ]]

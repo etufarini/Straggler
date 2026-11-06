@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Isolated integration checks; optional argument compares another standalone launcher.
+# Isolated integration checks; optional argument adds a baseline launcher.
 set -euo pipefail
 TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 python3 -I - "$TEST_ROOT" "${1:-}" <<'PY'
@@ -166,7 +166,6 @@ sys.exit(status)
     assert run(root / 'mir.sh', {'LLAMA_GENERATION_PRESET':'min-p', 'LLAMA_TEMPERATURE':'0.7'})[0] == 0
     print('PASS: generation presets, default omission, numeric validation, aliases and pass-through precedence')
 
-    # Source functions without running initialization, launching or installing traps.
     sources = 'MIR_ROOT=$1; source "$MIR_ROOT/tests/helpers/core.sh"; load_test_core fake\n'
     # Compare resolved controls and paths as well as launch arguments.
     control_values = {'LLAMA_CPP_DIR': str(server_dir), 'MODELS_DIR': str(models),
@@ -482,7 +481,7 @@ initialize_config "$2"
     subprocess.run(['bash','-euo','pipefail','-c',sources+folder_checks,'test',str(root),str(model)],env=env,check=True)
     print('PASS: folder selection memory, hidden folders, parent navigation, invalid paths and cancellation')
 
-    # Drive the complete TUI in a real terminal, using a deterministic dialog queue.
+    # Drive the TUI through a PTY with queued dialog responses.
     for launcher in launchers:
         (work / 'config/mir.cpp/profiles/A profile.conf').unlink(missing_ok=True)
         queue = [[0,'configurations'],[0,'save'],[0,'A profile'],[0,''],[0,'back'],

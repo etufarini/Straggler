@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test-only services use isolated fixture commands, never the host platform.
+# Linux-style test adapter; callers provide command fixtures.
 source "$MIR_ROOT/lib/platform.sh"
 platform_required_tools() { REQUIRED_TOOLS=(curl ss); }
 platform_dependency_hint() { printf 'Missing fixture commands: %s\n' "$*"; }

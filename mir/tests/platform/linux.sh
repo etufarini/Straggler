@@ -18,8 +18,7 @@ check_port
 TEST_LISTENERS='LISTEN 0 128 [::]:9931 [::]:* users:(("server",pid=123,fd=4),("server",pid=123,fd=5),("other",pid=456,fd=6))'
 check_port
 [[ ${PIDS[*]} == '123 456' ]]
-# Keep numeric order and deduplication with multiple lines and process owners
-# hidden on some listeners. Neither grep nor cut is needed to parse the result.
+# Verify sorted, unique PIDs when some listeners hide process details.
 TEST_LISTENERS=$'LISTEN 0 128 [::]:9931 [::]:* users:(("one",pid=20,fd=4),("two",pid=3,fd=5))\nLISTEN 0 128 0.0.0.0:9931 0.0.0.0:* users:(("one",pid=20,fd=6),("three",pid=100,fd=7))\nLISTEN 0 128 127.0.0.1:9931 0.0.0.0:*'
 # shellcheck disable=SC2329 # Guards must fail if these commands are reintroduced.
 (

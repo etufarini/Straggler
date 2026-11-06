@@ -14,7 +14,6 @@ message() { UI_TITLE=Information ui --msgbox "$1" 12 76; }
 
 view_log() { UI_TITLE='Server log' ui --exit-label Back --textbox "$LOG_FILE" 22 80 || true; }
 
-# Keep summaries on one line while retaining both ends of long names.
 compact_text() {
     local text=${1:-Not selected} width=${2:-58}
     text=${text//$'\n'/ }

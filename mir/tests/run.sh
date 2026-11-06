@@ -19,7 +19,6 @@ if [[ "$suite" == common || "$suite" == all ]]; then
     test_scripts=("$MIR_ROOT"/tests/*.sh "$MIR_ROOT"/tests/helpers/*.sh "$MIR_ROOT"/tests/platform/*.sh "$MIR_ROOT"/tests/native/*.sh)
     lint_pid=''
     if command -v shellcheck >/dev/null; then
-        # Static analysis only reads repository files; fixtures use temporary directories.
         shellcheck -x -P "$MIR_ROOT" -P SCRIPTDIR "$MIR_ROOT/mir.sh" "$MIR_ROOT/sh/install.sh" "$MIR_ROOT/sh/build-install.sh" "${test_scripts[@]}" &
         lint_pid=$!
     fi
