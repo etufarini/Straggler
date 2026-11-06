@@ -8,9 +8,6 @@ Install and manage llama.cpp on Linux and macOS through simple terminal menus.
 Choose a local GGUF model, adjust its settings, save configurations and launch
 the chat interface in your browser.
 
-Designed for Linux and macOS users who are comfortable with a terminal and want
-a simple, guided way to set up and run local language models.
-
 Mir.cpp supports Linux with CPU, Vulkan and CUDA builds, and macOS with CPU and Metal.
 CUDA smoke tests passed on RTX 2060/3060 with one llama.cpp build and model;
 compatibility with other configurations depends on the installed build and hardware.
@@ -45,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/etufarini/Mir.cpp/main/mir/sh/insta
 Installs for your user in `~/.local/share/mir.cpp/` and creates
 `~/.local/bin/mir`. Close the launcher and run the same command again to update.
 
-## Start
+## First launch
 
 ```bash
 mir
@@ -53,8 +50,8 @@ mir
 
 If the command is not found, use `~/.local/bin/mir` or add `~/.local/bin` to your PATH.
 
-1. Open **Folders → Install / update llama.cpp** to build CPU/Vulkan/CUDA on Linux
-   or CPU/Metal on macOS. You can also select an existing **llama.cpp folder**.
+1. Open **Folders → Install / update llama.cpp** to build llama.cpp for your platform,
+   or select an existing **llama.cpp folder**.
 2. Choose your **Models folder** in **Folders**. Models can be organized in subfolders.
 3. Choose a GGUF from **Model settings → Model**, then review the settings.
    Start with **Auto** and **Default** values; KV Cache defaults to **Q4_0** for K and V.
