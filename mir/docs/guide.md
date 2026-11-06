@@ -564,7 +564,9 @@ bash mir/tests/run.sh all
 ```
 
 `common` checks architecture, generated installer, Bash syntax, ShellCheck when
-available, configuration/profiles, arguments, memory and real dialog geometry.
+available, configuration, profiles/storage, GGUF discovery, shutdown safety,
+arguments, memory and real dialog geometry. Syntax and lint checks include the
+installer, its canonical sources and the disinstaller.
 `linux` and `macos` add adapter, managed-build and installer fixtures plus native
 checks for the current host. `all` runs all suites. The runner selects compatible
 Bash on macOS. Linux suites need no macOS files or Homebrew; unavailable native
@@ -574,10 +576,13 @@ and macOS.
 Tests require Python 3 and launcher dependencies; geometry checks use real
 `dialog --trace`. Core tests use a fake adapter and isolated commands; adapter
 contracts run in separate Bash processes. Tests use temporary settings and owned
-sockets without loading real models or stopping existing services. For optional
-comparison with an older standalone launcher, run
-`bash mir/tests/regression.sh /path/to/old-launcher.sh`. Direct test scripts need
-Bash 4.4 or newer on PATH.
+sockets without loading real models or stopping existing services. Run individual
+scripts to focus on a failure: `config.sh` covers validation and environment
+precedence, `profiles.sh` persistence and compatibility defaults, `storage.sh`
+write failures and migration, `models.sh` GGUF metadata/discovery, and
+`processes.sh` shutdown confirmations and PID identity. `regression.sh` covers
+complete launcher flows; `portability.sh` covers native capability and argument
+compatibility. Direct test scripts need Bash 4.4 or newer on PATH.
 
 The optional `bash mir/tests/download.sh` network check installs and updates in a
 temporary HOME, checks preserved settings and removes the program if supported

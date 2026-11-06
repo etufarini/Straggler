@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Isolated integration checks; optional argument adds a baseline launcher.
+# End-to-end startup, TUI navigation and owned-server lifecycle checks.
 set -euo pipefail
 TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-python3 -I - "$TEST_ROOT" "${1:-}" <<'PY'
+python3 -I - "$TEST_ROOT" <<'PY'
 import json
 import os
 from pathlib import Path
 import pty
+import signal
 import subprocess
 import shutil
 import sys
@@ -14,11 +15,7 @@ import tempfile
 import time
 
 root = Path(sys.argv[1])
-baseline = sys.argv[2]
-launchers = [root / 'mir.sh']
-assert all(path.is_file() for path in launchers)
-if baseline:
-    launchers.append(Path(baseline).resolve())
+launcher = root / 'mir.sh'
 
 with tempfile.TemporaryDirectory(prefix='mir-regression-') as temporary:
     work = Path(temporary).resolve()
@@ -45,7 +42,6 @@ if [[ ${1:-} == --list-devices ]]; then
     printf 'Available devices:\\n  Vulkan0: Test GPU\\n  Vulkan1: Other GPU\\n'; exit 0
 fi
 if [[ ${1:-} == --help ]]; then
-    echo 'number of server slots (default: 1)'
     echo '--model --port --host --ctx-size --device --threads --gpu-layers --batch-size --ubatch-size --temperature --top-p --top-k --min-p --repeat-penalty --presence-penalty --frequency-penalty --seed --n-predict --cache-type-k --cache-type-v'
     exit 0
 fi
@@ -75,20 +71,19 @@ p.write_text(json.dumps(queue))
 sys.stdout.write(value)
 sys.exit(status)
 ''')
-    env = {k: v for k, v in os.environ.items() if not k.startswith(('LLAMA_', 'MIR_'))}
-    env.update(PATH=str(bin_dir) + ':' + env['PATH'], XDG_CONFIG_HOME=str(work / 'config'),
+    env = {k: v for k, v in os.environ.items() if not k.startswith(('LLAMA_', 'MIR_', 'XDG_'))}
+    (work / 'home').mkdir()
+    env.update(HOME=str(work / 'home'), XDG_DATA_HOME=str(work / 'data'), PATH=str(bin_dir) + ':' + env['PATH'], XDG_CONFIG_HOME=str(work / 'config'),
                LLAMA_CPP_DIR=str(server_dir), LLAMA_MODELS_DIR=str(models),
                TEST_ARGS=str(work / 'args'), TEST_PID=str(work / 'pid'),
                TEST_STOP=str(work / 'stopped'), TEST_BROWSER=str(work / 'browser'),
                TEST_QUEUE=str(work / 'queue'), TEST_DIALOG=str(work / 'dialog.log'), TERM='xterm')
-    def run(launcher, overrides=None, arguments=None):
+    def run(overrides=None, arguments=None, model_path=model):
         args_file = work / 'args'
         args_file.unlink(missing_ok=True)
-        result = subprocess.run(['bash', str(launcher), str(model)] + (arguments or []),
+        result = subprocess.run(['bash', str(launcher), str(model_path)] + (arguments or []),
                                 env=env | (overrides or {}), cwd='/', capture_output=True, timeout=8)
-        error = result.stderr
-        error = error.replace(b'MIR_LLAMA_CPP_DIR', b'LLAMA_CPP_DIR').replace(b'MIR_', b'LLAMA_')
-        return result.returncode, result.stdout, error, args_file.read_bytes() if args_file.exists() else None
+        return result.returncode, result.stdout, result.stderr, args_file.read_bytes() if args_file.exists() else None
     cases = [({}, []), ({'LLAMA_DEVICE':'none', 'LLAMA_GPU_LAYERS':'all'}, []),
              ({'LLAMA_THREADS':'4', 'LLAMA_GPU_LAYERS':'12', 'LLAMA_DEVICE':'Vulkan0',
                'LLAMA_PROMPT_PROCESSING':'large-batch',
@@ -100,27 +95,36 @@ sys.exit(status)
              ({'TEST_LISTENERS':'LISTEN 0 128 0.0.0.0:9931 0.0.0.0:*\n'}, []),
              ({'TEST_EXIT':'7'}, [])]
     for index, (overrides, arguments) in enumerate(cases):
-        results = [run(launcher, overrides, arguments) for launcher in launchers]
-        renamed = {('MIR_LLAMA_CPP_DIR' if key == 'LLAMA_CPP_DIR' else key.replace('LLAMA_', 'MIR_', 1)): value
-                   for key, value in overrides.items()}
-        assert run(root / 'mir.sh', renamed, arguments) == results[0], index
-        assert all(r == results[0] for r in results), (index, results)
-        code, _, error, args = results[0]
+        result = run(overrides, arguments)
+        code, _, error, args = result
         if index < 4:
-            assert code == 0 and args, (index, results)
+            assert code == 0 and args, (index, result)
         elif index < 10:
-            assert code == 1 and args is None and error, (index, results)
+            assert code == 1 and args is None and error, (index, result)
         else:
-            assert code == 7, results
+            assert code == 7, result
         if index == 0:
             assert b'--threads' not in args and b'--gpu-layers' not in args
+            default_args = args.decode().split('\0')
         if index == 1:
             assert b'--gpu-layers\x000\x00' in args
         if index == 2:
             assert args.endswith(b'--ctx-size\x008192\x00--alias\x00a b\x00')
     print('PASS: direct startup, validation, port blocking, argument boundaries and exit status')
 
-    precedence = run(root / 'mir.sh', {'LLAMA_THREADS':'bad', 'MIR_THREADS':'3',
+    disabled = work / 'disabled/bin'
+    disabled.mkdir(parents=True)
+    (disabled / 'llama-server').write_text('#!/bin/sh\nexit 99\n')
+    for overrides, selected, diagnostic in [
+        ({'MIR_LLAMA_CPP_DIR':str(work / 'missing')}, model, b'llama-server not found'),
+        ({'MIR_LLAMA_CPP_DIR':str(disabled.parent)}, model, b'llama-server not found'),
+        ({}, work / 'missing.gguf', b'GGUF model missing or unreadable'),
+    ]:
+        result = run(overrides, model_path=selected)
+        assert result[0] == 1 and result[3] is None and diagnostic in result[2], result
+    print('PASS: missing/non-executable server and missing model block startup before execution')
+
+    precedence = run({'LLAMA_THREADS':'bad', 'MIR_THREADS':'3',
                          'LLAMA_PORT':'bad', 'MIR_PORT':'10001',
                          'LLAMA_DEVICE':'Vulkan0', 'MIR_DEVICE':'none',
                          'LLAMA_HOST':'127.0.0.2', 'MIR_HOST':'127.0.0.1',
@@ -135,248 +139,37 @@ sys.exit(status)
                'exploratory':['1','0.95','20','0','1','0','0'],
                'min-p':['1','1','0','0.05','1','0','0']}
     for preset, values in presets.items():
-        result = run(root / 'mir.sh', {'MIR_GENERATION_PRESET':preset})
+        result = run({'MIR_GENERATION_PRESET':preset})
         assert result[0] == 0, result
         args = result[3].decode().split('\0')[:-1]
         for key, value in zip(sampling, values):
             assert args[args.index('--'+key.replace('_','-'))+1] == value, args
         assert '--seed' not in args and '--n-predict' not in args
-    default_args = run(root / 'mir.sh')[3].decode().split('\0')
     assert all('--'+key.replace('_','-') not in default_args for key in sampling)
     overrides = {'MIR_GENERATION_PRESET':'focused', 'MIR_TEMPERATURE':'0.75',
                  'LLAMA_TEMPERATURE':'bad', 'MIR_SEED':'4294967295', 'MIR_MAX_TOKENS':'1024'}
-    args = run(root / 'mir.sh', overrides, ['--temperature','0.9'])[3].decode().split('\0')[:-1]
+    args = run(overrides, ['--temperature','0.9'])[3].decode().split('\0')[:-1]
     assert args[args.index('--temperature')+1] == '0.75' and args[-2:] == ['--temperature','0.9']
     assert args[args.index('--seed')+1] == '4294967295' and args[args.index('--n-predict')+1] == '1024'
     for key, value in [('TEMPERATURE','nan'), ('TOP_P','1.01'), ('MIN_P','-0.1'), ('TOP_K','1.5'),
                        ('REPEAT_PENALTY','0'), ('PRESENCE_PENALTY','$(touch bad)'),
                        ('FREQUENCY_PENALTY','-0.1234567890'),
                        ('SEED','4294967296'), ('MAX_TOKENS','-2'), ('GENERATION_PRESET','unknown')]:
-        result = run(root / 'mir.sh', {'MIR_'+key:value})
+        result = run({'MIR_'+key:value})
         assert result[0] == 1 and result[3] is None and result[2], (key,value,result)
     explicit = {'TEMPERATURE':'0', 'TOP_P':'1.000', 'MIN_P':'0', 'TOP_K':'0',
                 'REPEAT_PENALTY':'0.01', 'PRESENCE_PENALTY':'-0.5', 'FREQUENCY_PENALTY':'0.2',
                 'SEED':'-1', 'MAX_TOKENS':'0'}
-    result = run(root / 'mir.sh', {'MIR_'+key:value for key,value in explicit.items()})
+    result = run({'MIR_'+key:value for key,value in explicit.items()})
     assert result[0] == 0, result
     args = result[3].decode().split('\0')[:-1]
     for key, value in explicit.items():
         flag = '--n-predict' if key == 'MAX_TOKENS' else '--' + key.lower().replace('_','-')
         assert args[args.index(flag)+1] == value, (key,value,args)
-    assert run(root / 'mir.sh', {'LLAMA_GENERATION_PRESET':'min-p', 'LLAMA_TEMPERATURE':'0.7'})[0] == 0
+    assert run({'LLAMA_GENERATION_PRESET':'min-p', 'LLAMA_TEMPERATURE':'0.7'})[0] == 0
     print('PASS: generation presets, default omission, numeric validation, aliases and pass-through precedence')
 
     sources = 'MIR_ROOT=$1; source "$MIR_ROOT/tests/helpers/core.sh"; load_test_core fake\n'
-    # Compare resolved controls and paths as well as launch arguments.
-    control_values = {'LLAMA_CPP_DIR': str(server_dir), 'MODELS_DIR': str(models),
-                      'CTX_SIZE': '8192', 'PORT': '10002',
-                      'DEVICE': 'none', 'THREADS': '3', 'GPU_LAYERS': '12',
-                      'PROMPT_PROCESSING': 'low-memory', 'HOST': '::1',
-                      'GENERATION_PRESET': 'focused', 'TEMPERATURE': '0.7',
-                      'TOP_P': '0.9', 'TOP_K': '30', 'MIN_P': '0.05',
-                      'REPEAT_PENALTY': '1.1', 'PRESENCE_PENALTY': '-0.2',
-                      'FREQUENCY_PENALTY': '0.2', 'SEED': '42', 'MAX_TOKENS': '2048'}
-    def control_snapshot(overrides):
-        code = sources + '''initialize_config "$2"
-validate_config
-profile_data
-printf '%s\\n' "$LLAMA_CPP_PATH" "$MODELS_DIR" "$SERVER_HOST" "$(generation_preset)"
-'''
-        result = subprocess.run(['bash', '-euo', 'pipefail', '-c', code, 'test', str(root), str(model)],
-                                env=env | overrides, capture_output=True, timeout=8)
-        assert result.returncode == 0, (overrides, result.stderr)
-        return result.stdout
-    for suffix, value in control_values.items():
-        legacy = 'LLAMA_' + ('CPP_DIR' if suffix == 'LLAMA_CPP_DIR' else suffix)
-        expected = control_snapshot({legacy: value})
-        assert control_snapshot({'MIR_' + suffix: value, legacy: 'bad'}) == expected
-    assert run(root / 'mir.sh', {'MIR_THREADS': '', 'LLAMA_THREADS': '4'})[0] == 1
-    assert run(root / 'mir.sh', {'MIR_TEMPERATURE': '', 'LLAMA_TEMPERATURE': '0.7'})[0] == 1
-    literal_checks = r'''
-MIR_HOST=$'$(touch executed)\n'
-read_launcher_control literal HOST default
-[[ "$literal" == "$MIR_HOST" && ! -e executed ]]
-unset MIR_HOST
-MIR_THREADS=3
-initialize_config "$2"
-[[ $THREADS == 3 && ! -v LLAMA_THREADS ]]
-MIR_THREADS=4
-initialize_config "$2"
-[[ $THREADS == 4 && ! -v LLAMA_THREADS ]]
-unset MIR_THREADS
-LLAMA_THREADS=''
-initialize_config "$2"
-[[ $THREADS == auto ]]
-'''
-    subprocess.run(['bash', '-euo', 'pipefail', '-c', sources + literal_checks, 'test', str(root), str(model)],
-                   env=env, cwd=work, check=True)
-    print('PASS: all current/legacy control priorities, explicit empties, literal values and repeat initialization')
-    checks = r'''
-initialize_config "$2"
-validate_config
-save_paths
-LLAMA_CPP_PATH=; MODELS_DIR=
-load_paths
-[[ "$LLAMA_CPP_PATH" == "$LLAMA_CPP_DIR" && "$MODELS_DIR" == "$LLAMA_MODELS_DIR" ]]
-scan_models
-[[ "$MODEL" == "$2" && ${#MODELS[@]} == 1 ]]
-mkdir -p "$PROFILES_DIR"
-write_profile "$PROFILES_DIR/Valid.conf"
-load_profile "$PROFILES_DIR/Valid.conf"
-[[ $(profile_status) == Valid ]]
-THREADS=3
-[[ $(profile_status) == 'Valid (Modified)' ]]
-THREADS=auto
-[[ $(profile_status) == Valid ]]
-# Canceled overwrite and failed atomic replacement preserve file and tracking.
-message() { :; }
-ui() { return 1; }
-original=$(cat "$CURRENT_PROFILE")
-save_profile update
-[[ $(cat "$CURRENT_PROFILE") == "$original" && $(profile_status) == Valid ]]
-mv() { return 1; }
-if write_profile "$CURRENT_PROFILE"; then exit 1; fi
-unset -f mv
-[[ $(cat "$CURRENT_PROFILE") == "$original" && $(profile_status) == Valid ]]
-[[ -z $(find "$PROFILES_DIR" -name '.profile.*' -print) ]]
-before=$(profile_data)
-printf 'threads=bad\n' >> "$PROFILES_DIR/Valid.conf"
-if load_profile "$PROFILES_DIR/Valid.conf"; then exit 1; fi
-[[ $(profile_data) == "$before" && $(profile_status) == Valid ]]
-printf 'llama_dir=$(touch %s)\nmodels_dir=%s\n' "$CONFIG_DIR/executed" "$MODELS_DIR" > "$PATHS_FILE"
-load_paths
-[[ ! -e "$CONFIG_DIR/executed" ]]
-'''
-    subprocess.run(['bash','-euo','pipefail','-c', sources + checks, 'test', str(root), str(model)], env=env, check=True)
-    print('PASS: module loading, saved paths, GGUF discovery, profile tracking and invalid-load rollback')
-
-    generation_checks = r'''
-initialize_config "$2"
-build_model_args
-model_args=$(printf '%s\n' "${MODEL_ARGS[@]}")
-set_generation_preset focused
-GENERATION[seed]=7 GENERATION[max_tokens]=2048
-set_generation_preset min-p
-[[ $(generation_preset) == min-p && ${GENERATION[seed]} == 7 && ${GENERATION[max_tokens]} == 2048 ]]
-build_model_args
-[[ $(printf '%s\n' "${MODEL_ARGS[@]}") == "$model_args" ]]
-write_profile "$PROFILES_DIR/Generation.conf"
-(( $(wc -l < "$PROFILES_DIR/Generation.conf") == 21 ))
-saved=$(profile_data)
-GENERATION[temperature]=0.8
-[[ $(generation_preset) == custom && $(profile_status) == 'Generation (Modified)' ]]
-load_profile "$PROFILES_DIR/Generation.conf"
-[[ $(profile_data) == "$saved" && $(profile_status) == Generation && $(generation_preset) == min-p ]]
-GENERATION[seed]=8
-[[ $(profile_status) == 'Generation (Modified)' ]]
-GENERATION[seed]=7
-[[ $(profile_status) == Generation ]]
-before=$(profile_data)
-for value in 'temperature=nan' 'top_p=2' 'seed=4294967296' 'max_tokens=-2'; do
-    field=${value%%=*}
-    while IFS= read -r line; do
-        if [[ "$line" == "$field="* ]]; then printf '%s\n' "$value"; else printf '%s\n' "$line"; fi
-    done < "$PROFILES_DIR/Generation.conf" > "$PROFILES_DIR/Invalid.conf"
-    if load_profile "$PROFILES_DIR/Invalid.conf"; then exit 1; fi
-    [[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
-done
-# Invalid or canceled edits preserve all saved values and tracking.
-message() { :; }
-ui() { printf 'bad'; }
-before=$(profile_data)
-edit_generation_value temperature
-[[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
-ui() { return 255; }
-edit_generation_value seed
-generation_menu
-[[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
-rm "$PROFILES_DIR/Generation.conf" "$PROFILES_DIR/Invalid.conf"
-'''
-    subprocess.run(['bash','-euo','pipefail','-c',sources+generation_checks,'test',str(root),str(model)],env=env,check=True)
-    print('PASS: current profile saves, Modified tracking, rollback, cancellation and model argument isolation')
-
-    flexible_profiles = r'''
-initialize_config "$2"
-CTX_SIZE=8192 PORT=10001 DEVICE=Vulkan0 THREADS=4 GPU_LAYERS=12
-PROMPT_PROCESSING=large-batch CACHE_TYPE_K=q8_0 CACHE_TYPE_V=f16
-SPLIT_MODE=layer TENSOR_SPLIT=2,1 FIT_TARGET=2048,1024
-set_generation_preset focused
-GENERATION[seed]=42 GENERATION[max_tokens]=1024
-write_profile "$PROFILES_DIR/Complete.conf"
-complete=$(profile_data)
-for field in model context port device threads gpu_layers prompt_processing cache_type_k cache_type_v split_mode tensor_split fit_target "${GENERATION_KEYS[@]}"; do
-    load_profile "$PROFILES_DIR/Complete.conf"
-    before=$(profile_data)
-    tracking=$SAVED_PROFILE
-    while IFS= read -r line; do
-        [[ "$line" == "$field="* ]] || printf '%s\n' "$line"
-    done < "$CURRENT_PROFILE" > "$PROFILES_DIR/Partial.conf"
-    if [[ "$field" == model ]]; then
-        if load_profile "$PROFILES_DIR/Partial.conf"; then exit 1; fi
-        [[ $(profile_data) == "$before" && $SAVED_PROFILE == "$tracking" && $(profile_status) == Complete ]]
-    else
-        case "$field" in port) default=9931 ;; cache_type_k|cache_type_v) default=q4_0 ;; *) default=auto ;; esac
-        expected=$(printf '%s\n' "$complete" | sed "s/^$field=.*/$field=$default/")
-        load_profile "$PROFILES_DIR/Partial.conf"
-        [[ $(profile_data) == "$expected" && $(profile_status) == Partial ]]
-    fi
-    load_profile "$PROFILES_DIR/Complete.conf"
-    # Duplicate recognized fields remain errors even when both values are valid.
-    printf '%s\n' "$complete" > "$PROFILES_DIR/Duplicate.conf"
-    while IFS= read -r line; do
-        if [[ "$line" == "$field="* ]]; then printf '%s\n' "$line"; fi
-    done < "$CURRENT_PROFILE" >> "$PROFILES_DIR/Duplicate.conf"
-    if load_profile "$PROFILES_DIR/Duplicate.conf"; then exit 1; fi
-    [[ $(profile_data) == "$complete" && $SAVED_PROFILE == "$complete" && $(profile_status) == Complete ]]
-done
-# A model-only profile resets every optional control, including environment overrides.
-printf 'model=%s\n' "$2" > "$PROFILES_DIR/Minimal.conf"
-load_profile "$PROFILES_DIR/Minimal.conf"
-[[ $CTX_SIZE == auto && $PORT == 9931 && $DEVICE == auto && $THREADS == auto && $GPU_LAYERS == auto ]]
-[[ $PROMPT_PROCESSING == auto && $CACHE_TYPE_K == q4_0 && $CACHE_TYPE_V == q4_0 ]]
-[[ $SPLIT_MODE == auto && $TENSOR_SPLIT == auto && $FIT_TARGET == auto ]]
-for key in "${GENERATION_KEYS[@]}"; do [[ ${GENERATION[$key]} == auto ]]; done
-defaults=$(profile_data)
-[[ $(profile_status) == Minimal ]]
-# Old and future fields are ignored literally, including duplicate unknown keys.
-printf '%s\n' "$complete" 'removed_control=auto' 'removed_control=off' 'future_control=$(touch executed)' '$(touch executed)=ignored' > "$PROFILES_DIR/Compatible.conf"
-original=$(cat "$PROFILES_DIR/Compatible.conf")
-load_profile "$PROFILES_DIR/Compatible.conf"
-[[ $(profile_data) == "$complete" && $(profile_status) == Compatible && ! -e executed ]]
-[[ $(cat "$CURRENT_PROFILE") == "$original" ]]
-write_profile "$PROFILES_DIR/Resaved.conf"
-[[ $(cat "$CURRENT_PROFILE") == "$complete" ]]
-# Reject malformed input and invalid recognized fields without changing state.
-for value in 'malformed line without separator' 'model=' "model=$2.missing.gguf" 'context=' 'port=' 'device=' 'threads=' 'gpu_layers=' 'prompt_processing=' 'cache_type_k=' 'cache_type_v=' 'split_mode=' 'tensor_split=' 'fit_target=' 'temperature=$(touch executed)'; do
-    field=${value%%=*}
-    while IFS= read -r line; do
-        [[ "$line" == "$field="* ]] || printf '%s\n' "$line"
-    done < "$CURRENT_PROFILE" > "$PROFILES_DIR/Invalid.conf"
-    printf '%s\n' "$value" >> "$PROFILES_DIR/Invalid.conf"
-    if load_profile "$PROFILES_DIR/Invalid.conf"; then exit 1; fi
-    [[ $(profile_data) == "$complete" && $SAVED_PROFILE == "$complete" && $(profile_status) == Resaved && ! -e executed ]]
-done
-# Partial historical layouts also use defaults for the fields they omit.
-sed '/^cache_type_[kv]=/d' "$PROFILES_DIR/Complete.conf" > "$PROFILES_DIR/Partial.conf"
-printf 'removed_control=auto\n' >> "$PROFILES_DIR/Partial.conf"
-load_profile "$PROFILES_DIR/Partial.conf"
-expected=$(printf '%s\n' "$complete" | sed 's/^cache_type_k=.*/cache_type_k=q4_0/; s/^cache_type_v=.*/cache_type_v=q4_0/')
-[[ $(profile_data) == "$expected" && $(profile_status) == Partial ]]
-grep -E '^(model|context|port|device|threads|gpu_layers|prompt_processing)=' "$PROFILES_DIR/Complete.conf" > "$PROFILES_DIR/Partial.conf"
-load_profile "$PROFILES_DIR/Partial.conf"
-[[ $CTX_SIZE == 8192 && $PORT == 10001 && $CACHE_TYPE_K == q4_0 && $CACHE_TYPE_V == q4_0 ]]
-for key in "${GENERATION_KEYS[@]}"; do [[ ${GENERATION[$key]} == auto ]]; done
-printf 'model=%s' "$2" > "$PROFILES_DIR/Minimal.conf"
-load_profile "$PROFILES_DIR/Minimal.conf"
-[[ $(profile_data) == "$defaults" ]]
-'''
-    subprocess.run(['bash','-euo','pipefail','-c',sources+flexible_profiles,'test',str(root),str(model)],
-                   env=env | {'MIR_PORT':'11000', 'MIR_CACHE_TYPE_K':'f32', 'MIR_CACHE_TYPE_V':'q8_0',
-                              'MIR_GENERATION_PRESET':'exploratory', 'LLAMA_ARG_CACHE_TYPE_V':'f16',
-                              'MIR_SPLIT_MODE':'row', 'MIR_TENSOR_SPLIT':'3,1', 'MIR_FIT_TARGET':'4096'},
-                   cwd=work, check=True)
-    print('PASS: flexible profiles, independent defaults, unknown literal fields, current-only saves and atomic load rejection')
-
     summary_checks = r'''
 initialize_config "$2"
 CTX_SIZE=4096
@@ -403,64 +196,6 @@ MODEL=''
     subprocess.run(['bash','-euo','pipefail','-c',sources+summary_checks,'test',str(root),str(model)],env=env,check=True)
     print('PASS: compact summary, long names, Modified visibility and unchanged settings')
 
-    # Migration is isolated from the normal regression settings and never evaluates data.
-    migration_base = work / 'migration config'
-    legacy = migration_base / 'llama-launcher'
-    legacy.mkdir(parents=True)
-    (legacy / 'profiles').mkdir()
-    paths_data = f'llama_dir={server_dir}\nmodels_dir={models}\n'
-    (legacy / 'paths.conf').write_text(paths_data)
-    profile_data = (f'model={model}\ncontext=4096\nport=9931\n'
-                    'device=auto\nthreads=auto\ngpu_layers=auto\nprompt_processing=auto\n'
-                    'cache_type_k=q4_0\ncache_type_v=q4_0\n'
-                    + ''.join(f'{key}=auto\n' for key in [*sampling, 'seed', 'max_tokens'])).encode()
-    (legacy / 'profiles/Old.conf').write_bytes(profile_data)
-    migration_env = {k:v for k,v in env.items() if k not in ('LLAMA_CPP_DIR','LLAMA_MODELS_DIR')}
-    migration_env.update(XDG_CONFIG_HOME=str(migration_base), TEST_SERVER_DIR=str(server_dir), TEST_MODELS_DIR=str(models))
-    migration_check = r'initialize_config "$2"; [[ "$LLAMA_CPP_PATH" == "$TEST_SERVER_DIR" && "$MODELS_DIR" == "$TEST_MODELS_DIR" ]]; load_profile "$PROFILES_DIR/Old.conf"; [[ $(profile_status) == Old ]]'
-    def check_migration(code, success=True):
-        result = subprocess.run(['bash','-euo','pipefail','-c',sources+code,'test',str(root),str(model)],
-                                env=migration_env, capture_output=True)
-        assert (result.returncode == 0) == success, result.stderr
-        return result
-    check_migration(migration_check)
-    imported = migration_base / 'mir.cpp'
-    assert (imported / 'paths.conf').read_text() == paths_data
-    assert (imported / 'profiles/Old.conf').read_bytes() == profile_data
-    assert (legacy / 'paths.conf').read_text() == paths_data
-    (legacy / 'profiles/Later.conf').write_text('not copied after first import')
-    check_migration(migration_check)
-    assert not (imported / 'profiles/Later.conf').exists()
-    shutil.rmtree(imported)
-    failure = check_migration('cp() { return 1; }; initialize_config "$2"', success=False)
-    assert b'Cannot import previous' in failure.stderr and not imported.exists()
-    assert not list(migration_base.glob('.mir-migration.*'))
-    check_migration('mv() { return 1; }; initialize_config "$2"', success=False)
-    assert not imported.exists() and (legacy / 'paths.conf').read_text() == paths_data
-    assert not list(migration_base.glob('.mir-migration.*'))
-    check_migration(migration_check)
-    # Existing Mir.cpp settings win even when the legacy source changes.
-    recent_profile = profile_data.replace(b'context=4096', b'context=8192')
-    (legacy / 'profiles/Old.conf').write_bytes(recent_profile)
-    check_migration(migration_check + '; [[ $CTX_SIZE == 4096 ]]')
-    shutil.rmtree(imported)
-    check_migration(migration_check + '; [[ $CTX_SIZE == 8192 ]]')
-    assert (imported / 'profiles/Old.conf').read_bytes() == recent_profile
-    assert (legacy / 'profiles/Old.conf').read_bytes() == recent_profile
-    shutil.rmtree(imported)
-    # A destination created during activation must also remain untouched.
-    check_migration(r'''mv() {
-    mkdir -p "$CONFIG_DIR"
-    printf existing > "$CONFIG_DIR/Existing"
-    command mv "$@"
-}
-initialize_config "$2"
-[[ $(cat "$CONFIG_DIR/Existing") == existing && ! -e "$PATHS_FILE" ]]
-''')
-    assert sorted(p.name for p in imported.iterdir()) == ['Existing']
-    assert not list(migration_base.glob('.mir-migration.*'))
-    print('PASS: atomic legacy import, unchanged originals, existing-directory precedence and failed-import recovery')
-
     hidden = models / '.hidden'
     hidden.mkdir()
     (work / 'dialog.log').write_text('')
@@ -482,121 +217,96 @@ initialize_config "$2"
     print('PASS: folder selection memory, hidden folders, parent navigation, invalid paths and cancellation')
 
     # Drive the TUI through a PTY with queued dialog responses.
-    for launcher in launchers:
-        (work / 'config/mir.cpp/profiles/A profile.conf').unlink(missing_ok=True)
-        queue = [[0,'configurations'],[0,'save'],[0,'A profile'],[0,''],[0,'back'],
-                 [0,'model'],[0,'context'],[0,'8192'],
-                 *([[0,'generation'],[0,'preset'],[0,'focused'],
-                 [0,'sampling'],[0,'temperature'],[0,'0.7'],[0,'back'],
-                 [0,'seed'],[0,'42'],[0,'max_tokens'],[0,'2048'],[0,'back']] if launcher == root / 'mir.sh' else []),
-                 [0,'back'],
-                 [0,'performance'],[0,'prompt'],[0,'low-memory'],[0,'back'],
-                 [0,'configurations'],[0,'update'],[0,''],[0,''],[0,'back'],
-                 [0,'configurations'],[0,'load'],[0,'0'],
-                 [0,'configurations'],[0,'delete'],[0,'0'],[0,''],[0,'back'],
-                 [0,'server'],[0,'check'],[0,'details'],[0,''],[0,'back'],[0,'launch'],[1,''],[0,''],[0,'']]
-        (work / 'queue').write_text(json.dumps(queue))
-        (work / 'dialog.log').write_text('')
-        (work / 'stopped').unlink(missing_ok=True)
-        master, slave = pty.openpty()
-        process = subprocess.Popen(['bash',str(launcher)], stdin=slave, stdout=slave, stderr=slave,
-                                   env=env | {'TEST_LIVE':'1','TEST_HEALTH':'0'}, cwd='/')
-        os.close(slave)
-        try:
-            process.wait(timeout=8)
-            assert process.returncode == 0
-        finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
-            os.close(master)
-        assert (work / 'stopped').exists(), 'Server was not cleaned up'
-        assert not (work / 'config/mir.cpp/profiles/A profile.conf').exists()
-        assert json.loads((work / 'queue').read_text()) == []
-        log = (work / 'dialog.log').read_text()
-        assert 'View log' in log and 'Ready' in log
-        if launcher == root / 'mir.sh':
-            assert 'MIR.CPP / STATION CONTROL' in log and 'Status     Ready' in log
-            assert 'Est. free' not in log
-            assert 'Free GiB:' in log, log
-            dialogs = [json.loads(line) for line in log.splitlines()]
-            for args in dialogs:
-                assert args.count('MIR.CPP / STATION CONTROL') == 1
-                title = args[args.index('--title')+1].strip()
-                assert title and 'Mir.cpp' not in title and 'STATION CONTROL' not in title
-            menus = [args for args in dialogs if '--menu' in args]
-            model_menus = [args for args in menus if args[args.index('--title')+1] == ' Model settings ']
-            assert model_menus
-            for args in model_menus:
-                index = args.index('--menu')
-                assert args[index+4] == '5'
-                assert args[index+5::2] == ['model','context','cache','generation','back']
-            assert all(args[args.index('--ok-label')+1] == 'Select' for args in menus)
-            for args in menus:
-                cancel = [value for key, value in zip(args, args[1:]) if key == '--cancel-label'][-1]
-                assert cancel == ('Quit' if 'Launch server' in args else 'Back')
-            main = [args for args in menus if 'Launch server' in args]
-            assert [args[args.index('--default-item')+1] for args in main] == [
-                'launch', 'configurations', 'model', 'performance',
-                'configurations', 'configurations', 'configurations', 'server']
-            assert any(args[args.index('--default-item')+1] == 'context' for args in menus)
-            for args in main:
-                assert args[args.index('--title')+1] == ' Main menu '
-                index = args.index('--menu')
-                assert args[index+5::2] == ['launch','model','performance','server','configurations','paths','quit']
-                assert len(args[index+1].splitlines()) == 5
-            assert any('--msgbox' in args and ' Port process details ' in args and '--scrollbar' in args for args in dialogs)
-            assert any('--msgbox' in args and ' Information ' in args for args in dialogs)
-            assert all(args[args.index('--title')+1] == ' Server log ' and '--exit-label' in args
-                       for args in dialogs if '--textbox' in args)
-        args = (work / 'args').read_bytes()
-        assert b'--ctx-size\x008192\x00' in args and b'--batch-size\x00512\x00' in args
-        if launcher == root / 'mir.sh':
-            assert b'--temperature\x000.7\x00' in args and b'--seed\x0042\x00' in args and b'--n-predict\x002048\x00' in args
-        boxes = [json.loads(line) for line in log.splitlines() if '--textbox' in line]
-        assert boxes and not Path(boxes[0][boxes[0].index('--textbox')+1]).exists()
+    (work / 'config/mir.cpp/profiles/A profile.conf').unlink(missing_ok=True)
+    queue = [[0,'configurations'],[0,'save'],[0,'A profile'],[0,''],[0,'back'],
+             [0,'model'],[0,'context'],[0,'8192'],
+             [0,'generation'],[0,'preset'],[0,'focused'],
+             [0,'sampling'],[0,'temperature'],[0,'0.7'],[0,'back'],
+             [0,'seed'],[0,'42'],[0,'max_tokens'],[0,'2048'],[0,'back'],
+             [0,'back'],
+             [0,'performance'],[0,'prompt'],[0,'low-memory'],[0,'back'],
+             [0,'configurations'],[0,'update'],[0,''],[0,''],[0,'back'],
+             [0,'configurations'],[0,'load'],[0,'0'],
+             [0,'configurations'],[0,'delete'],[0,'0'],[0,''],[0,'back'],
+             [0,'server'],[0,'check'],[0,'details'],[0,''],[0,'back'],[0,'launch'],[1,''],[0,''],[0,'']]
+    (work / 'queue').write_text(json.dumps(queue))
+    (work / 'dialog.log').write_text('')
+    (work / 'stopped').unlink(missing_ok=True)
+    (work / 'browser').unlink(missing_ok=True)
+    (work / 'args').unlink(missing_ok=True)
+    master, slave = pty.openpty()
+    process = subprocess.Popen(['bash',str(launcher)], stdin=slave, stdout=slave, stderr=slave,
+                               env=env | {'TEST_LIVE':'1','TEST_HEALTH':'0'}, cwd='/', start_new_session=True)
+    os.close(slave)
+    try:
+        process.wait(timeout=8)
+        assert process.returncode == 0
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=3)
+        os.close(master)
+    assert (work / 'stopped').exists(), 'Server was not cleaned up'
+    assert (work / 'browser').read_text() == 'http://127.0.0.1:9931'
+    assert not (work / 'config/mir.cpp/profiles/A profile.conf').exists()
+    assert json.loads((work / 'queue').read_text()) == []
+    log = (work / 'dialog.log').read_text()
+    assert 'View log' in log and 'Ready' in log
+    assert 'MIR.CPP / STATION CONTROL' in log and 'Status     Ready' in log
+    assert 'Free GiB:' in log, log
+    dialogs = [json.loads(line) for line in log.splitlines()]
+    for args in dialogs:
+        assert args.count('MIR.CPP / STATION CONTROL') == 1
+        title = args[args.index('--title')+1].strip()
+        assert title and 'Mir.cpp' not in title and 'STATION CONTROL' not in title
+    menus = [args for args in dialogs if '--menu' in args]
+    model_menus = [args for args in menus if args[args.index('--title')+1] == ' Model settings ']
+    assert model_menus
+    for args in model_menus:
+        index = args.index('--menu')
+        assert args[index+4] == '5'
+        assert args[index+5::2] == ['model','context','cache','generation','back']
+    assert all(args[args.index('--ok-label')+1] == 'Select' for args in menus)
+    for args in menus:
+        cancel = [value for key, value in zip(args, args[1:]) if key == '--cancel-label'][-1]
+        assert cancel == ('Quit' if 'Launch server' in args else 'Back')
+    main = [args for args in menus if 'Launch server' in args]
+    assert [args[args.index('--default-item')+1] for args in main] == [
+        'launch', 'configurations', 'model', 'performance',
+        'configurations', 'configurations', 'configurations', 'server']
+    assert any(args[args.index('--default-item')+1] == 'context' for args in menus)
+    for args in main:
+        assert args[args.index('--title')+1] == ' Main menu '
+        index = args.index('--menu')
+        assert args[index+5::2] == ['launch','model','performance','server','configurations','paths','quit']
+        assert len(args[index+1].splitlines()) == 5
+    assert any('--msgbox' in args and ' Port process details ' in args and '--scrollbar' in args for args in dialogs)
+    assert any('--msgbox' in args and ' Information ' in args for args in dialogs)
+    assert all(args[args.index('--title')+1] == ' Server log ' and '--exit-label' in args
+               for args in dialogs if '--textbox' in args)
+    args = (work / 'args').read_bytes()
+    assert b'--ctx-size\x008192\x00' in args and b'--batch-size\x00512\x00' in args
+    assert b'--temperature\x000.7\x00' in args and b'--seed\x0042\x00' in args and b'--n-predict\x002048\x00' in args
+    boxes = [json.loads(line) for line in log.splitlines() if '--textbox' in line]
+    assert boxes and not Path(boxes[0][boxes[0].index('--textbox')+1]).exists()
     print('PASS: TUI navigation, settings, readiness, logs, Stop server and temporary-log cleanup')
 
-    for launcher in launchers:
-        (work / 'pid').unlink(missing_ok=True)
-        (work / 'stopped').unlink(missing_ok=True)
-        process = subprocess.Popen(['bash', str(launcher), str(model)], env=env | {'TEST_LIVE':'1'},
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        try:
-            deadline = time.monotonic() + 4
-            while not (work / 'pid').exists() and time.monotonic() < deadline:
-                time.sleep(0.01)
-            assert (work / 'pid').exists()
-            process.terminate()
-            process.communicate(timeout=4)
-            assert process.returncode == 143 and (work / 'stopped').exists()
-        finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
+    (work / 'pid').unlink(missing_ok=True)
+    (work / 'stopped').unlink(missing_ok=True)
+    process = subprocess.Popen(['bash', str(launcher), str(model)], env=env | {'TEST_LIVE':'1'},
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+    try:
+        deadline = time.monotonic() + 4
+        while not (work / 'pid').exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert (work / 'pid').exists()
+        process.terminate()
+        process.communicate(timeout=4)
+        assert process.returncode == 143 and (work / 'stopped').exists()
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=3)
     print('PASS: SIGTERM exit status and owned-server cleanup')
 
-    # Exercise listener safety without sending any operating-system signal.
-    safety = r'''
-initialize_config "$2"
-check_port() { LISTENERS=occupied; PIDS=(999999); PORT_STATUS='Port 9931: IN USE'; }
-message() { :; }
-ps() { printf 'identity\n'; }
-sleep() { :; }
-kill() { printf '%s\n' "$*" >> "$TEST_STOP"; }
-ui() { return 1; }
-stop_listener
-[[ ! -e "$TEST_STOP" ]]
-ui() { [[ "$*" != *SIGKILL* ]]; }
-stop_listener
-[[ $(cat "$TEST_STOP") == '-TERM 999999' ]]
-rm "$TEST_STOP"
-# PID identity changes between confirmation and the signal attempt.
-ui() { ps() { printf 'changed\n'; }; }
-stop_listener
-[[ ! -e "$TEST_STOP" ]]
-'''
-    (work / 'stopped').unlink(missing_ok=True)
-    subprocess.run(['bash','-euo','pipefail','-c',sources+safety,'test',str(root),str(model)],env=env,check=True)
-    print('PASS: canceled shutdown, separate SIGKILL confirmation and reused-PID protection')
 PY

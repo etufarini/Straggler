@@ -13,4 +13,10 @@ if [[ $(uname -s) == Linux ]]; then
     platform_move "$work/source" "$work/target" no-clobber
     [[ -d "$work/source" && $(cat "$work/target/data") == original ]]
     printf 'PASS: native Linux no-clobber activation preserves an existing directory\n'
+    platform_memory_snapshot
+    [[ $RAM_AVAILABLE =~ ^[0-9]+$ ]]
+    total=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
+    (( RAM_AVAILABLE <= total ))
+    [[ $(platform_memory_style) == margins ]]
+    printf 'PASS: native Linux available-RAM snapshot and KiB conversion\n'
 fi

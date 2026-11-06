@@ -117,7 +117,7 @@ ui() { /bin/sleep 0.03; return 5; }
 
     def check(code, overrides=None, success=True, timeout=12):
         result = subprocess.run(['bash', '-euo', 'pipefail', '-c', sources + init + code],
-                                env=env | (overrides or {}), capture_output=True, text=True, timeout=timeout)
+                                env=env | (overrides or {}), cwd=work, capture_output=True, text=True, timeout=timeout)
         assert (result.returncode == 0) == success, (code, result.stdout, result.stderr)
         return result
 
@@ -188,7 +188,7 @@ activate_build "$second"
 
     ui_archive = work / 'ui.tar.gz'
     def make_ui_archive(unsafe=False):
-        with tarfile.open(ui_archive, 'w:gz') as archive:
+        with tarfile.open(ui_archive, 'w:gz', compresslevel=1) as archive:
             entries = {'llama-v1/index.html':b'<html>UI release v1</html>'}
             if unsafe:
                 entries[str(work / 'escaped-ui')] = b'unsafe'
@@ -291,56 +291,62 @@ done
 ''', {slow:'1', 'TEST_PROCESS_NAME':name})
     print('PASS: confirmed cancellation stops both compiler and server probes and preserves paths')
 
-    (work / 'worker.pid').unlink()
-    (work / 'worker.stopped').unlink()
-    process = subprocess.Popen(['bash', '-euo', 'pipefail', '-c', sources + init + 'install_build interrupted cpu 2'],
-                               env=env | {'TEST_SLOW':'1'}, start_new_session=True,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    deadline = time.monotonic() + 5
-    while not (work / 'worker.pid').exists() and time.monotonic() < deadline:
-        time.sleep(0.02)
-    assert (work / 'worker.pid').exists()
-    os.killpg(process.pid, signal.SIGTERM)
-    process.communicate(timeout=5)
-    deadline = time.monotonic() + 3
-    while not (work / 'worker.stopped').exists() and time.monotonic() < deadline:
-        time.sleep(0.02)
-    assert (work / 'worker.stopped').exists()
-    print('PASS: launcher termination stops its detached compiler process group')
-
-    (work / 'worker.pid').unlink()
-    (work / 'worker.stopped').unlink()
-    process = subprocess.Popen(['bash', '-euo', 'pipefail', '-c', sources + init + 'install_build interrupted cpu 2'],
-                               env=env | {'TEST_SLOW':'1', 'TEST_PS_RACE':'1'}, start_new_session=True,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    worker_group = None
-    try:
-        deadline = time.monotonic() + 5
-        while not all((work / name).exists() for name in ('worker.pid', 'ps-started')) and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert (work / 'ps-started').exists() and (work / 'worker.pid').exists()
-        worker_group = os.getpgid(int((work / 'worker.pid').read_text()))
-        os.killpg(process.pid, signal.SIGTERM)
-        process.communicate(timeout=5)
-        deadline = time.monotonic() + 3
-        while not (work / 'worker.stopped').exists() and time.monotonic() < deadline:
-            time.sleep(0.02)
-        assert (work / 'worker.stopped').exists()
-    finally:
-        if worker_group:
-            try: os.killpg(worker_group, signal.SIGTERM)
-            except ProcessLookupError: pass
-        if process.poll() is None:
+    # Both interruption timings share cleanup, including assertion/timeout failures.
+    for race in (False, True):
+        for name in ('worker.pid', 'worker.stopped', 'ps-started'):
+            (work / name).unlink(missing_ok=True)
+        process = subprocess.Popen(['bash', '-euo', 'pipefail', '-c', sources + init + 'install_build interrupted cpu 2'],
+                                   env=env | {'TEST_SLOW':'1', 'TEST_PS_RACE':str(int(race))},
+                                   start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        worker_group = None
+        try:
+            expected = ('worker.pid', 'ps-started') if race else ('worker.pid',)
+            deadline = time.monotonic() + 5
+            while not all((work / name).exists() for name in expected) and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert all((work / name).exists() for name in expected), expected
+            worker_group = os.getpgid(int((work / 'worker.pid').read_text()))
             os.killpg(process.pid, signal.SIGTERM)
             process.communicate(timeout=5)
-    print('PASS: deterministic SIGTERM during initial worker identity lookup')
+            deadline = time.monotonic() + 3
+            while not (work / 'worker.stopped').exists() and time.monotonic() < deadline:
+                time.sleep(0.02)
+            assert (work / 'worker.stopped').exists()
+        finally:
+            if worker_group:
+                try:
+                    os.killpg(worker_group, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            if process.poll() is None:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=3)
+        print('PASS: launcher SIGTERM stops its worker' + (' during initial identity lookup' if race else ''))
 
-    check('''metadata="$LLAMA_CPP_PATH/mir-build.conf"
+    check(r'''metadata="$LLAMA_CPP_PATH/mir-build.conf"
 cp "$metadata" "$TEST_WORK/metadata"
-printf 'format=1\ntag=$(touch %s)\n' "$TEST_WORK/executed" > "$metadata"
+for invalid in format=2 'tag=$(touch executed)' commit=invalid backend=unknown previous=../outside; do
+    field=${invalid%%=*}
+    while IFS= read -r line; do
+        if [[ $line == "$field="* ]]; then printf '%s\n' "$invalid";
+        else printf '%s\n' "$line"; fi
+    done < "$TEST_WORK/metadata" > "$metadata"
+    if read_build "$LLAMA_CPP_PATH"; then exit 1; fi
+    [[ ! -e executed ]]
+done
+for extra in 'tag=duplicate' 'future=value' 'malformed'; do
+    cp "$TEST_WORK/metadata" "$metadata"
+    printf '%s\n' "$extra" >> "$metadata"
+    if read_build "$LLAMA_CPP_PATH"; then exit 1; fi
+done
+sed '/^previous=/d' "$TEST_WORK/metadata" > "$metadata"
 if read_build "$LLAMA_CPP_PATH"; then exit 1; fi
-[[ ! -e "$TEST_WORK/executed" ]]
+rm -- "$metadata"
+ln -s "$TEST_WORK/metadata" "$metadata"
+if read_build "$LLAMA_CPP_PATH"; then exit 1; fi
+rm -- "$metadata"
 cp "$TEST_WORK/metadata" "$metadata"
+read_build "$LLAMA_CPP_PATH"
 if read_build "$LLAMA_CPP_PATH/../../builds/${LLAMA_CPP_PATH##*/}"; then exit 1; fi
 latest_build_tag() { printf b2; }
 ui() { return 0; }
@@ -352,7 +358,7 @@ platform_ensure_dependencies() { return 0; }
 build_menu
 ''')
     assert 'already the latest' in (work / 'messages').read_text()
-    print('PASS: data-only metadata, contained managed paths and current-release menu')
+    print('PASS: metadata fields/structure/symlinks, contained managed paths and current-release menu')
 
     if adapter != 'linux':
         print('PASS: macOS managed CPU/Metal builds, update/restore and worker cancellation fixtures')

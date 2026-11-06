@@ -17,15 +17,12 @@ for file in [root/'sh/install-core.sh', *sorted((root/'lib').glob('*.sh')), *sor
         continue
     text = file.read_text()
     assert not re.search(r'\bis_macos\b|\bDarwin\b|\bHomebrew\b|/proc/|\b(?:gfind|gmv|gtimeout|netstat|lsof|xdg-open)\b', text), file
-for file in (root/'tests').rglob('*.sh'):
-    if file.name == 'architecture.sh':
-        continue
-    assert not re.search(r'sources\s*=.*rglob', file.read_text()), file
 with tempfile.TemporaryDirectory(prefix='mir-architecture-') as temporary:
     work = Path(temporary)
     (work/'lib/platform').mkdir(parents=True)
-    for name in ('runtime.sh', 'platform.sh'):
-        (work/'lib'/name).symlink_to(root/'lib'/name)
+    for source in (root/'lib').glob('*.sh'):
+        (work/'lib'/source.name).symlink_to(source)
+    (work/'lib/tui').symlink_to(root/'lib/tui', target_is_directory=True)
     (work/'lib/platform/linux.sh').symlink_to(root/'lib/platform/linux.sh')
     # Omit macOS files so accidental imports fail.
     command = '''source "$1/lib/runtime.sh"
@@ -36,12 +33,16 @@ MIR_ROOT=$1
 configure_runtime
 [[ "$PLATFORM_ID" == linux && "$RUNTIME_BASH" == "$BASH" ]]
 load_platform "$PLATFORM_ID"
+source "$1/lib/launcher.sh"
+load_launcher_modules
 platform_required_tools
 [[ ${REQUIRED_TOOLS[*]} == 'curl ss' ]]
 load_platform linux
 if load_platform macos; then exit 1; fi
 [[ "$PLATFORM_LOADED" == linux ]]
 if load_platform '../unexpected'; then exit 1; fi
+uname() { printf 'Unsupported-test-OS\\n'; }
+if configure_runtime check; then exit 1; fi
 '''
     result = subprocess.run(['bash','-euo','pipefail','-c',command,'test',str(work)],
                             capture_output=True,text=True,timeout=5,env=os.environ)

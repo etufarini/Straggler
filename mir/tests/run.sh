@@ -9,27 +9,56 @@ export PATH="${BASH%/*}:$PATH"
 suite=${1:-all}
 case "$suite" in common|linux|macos|all) ;; *) printf 'Usage: bash mir/tests/run.sh [common|linux|macos|all]\n' >&2; exit 1 ;; esac
 if (( $# > 1 )); then exit 1; fi
+lint_pids=()
+finish_lint() {
+    local pid status=0
+    for pid in "${lint_pids[@]}"; do wait "$pid" || status=1; done
+    lint_pids=()
+    return "$status"
+}
+trap finish_lint EXIT
 lint_adapter() {
     "$BASH" -n "$MIR_ROOT/lib/platform/$1.sh"
     if command -v shellcheck >/dev/null; then shellcheck "$MIR_ROOT/lib/platform/$1.sh"; fi
 }
-run() { printf '\nChecking %s\n' "$1"; "$BASH" "$MIR_ROOT/tests/$1" "${@:2}"; }
+run() {
+    printf '\nChecking %s\n' "$1"
+    if ! "$BASH" "$MIR_ROOT/tests/$1" "${@:2}"; then
+        printf 'FAIL: %s\n' "$1" >&2
+        return 1
+    fi
+}
 if [[ "$suite" == common || "$suite" == all ]]; then
     run architecture.sh
     test_scripts=("$MIR_ROOT"/tests/*.sh "$MIR_ROOT"/tests/helpers/*.sh "$MIR_ROOT"/tests/platform/*.sh "$MIR_ROOT"/tests/native/*.sh)
-    lint_pid=''
+    source_scripts=("$MIR_ROOT/mir.sh" "$MIR_ROOT"/lib/*.sh "$MIR_ROOT"/lib/tui/*.sh "$MIR_ROOT"/sh/*.sh)
     if command -v shellcheck >/dev/null; then
-        shellcheck -x -P "$MIR_ROOT" -P SCRIPTDIR "$MIR_ROOT/mir.sh" "$MIR_ROOT/sh/install.sh" "$MIR_ROOT/sh/build-install.sh" "${test_scripts[@]}" &
-        lint_pid=$!
+        # Follow modules from the entry point so lint sees their shared state.
+        # Two bounded groups avoid serially repeating module analysis per test.
+        lint_files=("$MIR_ROOT/mir.sh" "$MIR_ROOT"/sh/*.sh "${test_scripts[@]}")
+        first=(); second=()
+        for index in "${!lint_files[@]}"; do
+            if (( index % 2 )); then second+=("${lint_files[index]}");
+            else first+=("${lint_files[index]}"); fi
+        done
+        shellcheck -x -P "$MIR_ROOT" -P SCRIPTDIR "${first[@]}" &
+        lint_pids+=("$!")
+        shellcheck -x -P "$MIR_ROOT" -P SCRIPTDIR "${second[@]}" &
+        lint_pids+=("$!")
+    else
+        printf 'SKIP: ShellCheck is not installed\n'
     fi
-    for file in "$MIR_ROOT/mir.sh" "$MIR_ROOT"/lib/*.sh "$MIR_ROOT"/lib/tui/*.sh "$MIR_ROOT/sh/install.sh" "${test_scripts[@]}"; do "$BASH" -n "$file"; done
+    for file in "${source_scripts[@]}" "${test_scripts[@]}"; do "$BASH" -n "$file"; done
     run config.sh
+    run profiles.sh
     run storage.sh
+    run models.sh
+    run processes.sh
     run regression.sh
     run portability.sh
     run memory.sh
     run tui.sh
-    if [[ -n "$lint_pid" ]]; then wait "$lint_pid"; fi
+    finish_lint
 fi
 if [[ "$suite" == linux || "$suite" == all ]]; then
     lint_adapter linux
