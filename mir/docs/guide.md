@@ -124,8 +124,8 @@ settings. These paths apply to all profiles and direct startup.
 ## Build and update llama.cpp
 
 Open **Folders → Install / update llama.cpp → Install / change build**. Managed
-backends are CPU, Vulkan and CUDA on Linux, or CPU and Metal on macOS. CUDA still
-needs validation on NVIDIA hardware. Other builds and backends can be selected
+backends are CPU, Vulkan and CUDA on Linux, or CPU and Metal on macOS. CUDA has
+limited NVIDIA hardware smoke coverage, recorded below. Other builds can be selected
 through **llama.cpp folder**; available devices come from the installed server.
 
 ![llama.cpp setup menu with install, update, restore and build log controls](screenshots/llama-setup.png)
@@ -285,6 +285,16 @@ leave room for other GPU applications:
   native fitting. The numbers follow the displayed device order; recheck them
   after changing devices. With Auto devices, use native `--list-devices` order.
 
+Advertised modes can still fail at runtime. In the tested CUDA build b12177,
+**Row** failed with `does not support split buffers`; **Tensor** did not implement
+automatic fitting and ran out of memory on unequal GPUs without explicit
+proportions. Tensor worked with proportions suited to those devices. These are
+results for that build and model, not rules for other versions or hardware.
+Start with Auto; if a manual mode fails, review the server log and try Auto or
+Layer. Explicit proportions or GPU layers can restrict native fitting, so a
+memory margin alone cannot make them safe. Mir.cpp does not replace native fitting
+or impose backend- or model-specific placement rules.
+
 The checklist is offered only on Linux when at least two distinct native device
 names report positive capacity and valid free memory. Missing or zero-capacity
 entries do not count; a failed probe hides the controls. Existing selections keep
@@ -404,7 +414,12 @@ MIR_DEVICE=none MIR_THREADS=4 MIR_PROMPT_PROCESSING=low-memory \
 
 GPU memory controls override `LLAMA_ARG_SPLIT_MODE`, `LLAMA_ARG_TENSOR_SPLIT`
 and `LLAMA_ARG_FIT_TARGET`, respectively. **Auto** leaves those native settings
-in effect; empty values are invalid. Margins and proportion integer parts are
+in effect; empty values are invalid. llama.cpp can reject malformed native
+environment values before reading overriding command-line options; correct or
+unset those values first. Pass native options and their values as separate
+arguments (for example `--split-mode layer`); not all builds accept
+`--split-mode=layer`. Mir.cpp preserves explicit trailing arguments for the server
+to interpret. Margins and proportion integer parts are
 limited to 2147483647; proportions allow up to nine fractional digits. The
 [GPU memory panel](#gpu-memory) explains device order and TUI visibility.
 For two discovered devices:
@@ -598,5 +613,22 @@ removal behavior.
 Automated fixtures and native OS checks do not establish GPU inference coverage.
 Recorded Apple M4 smoke checks used Auto, CPU only and explicit Metal with
 `stories260K.gguf`, covering health, Web UI, completion and shutdown. They do not
-establish performance, large-model capacity or Intel Mac coverage. NVIDIA CUDA
-hardware validation remains pending.
+establish performance, large-model capacity or Intel Mac coverage.
+
+CUDA smoke checks on 2026-11-06 used Ubuntu 26.04.1, NVIDIA driver 615.71.09,
+CUDA toolkit 12.4, RTX 2060 (6 GiB) and RTX 3060 (12 GiB), llama.cpp b12177
+(`6c01da6278ab6c69ed67d9124806b50d2b299ba7`) and
+`gemma_4_26b_a4b_it_qat_ud_q4_k_xl.gguf`. Single-GPU inference passed on each
+card with native CPU offload as needed. Multi-GPU Auto and Layer passed, including
+reversed device order with corresponding proportions and margins. Tensor passed
+with explicit 2:1 proportions; without them it exhausted the smaller GPU and
+exited 134. Row failed because this CUDA backend lacked split buffers.
+
+Checks covered health, short completion/chat requests, Web UI HTTP delivery,
+JavaScript delivery on the Single-GPU and Layer cases, shutdown and resource
+release after success and failure. Automatic context fitting also passed a short
+chat request, choosing 26880 tokens; a full-context workload was not tested.
+GPU allocations returned to baseline and listening ports were released.
+Interactive browser use, sustained workloads, performance benchmarks, other
+NVIDIA configurations and other models were not verified. These checks do not
+establish universal CUDA or Multi-GPU compatibility.

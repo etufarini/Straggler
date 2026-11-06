@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
 memory_available() {
+    local device=${EFFECTIVE_DEVICE:-$DEVICE}
     platform_memory_snapshot
     declare -gA DEVICE_FREE=()
     GPU_DEVICE_NAMES=()
-    if [[ $(platform_memory_style) == margins && "$DEVICE" != none ]]; then server_devices || true; fi
+    if [[ $(platform_memory_style) == margins && "$device" != none ]]; then server_devices || true; fi
 }
 
 memory_gib() {
@@ -23,6 +24,7 @@ memory_width() {
 
 memory_line() {
     local width=${1:-$(memory_width)} prefix='Free GiB:' line item name value index start gpu=0 hidden=0
+    local device=${EFFECTIVE_DEVICE:-$DEVICE}
     local -a items=()
     [[ "$width" =~ ^[0-9]{1,3}$ ]] || width=72
     (( width >= 16 )) || width=16
@@ -37,13 +39,13 @@ memory_line() {
     fi
     items+=("RAM $value")
     for name in "${GPU_DEVICE_NAMES[@]}"; do
-        [[ "$DEVICE" != none ]] || break
+        [[ "$device" != none ]] || break
         gpu=$((gpu + 1))
         item=GPU
         if (( ${#GPU_DEVICE_NAMES[@]} > 1 )); then item="GPU$gpu"; fi
         items+=("$item $(memory_gib "${DEVICE_FREE[$name]}")")
     done
-    if [[ "$DEVICE" == none ]]; then items+=('GPU off');
+    if [[ "$device" == none ]]; then items+=('GPU off');
     elif (( gpu == 0 )); then items+=('GPU N/A'); fi
     line=$prefix
     start=$(( ${MEMORY_PAGE:-0} % ${#items[@]} ))

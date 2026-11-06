@@ -61,6 +61,9 @@ number of server slots (default: 1)'''
 if [[ ${1:-} == --help ]]; then printf '%s\\n' "$TEST_HELP"; exit "${TEST_HELP_EXIT:-0}"; fi
 if [[ ${1:-} == --list-devices ]]; then printf '%s\\n' "$TEST_DEVICES"; exit "${TEST_DEVICE_EXIT:-0}"; fi
 printf '%s\\0' "$@" > "$TEST_ARGS"
+# Inject native startup failures without duplicating llama.cpp's parser.
+if [[ -n ${TEST_START_ERROR:-} ]]; then printf '%s\\n' "$TEST_START_ERROR" >&2; fi
+if [[ ${TEST_START_EXIT:-0} != 0 ]]; then exit "$TEST_START_EXIT"; fi
 if [[ ${TEST_LIVE:-0} == 1 ]]; then
     trap 'exit 0' TERM
     while true; do /bin/sleep 0.02; done
@@ -142,18 +145,25 @@ if valid_device "$DEVICE"; then exit 1; fi
     result, args = launch()
     for flag in ['--split-mode', '--tensor-split', '--fit-target']:
         assert flag not in args
-    gpu_controls = {'SPLIT_MODE':('layer','--split-mode'),
-                    'TENSOR_SPLIT':('2.5,1','--tensor-split'),
-                    'FIT_TARGET':('2048,1024','--fit-target')}
-    for key, (value, flag) in gpu_controls.items():
+    gpu_controls = {'SPLIT_MODE':('layer','--split-mode','row'),
+                    'TENSOR_SPLIT':('2.5,1','--tensor-split','1,2'),
+                    'FIT_TARGET':('2048,1024','--fit-target','512')}
+    for key, (value, flag, native) in gpu_controls.items():
         result, args = launch({'MIR_'+key:value})
         assert result.returncode == 0 and args[args.index(flag)+1] == value, result.stderr
         result, args = launch({'LLAMA_ARG_'+key:value})
         assert result.returncode == 0 and flag not in args
         result, args = launch({'MIR_'+key:'auto', 'LLAMA_ARG_'+key:value})
         assert result.returncode == 0 and flag not in args
-        result, args = launch({'MIR_'+key:value, 'LLAMA_ARG_'+key:'invalid'})
+        result, args = launch({'MIR_'+key:value, 'LLAMA_ARG_'+key:native})
         assert result.returncode == 0 and args[args.index(flag)+1] == value
+        # Native parsers may reject malformed environment values before CLI
+        # overrides. Construction alone cannot establish successful startup.
+        error = 'error while handling environment variable "LLAMA_ARG_'+key+'"'
+        result, args = launch({'MIR_'+key:value, 'LLAMA_ARG_'+key:'invalid',
+                               'TEST_START_EXIT':'1', 'TEST_START_ERROR':error})
+        assert result.returncode == 1 and error in result.stderr
+        assert args[args.index(flag)+1] == value
         result, args = launch({'MIR_'+key:value, 'MIR_DEVICE':'none', 'TEST_HELP':help_text.replace(flag,'--unavailable')})
         assert result.returncode == 0 and flag not in args and args[args.index('--gpu-layers')+1] == '0'
         result, args = launch({'MIR_'+key:value, 'TEST_HELP':help_text.replace(flag,'--unavailable')})
@@ -164,12 +174,17 @@ if valid_device "$DEVICE"; then exit 1; fi
     result, args = launch({'MIR_TENSOR_SPLIT':'0,1', 'MIR_FIT_TARGET':'0'})
     assert result.returncode == 0, result.stderr
     for arguments in [['-sm','row','-ts','1,2','-fitt','1024'],
-                      ['--split-mode=row','--tensor-split=1,2','--fit-target=1024']]:
+                      ['--split-mode','row','--tensor-split','1,2','--fit-target','1024']]:
         check('''initialize_config "$2"
 validate_config
 prepare_server ''' + ' '.join(arguments) + '''
 [[ $EFFECTIVE_SPLIT_MODE == row ]]
 ''', {'MIR_SPLIT_MODE':'tensor', 'MIR_TENSOR_SPLIT':'2,1', 'MIR_FIT_TARGET':'2048'})
+    # b12177 rejects the equals form; pass it through unchanged and surface
+    # the server's failure rather than claiming universal native support.
+    error = 'error: invalid argument: --split-mode=row'
+    result, args = launch({'TEST_START_EXIT':'1', 'TEST_START_ERROR':error}, ['--split-mode=row'])
+    assert result.returncode == 1 and error in result.stderr and args[-1] == '--split-mode=row'
     for arguments in [['-ts'], ['--fit-target'], ['--split-mode','bogus']]:
         result, args = launch(arguments=arguments)
         assert result.returncode != 0 and not args, arguments
@@ -308,7 +323,7 @@ help=$'--cache-type-k TYPE\n  allowed values: f16, q4_0,\n                  cust
         assert result.returncode != 0 and not args, key
         result, args = launch({'MIR_CACHE_TYPE_'+key:'unavailable'})
         assert result.returncode != 0 and not args and 'not advertised' in result.stderr
-    for arguments in [['-ctk','q8_0','-ctv','f16'], ['--cache-type-k=q8_0','--cache-type-v=f16']]:
+    for arguments in [['-ctk','q8_0','-ctv','f16'], ['--cache-type-k','q8_0','--cache-type-v','f16']]:
         result, args = launch({'MIR_CACHE_TYPE_K':'unavailable'}, arguments)
         assert result.returncode == 0 and 'KV cache: K q8_0 | V f16' in result.stdout, result.stderr
     result, args = launch(arguments=['--alias','--cache-type-v'])
@@ -363,7 +378,7 @@ select_cache_type K "$CACHE_TYPE_K"
     assert args[-6:] == ['--port','10001', '--host','::1', '--alias','two words']
     result, _ = launch({'TEST_BUSY_PORT':'10001'}, ['--port','10001'])
     assert result.returncode != 0 and 'IN USE' in result.stderr and not (work / 'args').exists()
-    result, _ = launch({'TEST_BUSY_PORT':'9931'}, ['--port=10002','--host=0.0.0.0'])
+    result, _ = launch({'TEST_BUSY_PORT':'9931'}, ['--port','10002','--host','0.0.0.0'])
     assert result.returncode == 0 and 'http://127.0.0.1:10002' in result.stdout
     result, _ = launch(arguments=['--alias','--port','--lora-scaled','--host','1'])
     assert result.returncode == 0 and 'http://127.0.0.1:9931' in result.stdout, result
