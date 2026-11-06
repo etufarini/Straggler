@@ -1,14 +1,14 @@
 # Mir.cpp user guide
 
 For platform support, installation and first launch, see the [README](../../README.md).
-This guide covers configuration, maintenance and development.
+This guide covers configuration, advanced controls, maintenance and development.
 
 ## Dependencies and source startup
 
-The installer asks before installing missing launcher packages through apt on
-Ubuntu/Debian or Homebrew on macOS, including with `curl | bash`. Refusal, failure
-or a missing terminal preserves the existing installation. Only apt operations
-may use sudo; Mir.cpp and managed llama.cpp builds run as your user.
+The installer offers missing launcher packages through apt on Ubuntu/Debian or
+Homebrew on macOS, including with `curl | bash`. Approval requires a terminal;
+refusal or dependency failure keeps the existing installation. Only apt may use
+sudo; the launcher and managed builds run as your user.
 
 For manual installation on Ubuntu/Debian:
 
@@ -19,24 +19,22 @@ sudo apt-get install bash curl ca-certificates coreutils findutils grep \
 ```
 
 Bash 4.4 or newer is required. `xdg-utils` enables automatic browser opening;
-otherwise open the displayed address manually. Assisted installation does not
-remove packages or upgrade the system. Other Linux distributions need equivalent
-packages installed manually.
+otherwise open the displayed address manually. Assisted installation uses
+`apt-get update` and `apt-get install --no-remove`, without a system upgrade.
+Other Linux distributions need equivalent packages installed manually.
 
-On macOS, install Homebrew separately, then install launcher packages manually if
-preferred:
+On macOS, install Homebrew separately. For manual launcher dependencies:
 
 ```bash
 brew install bash coreutils findutils dialog flock
 ```
 
-On macOS, the installer can start with system Bash 3.2 and may ask to install
-compatible Bash before the other packages. Source and installed-command startup
-only check dependencies. Homebrew is discovered through `brew --prefix` or its
-standard Apple Silicon/Intel locations. Its bin directory is added only within
-Mir.cpp, preserving command precedence and leaving the login shell and shell
-files unchanged. Installing packages through Homebrew uses neither sudo nor an
-explicit update.
+The macOS installer starts with system Bash 3.2 and offers compatible Bash before
+other missing packages. Source and installed-command startup only check
+dependencies. Mir.cpp discovers Homebrew through `brew --prefix` or standard
+Apple Silicon/Intel locations and appends its bin directory to the process PATH,
+preserving command precedence. Your login shell and shell files stay unchanged.
+Package installation through Homebrew uses neither sudo nor an explicit update.
 
 To run from a source checkout, keep the whole `mir/` folder together:
 
@@ -44,9 +42,8 @@ To run from a source checkout, keep the whole `mir/` folder together:
 bash mir/mir.sh
 ```
 
-Run this command from the repository root; module lookup is independent of the
-working directory. Python 3 is optional for GGUF filtering, but required by the
-managed build workflow for release metadata.
+This example runs from the repository root; module lookup works from any working
+directory. Python 3 is optional for GGUF filtering and required for managed builds.
 
 ## Using the menu
 
@@ -68,17 +65,15 @@ Long names are shortened only for display. All seven actions fit an 80×24 termi
 | Folders | Manage llama.cpp builds and select llama.cpp and models folders. |
 | Quit | Exit the launcher. |
 
-The theme in `dialogrc` applies only to Mir.cpp. Colors and font follow your
-terminal; status is also shown in text. Dialog windows recenter when resized.
-Inherited `LINES`, `COLUMNS` and `DIALOGOPTS` are ignored only for dialog calls so
-external sizing options cannot displace the menus.
+The theme applies only to Mir.cpp; colors and font follow your terminal. Status
+is also shown in text, and dialog windows recenter when resized.
 
 ### Defaults and compatibility
 
 **Auto** and **Default** omit the corresponding launcher arguments, leaving native
-llama.cpp settings in effect. K/V cache types default to **Q4_0** and are always
-passed explicitly. Model support, context limits and memory requirements depend
-on the installed llama.cpp build and hardware.
+llama.cpp settings in effect. KV Cache has explicit defaults described below.
+Model support, context limits and memory requirements depend on the model,
+installed llama.cpp build and hardware.
 
 Before launch, Mir.cpp checks requested controls against server help and checks
 explicit devices when discovery succeeds. Unsupported choices produce an error;
@@ -92,30 +87,27 @@ conversations.
 
 ## Folders and model discovery
 
-Open **Folders → llama.cpp folder** or **Models folder**. The browser displays the
-current path, folder actions and alphabetically sorted directories. **Enter**
-opens the highlighted directory; **Parent folder** goes up one level. **Enter
-path** accepts a typed or pasted path, including spaces and `~/`. Navigation alone
-does not save: choose **Use this folder** to confirm. **Back/Esc** cancels.
+Open **Folders → llama.cpp folder** or **Models folder**. The browser shows the
+current path and alphabetically sorted directories. **Enter** opens a directory;
+**Parent folder** goes up; **Enter path** accepts typed or pasted paths, including
+spaces and `~/`. **Show hidden folders / Hide hidden folders** toggles dot-prefixed
+directories, hidden initially; manual paths can always access them. Choose
+**Use this folder** to save, or **Back/Esc** to cancel.
 
-Dot-prefixed folders are hidden initially. **Show hidden folders** and **Hide
-hidden folders** toggle their display; manual paths can always access them.
 Select a readable folder. The llama.cpp folder must contain executable
 `build/bin/llama-server` or `bin/llama-server`; the source-build layout takes
 precedence. For a Homebrew build, select the path from `brew --prefix llama.cpp`.
 
-The models folder is searched recursively for GGUF files. File symlinks and a
-linked root folder work; linked subfolders are not traversed. With Python 3, a
-bounded metadata reader filters recognized projectors, adapters and continuation
-parts of split models. Select the first part and keep the others alongside it.
-Unknown or unreadable metadata stays listed for llama.cpp to handle. Without
-Python, all discovered GGUF files are shown.
+GGUF discovery is recursive. File symlinks and a linked root folder work; linked
+subfolders are not traversed. Optional, bounded Python 3 metadata filtering hides
+recognized projectors, adapters and continuation parts of split models. Select
+the first part and keep the others alongside it. Unknown or unreadable metadata
+stays listed; without Python, all discovered GGUF files are shown.
 
-Changing the models folder refreshes discovery, retaining the selected model if
-still listed or selecting the first available model. Empty folders are accepted
-with a message; select the folder again after adding files. Missing paths or
-models can be corrected in the menu. Launching requires an executable server and
-a readable model.
+Changing the folder refreshes discovery, keeping the selected model if still
+listed or selecting the first available one. Empty folders are accepted with a
+message; select the folder again after adding files. Correct missing paths or
+models in the menu. Launch requires an executable server and readable model.
 
 Accepted paths are saved atomically in
 `${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/paths.conf`. A failed save keeps previous
@@ -124,9 +116,8 @@ settings. These paths apply to all profiles and direct startup.
 ## Build and update llama.cpp
 
 Open **Folders → Install / update llama.cpp → Install / change build**. Managed
-backends are CPU, Vulkan and CUDA on Linux, or CPU and Metal on macOS. CUDA has
-limited NVIDIA hardware smoke coverage, recorded below. Other builds can be selected
-through **llama.cpp folder**; available devices come from the installed server.
+backends are CPU, Vulkan and CUDA on Linux, or CPU and Metal on macOS. Select
+other builds through **llama.cpp folder**; device discovery uses that server.
 
 ![llama.cpp setup menu with install, update, restore and build log controls](screenshots/llama-setup.png)
 
@@ -146,42 +137,36 @@ for platform requirements.
 On macOS, run `xcode-select --install` and complete Apple's command line tools
 setup first. Mir.cpp checks the compiler tools and macOS SDK, then offers missing
 CMake, Python 3 and GNU timeout through Homebrew. It does not install Homebrew or
-change the developer directory. CPU builds disable Metal; Metal builds must
-expose an accelerator before activation. Device availability depends on the Mac,
-SDK and llama.cpp release.
+change the developer directory. CPU builds disable Metal; Metal uses GPU support
+built into macOS. Availability depends on the Mac, SDK and llama.cpp release.
 
-Package installation temporarily replaces the menu with terminal confirmation
-and output, including sudo authentication on Linux if needed. Press **Enter**
-after success, failure or cancellation to return. No handoff occurs when all
-dependencies are present.
+When packages are missing, the menu gives way to terminal confirmation and output,
+including sudo authentication on Linux if needed. Press **Enter** afterward to
+return, including after failure or cancellation.
 
-Choose **Latest published release** or **Specific release tag**, then 1–64
-compiler jobs (default 2). Latest can include pre-releases and does not imply
-stable. More jobs use more RAM; they do not change inference threads.
-Each build records the selected tag's commit in a new directory. Downloaded Web UI
-assets must match that release and its SHA-256 digest; missing or mismatched
-assets block activation. Releases with bundled UI assets use those instead.
+Choose **Latest published release** (including pre-releases) or **Specific release
+tag**, then 1–64 compiler jobs (default 2). More jobs use more RAM without changing
+inference threads. Each build records the tag's commit in a new directory. Web UI
+assets are bundled or downloaded for that release with SHA-256 verification;
+missing or mismatched assets block activation.
 
 **View log** shows build output. **Cancel build** or **Esc** asks before
 cancellation; a lock prevents concurrent managed builds. Before activation,
 Mir.cpp checks version/help, device discovery and Web UI assets. GPU builds
 require an accelerator. These checks do not validate inference or model capacity.
 
-A successful build saves its path for both menu and direct startup. Failure or
+A successful build saves its path for menu and direct startup; failure or
 cancellation keeps the previous selection. **Check for updates** offers the latest
-published release for the current managed backend; **Install / change build** lets
-you change backend or version.
-**Restore previous build** selects the preceding managed build after confirmation,
-offline and without rebuilding. External source trees, models, profiles and
-browser settings are preserved.
+published release for the current managed backend. **Restore previous build**
+selects the preceding managed build after confirmation, offline and without
+rebuilding. External source trees, models, profiles and browser settings are kept.
 
 Builds are retained under
 `${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/llama.cpp/builds/`, each with source,
 build tree and `mir-build.conf`. Failed builds are removed. **View build log**
 opens `llama.cpp/build.log`, retained until the next attempt. When reclaiming disk
-space, keep builds referenced by saved paths or running sessions. Launcher
-updates and removal preserve managed builds and system dependency packages.
-Use the same `XDG_DATA_HOME` to manage them later.
+space, keep builds referenced by saved paths or running sessions. Use the same
+`XDG_DATA_HOME` to manage them later; see maintenance for launcher removal.
 
 ## Model settings
 
@@ -226,58 +211,63 @@ Open **Model settings → Generation → Preset**:
 | Min-P | 1 | 1 (disabled) | 0 (disabled) | 0.05 |
 | Custom | Edit individual sampling values | | | |
 
-The three explicit presets set repeat penalty to 1 and presence/frequency
+The three explicit presets also set repeat penalty to 1 and presence/frequency
 penalties to 0. They are manual starting points, with no model-family detection
 or quality guarantee. Applying one preserves context, performance, seed and output
-length. The label follows the exact sampling values; other combinations show
-**Custom**.
+length. The label reflects sampling values; other combinations show **Custom**.
 
 **Sampling parameters** edits all seven values. Temperature controls randomness;
 Top-P, Top-K and Min-P filter token choices. Penalties can reduce repetition but
 also harm useful repeated text. Lower temperature does not guarantee accuracy.
-Use **auto** for native defaults. Numeric fields accept integers or, where
-allowed, decimals with a leading digit, a dot and up to nine fractional digits.
-Ranges appear in the [command-line reference](#advanced-command-line-use).
+Accepted numbers and **auto** values are listed in the
+[generation control reference](#generation-controls).
 
-**Seed** accepts **auto**, **-1** or 0–4294967295; -1 and 4294967295 select random.
-A fixed seed helps comparisons but does not guarantee identical results across
-hardware or settings. **Maximum output tokens** accepts **auto**, **-1** for no
-fixed generation limit, or 0–2147483647. Zero evaluates input without generating
-an answer. This limit is separate from context; short limits can truncate output.
-
-To follow these defaults in browser chat, use the Web UI's server-default
-sampling settings. If the server rejects an option, inspect **View log**, update
-llama.cpp or return that field to **auto**.
+**Seed** controls random sampling; a fixed seed helps comparisons but does not
+guarantee identical results across hardware or settings. **Maximum output tokens**
+is separate from context; short limits can truncate output. To follow these
+presets in browser chat, choose the Web UI's server-default sampling settings.
 
 ## Performance
 
-Start with **Auto** and **Default** under **Performance**:
+Open **Performance** to configure execution:
 
 | Option | Behavior |
 | --- | --- |
-| Device | **Auto**, **CPU only**, a discovered device, or **Select multiple devices** on Linux when at least two devices report usable memory. Auto can already use multiple GPUs. Space selects devices in the checklist; Enter applies, Back/Esc cancels. CPU only disables GPU layers. |
+| Device | **Auto**, **CPU only**, a discovered device, or **Select multiple devices** on eligible Linux builds (see below). Auto can already use multiple GPUs. CPU only disables GPU layers. |
 | CPU threads | **auto** or 1–2147483647. More threads are not always faster. |
 | GPU layers | **auto**, **all**, or 0–2147483647. Auto leaves native defaults in effect; all can exceed memory. CPU only shows **Ignored (CPU only)** and retains the chosen value for other devices. |
 | Prompt processing | **Default** omits batch overrides. **Low memory** uses `--batch-size 512 --ubatch-size 128`; **Large batch** uses `--batch-size 2048 --ubatch-size 1024`. |
-| GPU memory | Linux only, with multiple usable devices active or selected through Auto. Controls split mode, relative GPU proportions and memory margin; all default to **Auto**. |
+| GPU memory | Split mode, relative GPU proportions and memory margin; see below for availability. |
 
 Batch sizes affect input processing, not answer length. Larger batches need more
 memory and do not guarantee faster generation. CPU and GPU can share memory on
-integrated graphics. Flash Attention stays automatic. Compare changes using the
-same model, context and input; try Auto/Default or a smaller context if loading fails.
+integrated graphics. Flash Attention stays under native control. Compare changes
+using the same model, context and input; try Auto/Default or a smaller context if
+loading fails.
 
 ### GPU memory
 
-This panel is optional. Keep Auto unless you need to correct placement or
-leave room for other GPU applications:
+Multiple-device selection is available only on Linux when at least two distinct
+native device names report positive capacity and valid free memory. Failed probes
+and missing or zero-capacity entries do not qualify. In the checklist, **Space**
+selects devices, **Enter** applies and **Back/Esc** cancels. Existing selections
+keep their order, followed by new devices in discovery order. Different backend
+names do not establish whether devices are physically distinct.
+
+The GPU memory panel requires multiple eligible devices active, including through
+Auto. While hidden, saved values are kept but the TUI omits their launcher
+arguments. Direct startup and native arguments remain available. Other performance
+controls and all model settings are available on macOS.
+
+All three controls default to **Auto**, preserving native settings:
 
 - **Memory margin (MiB)** sets the free-memory target used by llama.cpp's automatic
   fitting (`--fit-target`). One integer applies to every device; a comma-separated
   list sets margins in device order, for example `2048,1024`. This is not a limit
   on process RAM or a guarantee of free VRAM. It has no effect when native fitting
   is disabled and cannot make a fixed configuration fit by itself.
-- **Split mode** offers modes advertised by the selected build: layer distribution,
-  row distribution and experimental tensor parallelism where available. Model and
+- **Split mode** offers modes advertised by the selected build: single GPU, layer
+  distribution, row distribution and experimental tensor parallelism. Model and
   backend restrictions still apply. No mode guarantees a speed improvement.
 - **GPU proportions** passes relative weights to `--tensor-split`, for example
   `2,1`, not GiB or fixed memory reservations. Values must be nonnegative, with at
@@ -285,27 +275,11 @@ leave room for other GPU applications:
   native fitting. The numbers follow the displayed device order; recheck them
   after changing devices. With Auto devices, use native `--list-devices` order.
 
-Advertised modes can still fail at runtime. In the tested CUDA build b12177,
-**Row** failed with `does not support split buffers`; **Tensor** did not implement
-automatic fitting and ran out of memory on unequal GPUs without explicit
-proportions. Tensor worked with proportions suited to those devices. These are
-results for that build and model, not rules for other versions or hardware.
-Start with Auto; if a manual mode fails, review the server log and try Auto or
-Layer. Explicit proportions or GPU layers can restrict native fitting, so a
-memory margin alone cannot make them safe. Mir.cpp does not replace native fitting
-or impose backend- or model-specific placement rules.
-
-The checklist is offered only on Linux when at least two distinct native device
-names report positive capacity and valid free memory. Missing or zero-capacity
-entries do not count; a failed probe hides the controls. Existing selections keep
-their order, followed by new devices in discovery order. Native lists cannot tell
-whether different backends expose the same physical GPU.
-
-The GPU memory panel requires multiple eligible devices active. It is hidden on
-macOS or with CPU only. While hidden, its saved values are kept but the TUI omits
-its launcher arguments. Direct startup and native arguments remain available.
-llama.cpp checks model/backend restrictions at startup. The other performance
-controls and all model settings remain available on macOS.
+Advertised modes can still fail at runtime; see the
+[recorded CUDA limitations](#cuda). If a manual mode fails, inspect the log and
+try Auto or Layer. Explicit proportions or GPU layers can restrict native fitting;
+a memory margin alone cannot make them safe. Mir.cpp leaves fitting and runtime
+model/backend checks to llama.cpp.
 
 ## Saved configurations
 
@@ -319,58 +293,53 @@ After selecting a model and settings, open **Saved configurations**:
 | Delete configuration | Remove a profile after confirmation. Current settings are kept. |
 
 Names allow 1–80 letters, digits, spaces, dots, underscores or hyphens, starting
-with a letter or digit. Profiles are saved only through **Save as new
-configuration** or **Update current**. Loading or saving sets the session's
-current profile. **Modified** appears only when values differ from the saved
-ones; deleting the current profile changes its label to **Not saved**.
+with a letter or digit. Loading or saving sets the session's current profile;
+**Modified** means its values have changed. Save changes explicitly; deleting the
+current profile changes its label to **Not saved**.
 
-Profiles are plain `key=value` files under
-`${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/profiles/`; back up this folder to retain
-them. New saves contain the current settings: model, context, port, device,
-threads, GPU layers, prompt processing, K/V cache types, GPU split mode,
-proportions, memory margin and nine generation values.
-Loading ignores unknown or removed fields. Only the model path is required.
-Missing settings use launcher defaults: port 9931, Q4_0 for both cache types and
-Auto for the remaining controls, independently of current settings or environment
-overrides. Invalid or duplicate recognized fields, malformed lines and missing
-models reject the entire load, keeping current settings unchanged. Saved devices
-and cache types are checked against the current server before launch. Loading
-does not rewrite the file; saving again writes only currently supported fields.
+Back up `${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/profiles/` to retain profiles.
+Each plain `key=value` file saves model, context, port, device, threads, GPU layers,
+prompt processing, K/V cache types, split mode, proportions, memory margin and
+the nine generation values. Conversations, trailing arguments and unrelated
+environment settings are excluded. Folder paths are separate, though changing
+the selected model through folder discovery can mark a profile **Modified**.
 
-Profiles exclude conversations, trailing arguments and unrelated environment
-settings. Global folder paths are stored separately; changing the models folder
-can still mark a profile Modified if it changes the selected model.
+Only the model path is required when loading. Missing settings use port 9931,
+Q4_0 for both caches and Auto for other controls, independently of current values
+or environment overrides. Unknown or removed fields are ignored. Invalid or
+duplicate recognized fields, malformed lines or missing models reject the entire
+load without changing current settings. Devices and cache types are checked
+against the server before launch. Loading never rewrites the file; saving writes
+only current fields.
 
 ## Running and stopping the server
 
-After launch, the screen shows **Loading**, then **Ready** when the health check
-succeeds. The browser opens at the displayed address, normally
-`http://127.0.0.1:9931`. Open it manually if needed. **View log** shows server
-output; **Stop server** stops the server and exits the launcher. Closing the
-browser leaves the server running. Server logs are temporary and removed on exit.
+Launch shows **Loading**, then **Ready** when the health check succeeds, and opens
+the browser at the displayed address, normally `http://127.0.0.1:9931`. Open it
+manually if needed. **View log** shows temporary server output, removed on exit.
+**Stop server** stops the server and exits Mir.cpp; closing the browser leaves it
+running.
 
 ### Live memory
 
-The running server screen shows **Free GiB**. On Linux it reports available system
-RAM and native device memory; **+N** indicates pools available through **Next memory**.
-Device numbers follow discovery order. CPU only shows **GPU off**. Missing or
-malformed measurements show **N/A** and never block server controls.
+**Free GiB** shows available system RAM and, on Linux, native device memory in
+discovery order. **+N** marks pools accessible through **Next memory**; CPU only
+shows **GPU off**. Missing or malformed readings show **N/A** without blocking controls.
 
-On macOS the line shows approximate available system RAM with a `~` marker, using
-native `vm_stat` free, inactive and speculative pages and the reported page size,
-following [psutil's available-memory calculation](https://github.com/giampaolo/psutil/blob/master/psutil/arch/osx/mem.c).
+On macOS, `~` marks approximate available system RAM: `vm_stat` free, inactive
+and speculative pages multiplied by the reported page size, following
+[psutil's available-memory calculation](https://github.com/giampaolo/psutil/blob/master/psutil/arch/osx/mem.c).
 
-These readings do not guarantee a model will fit or prevent swapping. The line
-omits RSS, pressure, swap, total RAM and device budgets. Mir.cpp does not monitor
-utilization, record conversations or upload telemetry. llama.cpp retains its
-native automatic memory fitting.
+Readings do not guarantee fitting or prevent swapping, and omit RSS, pressure,
+swap, total RAM and device budgets. Mir.cpp neither records conversations nor
+uploads telemetry; llama.cpp retains automatic memory fitting.
 
 ### Occupied ports
 
-The default port is `9931`. **Server & port** checks listeners and offers process
-IDs, owners and names when available. **View process details** and shutdown
-confirmations support **Up/Down** scrolling. An unidentified listener still blocks
-launch; choose another port if it cannot be inspected or stopped.
+**Server & port** checks listeners and offers process IDs, owners and names when
+available. **View process details** and shutdown confirmations support **Up/Down**
+scrolling. An unidentified listener still blocks launch; choose another port if
+it cannot be inspected or stopped.
 
 **Stop process using port** first asks before SIGTERM. If listeners remain, a
 separate confirmation is required for SIGKILL. Identity checks reduce the risk of
@@ -387,8 +356,10 @@ MIR_CTX_SIZE=8192 MIR_PORT=9931 \
     ~/.local/bin/mir "/path/to/model.gguf"
 ```
 
-Saved folders apply to direct startup; override them for one invocation with
-`MIR_LLAMA_CPP_DIR` and `MIR_MODELS_DIR`.
+### Server and performance controls
+
+Saved folders apply to direct startup. Use the following environment controls to
+override settings for an invocation:
 
 | Control | Accepted values; default |
 | --- | --- |
@@ -413,35 +384,30 @@ MIR_DEVICE=none MIR_THREADS=4 MIR_PROMPT_PROCESSING=low-memory \
 ```
 
 GPU memory controls override `LLAMA_ARG_SPLIT_MODE`, `LLAMA_ARG_TENSOR_SPLIT`
-and `LLAMA_ARG_FIT_TARGET`, respectively. **Auto** leaves those native settings
-in effect; empty values are invalid. llama.cpp can reject malformed native
-environment values before reading overriding command-line options; correct or
-unset those values first. Pass native options and their values as separate
-arguments (for example `--split-mode layer`); not all builds accept
-`--split-mode=layer`. Mir.cpp preserves explicit trailing arguments for the server
-to interpret. Margins and proportion integer parts are
-limited to 2147483647; proportions allow up to nine fractional digits. The
-[GPU memory panel](#gpu-memory) explains device order and TUI visibility.
-For two discovered devices:
+and `LLAMA_ARG_FIT_TARGET`, respectively; **auto** leaves those native values in
+effect. Margins and proportion integer parts are limited to 2147483647;
+proportions allow up to nine fractional digits. The [GPU memory panel](#gpu-memory)
+explains device order and TUI visibility. For two devices from `--list-devices`,
+substitute your build's names in this example:
 
 ```bash
 MIR_DEVICE=CUDA0,CUDA1 MIR_TENSOR_SPLIT=2,1 MIR_FIT_TARGET=2048 \
     ~/.local/bin/mir "/path/to/model.gguf"
 ```
 
-Use device names from your build, not the example names if they differ.
-
 Cache types fall back to the respective native `LLAMA_ARG_CACHE_TYPE_K` and
-`LLAMA_ARG_CACHE_TYPE_V` values, then `q4_0` when unset. Empty values are invalid.
-For example, use matching Q8_0 caches:
+`LLAMA_ARG_CACHE_TYPE_V` values, then `q4_0` when unset. For matching Q8_0 caches:
 
 ```bash
 MIR_CACHE_TYPE_K=q8_0 MIR_CACHE_TYPE_V=q8_0 \
     ~/.local/bin/mir "/path/to/model.gguf"
 ```
 
-`MIR_GENERATION_PRESET` accepts `default`, `focused`, `exploratory` or `min-p`.
-Individual controls override its values; each accepts `auto`:
+### Generation controls
+
+`MIR_GENERATION_PRESET` accepts `default`, `focused`, `exploratory` or `min-p`,
+using the values in the [preset table](#generation-settings). Individual controls
+override preset values; all accept `auto`:
 
 | Control | Numeric values |
 | --- | --- |
@@ -450,20 +416,18 @@ Individual controls override its values; each accepts `auto`:
 | `MIR_TOP_K` | Integer from 0 to 2147483647. |
 | `MIR_REPEAT_PENALTY` | Positive decimal. |
 | `MIR_PRESENCE_PENALTY`, `MIR_FREQUENCY_PENALTY` | Signed decimal. |
-| `MIR_SEED`, `MIR_MAX_TOKENS` | Ranges described under Generation settings. |
+| `MIR_SEED` | Integer from 0 to 4294967295, or -1; -1 and 4294967295 select random. |
+| `MIR_MAX_TOKENS` | Integer from 0 to 2147483647, or -1 for no fixed generation limit; 0 evaluates input without generating an answer. |
 
-Decimal integer parts are limited to 2147483647 in magnitude. For example:
+Decimals need a leading digit, a dot and at most nine fractional digits; integer
+parts are limited to 2147483647 in magnitude. For example:
 
 ```bash
 MIR_GENERATION_PRESET=focused MIR_TEMPERATURE=0.7 MIR_MAX_TOKENS=2048 \
     ~/.local/bin/mir "/path/to/model.gguf"
 ```
 
-Arguments after the model path pass unchanged to llama.cpp and can override
-launcher choices. Use them for capabilities beyond the menus, such as
-`--mmproj /path/to/projector.gguf`, `--embedding` or `--rerank` with a suitable
-model and build. Follow the model author's component and template requirements;
-these options are not inferred from filenames or saved in profiles.
+### Native arguments and precedence
 
 Legacy `LLAMA_*` launcher aliases remain supported: replace the `MIR_` prefix
 with `LLAMA_`, except `MIR_LLAMA_CPP_DIR` maps to `LLAMA_CPP_DIR` and the cache
@@ -472,19 +436,37 @@ and GPU memory controls use the native variables described above. Explicit
 values retain fallback defaults for paths and basic controls; empty individual
 generation aliases are invalid. Native `LLAMA_ARG_*` variables remain unchanged.
 
+Empty cache-type and GPU memory controls are invalid. llama.cpp can reject
+malformed native environment values before reading overriding command-line
+options; correct or unset those values first.
+
+Arguments after the model path pass unchanged to llama.cpp and can override
+launcher choices. Pass options and values separately, for example
+`--split-mode layer`; not all builds accept `--split-mode=layer`. Use native
+arguments for features beyond the menus, such as `--mmproj /path/to/projector.gguf`,
+`--embedding` or `--rerank` with a suitable model and build. Follow the model
+author's component and template requirements; these options are neither inferred
+from filenames nor saved in profiles.
+
 Endpoint checks, readiness and browser opening follow effective `--host` and
 `--port` arguments, including IPv6. Wildcard binds use a local browser address.
 A socket-only bind is checked through curl without opening a browser. Direct
 startup reports an occupied TCP port and exits; use the TUI to manage listeners.
 Stop a direct session with **Ctrl+C**.
 
-## Update, remove and recover
+## Maintenance and recovery
+
+### Launcher updates
 
 Close the launcher and rerun the README's curl command to update. Files and Bash
 syntax are checked in a temporary folder before activation; failures preserve
 the active installation. Success removes old managed releases and interrupted
 staging folders; cleanup failures leave the new copy active with a warning.
 Reinstalling repairs a managed wrapper but refuses an unrelated existing `mir`.
+The installer downloads `main`; publishing a tag or prerelease does not change
+what this command installs. llama.cpp updates are separate, under **Folders**.
+
+### Storage and migration
 
 | Data | Location |
 | --- | --- |
@@ -494,11 +476,13 @@ Reinstalling repairs a managed wrapper but refuses an unrelated existing `mir`.
 | Paths and profiles | `${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/` |
 | Managed llama.cpp builds and log | `${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/llama.cpp/` |
 
-If Mir.cpp settings do not yet exist, startup imports `llama-launcher` from the
-same configuration parent using a temporary copy and atomic activation. Originals
-are preserved; existing Mir.cpp settings are never merged or overwritten. Import
-failure stops startup with an error; correct permissions and retry. Configuration
-files are read as data, never sourced or evaluated.
+If Mir.cpp settings do not yet exist, startup imports the previous `llama-launcher`
+configuration from the same parent through a temporary copy and atomic activation.
+Originals are kept; existing Mir.cpp settings are never merged or overwritten.
+Import failure stops startup; correct permissions and retry. Configuration files
+are read as data, never sourced or evaluated.
+
+### Removal
 
 To remove the installed launcher, stop its server and close it, then run:
 
@@ -507,18 +491,16 @@ mir --uninstall
 ```
 
 Confirm with `y` or `yes`; Enter cancels. Use `mir --uninstall --yes` without a
-prompt, or `~/.local/bin/mir --uninstall` if the command is not on PATH. Older
-installations may need an update to gain this command. Removal uses paths recorded
-at installation, independent of later HOME/XDG changes. It preserves models,
-llama.cpp builds, saved settings, dependency packages and unrelated files.
-It verifies the command ownership marker and target before removal and does not
-stop a running launcher or server.
+prompt, or `~/.local/bin/mir --uninstall` if the command is not on PATH. Removal
+uses paths recorded at installation, independent of later HOME/XDG changes, and
+checks command ownership and target. Models, llama.cpp builds, settings, dependency
+packages and unrelated files are kept. It does not stop running launchers or servers.
 
-Installation and removal share a nonblocking `flock` lock, released on exit or
-interruption. The small `.install.flock` file and containing directories remain
-for reuse; legacy `.install.lock` directories are ignored. Permission failures
-never trigger sudo; correct permissions and retry, or reinstall to repair a
-partial removal.
+Installation and removal share a nonblocking `flock` lock. If another operation
+holds it, retry when that operation finishes. The lock is released on exit or
+interruption; `.install.flock` and its containing directories remain for reuse.
+Permission failures never trigger sudo; correct permissions and retry, or
+reinstall to repair a partial removal.
 
 ## Common problems
 
@@ -530,6 +512,8 @@ partial removal.
 - **Device error:** check the selected server with `/path/to/llama.cpp/build/bin/llama-server --list-devices` (or `bin/llama-server` for package layouts). For Vulkan, also check `vulkaninfo --summary`. Try **Auto** or **CPU only** under **Performance**.
 
 ## Development and checks
+
+### Modules and platform contract
 
 `mir/mir.sh` is the source entry point. `runtime.sh` detects the OS and selects
 Bash; only macOS loads the Bash 3.2-compatible Homebrew bootstrap. `platform.sh`
@@ -545,6 +529,9 @@ paths resolve from `MIR_ROOT`. Never recursively source every shell file.
 | `lib/build.sh`, `lib/gguf.py` | Managed releases and optional GGUF metadata filtering. |
 | `lib/tui/`, `dialogrc` | Navigation, terminal geometry and theme. |
 | `tests/helpers/`, `tests/platform/`, `tests/native/` | Isolated helpers, adapter fixtures and real OS checks. |
+
+Dialog calls isolate `DIALOGRC`, `LINES`, `COLUMNS` and `DIALOGOPTS` from the rest
+of the process; geometry overrides never affect the user's environment.
 
 Modules define functions without side effects on import. Shared logic does not
 choose OS commands, invoke Homebrew or parse native process data. Adapters expose
@@ -564,6 +551,8 @@ stay shared. Listener inspection failures return failure; missing
 optional probes do not block startup. Atomic moves accept source, destination
 and `replace` or `no-clobber`. `load_platform` accepts `linux` or `macos` and rejects
 mixing adapters.
+
+### Automated checks
 
 Run suites from the repository root:
 
@@ -590,6 +579,13 @@ comparison with an older standalone launcher, run
 `bash mir/tests/regression.sh /path/to/old-launcher.sh`. Direct test scripts need
 Bash 4.4 or newer on PATH.
 
+The optional `bash mir/tests/download.sh` network check installs and updates in a
+temporary HOME, checks preserved settings and removes the program if supported
+by the published version. It tests GitHub `main`, which can differ from the
+checkout; local installer fixtures cover local removal behavior.
+
+### Generated installer
+
 The standalone `mir/sh/install.sh` is generated. Edit `install-core.sh`, the
 canonical bootstrap or adapters, then regenerate and commit the bundle:
 
@@ -604,25 +600,36 @@ Generation needs Bash 4.4 or newer; on macOS use
 and remains compatible with Bash 3.2 bootstrap. Installed runtime files include
 only the selected adapter. Users need no generation step.
 
-The optional `bash mir/tests/download.sh` network check installs and updates in a
-temporary HOME using real GitHub downloads, checks preserved settings and removes
-the program if that published version supports removal. It tests published
-`main`, which can differ from the checkout; local installer fixtures cover local
-removal behavior.
+## Recorded hardware checks
 
-Automated fixtures and native OS checks do not establish GPU inference coverage.
+These are earlier results, not checks rerun for every documentation or launcher
+change. Automated fixtures and native OS checks do not establish GPU inference
+coverage; results apply only to the recorded configurations.
+
+### Metal
+
 Recorded Apple M4 smoke checks used Auto, CPU only and explicit Metal with
 `stories260K.gguf`, covering health, Web UI, completion and shutdown. They do not
-establish performance, large-model capacity or Intel Mac coverage.
+establish performance, large-model capacity or Intel Mac coverage. The original
+record does not identify the macOS or llama.cpp version.
 
-CUDA smoke checks on 2026-11-06 used Ubuntu 26.04.1, NVIDIA driver 615.71.09,
-CUDA toolkit 12.4, RTX 2060 (6 GiB) and RTX 3060 (12 GiB), llama.cpp b12177
-(`6c01da6278ab6c69ed67d9124806b50d2b299ba7`) and
-`gemma_4_26b_a4b_it_qat_ud_q4_k_xl.gguf`. Single-GPU inference passed on each
-card with native CPU offload as needed. Multi-GPU Auto and Layer passed, including
-reversed device order with corresponding proportions and margins. Tensor passed
-with explicit 2:1 proportions; without them it exhausted the smaller GPU and
-exited 134. Row failed because this CUDA backend lacked split buffers.
+### CUDA
+
+Recorded smoke checks on 2026-11-06 used:
+
+| Component | Tested configuration |
+| --- | --- |
+| System | Ubuntu 26.04.1, NVIDIA driver 615.71.09, CUDA toolkit 12.4 |
+| GPUs | RTX 2060 (6 GiB) and RTX 3060 (12 GiB) |
+| llama.cpp | b12177, commit `6c01da6278ab6c69ed67d9124806b50d2b299ba7` |
+| Model | `gemma_4_26b_a4b_it_qat_ud_q4_k_xl.gguf` |
+
+| Mode | Result for this build and model |
+| --- | --- |
+| Single GPU | Inference passed on each card, with native CPU offload as needed. |
+| Multi-GPU Auto and Layer | Passed, including reversed device order with corresponding proportions and margins. |
+| Tensor (experimental) | Passed with explicit 2:1 proportions. Automatic fitting was not implemented; without proportions it exhausted the smaller GPU and exited 134. |
+| Row | Failed with `does not support split buffers`. |
 
 Checks covered health, short completion/chat requests, Web UI HTTP delivery,
 JavaScript delivery on the Single-GPU and Layer cases, shutdown and resource
@@ -631,4 +638,4 @@ chat request, choosing 26880 tokens; a full-context workload was not tested.
 GPU allocations returned to baseline and listening ports were released.
 Interactive browser use, sustained workloads, performance benchmarks, other
 NVIDIA configurations and other models were not verified. These checks do not
-establish universal CUDA or Multi-GPU compatibility.
+establish universal CUDA or multi-GPU compatibility.
