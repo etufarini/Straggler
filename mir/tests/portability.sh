@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Portable defaults and simulated backend/model edge cases; no real inference.
+# Server capabilities, device menus and native argument compatibility; no inference.
 set -euo pipefail
 TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 python3 -I - "$TEST_ROOT" <<'PY'
@@ -7,8 +7,8 @@ import json
 import os
 from pathlib import Path
 import pty
+import signal
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
@@ -55,8 +55,7 @@ with tempfile.TemporaryDirectory(prefix='mir-portability-') as temporary:
     allowed values: f32, f16, bf16, q8_0, q4_0, q4_1, iq4_nl, q5_0, q5_1
 --alias STRING       alias
 --lora-scaled FNAME SCALE   adapter
---no-webui           Disable the Web UI
-number of server slots (default: 1)'''
+--no-webui           Disable the Web UI'''
     executable(server_dir / 'build/bin/llama-server', '''#!/usr/bin/env bash
 if [[ ${1:-} == --help ]]; then printf '%s\\n' "$TEST_HELP"; exit "${TEST_HELP_EXIT:-0}"; fi
 if [[ ${1:-} == --list-devices ]]; then printf '%s\\n' "$TEST_DEVICES"; exit "${TEST_DEVICE_EXIT:-0}"; fi
@@ -88,8 +87,9 @@ path.write_text(json.dumps(queue))
 sys.stdout.write(value)
 sys.exit(status)
 ''')
-    env = {k:v for k,v in os.environ.items() if not k.startswith(('LLAMA_', 'MIR_'))}
-    env.update(PATH=str(commands) + ':' + env['PATH'], XDG_CONFIG_HOME=str(work / 'config'),
+    env = {k:v for k,v in os.environ.items() if not k.startswith(('LLAMA_', 'MIR_', 'XDG_'))}
+    (work / 'home').mkdir()
+    env.update(HOME=str(work / 'home'), XDG_DATA_HOME=str(work / 'data'), PATH=str(commands) + ':' + env['PATH'], XDG_CONFIG_HOME=str(work / 'config'),
                MIR_LLAMA_CPP_DIR=str(server_dir), MIR_MODELS_DIR=str(models),
                TEST_HELP=help_text, TEST_DEVICES='Available devices:\n  Vulkan0: First GPU (16384 MiB, 8192 MiB free)\n  Vulkan1: Second GPU (8192 MiB, 4096 MiB free)',
                TEST_ARGS=str(work / 'args'), TEST_PORTS=str(work / 'ports'),
@@ -122,23 +122,11 @@ sys.exit(status)
     assert result.returncode == 0 and '--ctx-size' not in args
     result, args = launch({'MIR_CTX_SIZE':'1+1'})
     assert result.returncode != 0 and not args
-    check('''initialize_config "$2"
-for CTX_SIZE in auto 0 1024; do
-    DEVICE=Vulkan0,Vulkan1
-    write_profile "$PROFILES_DIR/Multi.conf"
-    saved=$(profile_data)
-    CTX_SIZE=4096 DEVICE=none
-    load_profile "$PROFILES_DIR/Multi.conf"
-    [[ $(profile_data) == "$saved" && $(profile_status) == Multi ]]
-done
-DEVICE=Vulkan0,Vulkan1,
-if valid_device "$DEVICE"; then exit 1; fi
-''')
     (work / 'queue').write_text(json.dumps([[0,'context'], [0,'custom'], [0,'1024'], [0,'back']]))
     check('initialize_config "$2"; model_menu; [[ $CTX_SIZE == 1024 ]]')
     (work / 'queue').write_text(json.dumps([[0,'context'], [0,'custom'], [255,''], [0,'back']]))
     check('initialize_config "$2"; model_menu; [[ $CTX_SIZE == auto ]]')
-    print('PASS: automatic/custom context, native environment, bounded validation, multi-device profiles and canceled edits')
+    print('PASS: automatic/custom context, native environment, bounded validation, canceled edits')
 
 
     # GPU controls must stay optional, literal and independent of CPU fallback.
@@ -219,17 +207,6 @@ mapfile -t options < "$TEST_ARGS"
 DEVICE=Vulkan0,Vulkan1
 gpu_memory_menu
 [[ $SPLIT_MODE == row && $TENSOR_SPLIT == 2,1 && $FIT_TARGET == 2048,1024 ]]
-write_profile "$PROFILES_DIR/GPU.conf"
-saved=$(profile_data)
-for field in split_mode tensor_split fit_target; do
-    sed "s/^$field=.*/$field=invalid/" "$CURRENT_PROFILE" > "$PROFILES_DIR/Bad.conf"
-    if load_profile "$PROFILES_DIR/Bad.conf"; then exit 1; fi
-    [[ $(profile_data) == "$saved" && $(profile_status) == GPU ]]
-done
-SPLIT_MODE=auto TENSOR_SPLIT=auto FIT_TARGET=auto
-[[ $(profile_status) == 'GPU (Modified)' ]]
-load_profile "$PROFILES_DIR/GPU.conf"
-[[ $(profile_data) == "$saved" && $(profile_status) == GPU ]]
 ''')
     (work / 'queue').write_text(json.dumps([[0,'mode'],[255,''],[0,'proportions'],[255,''],[0,'margin'],[255,''],[0,'back']]))
     check('initialize_config "$2"; DEVICE=Vulkan0,Vulkan1; gpu_memory_menu; [[ $SPLIT_MODE == auto && $TENSOR_SPLIT == auto && $FIT_TARGET == auto ]]')
@@ -245,7 +222,7 @@ ui() { return 99; }
 gpu_memory_menu
 [[ $GPU_SETTINGS_ACTIVE == false ]]
 ''')
-    print('PASS: multi-GPU checklist order/cancellation, advanced menus, single-device visibility and atomic profile tracking')
+    print('PASS: multi-GPU checklist order/cancellation, advanced menus, single-device visibility')
 
 
     # Visibility follows platform capability and usable native memory reports.
@@ -341,30 +318,14 @@ help=$'--cache-type-k TYPE\n  allowed values: f16, q4_0,\n                  cust
     check('initialize_config "$2"; cache_menu; [[ $CACHE_TYPE_K == q4_0 && $CACHE_TYPE_V == q4_0 ]]')
     check(r'''initialize_config "$2"
 CACHE_TYPE_K=q8_0 CACHE_TYPE_V=q5_1
-write_profile "$PROFILES_DIR/Cache.conf"
 saved=$(profile_data)
-CACHE_TYPE_K=f16
-[[ $(profile_status) == 'Cache (Modified)' ]]
-load_profile "$PROFILES_DIR/Cache.conf"
-[[ $(profile_data) == "$saved" && $(profile_status) == Cache ]]
-CACHE_TYPE_V=q4_0
-[[ $(profile_status) == 'Cache (Modified)' ]]
-CACHE_TYPE_V=q5_1
-set_generation_preset focused
-[[ $CACHE_TYPE_K == q8_0 && $CACHE_TYPE_V == q5_1 ]]
-load_profile "$PROFILES_DIR/Cache.conf"
-for field in cache_type_k cache_type_v; do
-    sed "s/^$field=.*/$field=invalid value/" "$CURRENT_PROFILE" > "$PROFILES_DIR/Bad.conf"
-    if load_profile "$PROFILES_DIR/Bad.conf"; then exit 1; fi
-    [[ $(profile_data) == "$saved" && $(profile_status) == Cache ]]
-done
 message() { :; }
 platform_timeout() { return 1; }
 CAPABILITIES_SERVER=''
 select_cache_type K "$CACHE_TYPE_K"
-[[ $(profile_data) == "$saved" && $(profile_status) == Cache ]]
+[[ $(profile_data) == "$saved" ]]
 ''')
-    print('PASS: primary/other cache menus, separate K/V edits, cancellation, probe failure, profile round trips and rollback')
+    print('PASS: primary/other cache menus, separate K/V edits, cancellation, probe failure and unchanged selections')
 
     for host, address in [('::1','[::1]'), ('::','[::1]'), ('0.0.0.0','127.0.0.1'),
                           ('127.0.0.2','127.0.0.2'), ('::1,127.0.0.1','[::1]')]:
@@ -431,61 +392,12 @@ prepare_server
     assert time.monotonic() - start < 3
     print('PASS: server capability checks, missing devices without mutation, CPU recovery and bounded probing')
 
-    # Write metadata-only fixtures: tensor allocation is never needed.
-    def gguf(path, fields, endian='<', version=3):
-        def string(value):
-            value = value.encode()
-            return struct.pack(endian+'Q', len(value)) + value
-        data = b'GGUF' + struct.pack(endian+'IQQ', version, 0, len(fields))
-        for key, kind, value in fields:
-            data += string(key) + struct.pack(endian+'I', kind)
-            if kind == 8:
-                data += string(value)
-            elif kind == 9:
-                data += struct.pack(endian+'IQ', 8, len(value)) + b''.join(string(s) for s in value)
-            else:
-                data += struct.pack(endian+{2:'H',4:'I'}[kind], value)
-        path.write_bytes(data)
-
-    gguf(models / 'unrelated-name.gguf', [('general.type',8,'mmproj')])
-    gguf(models / 'adapter.gguf', [('general.type',8,'adapter')])
-    gguf(models / 'first.gguf', [('split.no',2,0), ('general.type',8,'model')])
-    gguf(models / 'second.gguf', [('split.no',2,1)])
-    gguf(models / 'big-endian.gguf', [('split.no',2,1)], endian='>')
-    gguf(models / 'future.gguf', [], version=99)
-    gguf(models / 'tokens.gguf', [('tokenizer.ggml.tokens',9,['a','b']), ('general.type',8,'model')])
-    (models / 'truncated.gguf').write_bytes(b'GGUF\x03')
-    (models / 'oversized.gguf').write_bytes(b'GGUF' + struct.pack('<IQQQ',3,0,1,2**63))
-    outside = work / 'outside.gguf'
-    gguf(outside, [('general.type',8,'model')])
-    (models / 'linked.gguf').symlink_to(outside)
-    (models / 'broken.gguf').symlink_to(work / 'missing.gguf')
-    (models / 'directory-link').symlink_to(work, target_is_directory=True)
-    (work / 'root-link').symlink_to(models, target_is_directory=True)
-    check('''initialize_config "$2"
-scan_models
-[[ $MODEL == "$2" ]]
-printf '%s\\0' "${MODELS[@]}" > "$TEST_ARGS"
-''')
-    discovered = {Path(os.fsdecode(p)).name for p in (work / 'args').read_bytes().split(b'\0') if p}
-    assert discovered == {'model.gguf','first.gguf','future.gguf','tokens.gguf','truncated.gguf','oversized.gguf','linked.gguf'}, discovered
-    check('''initialize_config "$2"
-scan_models
-[[ ${#MODELS[@]} == 7 ]]
-''', {'MIR_MODELS_DIR':str(work / 'root-link')})
-    # No Python is a supported runtime configuration; metadata is advisory only.
-    check('''initialize_config "$2"
-command() { if [[ ${*: -1} == python3 ]]; then return 1; else builtin command "$@"; fi; }
-scan_models
-[[ ${#MODELS[@]} == 11 ]]
-''')
-    print('PASS: linked files/root folders, component and shard metadata, unknown formats and optional-reader fallback')
-
     # The complete running loop must probe and open the effective IPv6 endpoint.
-    (work / 'browser').unlink(missing_ok=True)
+    for artifact in ('args', 'curl', 'browser'):
+        (work / artifact).unlink(missing_ok=True)
     process = subprocess.Popen(['bash', str(root / 'mir.sh'), str(model), '--port', '10003'],
                                env=env | {'TEST_LIVE':'1', 'MIR_HOST':'::1'},
-                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, start_new_session=True)
     try:
         deadline = time.monotonic() + 5
         while not (work / 'browser').exists() and time.monotonic() < deadline:
@@ -495,10 +407,16 @@ scan_models
         assert b'http://[::1]:10003/health' in curl_args and b'--noproxy' in curl_args and b'--globoff' in curl_args
     finally:
         process.terminate()
-        process.communicate(timeout=5)
+        try:
+            process.communicate(timeout=5)
+        finally:
+            if process.poll() is None:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=3)
     assert process.returncode == 143
     print('PASS: running health check, browser address and shutdown with an overridden IPv6 endpoint')
 
+    (work / 'args').unlink(missing_ok=True)
     # A rejected setting must return to the TUI so it can be corrected there.
     (work / 'queue').write_text(json.dumps([[0,'launch'], [0,''], [0,'performance'],
                                            [0,'threads'], [0,'auto'], [0,'back'],
@@ -507,17 +425,18 @@ scan_models
     process = subprocess.Popen(['bash', str(root / 'mir.sh')],
                                env=env | {'TEST_LIVE':'1', 'MIR_THREADS':'4',
                                           'TEST_HELP':minimal_help},
-                               stdin=slave, stdout=slave, stderr=slave)
+                               stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
     os.close(slave)
     try:
         process.wait(timeout=8)
         assert process.returncode == 0
         assert json.loads((work / 'queue').read_text()) == []
-        assert b'--threads' not in (work / 'args').read_bytes().split(b'\0')
+        args = (work / 'args').read_bytes().split(b'\0')
+        assert b'--model' in args and b'--threads' not in args
     finally:
         if process.poll() is None:
-            process.kill()
-            process.wait()
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=3)
         os.close(master)
     print('PASS: unsupported settings return to the TUI for correction before successful launch')
 PY

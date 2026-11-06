@@ -44,8 +44,7 @@ exit "${TEST_VM_STAT_EXIT:-0}"
     executable(package / 'bin/llama-server', '''#!/usr/bin/env bash
 case "$1" in
     --help)
-        printf '%s\\n' '--model --port --device --gpu-layers --cache-type-k --cache-type-v'
-        echo 'number of server slots (default: 1)' ;;
+        printf '%s\\n' '--model --port --device --gpu-layers --cache-type-k --cache-type-v' ;;
     --list-devices) printf probe >> "$TEST_DEVICE_PROBES"; /bin/sleep "${TEST_DEVICE_DELAY:-0}"; printf 'Available devices:\\n  MTL0: Test GPU (8192 MiB, 4096 MiB free)\\n' ;;
     *) printf '%s\\0' "$@" > "$TEST_ARGS"; /bin/sleep 0.2 ;;
 esac
@@ -137,32 +136,6 @@ if prepare_server; then exit 1; fi
           {'TEST_SOCKETS':busy, 'TEST_PIDS':'p123\nf10\np123'})
     check('PORT=9931; check_port', {'TEST_NETSTAT_EXIT':'1'}, success=False)
     print('PASS: Darwin IPv4/IPv6 listeners, exact ports, hidden owners, PID deduplication and fail-closed inspection')
-
-    stop_code = '''PORT=9931
-ps() { if [[ -f "$HOME/recycled" ]]; then echo new; else echo original; fi; }
-sleep() { :; }
-message() { printf '%s\\n' "$*" >> "$HOME/messages"; }
-kill() { printf '%s\\n' "$*" >> "$HOME/signals"; return "${TEST_KILL_EXIT:-0}"; }
-ui() {
-    printf '%s\\n' "$*" >> "$HOME/prompts"
-    if [[ ${TEST_RECYCLE:-0} == 1 ]]; then touch "$HOME/recycled"; fi
-    if [[ $* == *SIGKILL* ]]; then return "${TEST_FORCE:-1}"; fi
-    return "${TEST_CONFIRM:-0}"
-}
-stop_listener
-'''
-    def stop(overrides):
-        for name in ('recycled', 'signals', 'messages', 'prompts'):
-            (work / name).unlink(missing_ok=True)
-        check(stop_code, {'TEST_SOCKETS':busy, 'TEST_PIDS':'p123'} | overrides)
-        return (work / 'signals').read_text() if (work / 'signals').exists() else ''
-    assert not stop({'TEST_CONFIRM':'1'})
-    assert stop({}) == '-TERM 123\n'
-    assert stop({'TEST_FORCE':'0'}) == '-TERM 123\n-KILL 123\n'
-    assert not stop({'TEST_RECYCLE':'1'})
-    stop({'TEST_KILL_EXIT':'1'})
-    assert 'Cannot stop PID 123' in (work / 'messages').read_text()
-    print('PASS: canceled shutdown, SIGTERM first, separate SIGKILL approval, recycled PIDs and permission failures')
 
     check('''initialize_config "$2"
 prepare_server

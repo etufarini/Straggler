@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
     def source_path(name):
         return (root.parent if name in documents else root) / name
     def package(omit=None, broken=False, marker=''):
-        with tarfile.open(archive, 'w:gz') as tar:
+        with tarfile.open(archive, 'w:gz', compresslevel=1) as tar:
             for name in files:
                 if name == omit:
                     continue

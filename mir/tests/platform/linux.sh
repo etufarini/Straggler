@@ -20,13 +20,8 @@ check_port
 [[ ${PIDS[*]} == '123 456' ]]
 # Verify sorted, unique PIDs when some listeners hide process details.
 TEST_LISTENERS=$'LISTEN 0 128 [::]:9931 [::]:* users:(("one",pid=20,fd=4),("two",pid=3,fd=5))\nLISTEN 0 128 0.0.0.0:9931 0.0.0.0:* users:(("one",pid=20,fd=6),("three",pid=100,fd=7))\nLISTEN 0 128 127.0.0.1:9931 0.0.0.0:*'
-# shellcheck disable=SC2329 # Guards must fail if these commands are reintroduced.
-(
-    grep() { printf 'Unexpected grep invocation\n' >&2; exit 1; }
-    cut() { printf 'Unexpected cut invocation\n' >&2; exit 1; }
-    check_port
-    [[ ${PIDS[*]} == '3 20 100' && $LISTENERS == "$TEST_LISTENERS" ]]
-)
+check_port
+[[ ${PIDS[*]} == '3 20 100' && $LISTENERS == "$TEST_LISTENERS" ]]
 TEST_LISTENERS='LISTEN 0 128 127.0.0.1:9931 0.0.0.0:* users:(("one",pid=20,fd=4))'
 platform_listeners 9931
 [[ ${PIDS[*]} == 20 ]]

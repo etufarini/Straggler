@@ -1,22 +1,12 @@
 #!/usr/bin/env bash
 # Storage failures must preserve files, active settings and profile association.
 set -euo pipefail
-TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-for variable in ${!MIR_@} ${!LLAMA_@} ${!XDG_@}; do unset "$variable"; done
-MIR_ROOT=$TEST_ROOT
+MIR_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$MIR_ROOT/tests/helpers/core.sh"
 load_test_core fake
-work=$(mktemp -d)
-trap 'command rm -rf -- "$work"' EXIT
-export HOME="$work/home" XDG_CONFIG_HOME="$work/config"
-mkdir -p "$HOME" "$work/bin" "$work/models" "$work/empty" "$work/other-models" \
+setup_test_workspace
+mkdir -p "$work/models" "$work/empty" "$work/other-models" \
     "$work/llama/bin" "$work/other-llama/build/bin"
-for tool in find mv; do
-    executable=$(command -v "g$tool" || command -v "$tool")
-    ln -s "$executable" "$work/bin/$tool"
-done
-export PATH="$work/bin:$PATH"
-cd -- "$work"
 touch "$work/models/first.gguf" "$work/models/selected.gguf" "$work/other-models/new.gguf" \
     "$work/llama/bin/llama-server" "$work/other-llama/build/bin/llama-server"
 chmod +x "$work/llama/bin/llama-server" "$work/other-llama/build/bin/llama-server"
@@ -32,23 +22,25 @@ tracking=$SAVED_PROFILE
 cmp -s "$association" <(profile_data)
 cp "$association" "$work/profile.before"
 
-for failure in directory temporary serialization activation; do
-    (
-        expected=1
-        case "$failure" in
-            directory) mkdir() { return 1; }; expected=2 ;;
-            temporary) mktemp() { return 1; }; expected=3 ;;
-            serialization) profile_data() { printf 'model=partial\n'; return 1; } ;;
-            activation) mv() { return 1; } ;;
-        esac
-        status=0
-        write_profile "$PROFILES_DIR/Other.conf" || status=$?
-        [[ $status == "$expected" && $CURRENT_PROFILE == "$association" && $SAVED_PROFILE == "$tracking" ]]
-        [[ ! -e "$PROFILES_DIR/Other.conf" ]]
-        cmp -s "$association" "$work/profile.before"
-        temporary=("$PROFILES_DIR"/.profile.*)
-        [[ ! -e ${temporary[0]} ]]
-    )
+for target in "$PROFILES_DIR/Other.conf" "$association"; do
+    for failure in directory temporary serialization activation; do
+        (
+            expected=1
+            case "$failure" in
+                directory) mkdir() { return 1; }; expected=2 ;;
+                temporary) mktemp() { return 1; }; expected=3 ;;
+                serialization) profile_data() { printf 'model=partial\n'; return 1; } ;;
+                activation) mv() { return 1; } ;;
+            esac
+            status=0
+            write_profile "$target" || status=$?
+            [[ $status == "$expected" && $CURRENT_PROFILE == "$association" && $SAVED_PROFILE == "$tracking" ]]
+            [[ ! -e "$PROFILES_DIR/Other.conf" ]]
+            cmp -s "$association" "$work/profile.before"
+            temporary=("$PROFILES_DIR"/.profile.*)
+            [[ ! -e ${temporary[0]} ]]
+        )
+    done
 done
 printf 'PASS: exact profile bytes and unchanged files/tracking on directory, temporary-file, serialization and activation failures\n'
 
@@ -127,6 +119,33 @@ paths_menu
 load_profile "$association"
 printf 'PASS: invalid server folders, accepted model-folder refresh, selection retention and empty-folder recovery\n'
 
+(
+    # The save UI must reject names before they can become filesystem paths.
+    ui() { printf '%s' "$TEST_NAME"; }
+    for TEST_NAME in '' .hidden ../escape a/b -name "\$(touch executed)" $'line\nbreak' "$(printf 'Z%.0s' {1..81})"; do
+        save_profile
+        [[ $CURRENT_PROFILE == "$association" && $SAVED_PROFILE == "$tracking" ]]
+        cmp -s "$association" "$work/profile.before"
+        files=("$PROFILES_DIR"/*)
+        [[ ${#files[@]} == 1 && ${files[0]} == "$association" && ! -e executed ]]
+    done
+    for TEST_NAME in A 'Name with spaces._-' "$(printf 'Z%.0s' {1..80})"; do
+        save_profile
+        [[ $CURRENT_PROFILE == "$PROFILES_DIR/$TEST_NAME.conf" && $(profile_status) == "$TEST_NAME" ]]
+        cmp -s "$CURRENT_PROFILE" "$work/profile.before"
+        command rm -- "$CURRENT_PROFILE"
+    done
+)
+for action in save update; do
+    (
+        ui() { if [[ $* == *--inputbox* ]]; then printf Saved; else return 1; fi; }
+        save_profile "$action"
+        [[ $CURRENT_PROFILE == "$association" && $SAVED_PROFILE == "$tracking" ]]
+        cmp -s "$association" "$work/profile.before"
+    )
+done
+printf 'PASS: safe profile names, 80-character boundary and canceled replacement/update\n'
+
 for operation in cancel failure success; do
     printf 'delete\n0\nback\n' > "$work/queue"
     CONFIRM_STATUS=0
@@ -148,3 +167,48 @@ for operation in cancel failure success; do
 done
 [[ $(cat "$work/messages") == *'Cannot delete configuration'* ]]
 printf 'PASS: canceled/failed profile deletion preserves association; successful deletion clears it without changing settings\n'
+
+# Import is a one-time copy, including profile bytes, without merging settings.
+CONFIG_DIR="$work/migration/mir.cpp"
+legacy="$work/migration/llama-launcher"
+mkdir -p "$legacy/profiles"
+cp "$work/paths.before" "$legacy/paths.conf"
+cp "$work/profile.before" "$legacy/profiles/Old.conf"
+for failure in copy activation; do
+    (
+        if [[ $failure == copy ]]; then cp() { return 1; };
+        else mv() { return 1; }; fi
+        if XDG_CONFIG_HOME="$work/migration" initialize_config "$work/models/selected.gguf"; then exit 99; fi
+    ) > "$work/migration-error" 2>&1 && exit 1
+    [[ $(cat "$work/migration-error") == *'Cannot import previous launcher settings'* ]]
+    [[ ! -e $CONFIG_DIR ]]
+    temporary=("${CONFIG_DIR%/*}"/.mir-migration.*)
+    [[ ! -e ${temporary[0]} ]]
+    cmp -s "$legacy/paths.conf" "$work/paths.before"
+    cmp -s "$legacy/profiles/Old.conf" "$work/profile.before"
+done
+XDG_CONFIG_HOME="$work/migration" initialize_config "$work/models/selected.gguf"
+cmp -s "$PATHS_FILE" "$legacy/paths.conf"
+cmp -s "$PROFILES_DIR/Old.conf" "$legacy/profiles/Old.conf"
+load_profile "$PROFILES_DIR/Old.conf"
+[[ $(profile_status) == Old && $(profile_data) == "$profile_snapshot" ]]
+printf later > "$legacy/profiles/Later.conf"
+migrate_config
+[[ ! -e $PROFILES_DIR/Later.conf ]]
+printf changed > "$legacy/paths.conf"
+migrate_config
+cmp -s "$PATHS_FILE" "$work/paths.before"
+command rm -rf -- "$CONFIG_DIR"
+(
+    mv() {
+        mkdir -p "$CONFIG_DIR"
+        printf existing > "$CONFIG_DIR/Existing"
+        command mv "$@"
+    }
+    migrate_config
+    [[ $(cat "$CONFIG_DIR/Existing") == existing && ! -e $PATHS_FILE ]]
+)
+temporary=("${CONFIG_DIR%/*}"/.mir-migration.*)
+[[ ! -e ${temporary[0]} ]]
+cmp -s "$legacy/profiles/Old.conf" "$work/profile.before"
+printf 'PASS: atomic legacy import, preserved originals, existing-directory precedence and failure cleanup\n'
