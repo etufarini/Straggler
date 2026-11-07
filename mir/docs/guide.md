@@ -613,10 +613,10 @@ coverage; results apply only to the recorded configurations.
 
 ### Metal
 
-Recorded Apple M4 smoke checks used Auto, CPU only and explicit Metal with
+Recorded macOS smoke checks used Auto, CPU only and explicit Metal with
 `stories260K.gguf`, covering health, Web UI, completion and shutdown. They do not
-establish performance, large-model capacity or Intel Mac coverage. The original
-record does not identify the macOS or llama.cpp version.
+establish performance, large-model capacity or coverage of other hardware
+configurations. The original record does not identify the macOS or llama.cpp version.
 
 ### CUDA
 
@@ -625,7 +625,7 @@ Recorded smoke checks on 2026-11-06 used:
 | Component | Tested configuration |
 | --- | --- |
 | System | Ubuntu 26.04.1, NVIDIA driver 615.71.09, CUDA toolkit 12.4 |
-| GPUs | RTX 2060 (6 GiB) and RTX 3060 (12 GiB) |
+| GPU memory | Two devices with 6 GiB and 12 GiB |
 | llama.cpp | b12177, commit `6c01da6278ab6c69ed67d9124806b50d2b299ba7` |
 | Model | `gemma_4_26b_a4b_it_qat_ud_q4_k_xl.gguf` |
 
@@ -642,5 +642,5 @@ release after success and failure. Automatic context fitting also passed a short
 chat request, choosing 26880 tokens; a full-context workload was not tested.
 GPU allocations returned to baseline and listening ports were released.
 Interactive browser use, sustained workloads, performance benchmarks, other
-NVIDIA configurations and other models were not verified. These checks do not
+hardware configurations and other models were not verified. These checks do not
 establish universal CUDA or multi-GPU compatibility.
