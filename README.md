@@ -9,7 +9,7 @@ Choose a local GGUF model, adjust its settings, save configurations and launch
 the chat interface in your browser.
 
 Mir.cpp supports Linux with CPU, Vulkan and CUDA builds, and macOS with CPU and Metal.
-CUDA smoke tests passed on RTX 2060/3060 with one llama.cpp build and model;
+CUDA smoke tests passed with one llama.cpp build and model;
 compatibility with other configurations depends on the installed build and hardware.
 
 [<img src="mir/docs/screenshots/main-menu.png" alt="Main menu showing the current configuration and launch controls" width="640">](mir/docs/screenshots/main-menu.png)
