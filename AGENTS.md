@@ -16,7 +16,7 @@ Keep shared launcher behavior in `mir/lib/` and system operations in `mir/lib/pl
 
 Use explicit module loading through `lib/launcher.sh` in the entry point and isolated test helpers; never recursively source all shell files. Core tests use `tests/helpers/fake.sh`; platform contract tests live in `tests/platform/` and real OS tests in `tests/native/`. Keep `bash mir/tests/run.sh common` and `linux` usable on Linux without macOS dependencies; `all` additionally runs cross-platform fixtures and any native tests available on the current host. Keep Ubuntu and macOS CI checks independent and report skipped native checks honestly.
 
-Treat `mir/sh/install.sh` as a generated standalone artifact. Edit `install-core.sh`, the canonical bootstrap or adapters, regenerate with `bash mir/sh/build-install.sh`, and verify with `--check`. The bundle must include only installer-required adapter functions, keep the existing curl URL and installation layout, and retain Bash 3.2 bootstrap compatibility. Do not hand-edit generated copies of platform logic.
+Treat `mir/sh/install.sh` as a generated standalone artifact. Edit `install-core.sh`, the canonical bootstrap or adapters, regenerate with `bash mir/sh/build-install.sh`, and verify with `--check`. The bundle must include only installer-required adapter functions, keep the versioned raw GitHub curl URL format and installation layout, and retain Bash 3.2 bootstrap compatibility. Do not hand-edit generated copies of platform logic.
 
 ## Release scope
 
@@ -40,7 +40,63 @@ Keep Linux and macOS CI checks. For releases that change runtime behavior, requi
 
 Unavailable hardware does not automatically block a release. Distinguish tested configurations, expected compatibility and known problems. Record checks performed and limitations briefly in release notes; for inference tests, identify the OS, backend, relevant memory capacity, llama.cpp version and model without naming specific hardware models. A discovery probe or fixture is not an inference test. Known defects that can lose user data or signal an unintended process block release until fixed.
 
-Use an optional GitHub prerelease for broad or uncertain changes when user feedback would help; do not require a beta for every fix or ordinary release. Keep unverified claims explicit rather than treating a beta label as evidence of correctness. Installing a specific tagged release is separate from this policy: the current installer downloads `main`, so publishing a tag or prerelease does not change what it installs.
+Use an optional GitHub prerelease for broad or uncertain changes when user feedback would help; do not require a beta for every fix or ordinary release. Keep unverified claims explicit rather than treating a beta label as evidence of correctness.
+
+## Versioned releases
+
+`main` is the development branch and may contain changes newer than the
+latest stable release. Merging a pull request does not publish a release.
+
+The stable version is the latest published versioned GitHub Release that
+is not marked as a prerelease. Mark it as Latest on GitHub. A newer tag,
+draft or prerelease does not replace the stable version.
+
+Use tags named `vMAJOR.MINOR.PATCH`: increment PATCH for compatible fixes,
+MINOR for compatible features and MAJOR for incompatible changes to
+documented commands, configuration or behavior. Use `v1.0.0` for the first
+stable release.
+
+Keep releases manual and simple; no separate stable branch, version file,
+release workflow or custom source archive is required.
+
+The README quick-install curl URL must point directly to the latest stable
+tag, for example `https://raw.githubusercontent.com/etufarini/Mir.cpp/v1.0.0/mir/sh/install.sh`.
+The installer must download that same tag, never `main`. Keep its version
+in the single `release_tag` value in `mir/sh/install-core.sh`; derive the
+download URL, archive paths and download message from it. Regenerate the
+standalone installer after changing it. No separate installer asset or
+automatic latest-version lookup is needed. An older curl command reinstalls
+its original version; updates use the command in the current README.
+
+Release procedure:
+
+1. Prepare the release by setting the installer tag and README curl URL to
+   the intended version, updating the documented stable version and
+   regenerating the installer. Integrate the changes on `main`, then select
+   the exact candidate commit and record its full commit SHA. For prereleases,
+   keep the README quick install on the existing stable version and document
+   the prerelease command separately.
+2. Complete the applicable release and verification checks above on that
+   commit. If the candidate changes, reassess the affected checks.
+3. Prepare brief English release notes with changes, the full commit SHA,
+   checks performed and known limitations. Identify reused hardware checks
+   as earlier results.
+4. Obtain explicit user approval for the version, candidate commit and
+   release notes before creating the tag or publishing the release.
+5. Create an annotated version tag at the approved SHA and push that tag.
+   Publish its GitHub Release with `gh release create --verify-tag`, using
+   `--latest` for a stable release or `--prerelease --latest=false` for a
+   prerelease. Use the reviewed notes; GitHub-generated archives suffice.
+6. Verify that the published tag resolves to the approved SHA and that
+   the release notes and Latest status are correct. Test the published curl
+   command in an isolated HOME, including reinstall and preserved settings.
+
+Never move or reuse a published version tag. Publish corrections under a
+new version. GitHub-generated source archives are sufficient.
+
+Delete remote development branches only after confirming their work was
+merged and obtaining approval for the named branches. Preserve `main`
+and release tags.
 
 ## TUI organization
 

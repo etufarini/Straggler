@@ -36,11 +36,13 @@ for platform and GPU requirements.
 ## Quick install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/etufarini/Mir.cpp/main/mir/sh/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/etufarini/Mir.cpp/v1.0.0/mir/sh/install.sh | bash
 ```
 
 Installs for your user in `~/.local/share/mir.cpp/` and creates
-`~/.local/bin/mir`. Close the launcher and run the same command again to update.
+`~/.local/bin/mir`. This command installs stable release **v1.0.0**; `main` may
+contain newer development changes. To update, close the launcher and use the
+command from the current README.
 
 ## First launch
 

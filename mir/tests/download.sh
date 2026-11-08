@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 # Opt-in network smoke check of the published README command; uses an isolated HOME.
 set -euo pipefail
-python3 -I - <<'PY'
+TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+python3 -I - "$TEST_ROOT" <<'PY'
 import os
 from pathlib import Path
+import re
 import subprocess
+import sys
 import tempfile
 
-url = 'https://raw.githubusercontent.com/etufarini/Mir.cpp/main/mir/sh/install.sh'
+readme = (Path(sys.argv[1]).parent / 'README.md').read_text()
+match = re.search(r'https://raw\.githubusercontent\.com/etufarini/Mir\.cpp/v\d+\.\d+\.\d+/mir/sh/install\.sh', readme)
+assert match, 'README must pin the installer to a release tag'
+url = match.group()
 with tempfile.TemporaryDirectory(prefix='mir-download-') as temporary:
     home = Path(temporary) / 'home with spaces'
     home.mkdir()
@@ -52,5 +58,5 @@ with tempfile.TemporaryDirectory(prefix='mir-download-') as temporary:
         assert (config / 'profiles/Personal.conf').read_text() == 'personal profile\n'
         print('PASS: published uninstall command and preserved settings')
     else:
-        print('NOTE: published main does not include --uninstall yet; local integration tests cover it')
+        print('NOTE: published release does not include --uninstall; local integration tests cover it')
 PY

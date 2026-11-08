@@ -463,8 +463,11 @@ syntax are checked in a temporary folder before activation; failures preserve
 the active installation. Success removes old managed releases and interrupted
 staging folders; cleanup failures leave the new copy active with a warning.
 Reinstalling repairs a managed wrapper but refuses an unrelated existing `mir`.
-The installer downloads `main`; publishing a tag or prerelease does not change
-what this command installs. llama.cpp updates are separate, under **Folders**.
+The current README command points to the latest stable release tag. Its installer
+downloads that same tag, so an older command reinstalls its original version.
+`main` may contain development changes newer than the stable release. A tag alone,
+draft or prerelease does not replace the stable release. llama.cpp updates are
+separate, under **Folders**.
 
 ### Storage and migration
 
@@ -586,8 +589,9 @@ compatibility. Direct test scripts need Bash 4.4 or newer on PATH.
 
 The optional `bash mir/tests/download.sh` network check installs and updates in a
 temporary HOME, checks preserved settings and removes the program if supported
-by the published version. It tests GitHub `main`, which can differ from the
-checkout; local installer fixtures cover local removal behavior.
+by the published version. It uses the release URL in the checkout's README and
+requires that tag to be published; local installer fixtures test unpublished
+changes and removal behavior without a network download.
 
 ### Generated installer
 
@@ -604,6 +608,12 @@ Generation needs Bash 4.4 or newer; on macOS use
 `--check` to verify. The bundle includes only installer-required adapter functions
 and remains compatible with Bash 3.2 bootstrap. Installed runtime files include
 only the selected adapter. Users need no generation step.
+
+For a release, update `release_tag` in `install-core.sh` and the README curl URL
+to the same version, then regenerate. The installer uses that tag for the source
+download and archive paths. Publish the versioned GitHub Release from the verified
+commit; no separate installer asset is needed. Keep the full commit SHA, checks
+and limitations in the release notes. Published tags must not be moved or reused.
 
 ## Recorded hardware checks
 

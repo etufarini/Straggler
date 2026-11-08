@@ -285,6 +285,8 @@ runtime_files() {
 # Canonical installer logic; bundled by build-install.sh for curl delivery.
 main() {
     set -euo pipefail
+    local release_tag=v1.0.0 archive_root
+    archive_root="Mir.cpp-${release_tag#v}"
 
     fail() { printf 'Installation failed: %s\n' "$*" >&2; exit 1; }
     (( $# == 0 )) || fail 'This installer takes no arguments.'
@@ -338,16 +340,16 @@ main() {
     trap 'exit 130' INT
     trap 'exit 143' TERM
     STAGE=$(mktemp -d "$INSTALL_DIR/releases/install.XXXXXXXX")
-    printf 'Downloading Mir.cpp from etufarini/Mir.cpp (main)...\n'
+    printf 'Downloading Mir.cpp from etufarini/Mir.cpp (%s)...\n' "$release_tag"
     curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 \
         --connect-timeout 15 --max-time 180 --retry 2 \
-        https://codeload.github.com/etufarini/Mir.cpp/tar.gz/refs/heads/main \
+        "https://codeload.github.com/etufarini/Mir.cpp/tar.gz/refs/tags/$release_tag" \
         --output "$STAGE/source.tar.gz" 9>&-
 
     # Extract only the runtime files and documentation, never arbitrary archive paths.
     mapfile -t FILES < <(runtime_files)
     MEMBERS=()
-    for file in "${FILES[@]}"; do MEMBERS+=("Mir.cpp-main/mir/$file"); done
+    for file in "${FILES[@]}"; do MEMBERS+=("$archive_root/mir/$file"); done
     # Preserve the flat runtime layout expected by installed wrappers.
     tar -xzf "$STAGE/source.tar.gz" --no-same-owner --no-same-permissions \
         --strip-components=2 -C "$STAGE" -- "${MEMBERS[@]}" 9>&-
@@ -355,7 +357,7 @@ main() {
         mir/docs/screenshots/main-menu.png mir/docs/screenshots/model-settings.png
         mir/docs/screenshots/llama-setup.png)
     MEMBERS=()
-    for file in "${DOCUMENTS[@]}"; do MEMBERS+=("Mir.cpp-main/$file"); done
+    for file in "${DOCUMENTS[@]}"; do MEMBERS+=("$archive_root/$file"); done
     tar -xzf "$STAGE/source.tar.gz" --no-same-owner --no-same-permissions \
         --strip-components=1 -C "$STAGE" -- "${MEMBERS[@]}" 9>&-
     rm -- "$STAGE/source.tar.gz"
