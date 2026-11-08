@@ -120,6 +120,11 @@ GPU_LAYERS=auto THREADS=auto PROMPT_PROCESSING=auto
         try:
             await_position(shape)
             if resized:
+                # Wait for an input-triggered trace snapshot before resizing;
+                # the initial geometry alone does not confirm event processing.
+                ready_count = len(positions())
+                os.write(master, b'\x14')
+                await_position(shape, after=ready_count)
                 previous_count = len(positions())
                 size(resized)
                 os.killpg(process.pid, signal.SIGWINCH)
