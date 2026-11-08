@@ -6,6 +6,7 @@ python3 -I - "$TEST_ROOT" <<'PY'
 import os
 import fcntl
 import pty
+import re
 import select
 import signal
 import struct
@@ -72,11 +73,13 @@ exit 7
     # Use the real default Homebrew discovery with no brew/bash in PATH.
     (commands / 'brew').unlink()
     archive = work / 'source.tar.gz'
+    release_tag = re.search(r'local release_tag=([^\s]+)', (root / 'sh/install-core.sh').read_text()).group(1)
+    archive_root = 'Mir.cpp-' + release_tag[1:]
     with tarfile.open(archive, 'w:gz') as package:
         for path in [root.parent / 'README.md', root / 'mir.sh', root / 'dialogrc', root / 'sh/uninstall.sh',
                      *sorted((root / 'lib').rglob('*')), *sorted((root / 'docs').rglob('*'))]:
             if path.is_file():
-                package.add(path, arcname='Mir.cpp-main/' + str(path.relative_to(root.parent)), recursive=False)
+                package.add(path, arcname=archive_root + '/' + str(path.relative_to(root.parent)), recursive=False)
     executable(commands / 'curl', '''#!/bin/sh
 while [ "$#" -gt 0 ]; do
     if [ "$1" = --output ]; then cp "$TEST_ARCHIVE" "$2"; exit; fi

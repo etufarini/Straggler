@@ -7,6 +7,7 @@ import io
 import shlex
 import os
 import pty
+import re
 from pathlib import Path
 import subprocess
 import shutil
@@ -20,6 +21,13 @@ root = Path(sys.argv[1])
 target_os = sys.argv[2]
 assert target_os in ('Linux', 'Darwin')
 installer = (root / 'sh/install.sh').read_bytes()
+readme_url = re.search(r'https://raw\.githubusercontent\.com/etufarini/Mir\.cpp/(v\d+\.\d+\.\d+)/mir/sh/install\.sh',
+                       (root.parent / 'README.md').read_text())
+assert readme_url, 'README must pin the installer to a release tag'
+release_tag = re.search(r'local release_tag=([^\s]+)', (root / 'sh/install-core.sh').read_text()).group(1)
+if '-' not in release_tag:
+    assert readme_url.group(1) == release_tag, 'Stable installer and README versions must match'
+archive_root = 'Mir.cpp-' + release_tag[1:]
 host_brew = shutil.which('brew')
 host_brew_data = Path(host_brew).read_bytes() if host_brew else None
 with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
@@ -36,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
     files += documents
     def source_path(name):
         return (root.parent if name in documents else root) / name
-    def package(omit=None, broken=False, marker=''):
+    def package(omit=None, broken=False, marker='', prefix=archive_root):
         with tarfile.open(archive, 'w:gz', compresslevel=1) as tar:
             for name in files:
                 if name == omit:
@@ -45,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
                 if name == 'mir.sh':
                     data += b'\nif\n' if broken else ('\n# ' + marker + '\n').encode()
                 archive_name = name if name in documents else 'mir/' + name
-                info = tarfile.TarInfo('Mir.cpp-main/' + archive_name)
+                info = tarfile.TarInfo(prefix + '/' + archive_name)
                 info.size = len(data)
                 info.mode = 0o644  # Installer must make the launcher executable.
                 tar.addfile(info, io.BytesIO(data))
@@ -129,9 +137,11 @@ exec /bin/rm "$@"
     package(marker='first')
     install({'TEST_ACTIVATION':'fail'}, success=False)
     assert not command.exists() and not (install_dir / 'current').exists()
-    install()
+    result = install()
     target = (install_dir / 'current').resolve()
-    assert b'https://codeload.github.com/etufarini/Mir.cpp/tar.gz/refs/heads/main' in (work / 'download-args').read_bytes().split(b'\0')
+    download_args = (work / 'download-args').read_bytes().split(b'\0')
+    assert f'https://codeload.github.com/etufarini/Mir.cpp/tar.gz/refs/tags/{release_tag}'.encode() in download_args
+    assert f'({release_tag})'.encode() in result.stdout
     assert command.is_file() and os.access(command, os.X_OK)
     selected_adapters = {'lib/platform/linux.sh'} if target_os == 'Linux' else {'lib/platform/macos.sh', 'lib/platform/macos-bootstrap.sh'}
     for name in files:
@@ -172,6 +182,11 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
         assert (install_dir / 'current').resolve() == updated
         assert command.read_bytes() == snapshot
         assert set((install_dir / 'releases').iterdir()) == releases
+    package(prefix='Mir.cpp-main')
+    install(success=False)
+    assert (install_dir / 'current').resolve() == updated
+    assert command.read_bytes() == snapshot
+    assert set((install_dir / 'releases').iterdir()) == releases
     for omitted in [*selected_adapters, 'lib/runtime.sh', 'lib/tui/main.sh', 'lib/memory.sh', 'lib/gguf.py', 'dialogrc', 'sh/uninstall.sh', *documents]:
         package(omit=omitted)
         install(success=False)
