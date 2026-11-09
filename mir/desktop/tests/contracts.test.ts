@@ -45,6 +45,16 @@ describe('desktop contract', () => {
       expect(config.settings).toEqual({ ...defaultSettings, model });
       expect(config.devices[0].name).toBe('Future0');
       expect(config.capabilities.cacheTypesK).toEqual([]);
+      try {
+        invoke('inspect', [], { settings: { ...config.settings, threads: '0' } });
+        throw new Error('Invalid settings were accepted');
+      } catch (error) {
+        const failure = error as { stderr: Buffer };
+        const detail = JSON.parse(failure.stderr.toString().trim());
+        expect(detail.mirValidation).toBe(true);
+        expect(detail.field).toBe('threads');
+        expect(detail.message).toContain('positive integer');
+      }
       expect(
         config.backends.every(
           (backend) => typeof backend.id === 'string' && typeof backend.label === 'string',

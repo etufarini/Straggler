@@ -44,6 +44,15 @@ class Handler(BaseHTTPRequestHandler):
         with open(os.environ['TEST_REQUEST'], 'w') as record:
             json.dump(request, record)
         prompt = request['messages'][-1]['content']
+        if prompt in ('oom', 'compute-error'):
+            if prompt == 'oom':
+                report_memory_failure()
+            body = b'{"error":{"code":500,"message":"Compute error.","type":"server_error"}}'
+            self.send_response(500)
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if prompt == 'reject':
             body = b'{"error":{"message":"Unsupported chat template"}}'
             self.send_response(400)
@@ -61,7 +70,15 @@ class Handler(BaseHTTPRequestHandler):
             for byte in event.encode():
                 self.wfile.write(bytes([byte]))
                 self.wfile.flush()
-            if prompt == 'wait':
+            if prompt == 'memory-warning':
+                print('warning: out of memory, using a smaller allocation; recovered', file=sys.stderr, flush=True)
+            if prompt == 'oom-stream':
+                # The test acknowledges receipt before the independent log failure.
+                deadline = time.monotonic() + 5
+                while not os.path.exists(os.environ['TEST_REQUEST'] + '.continue') and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                report_memory_failure()
+            if prompt in ('wait', 'oom-stream'):
                 while True:
                     self.wfile.write(b': heartbeat\n\n')
                     self.wfile.flush()
@@ -73,5 +90,12 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
 
+def report_memory_failure():
+    print('error: Insufficient Memory (kIOGPUCommandBufferCallbackErrorOutOfMemory)', file=sys.stderr, flush=True)
+    print('backend is in error state from a previous command buffer failure - recreate the backend to recover', file=sys.stderr, flush=True)
+
+
+if os.environ.get('TEST_SERVER_MODE') == 'oom-init':
+    report_memory_failure()
 print('Test server started', flush=True)
 ThreadingHTTPServer((options.host, options.port), Handler).serve_forever()

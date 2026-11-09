@@ -1,5 +1,6 @@
 mod builds;
 mod chat;
+pub mod diagnostics;
 pub mod history;
 mod server;
 pub mod stream;
@@ -31,6 +32,7 @@ pub struct Status {
     pub logs: Vec<String>,
     pub error: Option<String>,
     pub running_settings: Option<Settings>,
+    pub issue: Option<diagnostics::ServerIssue>,
 }
 
 struct Server {
@@ -42,6 +44,7 @@ struct Server {
     url: Option<String>,
     logs: VecDeque<String>,
     error: Option<String>,
+    diagnostics: diagnostics::Diagnostics,
 }
 
 pub struct Runtime {
@@ -117,6 +120,7 @@ impl Runtime {
                 url: None,
                 logs: VecDeque::new(),
                 error: None,
+                diagnostics: diagnostics::Diagnostics::default(),
             })),
             active: Mutex::new(Generation::default()),
             client: reqwest::Client::builder()

@@ -33,6 +33,36 @@ pub struct Settings {
     pub max_tokens: String,
 }
 
+/// Validation belongs to the launcher; IPC carries its field identifier intact.
+#[derive(Debug, Serialize)]
+pub struct ConfigurationError {
+    pub field: Option<String>,
+    pub message: String,
+}
+
+impl From<String> for ConfigurationError {
+    fn from(message: String) -> Self {
+        for line in message.lines() {
+            if let Ok(value) = serde_json::from_str::<Value>(line) {
+                if value["mirValidation"] == true {
+                    if let (Some(field), Some(detail)) =
+                        (value["field"].as_str(), value["message"].as_str())
+                    {
+                        return Self {
+                            field: Some(field.into()),
+                            message: detail.into(),
+                        };
+                    }
+                }
+            }
+        }
+        Self {
+            field: None,
+            message,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BuildBackend {
     pub id: String,

@@ -31,7 +31,7 @@ impl Runtime {
             return Err("A chat request needs valid messages.".into());
         }
         let token = CancellationToken::new();
-        let url = {
+        let (url, run, failed) = {
             let mut active = self.active.lock().map_err(|e| e.to_string())?;
             if active.cancelled == Some(request.request_id) {
                 active.cancelled = None;
@@ -41,6 +41,11 @@ impl Runtime {
                 return Err("A response is already being generated.".into());
             }
             let state = self.server.lock().map_err(|e| e.to_string())?;
+            if state.diagnostics.issue.is_some() {
+                return Err(
+                    "The local server needs to be restarted before another request.".into(),
+                );
+            }
             if state.phase != "ready" {
                 return Err("Wait until the local model is Ready.".into());
             }
@@ -49,12 +54,20 @@ impl Runtime {
                 .clone()
                 .ok_or("The server address is unavailable.")?;
             active.current = Some((request.request_id, token.clone()));
-            url
+            (url, state.run, state.diagnostics.failed.clone())
         };
         let result = tokio::select! {
+            biased;
+            _ = failed.cancelled() => Err("The inference backend cannot continue. Check the server log and restart it.".into()),
             _ = token.cancelled() => Ok("stopped".into()),
             result = self.receive(&url, &request.messages, &mut emit) => result,
         };
+        if let Err(detail) = &result {
+            let mut state = self.server.lock().map_err(|e| e.to_string())?;
+            if state.run == run {
+                state.diagnostics.request_failed(detail);
+            }
+        }
         self.active.lock().map_err(|e| e.to_string())?.current = None;
         result
     }

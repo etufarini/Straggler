@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # Private, data-only desktop operations. The public entry point is mir.sh.
 
+desktop_invalid_setting() {
+    python3 - "$1" "$2" >&2 <<'PY'
+import json, sys
+print(json.dumps(dict(mirValidation=True, field=sys.argv[1], message=sys.argv[2])))
+PY
+    exit 1
+}
+
 desktop_request() {
     local line key value
     DESKTOP_REQUEST_FILE=$(mktemp -t mir-request.XXXXXXXX)

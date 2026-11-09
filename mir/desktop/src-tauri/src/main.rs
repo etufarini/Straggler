@@ -35,11 +35,13 @@ async fn configuration(state: State<'_, Application>) -> Result<Configuration> {
 async fn apply_settings(
     settings: Settings,
     state: State<'_, Application>,
-) -> Result<Configuration> {
-    let runtime = runtime(&state)?;
+) -> std::result::Result<Configuration, mir_desktop::workspace::ConfigurationError> {
+    let runtime = runtime(&state).map_err(mir_desktop::workspace::ConfigurationError::from)?;
     tauri::async_runtime::spawn_blocking(move || runtime.configure(settings))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+        .and_then(|result| result)
+        .map_err(mir_desktop::workspace::ConfigurationError::from)
 }
 
 #[tauri::command]

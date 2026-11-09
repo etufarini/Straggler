@@ -12,6 +12,8 @@ pub struct Message {
     #[serde(default)]
     pub reasoning: String,
     pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -131,6 +133,7 @@ mod tests {
                 content: "Partial response".into(),
                 reasoning: String::new(),
                 status: "streaming".into(),
+                error: None,
             }],
         }
     }

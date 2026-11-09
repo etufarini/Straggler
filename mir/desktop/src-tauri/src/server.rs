@@ -56,6 +56,7 @@ impl Runtime {
             url: None,
             logs: VecDeque::new(),
             error: None,
+            diagnostics: crate::diagnostics::Diagnostics::default(),
         };
         read_log(self.server.clone(), run, stdout, true);
         read_log(self.server.clone(), run, stderr, false);
@@ -68,7 +69,9 @@ impl Runtime {
             refresh_child(&mut state)?;
             (
                 state.run,
-                if matches!(state.phase.as_str(), "loading" | "ready") {
+                if state.diagnostics.issue.is_none()
+                    && matches!(state.phase.as_str(), "loading" | "ready")
+                {
                     state.url.clone()
                 } else {
                     None
@@ -92,12 +95,19 @@ impl Runtime {
         }
         let state = self.server.lock().map_err(|e| e.to_string())?;
         Ok(Status {
-            phase: state.phase.clone(),
+            phase: if state.diagnostics.issue.is_some()
+                && matches!(state.phase.as_str(), "loading" | "ready")
+            {
+                "needs-restart".into()
+            } else {
+                state.phase.clone()
+            },
             model: state.model.clone(),
             url: state.url.clone(),
             logs: state.logs.iter().cloned().collect(),
             error: state.error.clone(),
             running_settings: state.settings.clone(),
+            issue: state.diagnostics.issue.clone(),
         })
     }
 
@@ -158,7 +168,9 @@ fn refresh_child(state: &mut Server) -> Result<()> {
             state.url = None;
             state.phase = if exit.success() { "stopped" } else { "error" }.into();
             if !exit.success() {
-                state.error = Some(format!("llama.cpp exited ({exit}). Check the server log."));
+                let error = format!("llama.cpp exited ({exit}). Check the server log.");
+                state.diagnostics.process_failed(&error);
+                state.error = Some(error);
             }
         }
     }
@@ -202,6 +214,7 @@ fn read_log(
             if state.logs.len() == 300 {
                 state.logs.pop_front();
             }
+            state.diagnostics.observe_log(&line);
             state.logs.push_back(line);
         }
     });

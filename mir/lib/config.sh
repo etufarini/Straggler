@@ -2,6 +2,13 @@
 
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 
+invalid_setting() {
+    # The private desktop bridge attaches a field identifier; direct startup
+    # keeps the existing plain-text diagnostics and validation rules.
+    if declare -F desktop_invalid_setting >/dev/null; then desktop_invalid_setting "$@"; fi
+    fail "$2"
+}
+
 # llama.cpp accepts counts as signed 32-bit integers.
 
 valid_count() { [[ "$1" =~ ^(0|[1-9][0-9]{0,9})$ ]] && (( $1 <= 2147483647 )); }
@@ -145,25 +152,25 @@ initialize_config() {
 
 validate_config() {
     local key control
-    valid_port "$PORT" || fail 'Port must be an integer between 1 and 65535.'
+    valid_port "$PORT" || invalid_setting port 'Port must be an integer between 1 and 65535.'
     PORT=$((10#$PORT))
-    valid_context "$CTX_SIZE" || fail 'MIR_CTX_SIZE must be auto or an integer from 0 to 2147483647 (0 requests the full model context).'
-    valid_device "$DEVICE" || fail 'MIR_DEVICE must be auto, none or a comma-separated list of device names.'
-    valid_threads "$THREADS" || fail 'MIR_THREADS must be auto or a positive integer (up to 2147483647).'
-    valid_layers "$GPU_LAYERS" || fail 'MIR_GPU_LAYERS must be auto, all or a nonnegative integer (up to 2147483647).'
-    valid_split_mode "$SPLIT_MODE" || fail 'MIR_SPLIT_MODE must be auto, none, layer, row or tensor.'
-    valid_gpu_list ratios "$TENSOR_SPLIT" || fail 'MIR_TENSOR_SPLIT must be auto or comma-separated nonnegative proportions, with at least one positive value.'
-    valid_gpu_list margins "$FIT_TARGET" || fail 'MIR_FIT_TARGET must be auto or comma-separated nonnegative MiB integers (up to 2147483647).'
+    valid_context "$CTX_SIZE" || invalid_setting context 'Use Auto or an integer from 0 to 2147483647 for context (0 requests the full model context).'
+    valid_device "$DEVICE" || invalid_setting device 'Use Auto, none or a comma-separated list of device names.'
+    valid_threads "$THREADS" || invalid_setting threads 'CPU threads must be Auto or a positive integer (up to 2147483647).'
+    valid_layers "$GPU_LAYERS" || invalid_setting gpu_layers 'GPU layers must be Auto, all or a nonnegative integer (up to 2147483647).'
+    valid_split_mode "$SPLIT_MODE" || invalid_setting split_mode 'Split mode must be Auto, none, layer, row or tensor.'
+    valid_gpu_list ratios "$TENSOR_SPLIT" || invalid_setting tensor_split 'Use Auto or comma-separated nonnegative proportions, with at least one positive value.'
+    valid_gpu_list margins "$FIT_TARGET" || invalid_setting fit_target 'Use Auto or comma-separated nonnegative MiB integers (up to 2147483647).'
     for key in K V; do
         control="CACHE_TYPE_$key"
-        valid_cache_type "${!control}" || fail "MIR_$control must be a lowercase cache type advertised by llama-server (for example q4_0, q8_0 or f16)."
+        valid_cache_type "${!control}" || invalid_setting "${control,,}" "MIR_$control must be a lowercase cache type advertised by llama-server (for example q4_0, q8_0 or f16)."
     done
     case "$PROMPT_PROCESSING" in
         auto|low-memory|large-batch) ;;
-        *) fail 'MIR_PROMPT_PROCESSING must be auto, low-memory or large-batch.' ;;
+        *) invalid_setting prompt_processing 'MIR_PROMPT_PROCESSING must be auto, low-memory or large-batch.' ;;
     esac
     for key in "${GENERATION_KEYS[@]}"; do
-        valid_generation_value "$key" "${GENERATION[$key]}" || fail "Invalid MIR_${key^^}. Use auto or a valid generation value."
+        valid_generation_value "$key" "${GENERATION[$key]}" || invalid_setting "$key" "Invalid MIR_${key^^}. Use auto or a valid generation value."
     done
     check_dependencies runtime || exit 1
 }

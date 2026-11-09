@@ -185,6 +185,115 @@ async fn actual_launcher_bridge_stream_and_owned_shutdown() {
     assert!(TcpListener::bind(("127.0.0.1", fixture.port)).is_ok());
 }
 
+async fn wait_phase(runtime: &Runtime, phase: &str) -> mir_desktop::Status {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let status = runtime.status().await.unwrap();
+            if status.phase == phase {
+                return status;
+            }
+            tokio::time::sleep(Duration::from_millis(30)).await;
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn fatal_memory_failure_survives_health_checks_until_a_new_server_run() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    fixture.ready(&runtime).await;
+    let mut partial = String::new();
+    let result = tokio::time::timeout(
+        Duration::from_secs(5),
+        runtime.generate(request(Uuid::new_v4(), "oom-stream"), |delta| {
+            partial += &delta.content;
+            fs::write(format!("{}.continue", fixture.record.display()), []).unwrap();
+            Ok(())
+        }),
+    )
+    .await
+    .unwrap();
+    assert!(result.is_err());
+    assert_eq!(partial, "caffè ☕");
+    let status = wait_phase(&runtime, "needs-restart").await;
+    assert_eq!(
+        status.issue.unwrap().kind,
+        mir_desktop::diagnostics::IssueKind::Memory
+    );
+    // The fixture continues to advertise health after its backend has failed.
+    assert!(
+        reqwest::get(format!("http://127.0.0.1:{}/health", fixture.port))
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    assert_eq!(runtime.status().await.unwrap().phase, "needs-restart");
+    assert!(runtime
+        .generate(request(Uuid::new_v4(), "hello"), |_| Ok(()))
+        .await
+        .unwrap_err()
+        .contains("restarted"));
+    runtime.stop().unwrap();
+    let stopped = runtime.status().await.unwrap();
+    assert_eq!(stopped.phase, "stopped");
+    assert!(stopped.issue.is_some());
+    fixture.ready(&runtime).await;
+    assert!(runtime.status().await.unwrap().issue.is_none());
+    assert_eq!(
+        runtime
+            .generate(request(Uuid::new_v4(), "hello"), |_| Ok(()))
+            .await
+            .unwrap(),
+        "complete"
+    );
+    runtime.stop().unwrap();
+}
+
+#[tokio::test]
+async fn startup_and_request_oom_are_distinguished_from_recoverable_errors() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    fixture.ready(&runtime).await;
+    assert_eq!(
+        runtime
+            .generate(request(Uuid::new_v4(), "memory-warning"), |_| Ok(()))
+            .await
+            .unwrap(),
+        "complete"
+    );
+    assert_eq!(runtime.status().await.unwrap().phase, "ready");
+    runtime.stop().unwrap();
+    fixture.ready(&runtime).await;
+    assert!(runtime
+        .generate(request(Uuid::new_v4(), "compute-error"), |_| Ok(()))
+        .await
+        .unwrap_err()
+        .contains("Compute error"));
+    assert!(runtime.status().await.unwrap().issue.is_none());
+    assert!(runtime
+        .generate(request(Uuid::new_v4(), "oom"), |_| Ok(()))
+        .await
+        .is_err());
+    wait_phase(&runtime, "needs-restart").await;
+    runtime.stop().unwrap();
+    let launcher = fs::read_to_string(&fixture.launcher).unwrap();
+    fs::write(
+        &fixture.launcher,
+        launcher.replace("TEST_REQUEST=", "TEST_SERVER_MODE=oom-init TEST_REQUEST="),
+    )
+    .unwrap();
+    runtime.start(fixture.model.clone()).unwrap();
+    let status = wait_phase(&runtime, "needs-restart").await;
+    assert_eq!(
+        status.issue.unwrap().kind,
+        mir_desktop::diagnostics::IssueKind::Memory
+    );
+    runtime.stop().unwrap();
+}
+
 #[tokio::test]
 async fn cancellation_before_and_during_stream_and_new_request() {
     let fixture = Fixture::new();
