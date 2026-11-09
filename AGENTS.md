@@ -50,7 +50,7 @@ Keep mir/sh/install.sh generated from install-core.sh and canonical adapters usi
 
 ## Verification
 
-Use bash mir/tests/run.sh as the development entry point. Keep focused suites available and report skipped checks. Required checks use temporary user directories, fake executables and local HTTP fixtures; they must not install packages, contact inference services or use personal configuration. Verify test fixtures against real bridge contracts and pinned upstream examples/documentation to prevent drift.
+Use bash mir/tests/run.sh as the development entry point. Keep focused suites available and report skipped checks. Required checks use temporary user directories, fake executables and local HTTP fixtures; they must not install system packages, contact inference services or use personal configuration. Verify test fixtures against real bridge contracts and pinned upstream examples/documentation to prevent drift.
 
 Run Bash syntax checks and ShellCheck for shell changes, frontend type/lint/format checks, relevant unit and integration suites, and Linux/macOS CI. Test native windows, resources and process behavior on CPU runners of each target OS. Exercise storage failures, cancellation, process identity, migration and installation rollback when affected. No GPU, inference workload or hardware inventory is a release gate. Choose representative interactions and boundaries rather than exhaustive combinations or coverage quotas.
 

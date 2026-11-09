@@ -1,8 +1,8 @@
-use uuid::Uuid;
 use crate::{stream, ChatMessage, ChatRequest, Result, Runtime};
 use futures_util::StreamExt;
 use serde_json::{json, Value};
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 impl Runtime {
     pub fn cancel(&self, id: Uuid) -> Result<()> {

@@ -110,6 +110,7 @@ export function createFixture(scenario: Scenario) {
         cacheTypesV: ['q4_0', 'f16'],
         splitModes: ['layer', 'row'],
         multipleDevices: devices.length > 1,
+        buildNote: 'Available backends are supplied by the build adapter.',
       },
       build: null,
       profiles: [...profiles.keys()],

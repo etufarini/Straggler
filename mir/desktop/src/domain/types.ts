@@ -65,6 +65,7 @@ export interface Configuration {
     cacheTypesV: string[];
     splitModes: string[];
     multipleDevices: boolean;
+    buildNote: string;
   };
   profiles: string[];
   currentProfile: string | null;

@@ -183,3 +183,40 @@ test('invalid settings preserve the draft and display validation feedback', asyn
   await expect(page.getByRole('alert')).toContainText('CPU threads must be positive');
   await expect(page.getByRole('textbox', { name: /^CPU threads/ })).toHaveValue('0');
 });
+
+test('hardware scenarios preserve generic controls and unknown memory', async ({ page }) => {
+  for (const scenario of ['cpu', 'multiple', 'unknown-memory']) {
+    await page.goto(`/?scenario=${scenario}`);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Performance', exact: true }).click();
+    await expect(page.getByText('Auto uses llama.cpp defaults.', { exact: false })).toBeVisible();
+    if (scenario === 'multiple') {
+      await expect(page.getByText('Advanced device settings', { exact: true })).toBeVisible();
+    } else {
+      await expect(page.getByText('Advanced device settings', { exact: true })).toHaveCount(0);
+    }
+    if (scenario === 'unknown-memory')
+      await expect(page.getByText('Available RAM: Unavailable')).toBeVisible();
+  }
+});
+
+test('occupying listeners require separate normal and force confirmations', async ({ page }) => {
+  await page.goto('/?scenario=occupied');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Server & port', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Force stop process…', exact: true }),
+  ).toBeDisabled();
+  await page.getByRole('button', { name: 'Stop process using port', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('SIGTERM');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Force stop process…', exact: true }),
+  ).toBeDisabled();
+  await page.getByRole('button', { name: 'Stop process using port', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await page.getByRole('button', { name: 'Force stop process…', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('SIGKILL');
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(page.getByText('Port 9931: FREE')).toBeVisible();
+});

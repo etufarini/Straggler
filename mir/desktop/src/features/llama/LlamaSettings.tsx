@@ -59,7 +59,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
               </option>
             ))}
           </select>
-          <small>GPU builds require working drivers. CPU remains available in GPU builds.</small>
+          <small>{config.capabilities.buildNote}</small>
         </label>
         <NumberField
           label="Compiler jobs"

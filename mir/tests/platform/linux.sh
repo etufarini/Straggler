@@ -35,7 +35,6 @@ platform_open_url 'http://[::1]:9931/path with spaces'
 platform_required_tools
 [[ ${REQUIRED_TOOLS[*]} == 'curl ss' && $(platform_browser_command) == xdg-open ]]
 [[ $(platform_memory_style) == margins ]]
-platform_multi_gpu_ui
 [[ $(platform_gpu_build_note) == *'drivers'* ]]
 move_args=''
 mv() { printf -v move_args '%s|' "$@"; }

@@ -111,7 +111,7 @@ try:
         print(json.dumps(dict(cacheTypesK=arguments[0].splitlines(),
                               cacheTypesV=arguments[1].splitlines(),
                               splitModes=arguments[2].splitlines(),
-                              multipleDevices=arguments[3] == 'true')))
+                              multipleDevices=arguments[3] == 'true', buildNote=arguments[4])))
     elif operation == 'decode':
         decode()
     elif operation == 'fingerprint':

@@ -36,9 +36,9 @@ desktop_snapshot() {
     # Discovery is independent from whether an explicit CPU-only setting is active.
     server_devices || true
     server_capabilities
-    if multi_gpu_available; then multiple=true; fi
+    if multiple_devices_available; then multiple=true; fi
     capabilities=$(python3 "$MIR_ROOT/lib/desktop.py" capabilities \
-        "$(cache_types K)" "$(cache_types V)" "$(split_modes)" "$multiple")
+        "$(cache_types K)" "$(cache_types V)" "$(split_modes)" "$multiple" "$(platform_gpu_build_note)")
     for key in "${!DEVICE_NAMES[@]}"; do
         devices+=("${DEVICE_NAMES[key]}" "${DEVICE_DESCRIPTIONS[key]}")
     done

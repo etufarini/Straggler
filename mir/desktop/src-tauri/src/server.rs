@@ -1,7 +1,14 @@
 use crate::{workspace, Result, Runtime, Server, Status};
 use serde_json::Value;
-use std::{collections::VecDeque, io::{BufRead, BufReader}, os::unix::process::CommandExt,
-    process::{Command, Stdio}, sync::{Arc, Mutex}, thread, time::{Duration, Instant}};
+use std::{
+    collections::VecDeque,
+    io::{BufRead, BufReader},
+    os::unix::process::CommandExt,
+    process::{Command, Stdio},
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 use uuid::Uuid;
 
 impl Runtime {
@@ -141,7 +148,6 @@ impl Runtime {
         }
         result
     }
-
 }
 
 fn refresh_child(state: &mut Server) -> Result<()> {

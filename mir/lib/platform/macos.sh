@@ -21,7 +21,6 @@ platform_timeout() {
     "$timer" --kill-after=1 "$@" 2>/dev/null
 }
 platform_memory_style() { printf system; }
-platform_multi_gpu_ui() { return 1; }
 platform_gpu_build_note() { printf 'Metal uses the GPU support included in macOS.'; }
 # shellcheck disable=SC2034 # RAM_AVAILABLE is consumed by shared memory code.
 platform_memory_snapshot() {

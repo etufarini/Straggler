@@ -63,6 +63,7 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
         path.chmod(0o755)
+    executable(bin_dir / 'setsid', '#!/usr/bin/env python3\nimport os, sys\nos.setsid()\nos.execvp(sys.argv[1], sys.argv[1:])\n')
     executable(bin_dir / 'node', '#!/bin/sh\nexit 0\n')
     executable(bin_dir / 'npm', '#!/bin/sh\nexit "${TEST_GUI_BUILD:-0}"\n')
     executable(bin_dir / 'rustc', '#!/bin/sh\nprintf "rustc 1.96.1\\n"\n')
@@ -161,7 +162,7 @@ exec /bin/rm "$@"
         if name.startswith('lib/platform/') and name not in selected_adapters:
             assert not (target / name).exists()
         elif name != 'mir.sh':
-            assert (target / name).read_bytes() == source_path(name).read_bytes()
+            assert (target / name).read_bytes() == source_path(name).read_bytes(), name
     assert (config / 'paths.conf').read_text() == 'existing paths\n'
     assert (config / 'profiles/Personal.conf').read_text() == 'existing profile\n'
     # Launch outside the checkout to verify module lookup and literal arguments.
@@ -178,6 +179,13 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     assert result.returncode == 0, result.stderr
     assert (work / 'args').read_bytes().endswith(b'--alias\x00two words\x00')
     print('PASS: piped installer, complete runtime, paths with spaces, wrapper and personal configuration')
+
+    package(marker='failed-desktop')
+    result = install({'TEST_GUI_BUILD':'1'}, success=False)
+    assert b'Desktop preparation failed' in result.stderr
+    assert (install_dir / 'current').resolve() == target and command.is_file()
+    assert (config / 'profiles/Personal.conf').read_text() == 'existing profile\n'
+    print('PASS: failed desktop compilation preserves the active installation and settings')
 
     package(marker='second')
     install()

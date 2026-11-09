@@ -1,8 +1,14 @@
-use serde_json::Value;
-use crate::{Result, Runtime};
 use crate::workspace::{BridgeRequest, Job, JobStatus};
-use std::{io::{BufRead, BufReader, Write}, os::unix::process::CommandExt,
-    process::{Command, Stdio}, sync::{Arc, Mutex}, thread, time::{Duration, Instant}};
+use crate::{Result, Runtime};
+use serde_json::Value;
+use std::{
+    io::{BufRead, BufReader, Write},
+    os::unix::process::CommandExt,
+    process::{Command, Stdio},
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 
 impl Runtime {
     pub fn start_build(&self, tag: String, backend: String, jobs: String) -> Result<()> {

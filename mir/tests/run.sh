@@ -7,7 +7,7 @@ if [[ "$RUNTIME_BASH" != "$BASH" ]]; then exec "$RUNTIME_BASH" "${BASH_SOURCE[0]
 # Test subprocesses use the same compatible interpreter as this runner.
 export PATH="${BASH%/*}:$PATH"
 suite=${1:-all}
-case "$suite" in common|linux|macos|all) ;; *) printf 'Usage: bash mir/tests/run.sh [common|linux|macos|all]\n' >&2; exit 1 ;; esac
+case "$suite" in common|linux|macos|desktop|native|all) ;; *) printf 'Usage: bash mir/tests/run.sh [common|linux|macos|desktop|native|all]\n' >&2; exit 1 ;; esac
 if (( $# > 1 )); then exit 1; fi
 lint_pids=()
 finish_lint() {
@@ -57,6 +57,7 @@ if [[ "$suite" == common || "$suite" == all ]]; then
     run regression.sh
     run portability.sh
     run memory.sh
+    run bootstrap.sh
     finish_lint
 fi
 if [[ "$suite" == linux || "$suite" == all ]]; then
@@ -73,4 +74,25 @@ if [[ "$suite" == macos || "$suite" == all ]]; then
     run build.sh macos
     run installation.sh Darwin
     run native/macos.sh
+fi
+
+if [[ "$suite" == desktop || "$suite" == all || "$suite" == native ]]; then
+    for tool in npm cargo python3; do
+        command -v "$tool" >/dev/null || { printf 'Missing developer tool: %s. See mir/desktop/README.md.\n' "$tool" >&2; exit 1; }
+    done
+    cd -- "$MIR_ROOT/desktop"
+    if [[ ! -d node_modules ]]; then npm ci --no-audit --no-fund; fi
+    if [[ "$suite" == native ]]; then
+        npm run test:native
+    else
+        npm run format:check
+        npm run lint
+        npm run build
+        cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+        cargo clippy --locked --manifest-path src-tauri/Cargo.toml --no-default-features --all-targets -- -D warnings
+        npm test
+        npm run test:runtime
+        npm exec -- playwright install chromium webkit
+        npm run test:e2e
+    fi
 fi

@@ -61,8 +61,7 @@ exit "${TEST_EXIT:-0}"
     env.update(HOME=str(work / 'home'), XDG_DATA_HOME=str(work / 'data'), PATH=str(bin_dir) + ':' + env['PATH'], XDG_CONFIG_HOME=str(work / 'config'),
                LLAMA_CPP_DIR=str(server_dir), LLAMA_MODELS_DIR=str(models),
                TEST_ARGS=str(work / 'args'), TEST_PID=str(work / 'pid'),
-               TEST_STOP=str(work / 'stopped'), TEST_BROWSER=str(work / 'browser'),
-               TEST_QUEUE=str(work / 'queue'), TEST_DIALOG=str(work / 'dialog.log'), TERM='xterm')
+               TEST_STOP=str(work / 'stopped'), TEST_BROWSER=str(work / 'browser'))
     def run(overrides=None, arguments=None, model_path=model):
         args_file = work / 'args'
         args_file.unlink(missing_ok=True)

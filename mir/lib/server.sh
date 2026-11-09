@@ -79,23 +79,11 @@ server_devices() {
     done <<< "$DEVICE_OUTPUT"
 }
 
-multi_gpu_available() {
-    (( ${#GPU_DEVICE_NAMES[@]} >= 2 ))
-}
-
-gpu_settings_active() {
-    multi_gpu_available || return 1
-    local device=${DEVICE:-auto} name
-    local -a selected
-    local -A unique=()
-    if [[ "$device" == auto ]]; then device=${LLAMA_ARG_DEVICE:-auto}; fi
-    [[ "$device" != auto ]] || return 0
-    IFS=, read -r -a selected <<< "$device"
-    for name in "${selected[@]}"; do
-        [[ " ${GPU_DEVICE_NAMES[*]} " == *" $name "* ]] || return 1
-        unique[$name]=1
-    done
-    (( ${#unique[@]} >= 2 ))
+multiple_devices_available() {
+    local name
+    local -A distinct=()
+    for name in "${DEVICE_NAMES[@]}"; do distinct[$name]=1; done
+    (( ${#distinct[@]} >= 2 ))
 }
 
 launch_error() { LAUNCH_ERROR=$*; return 1; }

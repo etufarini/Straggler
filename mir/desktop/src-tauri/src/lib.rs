@@ -1,7 +1,7 @@
 mod builds;
-mod server;
 mod chat;
 pub mod history;
+mod server;
 pub mod stream;
 pub mod workspace;
 pub use workspace::{Configuration, JobStatus, Listener, Settings};
@@ -11,10 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     fs::{File, OpenOptions},
-    os::{
-        fd::AsRawFd,
-        unix::fs::OpenOptionsExt,
-    },
+    os::{fd::AsRawFd, unix::fs::OpenOptionsExt},
     path::PathBuf,
     process::{Child, Command},
     sync::{Arc, Mutex},
@@ -130,8 +127,6 @@ impl Runtime {
                 .map_err(|e| e.to_string())?,
         })
     }
-
-
 }
 
 impl Drop for Runtime {

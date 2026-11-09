@@ -198,8 +198,7 @@ impl Runtime {
         targets: Vec<Listener>,
     ) -> Result<Value> {
         match action {
-            "load-profile" | "save-profile" | "delete-profile" | "set-path" | "restore"
-            => {
+            "load-profile" | "save-profile" | "delete-profile" | "set-path" | "restore" => {
                 if (action == "restore"
                     || (action == "set-path"
                         && arguments.first().map(String::as_str) == Some("llama")))
@@ -282,5 +281,4 @@ impl Runtime {
         workspace.configuration = Some(next.clone());
         Ok(next)
     }
-
 }
