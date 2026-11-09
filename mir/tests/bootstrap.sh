@@ -35,6 +35,7 @@ with tempfile.TemporaryDirectory(prefix='mir-bootstrap-') as temporary:
         path.write_text(text)
         path.chmod(0o755)
     executable('dpkg-query', '#!/usr/bin/env bash\nprintf "install ok installed"\n')
+    executable('pkexec', '#!/usr/bin/env bash\nprintf "Unexpected privilege request\\n" >&2\nexit 99\n')
     executable('rustc', '#!/usr/bin/env bash\nprintf "rustc 1.96.1\\n"\n')
     executable('node', '#!/usr/bin/env bash\nexit 0\n')
     executable('npm', r'''#!/usr/bin/env bash

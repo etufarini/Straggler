@@ -5,7 +5,7 @@ MIR_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$MIR_ROOT/tests/helpers/core.sh"
 load_test_core fake
 setup_test_workspace
-initialize_config
+initialize_config ""
 server_devices() {
     GPU_DEVICE_NAMES=(First Second)
     DEVICE_FREE=([First]=4096 [Second]=2048)
