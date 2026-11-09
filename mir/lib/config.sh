@@ -137,15 +137,10 @@ initialize_config() {
     PROFILES_DIR="$CONFIG_DIR/profiles"
     declare -ga GPU_DEVICE_NAMES=()
     declare -gA DEVICE_FREE=()
-    GPU_SETTINGS_ACTIVE=false
-    MEMORY_PAGE=0
-    declare -ga MEMORY_BUTTONS=()
     CURRENT_PROFILE=""
     SAVED_PROFILE=""
     CAPABILITIES_SERVER=""
     SERVER_HELP=""
-    TUI=false
-    if (( $# == 0 )); then TUI=true; fi
 }
 
 validate_config() {

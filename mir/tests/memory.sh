@@ -1,89 +1,24 @@
 #!/usr/bin/env bash
-# Simulated memory telemetry and pagination; no inference.
+# Missing memory is optional data and never disables server controls.
 set -euo pipefail
 MIR_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$MIR_ROOT/tests/helpers/core.sh"
 load_test_core fake
-work=$(mktemp -d)
-trap 'rm -rf -- "$work"' EXIT
-SERVER="$work/llama-server"
-DEVICE=auto MEMORY_PAGE=0
-cat > "$SERVER" <<'MOCK'
-#!/usr/bin/env bash
-[[ "$1" == --list-devices ]] || exit 1
-printf '%s\n' "${MEMORY_TEST_DEVICES:-Available devices:
-  Accelerator0: First GPU (16384 MiB, 10240 MiB free)
-  Accelerator1: Unknown budget (0 MiB, 0 MiB free)
-  BLAS: CPU accelerator (0 MiB, 0 MiB free)}"
-exit "${MEMORY_TEST_EXIT:-0}"
-MOCK
-chmod +x "$SERVER"
+setup_test_workspace
+initialize_config
+server_devices() {
+    GPU_DEVICE_NAMES=(First Second)
+    DEVICE_FREE=([First]=4096 [Second]=2048)
+}
 memory_available
-[[ $RAM_AVAILABLE == 16384 && ${GPU_DEVICE_NAMES[*]} == Accelerator0 ]]
-[[ ${DEVICE_FREE[Accelerator0]} == 10240 && ${#DEVICE_FREE[@]} == 1 ]]
-[[ $(memory_line) == 'Free GiB: RAM 16.0 | GPU 10.0' ]]
-[[ $(memory_gib 512) == 0.5 ]]
-# Stable discovery order also identifies the pools across pages.
-export MEMORY_TEST_DEVICES='Available devices:
-  First: First GPU (16384 MiB, 10240 MiB free)
-  Second: Second GPU (8192 MiB, 2048 MiB free)
-  Third: Third GPU (8192 MiB, 4096 MiB free)'
-memory_available
-[[ ${GPU_DEVICE_NAMES[*]} == 'First Second Third' ]]
-for width in 16 24 32 40 72; do
-    line=$(memory_line "$width")
-    (( ${#line} <= width ))
-    [[ "$line" != *$'\n'* ]]
-done
-[[ $(memory_line 40) == *'+'* ]]
-seen=''
-for MEMORY_PAGE in 0 1 2 3; do seen+=$(memory_line 40); done
-[[ "$seen" == *GPU1* && "$seen" == *GPU2* && "$seen" == *GPU3* && "$seen" == *RAM* ]]
-MEMORY_PAGE=0
-memory_width() { printf 40; }
-memory_controls
-[[ ${MEMORY_BUTTONS[*]} == '--extra-button --extra-label Next memory' ]]
-# Duplicate, malformed, unavailable and zero-capacity reports are not extra GPUs.
-export MEMORY_TEST_DEVICES='Available devices:
-  First: GPU (16384 MiB, 10240 MiB free)
-  First: Duplicate (16384 MiB, 10240 MiB free)
-  Second: Invalid (8192 MiB, 9000 MiB free)
-  Third: Invalid (99999999999999999999 MiB, 0 MiB free)
-  Fourth: Missing memory metadata
-  bad[name]: Invalid device tag (8192 MiB, 4096 MiB free)
-  BLAS: CPU accelerator (0 MiB, 0 MiB free)'
-memory_available
-[[ ${GPU_DEVICE_NAMES[*]} == First && ${#DEVICE_FREE[@]} == 1 ]]
-export MEMORY_TEST_EXIT=1
-memory_available
-[[ ${#GPU_DEVICE_NAMES[@]} == 0 && ${#DEVICE_FREE[@]} == 0 ]]
-[[ $(memory_line) == *'GPU N/A'* ]]
+[[ $RAM_AVAILABLE == 16384 && ${DEVICE_FREE[First]} == 4096 ]]
 DEVICE=none
 memory_available
-[[ $(memory_line) == 'Free GiB: RAM 16.0 | GPU off' ]]
-# Resolve native and trailing overrides just as startup does, without changing
-# the stored selection. CPU-only telemetry must not probe the GPU backend.
-(
-    server_devices() { printf 'Unexpected CPU-only GPU probe\n' >&2; exit 1; }
-    DEVICE=auto LLAMA_ARG_DEVICE=none PORT=9931 CACHE_TYPE_K=q4_0 CACHE_TYPE_V=q4_0
-    resolve_endpoint
-    memory_available
-    [[ $DEVICE == auto && ${#GPU_DEVICE_NAMES[@]} == 0 && ${#DEVICE_FREE[@]} == 0 ]]
-    [[ $(memory_line) == 'Free GiB: RAM 16.0 | GPU off' ]]
-    DEVICE=First LLAMA_ARG_DEVICE=First
-    resolve_endpoint --device none
-    memory_available
-    [[ $DEVICE == First && $(memory_line) == 'Free GiB: RAM 16.0 | GPU off' ]]
-)
-(
-    unset MEMORY_TEST_EXIT
-    DEVICE=none LLAMA_ARG_DEVICE=none PORT=9931 CACHE_TYPE_K=q4_0 CACHE_TYPE_V=q4_0
-    resolve_endpoint --device First
-    memory_available
-    [[ $DEVICE == none && ${GPU_DEVICE_NAMES[*]} == First ]]
-    [[ $(memory_line) == 'Free GiB: RAM 16.0 | GPU 10.0' ]]
-)
+[[ $RAM_AVAILABLE == 16384 && ${#DEVICE_FREE[@]} == 0 ]]
+unset EFFECTIVE_DEVICE
+DEVICE=auto
 platform_memory_snapshot() { RAM_AVAILABLE=''; }
+server_devices() { return 1; }
 memory_available
-[[ $(memory_line) == 'Free GiB: RAM N/A | GPU off' ]]
-printf 'PASS: live RAM/device readings, stable pool order, pagination, malformed/probe failures and CPU-only telemetry\n'
+[[ -z $RAM_AVAILABLE && ${#DEVICE_FREE[@]} == 0 ]]
+printf 'PASS: optional memory data, CPU-only selection and unavailable discovery\n'

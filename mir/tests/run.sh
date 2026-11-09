@@ -31,7 +31,7 @@ run() {
 if [[ "$suite" == common || "$suite" == all ]]; then
     run architecture.sh
     test_scripts=("$MIR_ROOT"/tests/*.sh "$MIR_ROOT"/tests/helpers/*.sh "$MIR_ROOT"/tests/platform/*.sh "$MIR_ROOT"/tests/native/*.sh)
-    source_scripts=("$MIR_ROOT/mir.sh" "$MIR_ROOT"/lib/*.sh "$MIR_ROOT"/lib/tui/*.sh "$MIR_ROOT"/sh/*.sh)
+    source_scripts=("$MIR_ROOT/mir.sh" "$MIR_ROOT"/lib/*.sh "$MIR_ROOT"/sh/*.sh)
     if command -v shellcheck >/dev/null; then
         # Follow modules from the entry point so lint sees their shared state.
         # Two bounded groups avoid serially repeating module analysis per test.
@@ -57,7 +57,6 @@ if [[ "$suite" == common || "$suite" == all ]]; then
     run regression.sh
     run portability.sh
     run memory.sh
-    run tui.sh
     finish_lint
 fi
 if [[ "$suite" == linux || "$suite" == all ]]; then

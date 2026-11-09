@@ -12,7 +12,7 @@ import tempfile
 
 root = Path(sys.argv[1]).resolve()
 # Shared features must depend on services, not platform implementations.
-for file in [root/'sh/install-core.sh', *sorted((root/'lib').glob('*.sh')), *sorted((root/'lib/tui').glob('*.sh'))]:
+for file in [root/'sh/install-core.sh', *sorted((root/'lib').glob('*.sh'))]:
     if file.name in ('runtime.sh', 'platform.sh'):
         continue
     text = file.read_text()
@@ -22,7 +22,6 @@ with tempfile.TemporaryDirectory(prefix='mir-architecture-') as temporary:
     (work/'lib/platform').mkdir(parents=True)
     for source in (root/'lib').glob('*.sh'):
         (work/'lib'/source.name).symlink_to(source)
-    (work/'lib/tui').symlink_to(root/'lib/tui', target_is_directory=True)
     (work/'lib/platform/linux.sh').symlink_to(root/'lib/platform/linux.sh')
     # Omit macOS files so accidental imports fail.
     command = '''source "$1/lib/runtime.sh"

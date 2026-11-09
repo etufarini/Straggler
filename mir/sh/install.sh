@@ -108,7 +108,7 @@ platform_dependency_hint() {
     local -A hint_packages=()
     for tool in "$@"; do
         case "$tool" in
-            bash|curl|tar|gzip|dialog|grep) package="$tool" ;;
+            bash|curl|tar|gzip|grep) package="$tool" ;;
             flock) package=util-linux ;;
             ss) package=iproute2 ;;
             ps) package=procps ;;
@@ -136,9 +136,14 @@ platform_ensure_dependencies() {
     local group=$1 tool package
     local -a tools packages missing=()
     case "$group" in
+        cpu) return 0 ;;
         launcher)
-            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ss ps find sort grep dirname sleep cp)
-            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux dialog iproute2 procps findutils coreutils grep coreutils coreutils coreutils) ;;
+            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock ss ps find sort grep dirname sleep cp)
+            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux iproute2 procps findutils coreutils grep coreutils coreutils coreutils) ;;
+        desktop-runtime) tools=(python3); packages=(python3) ;;
+        desktop)
+            tools=(python3 cc c++ make pkg-config pkexec setsid)
+            packages=(python3 build-essential build-essential build-essential pkg-config policykit-1 util-linux) ;;
         build)
             tools=(git cmake make cc c++ python3 setsid timeout)
             packages=(git cmake build-essential build-essential build-essential python3 util-linux coreutils) ;;
@@ -156,6 +161,8 @@ platform_ensure_dependencies() {
         case "$group" in
             launcher) packages=(ca-certificates) ;;
             build) packages=(libssl-dev libcurl4-openssl-dev) ;;
+            desktop-runtime) packages=(libwebkit2gtk-4.1-0 libgtk-3-0) ;;
+            desktop) packages=(libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev) ;;
             vulkan) packages=(libvulkan-dev spirv-headers mesa-vulkan-drivers) ;;
             *) packages=() ;;
         esac
@@ -214,12 +221,14 @@ platform_ensure_dependencies() {
     local group=$1 index tool
     local -a tools=() formulas=() missing=()
     case "$group" in
-        metal) return 0 ;;
-        launcher) tools=(gmv gfind dialog flock); formulas=(coreutils findutils dialog flock) ;;
+        cpu|metal) return 0 ;;
+        launcher) tools=(gmv gfind flock); formulas=(coreutils findutils flock) ;;
         build) tools=(cmake python3 gtimeout); formulas=(cmake python coreutils) ;;
+        desktop-runtime) tools=(python3); formulas=(python) ;;
+        desktop) tools=(python3 gtimeout); formulas=(python coreutils) ;;
         *) printf 'Unknown dependency group: %s\n' "$group" >&2; return 1 ;;
     esac
-    if [[ "$group" == build ]]; then
+    if [[ "$group" == build || "$group" == desktop ]]; then
         if ! xcode-select -p >/dev/null 2>&1 || ! xcrun --find clang >/dev/null 2>&1 ||
             ! xcrun --find clang++ >/dev/null 2>&1 || ! xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1; then
             printf 'Apple command line tools and a macOS SDK are required. Run xcode-select --install, finish installation, then retry.\n' >&2
@@ -253,13 +262,10 @@ platform_ensure_dependencies() {
 check_dependencies() {
     local mode=$1 tool
     local -a missing=() tools=()
-    if [[ "$mode" == tui ]]; then tools=(dialog);
-    else
-        platform_required_tools
-        tools=("${REQUIRED_TOOLS[@]}")
-        if [[ "$mode" == install ]]; then
-            tools+=(bash uname tar gzip mktemp chmod mkdir mv ln rm flock dialog ps find sort grep dirname sleep cp)
-        fi
+    platform_required_tools
+    tools=("${REQUIRED_TOOLS[@]}")
+    if [[ "$mode" == install ]]; then
+        tools+=(bash uname tar gzip mktemp chmod mkdir mv ln rm flock ps find sort grep dirname sleep cp)
     fi
     for tool in "${tools[@]}"; do
         command -v "$tool" >/dev/null || missing+=("$tool")
@@ -275,8 +281,9 @@ check_dependencies() {
     if [[ "$mode" == install ]]; then printf 'The existing installation has not been changed.\n' >&2; fi
     return 1
 }
+
 runtime_files() {
-    printf '%s\n' mir.sh dialogrc sh/uninstall.sh lib/gguf.py lib/build.sh lib/config.sh lib/launcher.sh lib/memory.sh lib/paths.sh lib/platform.sh lib/processes.sh lib/profiles.sh lib/runtime.sh lib/server.sh lib/tui/build.sh lib/tui/common.sh lib/tui/folders.sh lib/tui/main.sh lib/tui/profiles.sh lib/tui/settings.sh
+    printf '%s\n' mir.sh sh/uninstall.sh lib/gguf.py lib/desktop.py desktop/runtime-files.txt lib/bootstrap.sh lib/build.sh lib/config.sh lib/desktop.sh lib/launcher.sh lib/memory.sh lib/paths.sh lib/platform.sh lib/processes.sh lib/profiles.sh lib/runtime.sh lib/server.sh desktop/README.md desktop/index.html desktop/package-lock.json desktop/package.json desktop/src-tauri/Cargo.lock desktop/src-tauri/Cargo.toml desktop/src-tauri/build.rs desktop/src-tauri/capabilities/main.json desktop/src-tauri/icons/128x128.png desktop/src-tauri/icons/128x128@2x.png desktop/src-tauri/icons/32x32.png desktop/src-tauri/icons/icon.png desktop/src-tauri/icons/icon.svg desktop/src-tauri/src/builds.rs desktop/src-tauri/src/chat.rs desktop/src-tauri/src/history.rs desktop/src-tauri/src/lib.rs desktop/src-tauri/src/main.rs desktop/src-tauri/src/server.rs desktop/src-tauri/src/stream.rs desktop/src-tauri/src/workspace.rs desktop/src-tauri/tauri.conf.json desktop/src-tauri/tauri.macos.conf.json desktop/src/app/App.tsx desktop/src/app/ConfirmationDialog.tsx desktop/src/app/Sidebar.tsx desktop/src/app/useWorkspace.ts desktop/src/components/FolderBrowser.tsx desktop/src/components/NumberField.tsx desktop/src/components/statusLabels.ts desktop/src/domain/types.ts desktop/src/features/chat/ChatPanel.tsx desktop/src/features/chat/Markdown.tsx desktop/src/features/chat/useConversation.ts desktop/src/features/llama/LlamaSettings.tsx desktop/src/features/server/ServerPanel.tsx desktop/src/features/settings/FolderSettings.tsx desktop/src/features/settings/ModelSettings.tsx desktop/src/features/settings/PerformanceSettings.tsx desktop/src/features/settings/SavedConfigurations.tsx desktop/src/features/settings/ServerSettings.tsx desktop/src/features/settings/Settings.tsx desktop/src/features/settings/useSettings.ts desktop/src/main.tsx desktop/src/services/desktop.ts desktop/src/services/fixtures.ts desktop/src/style.css desktop/tsconfig.json desktop/vite.config.ts
     case "$PLATFORM_ID" in
         linux) printf '%s\n' lib/platform/linux.sh ;;
         macos) printf '%s\n' lib/platform/macos.sh lib/platform/macos-bootstrap.sh ;;
@@ -297,10 +304,6 @@ main() {
     fi
     load_platform "$PLATFORM_ID"
     platform_ensure_dependencies launcher || exit 1
-    BROWSER=$(platform_browser_command)
-    if ! command -v "$BROWSER" >/dev/null; then
-        printf 'WARNING: %s is missing; automatic browser opening will be unavailable.\nOpen the server address manually.\n' "$BROWSER" >&2
-    fi
 
     INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp"
     BIN_DIR="$HOME/.local/bin"
@@ -311,6 +314,10 @@ main() {
     # Keep the inode so concurrent installers lock the same file.
     exec 9> "$INSTALL_DIR/.install.flock"
     flock -n 9 || fail 'Another Mir.cpp installation is running. Retry when it finishes.'
+    if [[ -f "$INSTALL_DIR/desktop/session.lock" && ! -L "$INSTALL_DIR/desktop/session.lock" ]]; then
+        exec 7< "$INSTALL_DIR/desktop/session.lock"
+        flock -n 7 || fail 'Close Mir.cpp desktop before updating.'
+    fi
     NEW_COMMAND=true
     if [[ -e "$COMMAND" || -L "$COMMAND" ]]; then
         NEW_COMMAND=false
@@ -354,7 +361,7 @@ main() {
     tar -xzf "$STAGE/source.tar.gz" --no-same-owner --no-same-permissions \
         --strip-components=2 -C "$STAGE" -- "${MEMBERS[@]}" 9>&-
     DOCUMENTS=(README.md mir/docs/guide.md mir/docs/images/logo.png
-        mir/docs/screenshots/main-menu.png mir/docs/screenshots/model-settings.png
+        mir/docs/screenshots/desktop-chat.png mir/docs/screenshots/desktop-settings.png
         mir/docs/screenshots/llama-setup.png)
     MEMBERS=()
     for file in "${DOCUMENTS[@]}"; do MEMBERS+=("$archive_root/$file"); done
@@ -366,6 +373,7 @@ main() {
         if [[ "$file" == *.sh ]]; then "$BASH" -n "$STAGE/$file"; fi
     done
     chmod +x "$STAGE/mir.sh"
+    "$BASH" "$STAGE/mir.sh" --prepare-desktop || fail 'Desktop preparation failed. The working installation was kept.'
 
     # Use a wrapper rather than a launcher symlink: modules resolve beside the script.
     WRAPPER=$(mktemp "$BIN_DIR/.mir.XXXXXXXX")
@@ -405,7 +413,7 @@ main() {
         *":$BIN_DIR:"*) printf 'You can also run: mir\n' ;;
         *) printf 'To use the mir command, add %s to your PATH.\n' "$BIN_DIR" ;;
     esac
-    printf 'In Folders, select a llama.cpp build or use Install / update llama.cpp where available, then choose your models folder.\n'
+    printf 'Open Settings to configure llama.cpp, your models folder and model settings.\n'
 }
 
 main "$@"

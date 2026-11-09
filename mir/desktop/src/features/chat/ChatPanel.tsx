@@ -1,0 +1,202 @@
+import Markdown from './Markdown';
+import { ArrowUp, HardDrive, LoaderCircle, Check, Copy, Square } from 'lucide-react';
+import { fileName } from '../../domain/types';
+import { messageStatusLabel } from '../../components/statusLabels';
+import type { WorkspaceController } from '../../app/useWorkspace';
+export default function ChatPanel({ controller }: { controller: WorkspaceController }) {
+  const {
+    follow,
+    chat,
+    setInput,
+    textarea,
+    active,
+    setPanel,
+    setCopied,
+    setError,
+    copied,
+    end,
+    canSend,
+    send,
+    sendPromise,
+    server,
+    input,
+    generating,
+    cancel,
+  } = controller;
+  return (
+    <>
+      <div
+        className="messages"
+        onScroll={(event) => {
+          const el = event.currentTarget;
+          follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+        }}
+      >
+        {chat.messages.length === 0 ? (
+          <div className="welcome">
+            <div className="welcome-mark">
+              <span /> <span /> <span />
+            </div>
+            <span className="eyebrow">A SPACE FOR YOUR IDEAS</span>
+            <h1>What’s on your mind?</h1>
+            <p>
+              A conversation, a fresh perspective, a place to think.
+              <br />
+              Powered by a model running right here.
+            </p>
+            <div className="suggestions">
+              {[
+                [
+                  'Explore an idea',
+                  'Help me explore an idea by asking me a few thoughtful questions.',
+                ],
+                [
+                  'Make something clear',
+                  'Help me understand a topic. Ask me what I would like to learn.',
+                ],
+                [
+                  'Start writing',
+                  'Help me get started on a piece of writing. Ask me about its purpose and audience.',
+                ],
+              ].map(([label, prompt]) => (
+                <button
+                  key={label}
+                  onClick={() => {
+                    setInput(prompt);
+                    textarea.current?.focus();
+                  }}
+                >
+                  <span>{label}</span>
+                  <ArrowUp size={15} />
+                </button>
+              ))}
+            </div>
+            {!active && (
+              <button className="welcome-load" onClick={() => setPanel('models')}>
+                <HardDrive size={15} />
+                Choose a model to get started <span>→</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="message-column">
+            {chat.messages.map((message) => (
+              <article className={`message ${message.role}`} key={message.id}>
+                <div className="message-avatar">{message.role === 'user' ? 'Y' : 'm·'}</div>
+                <div className="message-body">
+                  <div className="message-heading">
+                    {message.role === 'user' ? 'You' : 'Mir.cpp'}
+                    {message.role === 'assistant' && (
+                      <span>{chat.model ? fileName(chat.model) : 'Local model'}</span>
+                    )}
+                  </div>
+                  {message.reasoning && (
+                    <details className="reasoning">
+                      <summary>Reasoning</summary>
+                      <Markdown>{message.reasoning}</Markdown>
+                    </details>
+                  )}
+                  <div className="markdown">
+                    <Markdown>{message.content}</Markdown>
+                  </div>
+                  {message.status === 'streaming' && (
+                    <span className="typing-indicator">
+                      <LoaderCircle size={14} className="spin" />{' '}
+                      {message.content ? 'Generating' : 'Thinking'}
+                    </span>
+                  )}
+                  {messageStatusLabel[message.status] && (
+                    <div className="message-status">{messageStatusLabel[message.status]}</div>
+                  )}
+                  {message.role === 'assistant' &&
+                    message.content &&
+                    message.status !== 'streaming' && (
+                      <button
+                        className="copy-button"
+                        aria-label="Copy response"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(message.content);
+                            setCopied(message.id);
+                            setTimeout(() => setCopied(''), 1600);
+                          } catch (e) {
+                            setError(`Cannot copy text: ${String(e)}`);
+                          }
+                        }}
+                      >
+                        {copied === message.id ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    )}
+                </div>
+              </article>
+            ))}
+            <div ref={end} />
+          </div>
+        )}
+      </div>
+
+      <div className="composer-wrap">
+        <form
+          className="composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSend) {
+              const pending = send();
+              sendPromise.current = pending;
+              void pending;
+            }
+          }}
+        >
+          <textarea
+            ref={textarea}
+            aria-label="Message"
+            placeholder={
+              server.phase === 'ready'
+                ? 'Message your local model…'
+                : 'Load a model to start a conversation…'
+            }
+            value={input}
+            disabled={generating}
+            rows={3}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                if (canSend) event.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+          <div className="composer-footer">
+            <span>
+              <span className="privacy-dot" />
+              Local by design
+            </span>
+            <div>
+              <span className="keyboard-hint">Shift + Enter for a new line</span>
+              {generating ? (
+                <button
+                  type="button"
+                  className="send-button stop"
+                  aria-label="Stop response"
+                  onClick={() => void cancel().catch((e) => setError(String(e)))}
+                >
+                  <Square size={15} fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="send-button"
+                  aria-label="Send message"
+                  disabled={!canSend || !input.trim()}
+                >
+                  <ArrowUp size={19} />
+                </button>
+              )}
+            </div>
+          </div>
+        </form>
+        <p className="composer-note">Models can make mistakes. Check important information.</p>
+      </div>
+    </>
+  );
+}

@@ -42,7 +42,7 @@ command() {
     if [[ $1 == -v ]]; then
         case "$2" in
             brew) [[ ${TEST_NO_BREW:-0} == 0 ]]; return $? ;;
-            cmake|python3|gtimeout|gmv|gfind|dialog|flock)
+            cmake|python3|gtimeout|gmv|gfind|flock)
                 [[ ${TEST_MISSING:-0} == 0 || -f "$TEST_WORK/installed" ]]; return $? ;;
             git|make|cc|c++) return 0 ;;
         esac
@@ -88,7 +88,7 @@ if platform_ensure_dependencies build refuse; then exit 1; fi
     check('''check_dependencies() { [[ $1 == install ]]; }
 TEST_SDK_FAIL=1 platform_ensure_dependencies launcher
 capture() {
-    [[ $* == 'macos_install_packages coreutils findutils dialog flock' ]]
+    [[ $* == 'macos_install_packages coreutils findutils flock' ]]
     touch "$TEST_WORK/installed"
 }
 TEST_MISSING=1 platform_ensure_dependencies launcher capture
@@ -100,74 +100,4 @@ if platform_ensure_dependencies launcher; then exit 1; fi
     print('PASS: launcher package mapping, SDK-independent setup and native dependency failures')
     print('PASS: CPU/Metal flags, SDK prerequisite, missing Homebrew/tools, grouped packages and dependency rollback')
 
-    code = source + '''THEME_FILE="$MIR_ROOT/dialogrc"
-ui --infobox 'Before build dependencies' 7 60
-result=0
-platform_ensure_dependencies build dependency_terminal || result=$?
-ui --infobox 'After build dependencies' 7 60
-exit "$result"
-'''
-    def terminal_check(answer, failure):
-        (work / 'installed').unlink(missing_ok=True)
-        (work / 'packages').unlink(missing_ok=True)
-        master, slave = pty.openpty()
-        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 80, 0, 0))
-        def session():
-            os.setsid()
-            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-        process = subprocess.Popen(['bash', '-euo', 'pipefail', '-c', code, 'test', str(root)],
-                                   stdin=slave, stdout=slave, stderr=slave,
-                                   env=env | {'TEST_MISSING':'1', 'TEST_BREW_FAIL':str(failure)},
-                                   preexec_fn=session)
-        os.close(slave)
-        output = bytearray()
-        def pump():
-            if select.select([master], [], [], 0.05)[0]:
-                try:
-                    output.extend(os.read(master, 65536))
-                except OSError:
-                    pass
-        def await_text(text):
-            deadline = time.monotonic() + 5
-            while text not in output and time.monotonic() < deadline:
-                pump()
-            assert text in output, output
-        try:
-            await_text(b'[y/N]')
-            os.write(master, answer.encode() + b'\n')
-            await_text(b'Press Enter to return to Mir.cpp.')
-            assert b'After build dependencies' not in output and process.poll() is None
-            os.write(master, b'\n')
-            deadline = time.monotonic() + 5
-            while process.poll() is None and time.monotonic() < deadline:
-                pump()
-            assert process.poll() is not None, output
-            while select.select([master], [], [], 0.05)[0]:
-                try:
-                    data = os.read(master, 65536)
-                except OSError:
-                    break
-                if not data:
-                    break
-                output.extend(data)
-            assert (process.returncode == 0) == (answer == 'y' and failure == 0), output
-            clear = b'\x1b[0m\x1b[2J\x1b[H'
-            first = output.index(clear)
-            last = output.index(clear, first + len(clear))
-            assert output.index(b'Before build dependencies') < first < output.index(b'Missing dependency packages')
-            assert output.index(b'Press Enter to return') < last < output.index(b'After build dependencies')
-            if answer == 'y':
-                assert first < output.index(b'BREW_OUTPUT') < last
-                assert (work / 'packages').read_text() == 'install --formula cmake python coreutils\n'
-            else:
-                assert not (work / 'packages').exists()
-            assert (work / 'installed').exists() == (answer == 'y' and failure == 0)
-        finally:
-            os.close(master)
-            if process.poll() is None:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait(timeout=5)
-    for answer, failure in [('y',0), ('n',0), ('y',1)]:
-        terminal_check(answer, failure)
-    print('PASS: real 80x24 Homebrew consent, cancellation/failure, output handoff and menu redraw with simulated packages')
 PY

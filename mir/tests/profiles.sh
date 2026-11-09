@@ -39,18 +39,8 @@ for value in 'temperature=nan' 'top_p=2' 'seed=4294967296' 'max_tokens=-2'; do
     if load_profile "$PROFILES_DIR/Invalid.conf"; then exit 1; fi
     [[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
 done
-# Invalid or canceled edits preserve all saved values and tracking.
-message() { :; }
-ui() { printf 'bad'; }
-before=$(profile_data)
-edit_generation_value temperature
-[[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
-ui() { return 255; }
-edit_generation_value seed
-generation_menu
-[[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
 rm "$PROFILES_DIR/Generation.conf" "$PROFILES_DIR/Invalid.conf"
-printf 'PASS: generation profile round trips, invalid/canceled edits and sampling isolation\n'
+printf 'PASS: generation profile round trips, transactional rejection and sampling isolation\n'
 
 export MIR_PORT=11000 MIR_CACHE_TYPE_K=f32 MIR_CACHE_TYPE_V=q8_0
 export MIR_GENERATION_PRESET=exploratory LLAMA_ARG_CACHE_TYPE_V=f16

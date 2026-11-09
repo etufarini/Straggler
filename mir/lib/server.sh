@@ -80,7 +80,7 @@ server_devices() {
 }
 
 multi_gpu_available() {
-    platform_multi_gpu_ui && (( ${#GPU_DEVICE_NAMES[@]} >= 2 ))
+    (( ${#GPU_DEVICE_NAMES[@]} >= 2 ))
 }
 
 gpu_settings_active() {
@@ -96,11 +96,6 @@ gpu_settings_active() {
         unique[$name]=1
     done
     (( ${#unique[@]} >= 2 ))
-}
-
-refresh_gpu_settings() {
-    GPU_SETTINGS_ACTIVE=false
-    if platform_multi_gpu_ui && server_devices && gpu_settings_active; then GPU_SETTINGS_ACTIVE=true; fi
 }
 
 launch_error() { LAUNCH_ERROR=$*; return 1; }
@@ -189,9 +184,8 @@ prepare_server() {
     local key flag name types value
     LAUNCH_ERROR=''
     [[ -f "$SERVER" && -x "$SERVER" ]] || { launch_error 'llama-server not found. Set the llama.cpp folder in Folders, or use MIR_LLAMA_CPP_DIR.'; return 1; }
-    [[ -z "$PATHS_WARNING" || "$TUI" == true ]] || printf '%s\n' "$PATHS_WARNING" >&2
+    [[ -z "$PATHS_WARNING" ]] || printf '%s\n' "$PATHS_WARNING" >&2
     [[ -f "$MODEL" && -r "$MODEL" ]] || { launch_error "GGUF model missing or unreadable: $MODEL"; return 1; }
-    if "$TUI"; then refresh_gpu_settings; fi
     build_model_args
     ARGS=("${MODEL_ARGS[@]}" --port "$PORT")
     if [[ -n "$SERVER_HOST" ]]; then ARGS+=(--host "$SERVER_HOST"); fi
@@ -261,7 +255,7 @@ build_model_args() {
     if [[ "$DEVICE" != auto ]]; then MODEL_ARGS+=(--device "$DEVICE"); fi
     if [[ "$DEVICE" == none ]]; then MODEL_ARGS+=(--gpu-layers 0);
     elif [[ "$GPU_LAYERS" != auto ]]; then MODEL_ARGS+=(--gpu-layers "$GPU_LAYERS"); fi
-    if [[ "$DEVICE" != none ]] && { ! "$TUI" || "$GPU_SETTINGS_ACTIVE"; }; then
+    if [[ "$DEVICE" != none ]]; then
         for setting in SPLIT_MODE TENSOR_SPLIT FIT_TARGET; do
             flag=${setting,,}; flag=${flag//_/-}
             if [[ "${!setting}" != auto ]]; then MODEL_ARGS+=("--$flag" "${!setting}"); fi
@@ -288,16 +282,11 @@ run_server() {
     trap 'cleanup' EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM
-    if "$TUI"; then
-        LOG_FILE=$(mktemp "${TMPDIR:-/tmp}/mir.cpp.XXXXXXXX")
-        "$SERVER" "${ARGS[@]}" >"$LOG_FILE" 2>&1 &
-    else
-        printf 'Model: %s\nContext: %s\nWeb UI: %s\n' "$MODEL" "$(context_label)" "$URL"
-        printf 'KV cache: K %s | V %s\n' "$EFFECTIVE_CACHE_TYPE_K" "$EFFECTIVE_CACHE_TYPE_V"
-        printf 'Device: %s | CPU threads: %s | GPU layers: %s | Prompt processing: %s\nStop with Ctrl+C.\n' \
-            "$DEVICE" "$THREADS" "$GPU_LAYERS" "$PROMPT_PROCESSING"
-        "$SERVER" "${ARGS[@]}" &
-    fi
+    printf 'Model: %s\nContext: %s\nWeb UI: %s\n' "$MODEL" "$CTX_SIZE" "$URL"
+    printf 'KV cache: K %s | V %s\n' "$EFFECTIVE_CACHE_TYPE_K" "$EFFECTIVE_CACHE_TYPE_V"
+    printf 'Device: %s | CPU threads: %s | GPU layers: %s | Prompt processing: %s\nStop with Ctrl+C.\n' \
+        "$DEVICE" "$THREADS" "$GPU_LAYERS" "$PROMPT_PROCESSING"
+    "$SERVER" "${ARGS[@]}" &
     SERVER_PID=$!
     OPENED=false
     while kill -0 "$SERVER_PID" 2>/dev/null; do
@@ -307,15 +296,10 @@ run_server() {
             fi
             OPENED=true
         fi
-        if "$TUI"; then
-            running_screen
-        else
-            sleep 2
-        fi
+        sleep 2
     done
     RESULT=0
     wait "$SERVER_PID" || RESULT=$?
     SERVER_PID=""
-    if "$TUI" && (( RESULT != 0 )); then view_log; fi
     exit "$RESULT"
 }

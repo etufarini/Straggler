@@ -108,11 +108,9 @@ exec "$TEST_REAL_PS" "$@"
     env.update(HOME=str(home), XDG_CONFIG_HOME=str(home / 'config'),
                XDG_DATA_HOME=str(home / 'data'), PATH=str(commands) + ':' + os.environ['PATH'],
                MIR_ROOT=str(root), TEST_GPU=gpu, TEST_WORK=str(work), TEST_REAL_PS=shutil.which('ps'))
-    sources = 'source "$MIR_ROOT/tests/helpers/core.sh"\nload_test_core ' + adapter + '\n'
+    sources = 'source "$MIR_ROOT/tests/helpers/core.sh"\nload_test_core ' + adapter + '\nsource \"$MIR_ROOT/lib/desktop.sh\"\ninstall_build() { (platform_ensure_dependencies() { return 0; }; desktop_build \"$@\") || return; load_paths; SERVER=$(server_path \"$LLAMA_CPP_PATH\"); }\n'
     init = '''initialize_config
 mkdir -p "$CONFIG_DIR"
-message() { printf '%s\\n' "$*" >> "$TEST_WORK/messages"; }
-ui() { /bin/sleep 0.03; return 5; }
 '''
 
     def check(code, overrides=None, success=True, timeout=12):
@@ -129,30 +127,11 @@ done
     check('latest_build_tag', {'TEST_NETWORK_FAIL': '1'}, success=False)
     print('PASS: release ordering, prereleases, network errors and literal tag validation')
 
-    check(r'''install_build() { printf '%s\0' "$@" >> "$TEST_WORK/confirmed-builds"; }
-ui() {
-    if [[ $* == *--inputbox* ]]; then
-        [[ ${TEST_CANCEL:-0} == 0 ]] || return 255
-        printf '%s' "$TEST_JOBS"
-    else return "${TEST_CONFIRM:-0}"; fi
-}
-for value in 1 64; do TEST_JOBS=$value; confirm_build v1 cpu; done
-stage=$(mktemp -d "$TEST_WORK/jobs.XXXXXXXX")
-for value in '' 0 01 -1 65 1.5 '1+1' '$(touch executed)'; do
-    TEST_JOBS=$value
-    confirm_build v1 cpu
-    if build_release "$stage" v1 cpu "$value" ''; then exit 1; fi
+    check('''for jobs in 1 64; do valid_build_jobs "$jobs"; done
+for jobs in '' 0 01 -1 65 1.5 '1+1' '$(touch executed)'; do
+    if valid_build_jobs "$jobs"; then exit 1; fi
 done
-[[ ! -e "$stage/source" ]]
-rmdir -- "$stage"
-TEST_JOBS=2 TEST_CONFIRM=1 confirm_build v1 cpu
-TEST_JOBS=2 TEST_CANCEL=1 confirm_build v1 cpu
 ''')
-    assert (work / 'confirmed-builds').read_bytes().split(b'\0')[:-1] == [
-        b'v1', b'cpu', b'1', b'v1', b'cpu', b'64']
-    assert not (work / 'git.args').exists() and not (work / 'cmake.args').exists()
-    print('PASS: compiler job boundaries, invalid inputs before checkout and canceled build confirmation')
-
     check('''LLAMA_CPP_PATH="$HOME/external"
 mkdir -p "$LLAMA_CPP_PATH"; echo original > "$LLAMA_CPP_PATH/keep"
 MODEL="$HOME/model.gguf"; touch "$MODEL"
@@ -268,61 +247,6 @@ if install_build locked cpu 2; then exit 1; fi
 ''')
     print('PASS: checkout/compiler/probe/UI/device/storage failures and concurrent build protection')
 
-    for slow, name in [('TEST_SLOW','worker'), ('TEST_SLOW_PROBE','probe')]:
-        check('''previous=$LLAMA_CPP_PATH; before=$(cat "$PATHS_FILE")
-ui() {
-    if [[ ${UI_TITLE:-} == 'Building llama.cpp' ]]; then
-        for attempt in {1..100}; do
-            [[ -f "$TEST_WORK/$TEST_PROCESS_NAME.pid" ]] && break
-            /bin/sleep 0.01
-        done
-        /bin/sleep 0.05
-        return 1
-    fi
-    return 0
-}
-if install_build canceled cpu 2; then exit 1; fi
-[[ $LLAMA_CPP_PATH == "$previous" && $(cat "$PATHS_FILE") == "$before" ]]
-for attempt in {1..100}; do
-    [[ -f "$TEST_WORK/$TEST_PROCESS_NAME.stopped" ]] && break
-    /bin/sleep 0.01
-done
-[[ -f "$TEST_WORK/$TEST_PROCESS_NAME.stopped" ]]
-''', {slow:'1', 'TEST_PROCESS_NAME':name})
-    print('PASS: confirmed cancellation stops both compiler and server probes and preserves paths')
-
-    # Both interruption timings share cleanup, including assertion/timeout failures.
-    for race in (False, True):
-        for name in ('worker.pid', 'worker.stopped', 'ps-started'):
-            (work / name).unlink(missing_ok=True)
-        process = subprocess.Popen(['bash', '-euo', 'pipefail', '-c', sources + init + 'install_build interrupted cpu 2'],
-                                   env=env | {'TEST_SLOW':'1', 'TEST_PS_RACE':str(int(race))},
-                                   start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        worker_group = None
-        try:
-            expected = ('worker.pid', 'ps-started') if race else ('worker.pid',)
-            deadline = time.monotonic() + 5
-            while not all((work / name).exists() for name in expected) and time.monotonic() < deadline:
-                time.sleep(0.01)
-            assert all((work / name).exists() for name in expected), expected
-            worker_group = os.getpgid(int((work / 'worker.pid').read_text()))
-            os.killpg(process.pid, signal.SIGTERM)
-            process.communicate(timeout=5)
-            deadline = time.monotonic() + 3
-            while not (work / 'worker.stopped').exists() and time.monotonic() < deadline:
-                time.sleep(0.02)
-            assert (work / 'worker.stopped').exists()
-        finally:
-            if worker_group:
-                try:
-                    os.killpg(worker_group, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            if process.poll() is None:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait(timeout=3)
-        print('PASS: launcher SIGTERM stops its worker' + (' during initial identity lookup' if race else ''))
-
     check(r'''metadata="$LLAMA_CPP_PATH/mir-build.conf"
 cp "$metadata" "$TEST_WORK/metadata"
 for invalid in format=2 'tag=$(touch executed)' commit=invalid backend=unknown previous=../outside; do
@@ -348,20 +272,11 @@ rm -- "$metadata"
 cp "$TEST_WORK/metadata" "$metadata"
 read_build "$LLAMA_CPP_PATH"
 if read_build "$LLAMA_CPP_PATH/../../builds/${LLAMA_CPP_PATH##*/}"; then exit 1; fi
-latest_build_tag() { printf b2; }
-ui() { return 0; }
-menu() {
-    if [[ -f "$TEST_WORK/menu.visited" ]]; then printf back;
-    else touch "$TEST_WORK/menu.visited"; printf update; fi
-}
-platform_ensure_dependencies() { return 0; }
-build_menu
 ''')
-    assert 'already the latest' in (work / 'messages').read_text()
-    print('PASS: metadata fields/structure/symlinks, contained managed paths and current-release menu')
+    print('PASS: metadata fields, contained paths, symlinks and duplicate rejection')
 
     if adapter != 'linux':
-        print('PASS: macOS managed CPU/Metal builds, update/restore and worker cancellation fixtures')
+        print('PASS: macOS managed CPU/Metal builds, update/restore and compiler failure fixtures')
         sys.exit(0)
 
     # Simulated package operations use a pipe for the script and a PTY for consent.
@@ -389,14 +304,6 @@ command() {
     if [[ $1 == -v && $2 == cmake ]]; then return 1; fi
     builtin command "$@"
 }
-if [[ ${TEST_TUI:-0} == 1 ]]; then
-    THEME_FILE="$MIR_ROOT/dialogrc"
-    ui --infobox 'Dependency menu marker' 7 60
-    result=0
-    platform_ensure_dependencies build dependency_terminal || result=$?
-    ui --infobox 'Returned to menu marker' 7 60
-    exit "$result"
-fi
 platform_ensure_dependencies build
 '''
     def dependency_run(answer, overrides=None):
@@ -434,10 +341,6 @@ platform_ensure_dependencies build
                     time.sleep(0.01)
                 assert not termios.tcgetattr(master)[3] & termios.ECHO
                 os.write(master, b'test-password\n')
-            if settings.get('TEST_TUI') == '1':
-                await_text(b'Press Enter to return to Mir.cpp.')
-                assert b'Returned to menu marker' not in output and process.poll() is None
-                os.write(master, b'\n')
             deadline = time.monotonic() + 5
             while process.poll() is None and time.monotonic() < deadline:
                 if select.select([master], [], [], 0.05)[0]:
@@ -470,24 +373,4 @@ platform_ensure_dependencies build
     assert dependency_run('y', {'TEST_APT_FAIL': '1'})[0] != 0
     print('PASS: terminal consent with piped input, limited sudo, refusal and package failure')
 
-    clear = b'\x1b[0m\x1b[2J\x1b[H'
-    for answer, failure in [('y','0'), ('n','0'), ('y','1')]:
-        before = (work / 'packages').read_bytes()
-        status, output = dependency_run(answer, {'TEST_TUI':'1', 'TEST_APT_FAIL':failure, 'TEST_PASSWORD':'1'})
-        assert (status == 0) == (answer == 'y' and failure == '0'), output
-        first_clear = output.index(clear)
-        last_clear = output.index(clear, first_clear + len(clear))
-        assert output.index(b'Dependency menu marker') < first_clear < output.index(b'Missing dependency packages')
-        assert output.index(b'Press Enter to return') < last_clear < output.index(b'Returned to menu marker')
-        assert b'test-password' not in output
-        if answer == 'y':
-            assert first_clear < output.index(b'PACKAGE_STDOUT') < last_clear
-            assert first_clear < output.index(b'PACKAGE_STDERR') < last_clear
-        else:
-            assert b'PACKAGE_STDOUT' not in output and (work / 'packages').read_bytes() == before
-    result = check('''debian_package_manager() { return 0; }
-platform_ensure_dependencies build dependency_terminal
-''')
-    assert not result.stdout and not result.stderr
-    print('PASS: 80x24 dialog handoff, sudo input, stdout/stderr, pause and redraw on success/failure/refusal; no pause when ready')
 PY

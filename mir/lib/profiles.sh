@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+valid_profile_name() { [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9\ ._-]{0,79}$ ]]; }
+
 profile_data() {
     local key
     printf 'model=%s\ncontext=%s\nport=%s\ndevice=%s\nthreads=%s\ngpu_layers=%s\nprompt_processing=%s\ncache_type_k=%s\ncache_type_v=%s\n' \

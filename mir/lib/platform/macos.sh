@@ -74,12 +74,14 @@ platform_ensure_dependencies() {
     local group=$1 index tool
     local -a tools=() formulas=() missing=()
     case "$group" in
-        metal) return 0 ;;
-        launcher) tools=(gmv gfind dialog flock); formulas=(coreutils findutils dialog flock) ;;
+        cpu|metal) return 0 ;;
+        launcher) tools=(gmv gfind flock); formulas=(coreutils findutils flock) ;;
         build) tools=(cmake python3 gtimeout); formulas=(cmake python coreutils) ;;
+        desktop-runtime) tools=(python3); formulas=(python) ;;
+        desktop) tools=(python3 gtimeout); formulas=(python coreutils) ;;
         *) printf 'Unknown dependency group: %s\n' "$group" >&2; return 1 ;;
     esac
-    if [[ "$group" == build ]]; then
+    if [[ "$group" == build || "$group" == desktop ]]; then
         if ! xcode-select -p >/dev/null 2>&1 || ! xcrun --find clang >/dev/null 2>&1 ||
             ! xcrun --find clang++ >/dev/null 2>&1 || ! xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1; then
             printf 'Apple command line tools and a macOS SDK are required. Run xcode-select --install, finish installation, then retry.\n' >&2
@@ -123,3 +125,13 @@ platform_build_probe() {
     if ! command -v "$timer" >/dev/null; then timer=timeout; fi
     "$timer" --foreground --kill-after=2 30 "$@"
 }
+
+platform_node_system() { printf darwin; }
+platform_install_desktop_packages() { brew install "$@"; }
+
+platform_authorize_build_packages() {
+    shift
+    platform_install_desktop_packages "$@"
+}
+
+platform_desktop_package_allowed() { return 1; }

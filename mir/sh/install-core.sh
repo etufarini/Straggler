@@ -14,10 +14,6 @@ main() {
     fi
     load_platform "$PLATFORM_ID"
     platform_ensure_dependencies launcher || exit 1
-    BROWSER=$(platform_browser_command)
-    if ! command -v "$BROWSER" >/dev/null; then
-        printf 'WARNING: %s is missing; automatic browser opening will be unavailable.\nOpen the server address manually.\n' "$BROWSER" >&2
-    fi
 
     INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp"
     BIN_DIR="$HOME/.local/bin"
@@ -28,6 +24,10 @@ main() {
     # Keep the inode so concurrent installers lock the same file.
     exec 9> "$INSTALL_DIR/.install.flock"
     flock -n 9 || fail 'Another Mir.cpp installation is running. Retry when it finishes.'
+    if [[ -f "$INSTALL_DIR/desktop/session.lock" && ! -L "$INSTALL_DIR/desktop/session.lock" ]]; then
+        exec 7< "$INSTALL_DIR/desktop/session.lock"
+        flock -n 7 || fail 'Close Mir.cpp desktop before updating.'
+    fi
     NEW_COMMAND=true
     if [[ -e "$COMMAND" || -L "$COMMAND" ]]; then
         NEW_COMMAND=false
@@ -71,7 +71,7 @@ main() {
     tar -xzf "$STAGE/source.tar.gz" --no-same-owner --no-same-permissions \
         --strip-components=2 -C "$STAGE" -- "${MEMBERS[@]}" 9>&-
     DOCUMENTS=(README.md mir/docs/guide.md mir/docs/images/logo.png
-        mir/docs/screenshots/main-menu.png mir/docs/screenshots/model-settings.png
+        mir/docs/screenshots/desktop-chat.png mir/docs/screenshots/desktop-settings.png
         mir/docs/screenshots/llama-setup.png)
     MEMBERS=()
     for file in "${DOCUMENTS[@]}"; do MEMBERS+=("$archive_root/$file"); done
@@ -83,6 +83,7 @@ main() {
         if [[ "$file" == *.sh ]]; then "$BASH" -n "$STAGE/$file"; fi
     done
     chmod +x "$STAGE/mir.sh"
+    "$BASH" "$STAGE/mir.sh" --prepare-desktop || fail 'Desktop preparation failed. The working installation was kept.'
 
     # Use a wrapper rather than a launcher symlink: modules resolve beside the script.
     WRAPPER=$(mktemp "$BIN_DIR/.mir.XXXXXXXX")
@@ -122,7 +123,7 @@ main() {
         *":$BIN_DIR:"*) printf 'You can also run: mir\n' ;;
         *) printf 'To use the mir command, add %s to your PATH.\n' "$BIN_DIR" ;;
     esac
-    printf 'In Folders, select a llama.cpp build or use Install / update llama.cpp where available, then choose your models folder.\n'
+    printf 'Open Settings to configure llama.cpp, your models folder and model settings.\n'
 }
 
 main "$@"
