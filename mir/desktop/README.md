@@ -1,38 +1,34 @@
-# Mir.cpp desktop development
+# Desktop development
 
-Normal installed startup is `mir`; source startup is `bash mir/mir.sh` from the
-repository root. Both automatically prepare the same embedded desktop app.
-See the [user guide](../docs/guide.md) for installation, settings and data paths.
+Mir.cpp is written for human maintainers. Frontend modules separate app composition,
+chat, settings, server controls, llama.cpp maintenance, shared controls and native
+transport. Rust modules separate the bridge, server, chat, builds and history.
 
-The shared layout follows [Tauri project structure](https://v2.tauri.app/start/project-structure/):
-frontend code stays in src/, native code in src-tauri/src/, and platform packaging
-overrides in src-tauri/tauri.macos.conf.json. Shared launch behavior stays in the
-Bash bridge; lib/platform.sh and lib/platform.py hold Linux/macOS adapters.
-See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for system tools.
-The normal macOS preparation target is 13.5+ (the private Node 24 minimum).
+Normal source startup is `bash mir/mir.sh`; desktop preparation is automatic.
+Developer tools are Bash 4.4+, Python 3, compatible Node/npm and Rust 1.92+ with
+rustfmt and Clippy. Native window builds also require the platform's
+[Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
-This directory contains the React/TypeScript frontend and Tauri 2 native runtime.
-The Bash bridge reuses launcher validation, paths, profiles, builds and memory
-planning. Runtime settings and the edited draft are separate. Desktop chat does
-not overwrite browser chats or model profile data.
+From the repository root, run `bash mir/tests/run.sh` for the complete automated
+suite, including the native window when a graphical session is available, or select `common`, `linux`, `macos`, `desktop` or `native`. The runner
+prepares npm dependencies and browser downloads when needed. Tests use isolated
+directories, fake executables and a local HTTP server; no GPU, models or working
+llama.cpp installation are needed. Linux native-window tests can use xvfb-run.
 
-For frontend-only development, npm run dev opens an explicit interface preview
-without native services. npm run desktop starts Tauri's development workflow;
-these commands are developer conveniences and are not required by users.
-The release preparation path embeds frontend assets and runs no development server.
+From this directory, `npm run dev` opens the frontend development server.
+Append `?scenario=empty`, `cpu`, `multiple`, `unknown-memory`, `occupied`,
+`save-error`, `model-error`, `interrupted` or `cancel` to exercise simulated services.
+The banner identifies simulation; production builds exclude fixture transport.
+A plain browser preview reports unavailable native services.
 
-Tests: npm test, npm run test:runtime, npm run test:e2e and npm run test:native.
-Rust runtime checks can use --no-default-features without GUI development headers.
-The browser suite uses an explicit mocked native bridge. Runtime integration tests
-exercise the real Bash bridge with test HTTP servers, release checkouts and compiler
-fixtures; these are not inference or GPU validation. Automated native smoke tests use the Linux WebKitGTK inspector and require a
-graphical session and a debug binary, use isolated temporary data and a test server,
-and can select another binary using MIR_TEST_NATIVE. MIR_TEST_SHUTDOWN=signal checks
-SIGTERM cleanup. On macOS, run the runtime/browser suites and verify the prepared
-.app window, backend menu, fixture streaming, persistence and confirmed shutdown
-through the native interface. Browser tests use /usr/bin/google-chrome unless MIR_TEST_BROWSER
-selects another Chromium executable.
+Use `npm run desktop` for native development, `npm run format` for formatting,
+and `npm run test:native` for the actual window with a test server. Native tests
+use a debug-only embedded WebDriver plugin on both Linux and macOS. Production
+builds reject the native-tests feature. No inspector-specific client is needed.
 
-Keep runtime-files.txt aligned with the source files needed by the curl installer.
-Do not include node_modules, dist, target, generated schemas or test output there.
-The GUI sources stay under mir/desktop; public shell entry remains mir.sh.
+Keep runtime-files.txt aligned with bundled sources and regenerate the standalone
+installer after moving runtime files. Do not include generated output, tests,
+node_modules or target in the runtime manifest.
+
+See the [guide](../docs/guide.md#development-on-one-computer) for architecture,
+settings, contracts, preparation, data paths and release maintenance.
