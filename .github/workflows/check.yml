@@ -62,7 +62,7 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           WEBKIT_DISABLE_COMPOSITING_MODE: '1'
-        run: dbus-run-session -- xvfb-run -a bash mir/tests/run.sh native
+        run: xvfb-run -a dbus-run-session -- bash mir/tests/run.sh native
       - name: Native window on macOS
         if: runner.os == 'macOS'
         run: bash mir/tests/run.sh native

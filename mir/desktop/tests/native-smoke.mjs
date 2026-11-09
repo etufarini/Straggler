@@ -180,16 +180,16 @@ try {
       /caffè ☕/,
     );
     const history = path.join(stage, 'data/mir.cpp/desktop/conversations');
-    const files = await readdir(history);
-    const saved = JSON.parse(
-      await readFile(
-        path.join(
-          history,
-          files.find((name) => name.endsWith('.json')),
-        ),
-        'utf8',
-      ),
-    );
+    let conversationFile, saved;
+    // Rendering a response and atomically saving it are separate async operations.
+    await until(async () => {
+      const files = await readdir(history);
+      const filename = files.find((name) => name.endsWith('.json'));
+      if (!filename) return false;
+      conversationFile = path.join(history, filename);
+      saved = JSON.parse(await readFile(conversationFile, 'utf8'));
+      return saved.messages[1]?.status === 'complete';
+    }, 'completed response persisted');
     assert.equal(saved.messages[1].content, 'caffè ☕');
     assert.equal(saved.messages[1].status, 'complete');
     await mkdir(path.join(desktop, 'test-results'), { recursive: true });
@@ -256,15 +256,7 @@ try {
       await evaluate('document.querySelector(".confirmation .primary-button").click()');
     }
     await until(() => app.exitCode !== null, 'native window exit');
-    const final = JSON.parse(
-      await readFile(
-        path.join(
-          history,
-          files.find((name) => name.endsWith('.json')),
-        ),
-        'utf8',
-      ),
-    );
+    const final = JSON.parse(await readFile(conversationFile, 'utf8'));
     if (process.env.MIR_TEST_SHUTDOWN !== 'signal') {
       assert.equal(final.messages[3].status, 'stopped');
       assert.equal(final.messages[3].content, 'caffè ☕');
