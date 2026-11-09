@@ -35,15 +35,18 @@ async function freePort() {
 
 async function until(predicate, description) {
   const deadline = Date.now() + 20000;
+  let lastError;
   while (Date.now() < deadline) {
     try {
       if (await predicate()) return;
-    } catch {
-      /* The window may still be loading. */
+    } catch (error) {
+      lastError = error;
     }
     await wait(100);
   }
-  throw new Error(`Timed out: ${description}`);
+  throw new Error(`Timed out: ${description}${lastError ? ` (${lastError.message})` : ''}`, {
+    cause: lastError,
+  });
 }
 
 let app, driver, session, inspectPage;
@@ -80,12 +83,12 @@ try {
   app.stdout.pipe(log);
   app.stderr.pipe(log);
   driver = `http://127.0.0.1:${automationPort}`;
-  async function request(method, endpoint, data) {
+  async function request(method, endpoint, data, timeout = 5000) {
     const response = await fetch(driver + endpoint, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: data === undefined ? undefined : JSON.stringify(data),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(timeout),
     });
     const { value } = await response.json();
     if (!response.ok || value?.error)
@@ -93,10 +96,17 @@ try {
     return value;
   }
   await until(async () => {
-    const created = await request('POST', '/session', { capabilities: {} });
-    session = created.sessionId;
-    return session;
-  }, 'native WebDriver session');
+    if (app.exitCode !== null || app.signalCode !== null) {
+      throw new Error(`Desktop exited before WebDriver startup: ${app.exitCode ?? app.signalCode}`);
+    }
+    const status = await request('GET', '/status');
+    return status.ready;
+  }, 'native WebDriver server');
+  // Session creation can wait 10s for the window and 30s for WebKit evaluation.
+  // Send it once with that budget instead of aborting and retrying every 5s.
+  const created = await request('POST', '/session', { capabilities: {} }, 45000);
+  session = created.sessionId;
+  assert.ok(session, 'WebDriver must return a session identifier');
   async function evaluate(expression) {
     return request('POST', `/session/${session}/execute/sync`, {
       script: `return (${expression})`,
