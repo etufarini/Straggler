@@ -46,3 +46,17 @@ if platform_move /source /target invalid; then exit 1; fi
 hint=$(platform_dependency_hint ss flock ps)
 [[ "$hint" == *iproute2* && "$hint" == *util-linux* && "$hint" == *procps* ]]
 printf 'PASS: Linux adapter listeners, inspection failures, browser, tools, memory capability and atomic move contract\n'
+
+# shellcheck disable=SC2329 # These test doubles are called indirectly by the platform adapter.
+(
+    debian_package_manager() { return 0; }
+    # Record through a file because package checks run in command substitutions.
+    setup_test_workspace
+    dpkg-query() { printf '%s\n' "${*: -1}" >> "$work/packages"; printf '%s' 'install ok installed'; }
+    platform_ensure_dependencies desktop-runtime
+    [[ $(cat "$work/packages") == libwebkit2gtk-4.1-0 ]]
+    dpkg-query() { return 1; }
+    capture() { [[ $* == 'install_dependency_packages desktop-runtime libwebkit2gtk-4.1-0' ]]; }
+    platform_ensure_dependencies desktop-runtime capture
+)
+printf 'PASS: WebKitGTK runtime dependency is independent of GTK package renaming\n'

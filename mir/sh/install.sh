@@ -161,7 +161,8 @@ platform_ensure_dependencies() {
         case "$group" in
             launcher) packages=(ca-certificates) ;;
             build) packages=(libssl-dev libcurl4-openssl-dev) ;;
-            desktop-runtime) packages=(libwebkit2gtk-4.1-0 libgtk-3-0) ;;
+            # WebKitGTK depends on the distribution's GTK runtime (including t64 variants).
+            desktop-runtime) packages=(libwebkit2gtk-4.1-0) ;;
             desktop) packages=(libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev) ;;
             vulkan) packages=(libvulkan-dev spirv-headers mesa-vulkan-drivers) ;;
             *) packages=() ;;

@@ -68,6 +68,7 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
     executable(bin_dir / 'npm', '#!/bin/sh\nexit "${TEST_GUI_BUILD:-0}"\n')
     executable(bin_dir / 'rustc', '#!/bin/sh\nprintf "rustc 1.96.1\\n"\n')
     executable(bin_dir / 'pkg-config', '#!/bin/sh\nexit 0\n')
+    executable(bin_dir / 'dpkg-query', '#!/bin/sh\nprintf "install ok installed"\n')
     executable(bin_dir / 'pkexec', '#!/bin/sh\nexit 99\n')
     executable(bin_dir / 'cargo', '''#!/usr/bin/env bash
 mkdir -p "$CARGO_TARGET_DIR/release/bundle/macos/Mir.cpp.app/Contents/MacOS"
