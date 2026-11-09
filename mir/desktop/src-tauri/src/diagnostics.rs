@@ -38,8 +38,10 @@ impl Diagnostics {
 
     pub fn request_failed(&mut self, detail: &str) {
         let text = detail.to_ascii_lowercase();
-        let memory =
-            memory_error(&text) || (text.contains("compute error") && self.recent_memory_error());
+        // A generic compute error cannot establish that an earlier allocation
+        // warning caused this request to fail. Require explicit memory evidence
+        // in the response, or a fatal backend/process diagnostic from the log.
+        let memory = memory_error(&text);
         if memory || backend_failed(&text) {
             self.record_failure(detail, memory);
         }
@@ -99,11 +101,14 @@ mod tests {
         diagnostics.observe_log("warning: out of memory, retrying allocation");
         assert!(diagnostics.issue.is_none());
         assert!(!diagnostics.failed.is_cancelled());
-        let mut unknown = Diagnostics::default();
-        unknown.request_failed("Compute error.");
-        assert!(unknown.issue.is_none());
-        diagnostics.memory_error = Some(Instant::now() - Duration::from_secs(11));
         diagnostics.request_failed("Compute error.");
+        assert!(diagnostics.issue.is_none());
+        diagnostics.memory_error = Some(Instant::now() - Duration::from_secs(11));
+        diagnostics.process_failed("The process exited.");
+        assert!(diagnostics.issue.is_none());
+        diagnostics.observe_log("warning: out of memory, retrying allocation");
+        diagnostics.request_succeeded();
+        diagnostics.process_failed("The process exited.");
         assert!(diagnostics.issue.is_none());
     }
 
