@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test-only llama-server stand-in. No model inference is performed."""
+# Pinned upstream API and diagnostic references are in mir/desktop/README.md.
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -43,7 +44,9 @@ class Handler(BaseHTTPRequestHandler):
         request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         with open(os.environ['TEST_REQUEST'], 'w') as record:
             json.dump(request, record)
-        prompt = request['messages'][-1]['content']
+        # Failed assistant turns are omitted, so consecutive user turns can be
+        # merged. Fixture control words belong to the final user paragraph.
+        prompt = request['messages'][-1]['content'].split('\n\n')[-1]
         if prompt in ('oom', 'compute-error'):
             if prompt == 'oom':
                 report_memory_failure()
@@ -75,7 +78,10 @@ class Handler(BaseHTTPRequestHandler):
             if prompt == 'oom-stream':
                 # The test acknowledges receipt before the independent log failure.
                 deadline = time.monotonic() + 5
-                while not os.path.exists(os.environ['TEST_REQUEST'] + '.continue') and time.monotonic() < deadline:
+                while (
+                    not os.path.exists(os.environ['TEST_REQUEST'] + '.continue')
+                    and time.monotonic() < deadline
+                ):
                     time.sleep(0.01)
                 report_memory_failure()
             if prompt in ('wait', 'oom-stream'):

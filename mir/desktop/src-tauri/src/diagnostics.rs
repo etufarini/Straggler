@@ -51,6 +51,10 @@ impl Diagnostics {
         }
     }
 
+    pub fn request_succeeded(&mut self) {
+        self.memory_error = None;
+    }
+
     fn recent_memory_error(&self) -> bool {
         self.memory_error
             .is_some_and(|time| time.elapsed() <= Duration::from_secs(10))

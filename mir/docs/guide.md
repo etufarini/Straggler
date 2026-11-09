@@ -106,8 +106,31 @@ own server and build workers.
 
 A failed request reports the error and preserves partial text. Stop response keeps
 partial text too. Interrupted responses remain identifiable when history is reopened.
-Storage errors stay visible; Retry saving retries the current conversation. Do not
-close the window before resolving an unsaved-data error.
+Request failures stay with their response. Open Technical details for the original
+diagnostic; Review settings opens Model settings. Invalid settings are identified
+under the relevant field without discarding edited values. Build failures appear
+in Settings → llama.cpp, beside the build log.
+
+Storage errors remain beside the composer. Retry saving writes the current
+conversation again; Retry loading reloads unavailable history. New chat and history
+switching are disabled while the current conversation has unsaved text. Settings,
+logs and server controls remain available. Keep the window open until saving works;
+Mir.cpp reports saved data only after the write succeeds.
+
+An explicit fatal backend failure changes the server status to **Needs restart**.
+For confirmed memory exhaustion, the persistent banner says **Not enough memory**.
+Stop server asks for confirmation and releases the supervised server. The banner
+then offers Review settings: consider a smaller context, Performance → Prompt
+processing → Low memory, or a less demanding model/quantization before restarting.
+Settings and profiles are never changed automatically. These choices can reduce
+memory demand; they do not guarantee that a model fits.
+
+A healthy HTTP endpoint alone does not clear a recorded fatal backend failure.
+The diagnosis belongs to that server run, remains available after Stop, and clears
+when a new server is started. A generic Compute error is not diagnosed as OOM
+without explicit memory evidence. Recoverable allocation warnings do not by
+themselves block chat. This reports llama.cpp failures; it cannot prevent macOS or
+another operating system from terminating processes when resources are exhausted.
 
 ## Files and configuration compatibility
 
@@ -251,6 +274,12 @@ For UI work, run `npm run dev` from mir/desktop and open one of these URLs:
 | `?scenario=model-error` | Unsupported chat request |
 | `?scenario=interrupted` | Interrupted response |
 | `?scenario=cancel` | A response waiting for cancellation |
+| `?scenario=oom` | Fatal memory failure during a response and reviewed recovery |
+| `?scenario=oom-startup` | Fatal memory failure while loading |
+| `?scenario=oom-and-save-error` | Independent server and persistence failures |
+| `?scenario=compute-error` | Unknown compute failure without an OOM diagnosis |
+| `?scenario=history-error` | Unavailable conversation storage |
+| `?scenario=build-error` | Build failure in the llama.cpp settings section |
 
 These pages clearly identify simulated services. They need neither Tauri nor
 llama.cpp. Fixture transport is removed from production assets. A preview without
@@ -279,7 +308,10 @@ llama.cpp remains responsible for inference correctness and backend performance.
 
 Frontend code is grouped into app composition, feature components/hooks, shared
 controls, domain types and the desktop service. Native modules separate commands,
-workspace/bridge, server supervision, chat streaming, builds and history.
+workspace/bridge, server supervision, diagnostics, chat streaming, builds and history.
+The launcher owns setting validation and returns field identifiers through the
+private bridge. The UI uses shared Feedback and FieldError components; each feature
+owns the placement and recovery actions for its errors.
 
 ```text
 React features → desktop service → Tauri runtime → mir.sh --desktop
@@ -310,6 +342,9 @@ notes before creating a tag or publishing. Never move an existing tag.
 - **Port IN USE:** choose a free port or inspect the listener before confirming a stop.
 - **No memory measurement:** continue using the controls; llama.cpp reports loading
   failures. A missing measurement is not a capacity prediction.
+- **Not enough memory / Needs restart:** stop the server, review context and prompt
+  processing, then restart. Read the log for the original diagnostic. If it still
+  fails, choose a smaller model or quantization.
 - **Preparation fails:** inspect terminal output, system prerequisites, network access
   and disk space. Existing builds and user data remain available.
 - **Storage fails:** keep the window open, fix space/permissions and retry saving.

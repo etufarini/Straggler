@@ -167,4 +167,29 @@ mod tests {
         assert!(history.list().unwrap_err().contains("file was kept"));
         assert!(dir.path().join("broken.json").exists());
     }
+
+    #[test]
+    fn request_diagnostics_round_trip_and_older_conversations_still_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::new(dir.path().to_owned()).unwrap();
+        let mut chat = conversation();
+        chat.messages[0].status = "error".into();
+        chat.messages[0].error = Some("Compute error.".into());
+        history.save(&chat).unwrap();
+        assert_eq!(
+            history.list().unwrap()[0].messages[0].error.as_deref(),
+            Some("Compute error.")
+        );
+        let mut legacy = serde_json::to_value(&chat).unwrap();
+        legacy["messages"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("error");
+        fs::write(
+            dir.path().join(format!("{}.json", chat.id)),
+            serde_json::to_vec(&legacy).unwrap(),
+        )
+        .unwrap();
+        assert!(history.list().unwrap()[0].messages[0].error.is_none());
+    }
 }

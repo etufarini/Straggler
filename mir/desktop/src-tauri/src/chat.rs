@@ -62,12 +62,17 @@ impl Runtime {
             _ = token.cancelled() => Ok("stopped".into()),
             result = self.receive(&url, &request.messages, &mut emit) => result,
         };
-        if let Err(detail) = &result {
-            let mut state = self.server.lock().map_err(|e| e.to_string())?;
-            if state.run == run {
-                state.diagnostics.request_failed(detail);
+        let mut state = self.server.lock().map_err(|e| e.to_string())?;
+        if state.run == run {
+            match &result {
+                Err(detail) => state.diagnostics.request_failed(detail),
+                Ok(status) if matches!(status.as_str(), "complete" | "length") => {
+                    state.diagnostics.request_succeeded()
+                }
+                _ => {}
             }
         }
+        drop(state);
         self.active.lock().map_err(|e| e.to_string())?.current = None;
         result
     }

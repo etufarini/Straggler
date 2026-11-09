@@ -265,8 +265,6 @@ async fn startup_and_request_oom_are_distinguished_from_recoverable_errors() {
         "complete"
     );
     assert_eq!(runtime.status().await.unwrap().phase, "ready");
-    runtime.stop().unwrap();
-    fixture.ready(&runtime).await;
     assert!(runtime
         .generate(request(Uuid::new_v4(), "compute-error"), |_| Ok(()))
         .await

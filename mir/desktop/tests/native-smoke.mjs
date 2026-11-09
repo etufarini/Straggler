@@ -117,6 +117,22 @@ try {
     return request('GET', `/session/${session}/screenshot`);
   }
   inspectPage = evaluate;
+  async function fillField(selector, text) {
+    await evaluate(`(() => {
+      const input = document.querySelector(${JSON.stringify(selector)});
+      const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, ${JSON.stringify(text)});
+      input.dispatchEvent(new Event('input', {bubbles:true}));
+    })()`);
+  }
+  async function sendMessage(text) {
+    await fillField('textarea', text);
+    await until(
+      () => evaluate('!document.querySelector(".send-button").disabled'),
+      'enabled composer',
+    );
+    await evaluate('document.querySelector(".composer").requestSubmit()');
+  }
   if (process.env.MIR_CAPTURE_DOCS) {
     await until(
       () => evaluate('document.querySelector(".settings-heading h1")?.textContent === "Settings"'),
@@ -153,6 +169,38 @@ try {
       () => evaluate('globalThis.isTauri && document.querySelector(".count")?.textContent === "1"'),
       'native configuration',
     );
+    await evaluate(
+      'Array.from(document.querySelectorAll(".sidebar-bottom button")).find(button => button.textContent.trim() === "Settings").click()',
+    );
+    await until(() => evaluate('!!document.querySelector(".settings-nav")'), 'settings navigation');
+    await evaluate(
+      'Array.from(document.querySelectorAll(".settings-nav button")).find(button => button.textContent === "Performance").click()',
+    );
+    await until(
+      () => evaluate('!!document.querySelector("input[aria-label^=CPU]")'),
+      'performance fields',
+    );
+    await fillField('input[aria-label="CPU threads"]', '0');
+    await evaluate('document.querySelector(".configuration-heading button").click()');
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector("input[aria-label^=CPU]")?.getAttribute("aria-invalid") === "true"',
+        ),
+      'native validation attached to its field',
+    );
+    assert.match(
+      await evaluate('document.querySelector(".field-error").textContent'),
+      /positive integer/,
+    );
+    await fillField('input[aria-label="CPU threads"]', '2');
+    await evaluate('document.querySelector(".configuration-heading button").click()');
+    await until(
+      () =>
+        evaluate('document.querySelector(".success-message")?.textContent === "Settings applied."'),
+      'corrected settings',
+    );
+    await evaluate('document.querySelector(".settings-heading button").click()');
     await evaluate('document.querySelector("nav button").click()');
     await until(
       () => evaluate('!!document.querySelector(".panel .primary-button:not(:disabled)")'),
@@ -163,14 +211,7 @@ try {
       () => evaluate('document.querySelector(".local-badge")?.textContent === "Ready"'),
       'server readiness',
     );
-    await evaluate(
-      `(() => { const input = document.querySelector('textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'Native test question'); input.dispatchEvent(new Event('input', {bubbles:true})); })()`,
-    );
-    await until(
-      () => evaluate('!document.querySelector(".send-button").disabled'),
-      'enabled composer',
-    );
-    await evaluate('document.querySelector(".composer").requestSubmit()');
+    await sendMessage('Native test question');
     await until(
       () => evaluate('!!document.querySelector(".copy-button")'),
       'native streaming response',
@@ -198,6 +239,27 @@ try {
       path.join(desktop, 'test-results/native-chat.png'),
       Buffer.from(shot, 'base64'),
     );
+    await sendMessage('oom-stream');
+    await until(
+      () =>
+        evaluate(
+          'document.querySelectorAll(".assistant .markdown")[1]?.textContent === "caffè ☕"',
+        ),
+      'partial response before backend failure',
+    );
+    await writeFile(path.join(stage, 'request.json.continue'), '');
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".local-badge")?.textContent === "Needs restart" && document.querySelector(".workspace-feedback")?.textContent.includes("Not enough memory")',
+        ),
+      'fatal backend error despite successful health checks',
+    );
+    await until(async () => {
+      const failed = JSON.parse(await readFile(conversationFile, 'utf8'));
+      return failed.messages[3]?.status === 'error' && failed.messages[3]?.content === 'caffè ☕';
+    }, 'saved partial response after OOM');
+    assert.equal(await evaluate('document.querySelector(".send-button").disabled'), true);
     await evaluate('document.querySelector(".server-card").click()');
     await evaluate('document.querySelector(".danger-button").click()');
     await evaluate('document.querySelector(".confirmation .primary-button").click()');
@@ -216,18 +278,15 @@ try {
       () => evaluate('document.querySelector(".local-badge")?.textContent === "Ready"'),
       'server restart',
     );
-    await evaluate(
-      `(() => { const input = document.querySelector('textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'wait'); input.dispatchEvent(new Event('input', {bubbles:true})); })()`,
-    );
     await until(
-      () => evaluate('!document.querySelector(".send-button").disabled'),
-      'second composer',
+      () => evaluate('!document.querySelector(".workspace-feedback")'),
+      'fresh server without stale failure',
     );
-    await evaluate('document.querySelector(".composer").requestSubmit()');
+    await sendMessage('wait');
     await until(
       () =>
         evaluate(
-          'document.querySelectorAll(".assistant .markdown")[1]?.textContent === "caffè ☕"',
+          'document.querySelectorAll(".assistant .markdown")[2]?.textContent === "caffè ☕"',
         ),
       'active partial response',
     );
@@ -258,15 +317,15 @@ try {
     await until(() => app.exitCode !== null, 'native window exit');
     const final = JSON.parse(await readFile(conversationFile, 'utf8'));
     if (process.env.MIR_TEST_SHUTDOWN !== 'signal') {
-      assert.equal(final.messages[3].status, 'stopped');
-      assert.equal(final.messages[3].content, 'caffè ☕');
+      assert.equal(final.messages[5].status, 'stopped');
+      assert.equal(final.messages[5].content, 'caffè ☕');
     }
     const released = net.createServer();
     released.listen(port, '127.0.0.1');
     await once(released, 'listening');
     await new Promise((resolve) => released.close(resolve));
     console.log(
-      `PASS: real Tauri/WebKit window, discovery, readiness, IPC streaming, saved response, confirmed Stop, restart and server cleanup on ${process.env.MIR_TEST_SHUTDOWN === 'signal' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
+      `PASS: real Tauri/WebKit window, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.MIR_TEST_SHUTDOWN === 'signal' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
     );
     console.log('Screenshot: test-results/native-chat.png (test server; no model inference)');
   }
