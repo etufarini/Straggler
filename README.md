@@ -4,6 +4,8 @@
 
 # Mir.cpp
 
+Mir.cpp is written for humans to read, maintain, and improve.
+
 Install and manage llama.cpp on Linux and macOS through simple terminal menus.
 Choose a local GGUF model, adjust its settings, save configurations and launch
 the chat interface in your browser.
