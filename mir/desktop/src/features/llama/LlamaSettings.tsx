@@ -1,4 +1,5 @@
 import type { SettingsController } from '../settings/useSettings';
+import Feedback from '../../components/Feedback';
 import NumberField from '../../components/NumberField';
 import { invoke } from '../../services/desktop';
 import type { JobStatus } from '../../domain/types';
@@ -122,8 +123,12 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
       </div>
       <p role="status" className="job-status">
         Build status: {job.phase}
-        {job.error ? ` · ${job.error}` : ''}
       </p>
+      {job.error && (
+        <Feedback title="llama.cpp build failed" details={job.error}>
+          The working installation has been kept. Review the build log before trying again.
+        </Feedback>
+      )}
       {building && (
         <button
           className="danger-button"

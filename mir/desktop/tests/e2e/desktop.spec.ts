@@ -63,6 +63,32 @@ test('cancel keeps partial response and permits the next conversation', async ({
   await expect(page.getByRole('button', { name: /New chat/ })).toBeEnabled();
 });
 
+test('clipboard failure stays beside its response without blocking chat', async ({ page }) => {
+  await mockDesktop(page);
+  await page.goto('/');
+  await loadModel(page);
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A response to copy');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  const copy = page.getByRole('button', { name: 'Copy response' });
+  await expect(copy).toBeVisible();
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          throw new Error('Clipboard unavailable');
+        },
+      },
+    }),
+  );
+  await copy.click();
+  await expect(page.locator('.message.assistant').getByRole('alert')).toContainText(
+    'Text could not be copied',
+  );
+  await expect(page.locator('.workspace-feedback')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeEnabled();
+});
+
 test('storage failure preserves input in conversation and can be retried', async ({ page }) => {
   await mockDesktop(page, 'save-error');
   await page.goto('/');
@@ -87,9 +113,7 @@ test('unsupported chat is reported and leaves the conversation usable', async ({
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A question');
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.getByRole('alert')).toContainText('Unsupported chat template');
-  await expect(
-    page.getByText('Response failed · partial text kept', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('Response failed', { exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeEnabled();
 });
 
@@ -182,6 +206,147 @@ test('invalid settings preserve the draft and display validation feedback', asyn
   await page.getByRole('button', { name: 'Apply changes', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('CPU threads must be positive');
   await expect(page.getByRole('textbox', { name: /^CPU threads/ })).toHaveValue('0');
+  await expect(page.getByRole('textbox', { name: /^CPU threads/ })).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
+  await expect(page.locator('.workspace-feedback')).toHaveCount(0);
+  await page.getByRole('textbox', { name: /^CPU threads/ }).fill('2');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('fatal OOM stays visible through polling, preserves partial text and supports reviewed recovery', async ({
+  page,
+}) => {
+  await mockDesktop(page, 'oom');
+  await page.goto('/');
+  await loadModel(page);
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this response');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  const failure = page.locator('.workspace-feedback .feedback');
+  await expect(failure).toContainText('Not enough memory');
+  await expect(page.locator('.local-badge')).toHaveText('Needs restart');
+  await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this draft too');
+  await expect(page.getByRole('button', { name: 'Send message' })).toBeDisabled();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.evaluate(() => {
+    const state = window as Window & { errorNode?: Element | null; contentNode?: Element | null };
+    state.errorNode = document.querySelector('.workspace-feedback .feedback');
+    state.contentNode = document.querySelector('.image-placeholder');
+  });
+  // Observe the same elements across background status/configuration updates.
+  await page.waitForTimeout(5500);
+  expect(
+    await page.evaluate(() => {
+      const state = window as Window & { errorNode?: Element | null; contentNode?: Element | null };
+      return (
+        state.errorNode === document.querySelector('.workspace-feedback .feedback') &&
+        state.contentNode === document.querySelector('.image-placeholder')
+      );
+    }),
+  ).toBe(true);
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
+    'Keep this draft too',
+  );
+  await failure.getByRole('button', { name: 'Stop server', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(failure).toContainText('Not enough memory');
+  await failure.getByRole('button', { name: 'Stop server', exact: true }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Stop server', exact: true })
+    .click();
+  await expect(failure).toContainText('Server stopped after a memory error');
+  await failure.getByRole('button', { name: 'Review settings' }).click();
+  await page.getByRole('combobox', { name: 'Context size', exact: true }).selectOption('4096');
+  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await page.getByRole('combobox', { name: /^Prompt processing/ }).selectOption('low-memory');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).last().click();
+  await expect(page.locator('.local-badge')).toHaveText('Ready');
+  await expect(failure).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
+    'Keep this draft too',
+  );
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByRole('button', { name: 'Copy response' })).toHaveCount(2);
+  await page.reload();
+  await page.getByRole('button', { name: 'Keep this response', exact: true }).click();
+  await expect(page.locator('.message.assistant')).toHaveCount(2);
+  await expect(page.locator('.message.assistant').first()).toContainText('Compute error.');
+});
+
+test('startup OOM is persistent without opening a modal or accepting new requests', async ({
+  page,
+}) => {
+  await mockDesktop(page, 'oom-startup');
+  await page.goto('/');
+  await page.getByRole('button', { name: /^Models/ }).click();
+  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await expect(page.locator('.local-badge')).toHaveText('Needs restart');
+  await expect(page.getByRole('alert')).toContainText('Not enough memory');
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Send message' })).toBeDisabled();
+});
+
+test('memory and storage failures remain independently actionable in a small window', async ({
+  page,
+}) => {
+  await mockDesktop(page, 'oom-and-save-error');
+  await page.setViewportSize({ width: 760, height: 560 });
+  await page.goto('/');
+  await loadModel(page);
+  await page
+    .getByRole('textbox', { name: 'Message', exact: true })
+    .fill('Preserve despite both failures');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Not enough memory' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'Conversation not saved' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /New chat/ })).toBeDisabled();
+  const retry = page.getByRole('button', { name: 'Retry saving' });
+  await retry.scrollIntoViewIfNeeded();
+  await expect(retry).toBeInViewport();
+  await retry.click();
+  await expect(retry).toHaveCount(0);
+  await expect(page.getByRole('alert').filter({ hasText: 'Not enough memory' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /New chat/ })).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('unknown compute errors stay with the response and do not diagnose an OOM', async ({
+  page,
+}) => {
+  await mockDesktop(page, 'compute-error');
+  await page.goto('/');
+  await loadModel(page);
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A request');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.locator('.message.assistant').getByRole('alert')).toContainText(
+    'Compute error.',
+  );
+  await expect(page.locator('.workspace-feedback')).toHaveCount(0);
+  await expect(page.locator('.local-badge')).toHaveText('Ready');
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeEnabled();
+});
+
+test('history and build errors use their own context and recovery actions', async ({ page }) => {
+  await mockDesktop(page, 'history-error');
+  await page.goto('/');
+  await expect(page.locator('.composer-wrap').getByRole('alert')).toContainText(
+    'Conversation history unavailable',
+  );
+  await page.evaluate(() => localStorage.setItem('mir-fixture-history-recovered', 'true'));
+  await page.getByRole('button', { name: 'Retry loading' }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.goto('/?scenario=build-error');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
+  await page.getByRole('button', { name: 'Install / change build' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(page.locator('.settings-content').getByRole('alert')).toContainText(
+    'llama.cpp build failed',
+  );
+  await expect(page.locator('.workspace-feedback')).toHaveCount(0);
 });
 
 test('hardware scenarios preserve generic controls and unknown memory', async ({ page }) => {

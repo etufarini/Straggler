@@ -1,7 +1,11 @@
 import { useConversation } from '../features/chat/useConversation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
-import { equalSettings, emptyServer } from '../domain/types';
+import { equalSettings, emptyServer, serverActive } from '../domain/types';
+import { errorDetail, settingsFailure as describeSettingsFailure } from '../domain/errors';
+import type { SettingsFailure } from '../domain/errors';
+import { fieldSection } from '../features/settings/sections';
+import type { Section } from '../features/settings/sections';
 import type {
   Configuration,
   ServerStatus,
@@ -33,7 +37,8 @@ export function useWorkspace() {
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState('');
-  const [copied, setCopied] = useState('');
+  const [settingsFailure, setSettingsFailure] = useState<SettingsFailure | null>(null);
+  const [settingsSection, setSettingsSection] = useState<Section>('model');
   const mounted = useRef(true);
   const closeAction = useRef<() => void>(() => {});
   const native = isTauri();
@@ -49,7 +54,7 @@ export function useWorkspace() {
     chatRef,
     sendPromise,
     saveQueue,
-    end,
+    messageList,
     follow,
     textarea,
     updateChat,
@@ -58,7 +63,18 @@ export function useWorkspace() {
     cancel,
     send,
     openConversation,
-  } = useConversation(server, setError);
+  } = useConversation(server);
+
+  function reviewSettings(section: Section) {
+    setSettingsSection(section);
+    setPanel('settings');
+  }
+
+  function reportSettingsError(error: unknown) {
+    const failure = describeSettingsFailure(error, draft);
+    setSettingsFailure({ ...failure, section: settingsSection });
+    if (failure.field) reviewSettings(fieldSection(failure.field));
+  }
 
   const loadConfiguration = useCallback(async () => {
     try {
@@ -74,7 +90,10 @@ export function useWorkspace() {
       configRef.current = value;
       if (firstConfiguration.current) {
         firstConfiguration.current = false;
-        if (!value.serverAvailable || !value.modelsDir) setPanel('settings');
+        if (!value.serverAvailable || !value.modelsDir) {
+          setSettingsSection(!value.serverAvailable ? 'llama' : 'folders');
+          setPanel('settings');
+        }
       }
     } catch (e) {
       if (mounted.current) setError(String(e));
@@ -173,6 +192,15 @@ export function useWorkspace() {
     setServer(await invoke<ServerStatus>('server_status'));
   }
 
+  function requestStop() {
+    setConfirmation({
+      title: 'Stop server?',
+      text: 'Shut down the local server? Conversations are kept.',
+      actionLabel: 'Stop server',
+      action: stop,
+    });
+  }
+
   closeAction.current = () =>
     setConfirmation({
       title: 'Close Mir.cpp?',
@@ -183,6 +211,7 @@ export function useWorkspace() {
         await saveQueue.current;
         await getCurrentWindow().destroy();
       },
+      actionLabel: 'Close Mir.cpp',
     });
 
   async function launch() {
@@ -196,7 +225,8 @@ export function useWorkspace() {
       setServer(await invoke<ServerStatus>('server_status'));
       setPanel(null);
     } catch (e) {
-      setError(String(e));
+      if (errorDetail(e).field) reportSettingsError(e);
+      else setError(errorDetail(e).message);
       throw e;
     } finally {
       setBusy(false);
@@ -205,7 +235,7 @@ export function useWorkspace() {
 
   async function start() {
     if (busy || !selected) return;
-    if (['ready', 'loading', 'stopping'].includes(server.phase)) {
+    if (serverActive(server)) {
       setConfirmation({
         title: 'Restart server?',
         text: 'Stop the current server and load the selected configuration? Any active response will be stopped and saved.',
@@ -213,6 +243,7 @@ export function useWorkspace() {
           await stop();
           await launch();
         },
+        actionLabel: 'Restart server',
       });
     } else {
       await launch().catch(() => {});
@@ -232,8 +263,7 @@ export function useWorkspace() {
     }
   }
 
-  const active =
-    server.phase === 'ready' || server.phase === 'loading' || server.phase === 'stopping';
+  const active = serverActive(server);
   const displayModel = active ? server.model : selected;
   const canSend =
     native && server.phase === 'ready' && historyReady && !storageError && !generating && !busy;
@@ -264,6 +294,7 @@ export function useWorkspace() {
     error,
     setError,
     storageError,
+    historyReady,
     save,
     loadHistory,
     draft,
@@ -273,9 +304,7 @@ export function useWorkspace() {
     setJob,
     follow,
     textarea,
-    setCopied,
-    copied,
-    end,
+    messageList,
     canSend,
     send,
     sendPromise,
@@ -286,6 +315,13 @@ export function useWorkspace() {
     confirmation,
     confirmError,
     confirmBusy,
+    requestStop,
+    reviewSettings,
+    settingsSection,
+    setSettingsSection,
+    settingsFailure,
+    setSettingsFailure,
+    reportSettingsError,
   };
 }
 export type WorkspaceController = ReturnType<typeof useWorkspace>;

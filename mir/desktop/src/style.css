@@ -297,10 +297,6 @@ select:disabled {
   color: #9bceb3;
   font-size: 12px;
 }
-.inline-error {
-  color: #edb8b2;
-  font-size: 12px;
-}
 .folder-browser {
   width: min(600px, calc(100% - 30px));
   background: #1b2435;
@@ -854,22 +850,97 @@ textarea:disabled {
   color: #bccbec;
   overflow-wrap: anywhere;
 }
-.notice span {
-  flex: 1;
-}
 .notice code {
   margin: 0 3px;
 }
-.notice.error {
-  color: #edb8b2;
-  border-color: #65413e;
-  background: #332626;
+.workspace-feedback {
+  margin: 12px 24px 0;
 }
-.notice button {
+.workspace:has(.feedback) {
+  overflow-y: auto;
+}
+.workspace:has(.feedback) .messages {
+  min-height: 120px;
+}
+.feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid #65413e;
+  background: #292126;
+  border-radius: 7px;
+  padding: 13px 15px;
+  color: #edb8b2;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.feedback.warning {
+  background: #29271f;
+  border-color: #65573d;
+  color: #dfcc9f;
+}
+.feedback-icon {
   flex-shrink: 0;
-  font-size: 10px;
-  padding: 3px 6px;
-  text-decoration: underline;
+  margin-top: 2px;
+}
+.feedback-content {
+  flex: 1;
+  min-width: 0;
+}
+.feedback strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 550;
+}
+.feedback-body {
+  color: #c6ccd8;
+  margin-top: 3px;
+}
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 15px;
+  margin-top: 10px;
+}
+.feedback-actions button,
+.feedback-dismiss {
+  font-size: 11px;
+}
+.feedback-dismiss {
+  padding: 3px;
+  flex-shrink: 0;
+}
+.feedback-details {
+  margin-top: 8px;
+  color: #b6c1d6;
+}
+.feedback-details summary {
+  cursor: pointer;
+  font-size: 11px;
+}
+.feedback-details pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  margin: 8px 0 0;
+}
+.composer-wrap > .feedback,
+.settings-content > .feedback,
+.message-body > .feedback {
+  margin-bottom: 12px;
+}
+.field-error {
+  color: #edb8b2;
+  font-size: 12px;
+}
+[aria-invalid='true'] {
+  border-color: #c7847a;
+}
+.status-dot.needs-restart {
+  background: #d9ae80;
 }
 .message-column {
   max-width: 770px;

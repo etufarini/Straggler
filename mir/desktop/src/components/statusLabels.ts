@@ -5,12 +5,13 @@ export const statusLabel = {
   ready: 'Ready',
   stopping: 'Stopping',
   error: 'Error',
+  'needs-restart': 'Needs restart',
 };
 export const messageStatusLabel: Record<MessageStatus, string> = {
   complete: '',
   streaming: '',
   stopped: 'Response stopped',
   interrupted: 'Response interrupted',
-  error: 'Response failed · partial text kept',
+  error: 'Response failed',
   length: 'Output limit reached',
 };

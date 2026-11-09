@@ -19,6 +19,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
     setConversations,
     chatRef,
     server,
+    storageError,
   } = controller;
   return (
     <aside className="sidebar">
@@ -32,7 +33,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
       </div>
       <button
         className="new-chat"
-        disabled={generating}
+        disabled={generating || (!!storageError && chat.messages.length > 0)}
         onClick={() => {
           updateChat(newConversation());
           setInput('');
@@ -65,7 +66,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             className={`conversation-row ${chat.id === value.id ? 'selected' : ''}`}
           >
             <button
-              disabled={generating}
+              disabled={generating || (!!storageError && chat.messages.length > 0)}
               onClick={() => {
                 openConversation(value);
                 setPanel(null);

@@ -3,14 +3,26 @@ import NumberField from '../../components/NumberField';
 import { RefreshCw } from 'lucide-react';
 
 export default function ServerSettings({ controller }: { controller: SettingsController }) {
-  const { config, draft, busy, forceTargets, native, active, change, apply, run, stopListeners } =
-    controller;
+  const {
+    config,
+    draft,
+    busy,
+    forceTargets,
+    native,
+    active,
+    change,
+    apply,
+    run,
+    stopListeners,
+    fieldError,
+  } = controller;
   return (
     <>
       <h2>Server & port</h2>
       <NumberField
         label="TCP port"
         value={draft.port}
+        error={fieldError('port')}
         onChange={(value) => change('port', value)}
         hint="A port from 1 to 65535. The desktop server listens on 127.0.0.1."
       />

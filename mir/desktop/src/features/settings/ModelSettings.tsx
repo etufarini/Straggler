@@ -1,5 +1,6 @@
 import type { SettingsController } from './useSettings';
 import NumberField from '../../components/NumberField';
+import FieldError from '../../components/FieldError';
 import { Folder } from 'lucide-react';
 import { fileName, samplingKeys } from '../../domain/types';
 const labels: Record<string, string> = {
@@ -15,8 +16,17 @@ const labels: Record<string, string> = {
 };
 
 export default function ModelSettings({ controller }: { controller: SettingsController }) {
-  const { config, draft, setDraft, setSection, showSampling, setShowSampling, preset, change } =
-    controller;
+  const {
+    config,
+    draft,
+    setDraft,
+    setSection,
+    showSampling,
+    setShowSampling,
+    preset,
+    change,
+    fieldError,
+  } = controller;
   return (
     <>
       <h2>Model settings</h2>
@@ -28,6 +38,8 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
         <span>Model</span>
         <select
           aria-label="Model"
+          aria-invalid={fieldError('model') ? true : undefined}
+          aria-describedby={fieldError('model') ? 'model-error' : undefined}
           value={draft.model}
           onChange={(event) => change('model', event.target.value)}
         >
@@ -41,6 +53,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
             </option>
           ))}
         </select>
+        <FieldError id="model-error" message={fieldError('model')} />
       </label>
       {!config.models.length && (
         <div className="setup-callout">
@@ -91,6 +104,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
         <NumberField
           label="Context tokens"
           value={draft.context}
+          error={fieldError('context')}
           onChange={(value) => change('context', value)}
           hint="Auto or a custom count. 0 requests the full model context."
         />
@@ -111,6 +125,8 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
               <span>Cache {kind.toUpperCase()} type</span>
               <select
                 aria-label={`Cache ${kind.toUpperCase()} type`}
+                aria-invalid={fieldError(key) ? true : undefined}
+                aria-describedby={fieldError(key) ? `${key}-error` : undefined}
                 value={draft[key]}
                 onChange={(event) => change(key, event.target.value)}
               >
@@ -120,6 +136,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
                   </option>
                 ))}
               </select>
+              <FieldError id={`${key}-error`} message={fieldError(key)} />
               {!advertised.length && (
                 <small>Supported formats unavailable; the current selection is preserved.</small>
               )}
@@ -161,7 +178,11 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
       </label>
       <details
         className="sampling-details"
-        open={showSampling || preset === 'custom' ? true : undefined}
+        open={
+          showSampling || preset === 'custom' || samplingKeys.some((key) => fieldError(key))
+            ? true
+            : undefined
+        }
       >
         <summary>Sampling parameters</summary>
         <div className="field-grid">
@@ -170,6 +191,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
               key={key}
               label={labels[key]}
               value={draft[key]}
+              error={fieldError(key)}
               onChange={(value) => change(key, value)}
             />
           ))}
@@ -179,12 +201,14 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
         <NumberField
           label="Seed"
           value={draft.seed}
+          error={fieldError('seed')}
           onChange={(value) => change('seed', value)}
           hint="Auto, a numeric seed, or -1 for random. Repeatability across devices is not guaranteed."
         />
         <NumberField
           label="Maximum output tokens"
           value={draft.max_tokens}
+          error={fieldError('max_tokens')}
           onChange={(value) => change('max_tokens', value)}
           hint="Auto or a count. -1 has no fixed limit; 0 evaluates input only."
         />

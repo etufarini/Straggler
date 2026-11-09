@@ -43,6 +43,7 @@ export interface Confirmation {
   title: string;
   text: string;
   action: () => Promise<void>;
+  actionLabel?: string;
 }
 export interface Configuration {
   llamaDir: string;
@@ -74,12 +75,13 @@ export interface Configuration {
   restartRequired: boolean;
 }
 export interface ServerStatus {
-  phase: 'stopped' | 'loading' | 'ready' | 'stopping' | 'error';
+  phase: 'stopped' | 'loading' | 'ready' | 'stopping' | 'error' | 'needs-restart';
   model: string | null;
   url: string | null;
   logs: string[];
   error: string | null;
   runningSettings?: Settings | null;
+  issue: { kind: 'memory' | 'backend'; details: string } | null;
 }
 export type MessageStatus =
   'complete' | 'streaming' | 'stopped' | 'interrupted' | 'error' | 'length';
@@ -89,6 +91,7 @@ export interface Message {
   content: string;
   reasoning: string;
   status: MessageStatus;
+  error?: string;
 }
 export interface Conversation {
   id: string;
@@ -113,7 +116,10 @@ export const emptyServer: ServerStatus = {
   url: null,
   logs: [],
   error: null,
+  issue: null,
 };
+export const serverActive = (server: ServerStatus) =>
+  ['ready', 'loading', 'stopping', 'needs-restart'].includes(server.phase);
 export const fileName = (path: string) => path.split('/').pop() || path;
 export const equalSettings = (a: Settings, b: Settings) =>
   Object.keys(a).every((key) => a[key as keyof Settings] === b[key as keyof Settings]);

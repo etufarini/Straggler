@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { invoke, isTauri } from '../../services/desktop';
-import { equalSettings, samplingPreset } from '../../domain/types';
+import { equalSettings, samplingPreset, serverActive } from '../../domain/types';
+import type { SettingsFailure } from '../../domain/errors';
+import type { Section } from './sections';
 import type {
   Configuration,
   Confirmation,
@@ -9,7 +11,6 @@ import type {
   ServerStatus,
   Settings as Values,
 } from '../../domain/types';
-export type Section = 'model' | 'performance' | 'server' | 'profiles' | 'folders' | 'llama';
 export function useSettings({
   config,
   draft,
@@ -23,6 +24,10 @@ export function useSettings({
   onStop,
   onBack,
   onJob,
+  section,
+  setSection,
+  failure,
+  onClearError,
 }: {
   config: Configuration;
   draft: Values;
@@ -31,15 +36,16 @@ export function useSettings({
   job: JobStatus;
   accept: (value: Configuration) => void;
   confirm: (value: Confirmation) => void;
-  onError: (error: string) => void;
+  onError: (error: unknown) => void;
   onStart: () => void;
   onStop: () => Promise<void>;
   onBack: () => void;
   onJob: (value: JobStatus) => void;
+  section: Section;
+  setSection: (section: Section) => void;
+  failure: SettingsFailure | null;
+  onClearError: () => void;
 }) {
-  const [section, setSection] = useState<Section>(
-    !config.serverAvailable ? 'llama' : !config.modelsDir ? 'folders' : 'model',
-  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [profile, setProfile] = useState(config.currentProfile || config.profiles[0] || '');
@@ -55,13 +61,15 @@ export function useSettings({
     setForceTargets([]);
   }, [draft.port]);
   const native = isTauri();
-  const active = ['ready', 'loading', 'stopping'].includes(server.phase);
+  const active = serverActive(server);
   const building = ['running', 'stopping'].includes(job.phase);
   const dirty = !equalSettings(draft, config.settings);
   const modified = config.savedSettings ? !equalSettings(draft, config.savedSettings) : false;
   const restart = !!server.runningSettings && !equalSettings(draft, server.runningSettings);
   const preset = samplingPreset(draft, config.presets);
   const change = (key: keyof Values, value: string) => setDraft({ ...draft, [key]: value });
+  const fieldError = (key: keyof Values) =>
+    failure?.field === key && failure.value === draft[key] ? failure.message : undefined;
 
   async function apply() {
     const value = await invoke<Configuration>('apply_settings', { settings: draft });
@@ -72,10 +80,11 @@ export function useSettings({
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setMessage('');
+    onClearError();
     try {
       await action();
     } catch (e) {
-      onError(String(e));
+      onError(e);
     } finally {
       setBusy(false);
     }
@@ -107,6 +116,7 @@ export function useSettings({
   async function requestBuild(update = false) {
     setBusy(true);
     setMessage('');
+    onClearError();
     try {
       const selectedBackend = update ? config.build?.backend || backend : backend;
       const release =
@@ -137,7 +147,7 @@ export function useSettings({
         },
       });
     } catch (e) {
-      onError(String(e));
+      onError(e);
     } finally {
       setBusy(false);
     }
@@ -214,6 +224,8 @@ export function useSettings({
     requestSave,
     requestBuild,
     stopListeners,
+    failure,
+    fieldError,
   };
 }
 export type SettingsController = ReturnType<typeof useSettings>;

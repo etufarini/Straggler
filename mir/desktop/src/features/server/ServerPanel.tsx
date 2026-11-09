@@ -12,6 +12,7 @@ import {
 import { fileName } from '../../domain/types';
 import { statusLabel } from '../../components/statusLabels';
 import type { WorkspaceController } from '../../app/useWorkspace';
+import Feedback from '../../components/Feedback';
 export default function ServerPanel({ controller }: { controller: WorkspaceController }) {
   const {
     setPanel,
@@ -24,10 +25,9 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
     active,
     setSelected,
     server,
-    setConfirmation,
-    stop,
     job,
     start,
+    requestStop,
   } = controller;
   return (
     <div
@@ -75,7 +75,11 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                 </div>
               </div>
             )}
-            {config?.warning && <p className="notice error">{config.warning}</p>}
+            {config?.warning && (
+              <Feedback title="Folder settings need attention" severity="warning">
+                {config.warning}
+              </Feedback>
+            )}
             {config?.models.length === 0 && (
               <div className="empty-models">
                 <Folder size={28} />
@@ -112,13 +116,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                 <button
                   className="danger-button"
                   disabled={busy || server.phase === 'stopping'}
-                  onClick={() =>
-                    setConfirmation({
-                      title: 'Stop server?',
-                      text: 'This stops the server started by Mir.cpp and interrupts any active response. Conversations are kept.',
-                      action: stop,
-                    })
-                  }
+                  onClick={requestStop}
                 >
                   <Square size={14} />
                   Stop server
@@ -149,6 +147,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
               <code>{server.url || 'No active endpoint'}</code>
             </div>
             <pre className="server-log" tabIndex={0}>
+              {server.issue && `${server.issue.details}\n\n`}
               {server.logs.join('\n') || 'Server output will appear here when a model is loaded.'}
             </pre>
             <p className="capability-note">
@@ -158,13 +157,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
               <button
                 className="danger-button"
                 disabled={server.phase === 'stopping'}
-                onClick={() =>
-                  setConfirmation({
-                    title: 'Stop server?',
-                    text: 'Shut down the server started by this app? Conversations are kept.',
-                    action: stop,
-                  })
-                }
+                onClick={requestStop}
               >
                 <Square size={14} />
                 Stop server

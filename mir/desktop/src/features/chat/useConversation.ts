@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Channel, invoke, isTauri } from '../../services/desktop';
 import { newConversation, requestMessages } from '../../domain/types';
+import { errorDetail } from '../../domain/errors';
 import type { Conversation, Delta, Message, Response, ServerStatus } from '../../domain/types';
 
-export function useConversation(server: ServerStatus, setError: (error: string) => void) {
+export function useConversation(server: ServerStatus) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
   const [input, setInput] = useState('');
@@ -16,7 +17,7 @@ export function useConversation(server: ServerStatus, setError: (error: string) 
   const sendPromise = useRef<Promise<void> | null>(null);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const mounted = useRef(true);
-  const end = useRef<HTMLDivElement>(null);
+  const messageList = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const textarea = useRef<HTMLTextAreaElement>(null);
   function updateChat(value: Conversation) {
@@ -31,7 +32,7 @@ export function useConversation(server: ServerStatus, setError: (error: string) 
       setHistoryReady(true);
       setStorageError('');
     } catch (e) {
-      if (mounted.current) setStorageError(String(e));
+      if (mounted.current) setStorageError(errorDetail(e).message);
     }
   }, []);
 
@@ -42,9 +43,10 @@ export function useConversation(server: ServerStatus, setError: (error: string) 
       mounted.current = false;
     };
   }, [loadHistory]);
-  useEffect(() => {
-    if (follow.current)
-      end.current?.scrollIntoView({ behavior: generating ? 'instant' : 'smooth' });
+  useLayoutEffect(() => {
+    const list = messageList.current;
+    if (follow.current && list)
+      list.scrollTo({ top: list.scrollHeight, behavior: generating ? 'instant' : 'smooth' });
   }, [chat, generating]);
   function save(value: Conversation): Promise<void> {
     const snapshot = structuredClone(value);
@@ -63,7 +65,7 @@ export function useConversation(server: ServerStatus, setError: (error: string) 
       });
     saveQueue.current = pending;
     void pending.catch((e) => {
-      if (mounted.current) setStorageError(`Conversation not saved: ${String(e)}`);
+      if (mounted.current) setStorageError(errorDetail(e).message);
     });
     return pending;
   }
@@ -82,7 +84,6 @@ export function useConversation(server: ServerStatus, setError: (error: string) 
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     setGenerating(true);
-    setError('');
     setInput('');
     follow.current = true;
     const user: Message = {
@@ -139,10 +140,10 @@ export function useConversation(server: ServerStatus, setError: (error: string) 
       assistant.status = response.status;
       assistant.content = response.content;
       assistant.reasoning = response.reasoning;
-      if (response.error) setError(response.error);
+      if (response.error) assistant.error = response.error;
     } catch (e) {
       assistant.status = 'error';
-      if (generationStarted) setError(String(e));
+      if (generationStarted) assistant.error = errorDetail(e).message;
     } finally {
       // Ignore any queued IPC deltas once the final snapshot has arrived.
       requestRef.current = null;
@@ -177,7 +178,7 @@ export function useConversation(server: ServerStatus, setError: (error: string) 
     chatRef,
     sendPromise,
     saveQueue,
-    end,
+    messageList,
     follow,
     textarea,
     updateChat,

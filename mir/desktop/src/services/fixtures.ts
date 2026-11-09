@@ -18,7 +18,13 @@ export type Scenario =
   | 'save-error'
   | 'model-error'
   | 'cancel'
-  | 'interrupted';
+  | 'interrupted'
+  | 'oom'
+  | 'oom-startup'
+  | 'oom-and-save-error'
+  | 'build-error'
+  | 'history-error'
+  | 'compute-error';
 
 // Development data deliberately uses generic device names and no personal paths.
 export const defaultSettings: Settings = {
@@ -56,6 +62,12 @@ export const scenarios: Scenario[] = [
   'model-error',
   'cancel',
   'interrupted',
+  'oom',
+  'oom-startup',
+  'oom-and-save-error',
+  'build-error',
+  'history-error',
+  'compute-error',
 ];
 
 export function createFixture(scenario: Scenario) {
@@ -72,6 +84,17 @@ export function createFixture(scenario: Scenario) {
   let failedWrites = scenario === 'save-error' ? 2 : 0;
   let finish: (() => void) | undefined;
   let occupied = scenario === 'occupied';
+  let memoryFailureSeen = false;
+
+  function failMemory() {
+    memoryFailureSeen = true;
+    status = {
+      ...status,
+      phase: 'needs-restart',
+      issue: { kind: 'memory', details: 'Insufficient Memory; backend is in error state' },
+      logs: ['Insufficient Memory', 'backend is in error state - recreate the backend to recover'],
+    };
+  }
 
   function configuration(): Configuration {
     const devices =
@@ -132,7 +155,8 @@ export function createFixture(scenario: Scenario) {
       case 'apply_settings': {
         const next = args.settings as Settings;
         // This is a fixture response; numeric validation belongs to the real bridge tests.
-        if (next.threads === '0') throw new Error('CPU threads must be positive.');
+        if (next.threads === '0')
+          throw { field: 'threads', message: 'CPU threads must be positive.' };
         settings = structuredClone(next);
         return configuration();
       }
@@ -146,11 +170,13 @@ export function createFixture(scenario: Scenario) {
           url: 'http://127.0.0.1:9931',
           logs: ['Fixture server ready'],
           error: null,
+          issue: null,
           runningSettings: structuredClone(settings),
         };
+        if (scenario === 'oom-startup' && !memoryFailureSeen) failMemory();
         return;
       case 'stop_server':
-        status = { ...emptyServer };
+        status = { ...status, phase: 'stopped', url: null, runningSettings: undefined };
         finish?.();
         return;
       case 'cancel_generation':
@@ -159,7 +185,14 @@ export function createFixture(scenario: Scenario) {
       case 'job_status':
         return job;
       case 'start_build':
-        job = { phase: 'ready', logs: ['Fixture build completed'], error: null };
+        job =
+          scenario === 'build-error'
+            ? {
+                phase: 'failed',
+                logs: ['Fixture compiler failure'],
+                error: 'The compiler exited with an error.',
+              }
+            : { phase: 'ready', logs: ['Fixture build completed'], error: null };
         return;
       case 'cancel_build':
         job = { phase: 'canceled', logs: [], error: null };
@@ -216,6 +249,12 @@ export function createFixture(scenario: Scenario) {
         return configuration();
       }
       case 'history_list':
+        if (
+          scenario === 'history-error' &&
+          localStorage.getItem('mir-fixture-history-recovered') !== 'true'
+        ) {
+          throw new Error('Conversation storage is unavailable');
+        }
         return structuredClone(history);
       case 'history_save': {
         if (failedWrites > 0) {
@@ -237,6 +276,7 @@ export function createFixture(scenario: Scenario) {
         persistHistory();
         return;
       case 'generate': {
+        if (scenario === 'compute-error') throw new Error('Compute error.');
         if (scenario === 'model-error') throw new Error('Unsupported chat template');
         const delta: Delta = {
           content:
@@ -245,6 +285,11 @@ export function createFixture(scenario: Scenario) {
         };
         const channel = args.onDelta as { onmessage: (delta: Delta) => void };
         channel.onmessage(delta);
+        if (['oom', 'oom-and-save-error'].includes(scenario) && !memoryFailureSeen) {
+          failMemory();
+          if (scenario === 'oom-and-save-error') failedWrites = 1;
+          return { ...delta, status: 'error', error: 'Compute error.' };
+        }
         if (scenario === 'cancel')
           await new Promise<void>((resolve) => {
             finish = resolve;

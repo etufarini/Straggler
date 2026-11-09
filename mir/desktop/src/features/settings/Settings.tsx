@@ -8,6 +8,7 @@ import ServerSettings from './ServerSettings';
 import SavedConfigurations from './SavedConfigurations';
 import FolderSettings from './FolderSettings';
 import LlamaSettings from '../llama/LlamaSettings';
+import Feedback from '../../components/Feedback';
 const sections = [
   ['model', 'Model settings'],
   ['performance', 'Performance'],
@@ -45,6 +46,7 @@ export default function Settings(props: SettingsProps) {
     apply,
     run,
     operation,
+    failure,
   } = controller;
   return (
     <section className="settings-page" aria-label="Settings">
@@ -69,6 +71,16 @@ export default function Settings(props: SettingsProps) {
           ))}
         </nav>
         <div className="settings-content">
+          {failure && !failure.field && failure.section === section && (
+            <Feedback
+              title={
+                section === 'llama' ? 'llama.cpp operation failed' : 'Settings could not be updated'
+              }
+              details={failure.message}
+            >
+              Review the details and try again. Your edited settings remain available.
+            </Feedback>
+          )}
           <fieldset className="settings-fields" disabled={busy || !native}>
             {busy && (
               <p role="status" className="field-help">

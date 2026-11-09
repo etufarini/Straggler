@@ -1,4 +1,4 @@
-import { Cpu, ChevronDown, Square, X } from 'lucide-react';
+import { Cpu, ChevronDown, Square } from 'lucide-react';
 import { fileName, equalSettings, displayValue } from '../domain/types';
 import { statusLabel } from '../components/statusLabels';
 import { isFixture } from '../services/desktop';
@@ -7,6 +7,9 @@ import Sidebar from './Sidebar';
 import ConfirmationDialog from './ConfirmationDialog';
 import ChatPanel from '../features/chat/ChatPanel';
 import ServerPanel from '../features/server/ServerPanel';
+import ServerFeedback from '../features/server/ServerFeedback';
+import StorageFeedback from '../features/chat/StorageFeedback';
+import Feedback from '../components/Feedback';
 import { useWorkspace } from './useWorkspace';
 export default function App() {
   const controller = useWorkspace();
@@ -17,7 +20,6 @@ export default function App() {
     active,
     busy,
     setConfirmation,
-    stop,
     native,
     selected,
     job,
@@ -26,15 +28,18 @@ export default function App() {
     error,
     setError,
     storageError,
-    chat,
-    save,
-    loadHistory,
     draft,
     panel,
     setDraft,
     acceptConfiguration,
     setJob,
     confirmation,
+    requestStop,
+    settingsSection,
+    setSettingsSection,
+    settingsFailure,
+    setSettingsFailure,
+    reportSettingsError,
   } = controller;
   return (
     <div className="app-shell">
@@ -62,16 +67,7 @@ export default function App() {
               {statusLabel[server.phase]}
             </span>
             {active ? (
-              <button
-                disabled={busy || server.phase === 'stopping'}
-                onClick={() =>
-                  setConfirmation({
-                    title: 'Stop server?',
-                    text: 'Shut down the local server? Conversations are kept.',
-                    action: stop,
-                  })
-                }
-              >
+              <button disabled={busy || server.phase === 'stopping'} onClick={requestStop}>
                 <Square size={14} />
                 Stop
               </button>
@@ -104,30 +100,21 @@ export default function App() {
             to use local models.
           </div>
         )}
-        {(error || server.error) && (
-          <div role="alert" className="notice error">
-            <span>{error || server.error}</span>
-            <button aria-label="View server log" onClick={() => setPanel('logs')}>
-              View log
-            </button>
-            {error && (
-              <button aria-label="Dismiss error" onClick={() => setError('')}>
-                <X size={15} />
-              </button>
-            )}
+        <ServerFeedback controller={controller} />
+        {error && (
+          <div className="workspace-feedback">
+            <Feedback
+              title="Could not complete the action"
+              details={error}
+              onDismiss={() => setError('')}
+            >
+              Review the details before trying again.
+            </Feedback>
           </div>
         )}
-        {storageError && (
-          <div role="alert" className="notice error">
-            <span>{storageError} Your current text remains in this window.</span>
-            <button
-              onClick={() => {
-                if (chat.messages.length) void save(chat).catch(() => {});
-                else void loadHistory();
-              }}
-            >
-              Retry saving
-            </button>
+        {storageError && panel === 'settings' && (
+          <div className="workspace-feedback">
+            <StorageFeedback controller={controller} />
           </div>
         )}
 
@@ -160,9 +147,13 @@ export default function App() {
             job={job}
             accept={acceptConfiguration}
             confirm={setConfirmation}
-            onError={setError}
+            onError={reportSettingsError}
+            onClearError={() => setSettingsFailure(null)}
+            failure={settingsFailure}
+            section={settingsSection}
+            setSection={setSettingsSection}
             onStart={() => void start()}
-            onStop={stop}
+            onStop={controller.stop}
             onBack={() => setPanel(null)}
             onJob={setJob}
           />

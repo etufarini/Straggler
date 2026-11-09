@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '../services/desktop';
 import { ArrowUp, Folder, X } from 'lucide-react';
+import Feedback from './Feedback';
 
 interface Directory {
   path: string;
@@ -137,9 +138,9 @@ export default function FolderBrowser({
           your previous setting.
         </p>
         {error && (
-          <p role="alert" className="inline-error">
-            {error}
-          </p>
+          <Feedback title="Folder unavailable" details={error}>
+            Choose a readable folder or enter another path. Your previous setting has been kept.
+          </Feedback>
         )}
         <div className="directory-list">
           {busy ? (

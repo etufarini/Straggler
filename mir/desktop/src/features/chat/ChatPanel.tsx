@@ -2,8 +2,14 @@ import Markdown from './Markdown';
 import { ArrowUp, HardDrive, LoaderCircle, Check, Copy, Square } from 'lucide-react';
 import { fileName } from '../../domain/types';
 import { messageStatusLabel } from '../../components/statusLabels';
+import Feedback from '../../components/Feedback';
+import StorageFeedback from './StorageFeedback';
 import type { WorkspaceController } from '../../app/useWorkspace';
+import { useState } from 'react';
+import { errorDetail } from '../../domain/errors';
 export default function ChatPanel({ controller }: { controller: WorkspaceController }) {
+  const [copied, setCopied] = useState('');
+  const [copyError, setCopyError] = useState<{ messageId: string; detail: string } | null>(null);
   const {
     follow,
     chat,
@@ -11,10 +17,8 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
     textarea,
     active,
     setPanel,
-    setCopied,
     setError,
-    copied,
-    end,
+    messageList,
     canSend,
     send,
     sendPromise,
@@ -22,11 +26,13 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
     input,
     generating,
     cancel,
+    reviewSettings,
   } = controller;
   return (
     <>
       <div
         className="messages"
+        ref={messageList}
         onScroll={(event) => {
           const el = event.currentTarget;
           follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
@@ -105,8 +111,27 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                       {message.content ? 'Generating' : 'Thinking'}
                     </span>
                   )}
-                  {messageStatusLabel[message.status] && (
+                  {messageStatusLabel[message.status] && !(message.error && !server.issue) && (
                     <div className="message-status">{messageStatusLabel[message.status]}</div>
+                  )}
+                  {message.error && !server.issue && (
+                    <Feedback
+                      title={
+                        message.status === 'interrupted'
+                          ? 'Response interrupted'
+                          : 'Response failed'
+                      }
+                      details={message.error}
+                      actions={
+                        <button className="text-button" onClick={() => reviewSettings('model')}>
+                          Review settings
+                        </button>
+                      }
+                    >
+                      {message.content
+                        ? 'The response could not be completed. Partial text remains in this conversation.'
+                        : 'The server could not complete this request. Review the details before trying again.'}
+                    </Feedback>
                   )}
                   {message.role === 'assistant' &&
                     message.content &&
@@ -115,27 +140,37 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                         className="copy-button"
                         aria-label="Copy response"
                         onClick={async () => {
+                          setCopyError(null);
                           try {
                             await navigator.clipboard.writeText(message.content);
                             setCopied(message.id);
                             setTimeout(() => setCopied(''), 1600);
                           } catch (e) {
-                            setError(`Cannot copy text: ${String(e)}`);
+                            setCopyError({ messageId: message.id, detail: errorDetail(e).message });
                           }
                         }}
                       >
                         {copied === message.id ? <Check size={14} /> : <Copy size={14} />}
                       </button>
                     )}
+                  {copyError?.messageId === message.id && (
+                    <Feedback
+                      title="Text could not be copied"
+                      details={copyError.detail}
+                      onDismiss={() => setCopyError(null)}
+                    >
+                      Select the response text and copy it manually.
+                    </Feedback>
+                  )}
                 </div>
               </article>
             ))}
-            <div ref={end} />
           </div>
         )}
       </div>
 
       <div className="composer-wrap">
+        <StorageFeedback controller={controller} />
         <form
           className="composer"
           onSubmit={(event) => {
@@ -153,7 +188,9 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
             placeholder={
               server.phase === 'ready'
                 ? 'Message your local model…'
-                : 'Load a model to start a conversation…'
+                : server.issue
+                  ? 'Review settings and restart the server to continue…'
+                  : 'Load a model to start a conversation…'
             }
             value={input}
             disabled={generating}
