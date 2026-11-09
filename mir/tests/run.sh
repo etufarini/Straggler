@@ -96,3 +96,15 @@ if [[ "$suite" == desktop || "$suite" == all || "$suite" == native ]]; then
         npm run test:e2e
     fi
 fi
+
+if [[ "$suite" == all ]]; then
+    if [[ "$PLATFORM_ID" == linux && -z ${DISPLAY:-} && -z ${WAYLAND_DISPLAY:-} ]]; then
+        if command -v xvfb-run >/dev/null; then
+            xvfb-run -a "$BASH" "$MIR_ROOT/tests/run.sh" native
+        else
+            printf 'SKIP: native GUI needs a graphical session or xvfb-run; CI runs this check.\n'
+        fi
+    else
+        npm run test:native
+    fi
+fi

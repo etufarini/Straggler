@@ -97,6 +97,13 @@ TEST_MISSING=1 platform_ensure_dependencies launcher capture
     check('''check_dependencies() { return 1; }
 if platform_ensure_dependencies launcher; then exit 1; fi
 ''')
+    check('''source "$MIR_ROOT/lib/desktop.sh"
+MISSING_PACKAGES=()
+platform_ensure_dependencies build desktop_packages plan
+[[ ${MISSING_PACKAGES[*]} == 'cmake python coreutils' ]]
+[[ ! -e "$TEST_WORK/installed" ]]
+''', {'TEST_MISSING':'1'})
+    print('PASS: desktop package planning preserves all package names without installing them')
     print('PASS: launcher package mapping, SDK-independent setup and native dependency failures')
     print('PASS: CPU/Metal flags, SDK prerequisite, missing Homebrew/tools, grouped packages and dependency rollback')
 

@@ -24,7 +24,8 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
       ))}
       <p className="field-help">
         Changes are saved automatically after validation. An empty models folder is allowed. An
-        existing llama.cpp folder must contain executable build/bin/llama-server.
+        existing llama.cpp folder must contain executable build/bin/llama-server or
+        bin/llama-server.
       </p>
       <button onClick={() => setSection('llama')}>Install / update llama.cpp</button>
     </>

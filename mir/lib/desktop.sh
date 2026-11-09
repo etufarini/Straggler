@@ -80,8 +80,8 @@ desktop_dependencies() {
     local backend=$1
     platform_build_flags "$backend" || fail 'Choose a build supported on this platform.'
     MISSING_PACKAGES=()
-    platform_ensure_dependencies build desktop_packages || return 1
-    platform_ensure_dependencies "$backend" desktop_packages || return 1
+    platform_ensure_dependencies build desktop_packages plan || return 1
+    platform_ensure_dependencies "$backend" desktop_packages plan || return 1
 }
 
 desktop_build() (

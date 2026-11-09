@@ -99,6 +99,8 @@ platform_ensure_dependencies() {
         else
             macos_install_packages "${missing[@]}" || return 1
         fi
+        # Dependency plans collect package names without installing or rechecking them.
+        if [[ ${3:-} == plan ]]; then return 0; fi
         for tool in "${tools[@]}"; do
             command -v "$tool" >/dev/null || { printf 'Required command still unavailable after installation: %s\n' "$tool" >&2; return 1; }
         done
