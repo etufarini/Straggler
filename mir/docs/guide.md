@@ -376,12 +376,29 @@ server and stream states; responses from earlier server runs cannot leave stale
 stopped/error presence. `features/presence/createRenderer.ts` selects the renderer
 at one point. A replacement implements mount, setState, setPaused, resize and
 destroy. Canvas and particle details stay inside the current orb renderer.
-The supplied 1.11 engine is packaged as an ES module; its rendering algorithm is
-unchanged. It caps at 30 fps, comes to rest in quiet states, uses a still with
-reduced motion and is destroyed on unmount. Visibility combines DOM state with
+The renderer adapts the supplied 1.11 engine as an ES module, preserving its visual
+design while reusing particle buffers, colour sprites and shared ring calculations.
+It draws once per `requestAnimationFrame` callback, following the refresh cadence
+the webview provides without a fixed frame-rate cap. Motion uses the callback's
+elapsed time, so higher or changing refresh rates do not speed up the animation.
+Long event-loop stalls are clamped to avoid large jumps or catch-up work.
+The [HTML rendering model](https://html.spec.whatwg.org/multipage/webappapis.html#rendering-opportunity)
+allows the browser to reduce that cadence for load, visibility or power policy;
+matching a physical display's maximum refresh rate is not guaranteed.
+Quiet states come to rest; reduced motion uses a still frame.
+Pausing cancels pending frames, and resuming resets the clock to avoid a jump.
+The engine is destroyed on unmount. Visibility combines DOM state with
 read-only native window visibility/minimization checks to handle the desktop
 window lifecycle independently of the webview. Native
 visibility checks are canceled when the presence component unmounts.
+
+Chat keeps the textual Thinking/Generating indicator without a second rotating
+SVG spinner. In local Linux WebKit software-rendering comparisons, removing its
+rotation restored the orb's refresh cadence in the complete chat. This is evidence
+for that configuration, not a claim that SVG animations are slow on every webview.
+The optional native orb diagnostic records frame intervals and GUI CPU use;
+deterministic renderer tests cover fixed and changing refresh rates independently
+of the runner's display or rendering speed.
 
 Production layouts use explicit React classes instead of `:has()`. Composer width
 observation also handles webviews without container queries, and the save bar has

@@ -258,8 +258,11 @@ test('presence follows reasoning deltas and the ready renderer comes to rest', a
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'reasoning');
   await expect(page.locator('.presence-caption')).toContainText('Thinking…');
+  await expect(page.locator('.typing-indicator')).toHaveText('Thinking');
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'generating');
+  await expect(page.locator('.typing-indicator')).toHaveText('Generating');
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'ready');
+  await expect(page.locator('.typing-indicator')).toHaveCount(0);
   await page.waitForTimeout(17000);
   await page.evaluate(() => {
     const original = CanvasRenderingContext2D.prototype.clearRect;

@@ -46,9 +46,13 @@ export async function measureNativeOrb({ pid, evaluate, hide, output }) {
   }
   await evaluate(`(() => {
     window.__mirOrbFrames=0;
+    window.__mirOrbFrameTimes=[];
     const original=CanvasRenderingContext2D.prototype.clearRect;
     CanvasRenderingContext2D.prototype.clearRect=function(...args){
-      if(this.canvas.closest('.presence-stage')) window.__mirOrbFrames++;
+      if(this.canvas.closest('.presence-stage')) {
+        window.__mirOrbFrames++;
+        window.__mirOrbFrameTimes.push(performance.now());
+      }
       return original.apply(this,args);
     };
   })()`);
@@ -73,6 +77,11 @@ export async function measureNativeOrb({ pid, evaluate, hide, output }) {
       0,
     );
     const drawn = (await evaluate('window.__mirOrbFrames')) - frames;
+    const frameTimes = await evaluate(`window.__mirOrbFrameTimes.slice(${frames})`);
+    const intervals = frameTimes
+      .slice(1)
+      .map((time, index) => time - frameTimes[index])
+      .sort((a, b) => a - b);
     return {
       hidden,
       documentHidden,
@@ -82,6 +91,8 @@ export async function measureNativeOrb({ pid, evaluate, hide, output }) {
       guiCpuPercent: Math.round((ticks / hz / seconds) * 10000) / 100,
       orbFrames: drawn,
       orbFps: drawn / seconds,
+      frameIntervalMsMedian: intervals[Math.floor(intervals.length * 0.5)] ?? null,
+      frameIntervalMsP95: intervals[Math.floor(intervals.length * 0.95)] ?? null,
     };
   }
   const visible = await sample();
@@ -106,8 +117,8 @@ export async function measureNativeOrb({ pid, evaluate, hide, output }) {
   );
   assert.equal(visible.hidden, false, 'Visible window must be visible to WebKit');
   assert.ok(
-    visible.orbFrames > 0 && visible.orbFps <= 31,
-    'Live orb must draw at no more than 30 fps (sampling tolerance 1 fps)',
+    visible.orbFrames > 0,
+    'Live orb must draw while visible; the browser determines the available refresh rate',
   );
   assert.equal(hidden.hidden, true, 'Native window must actually be hidden for the hidden sample');
   assert.equal(hidden.orbFrames, 0, 'Hidden orb must stop drawing');

@@ -2,7 +2,7 @@ import ReasoningMenu from './ReasoningMenu';
 import SystemPromptMenu from './SystemPromptMenu';
 import ContextCounter from './ContextCounter';
 import Markdown from './Markdown';
-import { ArrowUp, HardDrive, LoaderCircle, Check, Copy, Square } from 'lucide-react';
+import { ArrowUp, HardDrive, Check, Copy, Square } from 'lucide-react';
 import { fileName } from '../../domain/types';
 import { messageStatusLabel } from '../../components/statusLabels';
 import Feedback from '../../components/Feedback';
@@ -117,7 +117,6 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   </div>
                   {message.status === 'streaming' && (
                     <span className="typing-indicator">
-                      <LoaderCircle size={14} className="spin" />{' '}
                       {message.content ? 'Generating' : 'Thinking'}
                     </span>
                   )}

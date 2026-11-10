@@ -18,7 +18,7 @@
  * API: new HoloOrb(canvas, {size, state, dpr, autostart, scanlines});
  * setState(s); setTilt(x, y); setPaused(b); disintegrate(); reassemble();
  * renderStill(state, t); resize(size); destroy().
- * Budget: 30 fps cap; pauses when the page is hidden; stops drawing once an
+ * Budget: one frame per browser refresh; pauses when hidden; stops once an
  * idle state has settled; one still frame with prefers-reduced-motion.
  */
 const HoloOrb = (function (root) {
@@ -183,15 +183,19 @@ const HoloOrb = (function (root) {
       this.time = 0;
       this.stateTime = 0;
       this.yaw = 0.6;
-      this.last = 0;
-      this.frameGap = 1000 / 30;
+      this.raf = 0;
+      this.destroyed = false;
+      this.last = null;
       this.reduce = root.matchMedia
         ? root.matchMedia('(prefers-reduced-motion: reduce)').matches
         : false;
       this.sprites = new Map();
       this.build();
       this.resize();
-      this.onVisibility = () => this.wake();
+      this.onVisibility = () => {
+        if (root.document.hidden) this.stopLoop();
+        else this.wake();
+      };
       if (root.document) root.document.addEventListener('visibilitychange', this.onVisibility);
       if (options.autostart !== false) this.wake();
     }
@@ -220,7 +224,8 @@ const HoloOrb = (function (root) {
           seed: r(),
           size: 0.8 + r() * 0.6,
           lat: y,
-          lon: Math.atan2(p[2], p[0]),
+          huePhase: y * 2.4 + Math.atan2(p[2], p[0]),
+          bandDirection: Math.floor((y + 1) * 3) % 2 ? 1 : -1,
           shard,
         });
       }
@@ -230,19 +235,19 @@ const HoloOrb = (function (root) {
           b = (r() - 0.5) * 1.2;
         this.shardDir.push([Math.cos(a) * 0.34, b * 0.26, Math.sin(a) * 0.34]);
       }
-      this.rings = [];
-      [
+      this.rings = [
         [1.52, 0.2, 0],
         [1.74, -0.12, 1],
-      ].forEach(([R, tilt, id]) => {
+      ].map(([R, tilt, id]) => {
+        const points = [];
         for (let i = 0; i < 260; i++) {
           const a = (i / 260) * TAU;
-          this.rings.push({
+          points.push({
             p: [Math.cos(a) * R, Math.sin(a) * R * Math.sin(tilt) * 0.5, Math.sin(a) * R],
             a,
-            id,
           });
         }
+        return { points, speedFactor: id ? -0.6 : 0.8, hueOffset: id ? 12 : -10 };
       });
       this.panels = [];
       for (let i = 0; i < 9; i++) {
@@ -274,7 +279,6 @@ const HoloOrb = (function (root) {
       this.canvas.height = px;
       this.canvas.style.width = this.size + 'px';
       this.canvas.style.height = this.size + 'px';
-      this.sprites = new Map();
       if (this.autostart) this.wake();
     }
 
@@ -284,7 +288,8 @@ const HoloOrb = (function (root) {
       const h = Math.round((((hue % 360) + 360) % 360) / 6) * 6;
       const s = Math.round(clamp(sat, 0, 100) / 20) * 20;
       const l = Math.round(clamp(light, 45, 85) / 10) * 10;
-      const key = h + ':' + s + ':' + l;
+      // Numeric keys avoid allocating a colour string for every particle lookup.
+      const key = (h * 101 + s) * 100 + l;
       let c = this.sprites.get(key);
       if (c) return c;
       c = root.document.createElement('canvas');
@@ -324,34 +329,54 @@ const HoloOrb = (function (root) {
       this.wake();
     }
     setPaused(p) {
+      if (p === this.paused) return;
       this.paused = p;
-      this.wake();
+      if (p) this.stopLoop();
+      else this.wake();
+    }
+
+    stopLoop() {
+      if (this.raf) root.cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.last = null;
     }
 
     wake() {
-      if (this.raf || !root.requestAnimationFrame) return;
+      if (
+        this.destroyed ||
+        this.paused ||
+        (root.document && root.document.hidden) ||
+        this.raf ||
+        !root.requestAnimationFrame
+      )
+        return;
       this.raf = root.requestAnimationFrame(this.loop);
     }
 
     loop(now) {
       this.raf = 0;
-      if (root.document && root.document.hidden) return;
+      if (this.destroyed || this.paused || (root.document && root.document.hidden)) {
+        this.stopLoop();
+        return;
+      }
       if (this.reduce) {
         this.snap();
         this.draw();
+        this.stopLoop();
         return;
       }
-      if (now - this.last >= this.frameGap) {
-        const dt = this.last ? Math.min(0.1, (now - this.last) / 1000) : 0;
-        this.last = now;
-        if (!this.paused && this.state !== 'stopped') this.step(dt);
-        this.draw();
-        if (this.paused || this.settled()) {
-          this.last = 0;
-          return;
-        }
+      // The browser owns the refresh cadence, including variable refresh rates.
+      // Elapsed time keeps motion independent of that cadence; clamp long stalls
+      // so a blocked event loop cannot cause a large jump or catch-up work.
+      const dt = this.last === null ? 0 : Math.min(0.1, (now - this.last) / 1000);
+      this.last = now;
+      if (this.state !== 'stopped') this.step(dt);
+      this.draw();
+      if (this.settled()) {
+        this.stopLoop();
+        return;
       }
-      this.raf = root.requestAnimationFrame(this.loop);
+      this.wake();
     }
 
     target(key) {
@@ -406,15 +431,22 @@ const HoloOrb = (function (root) {
       this.draw();
     }
 
-    rotate(p, cosY, sinY, cosX, sinX) {
+    rotate(p, cosY, sinY, cosX, sinX, result = []) {
       const x = p[0] * cosY + p[2] * sinY;
       const z0 = -p[0] * sinY + p[2] * cosY;
-      return [x, p[1] * cosX - z0 * sinX, p[1] * sinX + z0 * cosX];
+      result[0] = x;
+      result[1] = p[1] * cosX - z0 * sinX;
+      result[2] = p[1] * sinX + z0 * cosX;
+      return result;
     }
 
-    project(v, R, cx, cy) {
+    project(v, R, cx, cy, result = []) {
       const s = 3.4 / (3.4 - v[2]);
-      return [cx + v[0] * s * R, cy - v[1] * s * R, v[2], s];
+      result[0] = cx + v[0] * s * R;
+      result[1] = cy - v[1] * s * R;
+      result[2] = v[2];
+      result[3] = s;
+      return result;
     }
 
     draw() {
@@ -482,59 +514,71 @@ const HoloOrb = (function (root) {
 
       this.drawPanels(ctx, cosY, sinY, cosX, sinX, R, cx, cy, unit);
 
+      // Reuse projection buffers across particles to keep garbage collection
+      // out of the animation's hot path. Panels retain their own corner arrays.
+      const position = [0, 0, 0];
+      const v = [0, 0, 0];
+      const n = [0, 0, 0];
+      const sp = [0, 0, 0, 0];
+
       // Rings: thin, with a travelling arc.
-      for (const q of this.rings) {
-        const v = this.rotate(q.p, cosY, sinY, cosX, sinX);
-        const sp = this.project(v, R, cx, cy);
-        const speed = (q.id ? -0.6 : 0.8) * (0.3 + c.spin * 2 + c.waves * 0.6 + c.bands * 0.4);
+      for (const ring of this.rings) {
+        const sprite = this.sprite(H + ring.hueOffset, S, 66);
+        const speed = ring.speedFactor * (0.3 + c.spin * 2 + c.waves * 0.6 + c.bands * 0.4);
         const head = (((t * speed) % TAU) + TAU) % TAU;
-        let d = Math.abs(q.a - head);
-        d = Math.min(d, TAU - d);
-        const arc = Math.max(0, 1 - d / 1.1);
-        const depth = 0.45 + 0.55 * ((v[2] + 1.8) / 3.6);
-        ctx.globalAlpha = clamp(
-          (0.12 + arc * arc * 0.85) * depth * E * (1 - c.scatter * 0.7),
-          0,
-          1,
-        );
-        const sz = (0.9 + arc * 1.4) * sp[3] * unit;
-        ctx.drawImage(
-          this.sprite(H + (q.id ? 12 : -10), S, 66),
-          sp[0] - sz,
-          sp[1] - sz,
-          sz * 2,
-          sz * 2,
-        );
+        for (const q of ring.points) {
+          this.rotate(q.p, cosY, sinY, cosX, sinX, v);
+          this.project(v, R, cx, cy, sp);
+          let d = Math.abs(q.a - head);
+          d = Math.min(d, TAU - d);
+          const arc = Math.max(0, 1 - d / 1.1);
+          const depth = 0.45 + 0.55 * ((v[2] + 1.8) / 3.6);
+          ctx.globalAlpha = clamp(
+            (0.12 + arc * arc * 0.85) * depth * E * (1 - c.scatter * 0.7),
+            0,
+            1,
+          );
+          const sz = (0.9 + arc * 1.4) * sp[3] * unit;
+          ctx.drawImage(sprite, sp[0] - sz, sp[1] - sz, sz * 2, sz * 2);
+        }
       }
 
       // Shell.
       const scanY = Math.sin(t * 1.1) * 0.95;
+      const bandAngle = c.bands * t * 0.9;
+      const bandCos = Math.cos(bandAngle);
+      const bandSin = Math.sin(bandAngle);
       for (const q of this.shell) {
         const k = scatterOf(q.seed);
-        let p = q.p;
+        let x = q.p[0];
+        let z = q.p[2];
         // reasoning: bands flow in opposite directions
         if (c.bands > 0.01) {
-          const dir = Math.floor((q.lat + 1) * 3) % 2 ? 1 : -1;
-          const ang = c.bands * dir * t * 0.9;
-          const ca = Math.cos(ang),
-            sa = Math.sin(ang);
-          p = [p[0] * ca + p[2] * sa, p[1], -p[0] * sa + p[2] * ca];
+          const sa = bandSin * q.bandDirection;
+          x = q.p[0] * bandCos + q.p[2] * sa;
+          z = -q.p[0] * sa + q.p[2] * bandCos;
         }
         // loading: spiral twist while gathering
         if (c.breathe > 0.01 && k > 0.01) {
           const ang = k * 2.2;
           const ca = Math.cos(ang),
             sa = Math.sin(ang);
-          p = [p[0] * ca + p[2] * sa, p[1], -p[0] * sa + p[2] * ca];
+          const previousX = x;
+          x = previousX * ca + z * sa;
+          z = -previousX * sa + z * ca;
         }
-        let pos = [lerp(p[0], q.s[0], k), lerp(p[1], q.s[1], k), lerp(p[2], q.s[2], k)];
+        position[0] = lerp(x, q.s[0], k);
+        position[1] = lerp(q.p[1], q.s[1], k);
+        position[2] = lerp(z, q.s[2], k);
         // error: shards pushed apart along fixed directions
         if (c.shards > 0.01) {
           const d = this.shardDir[q.shard];
-          pos = [pos[0] + d[0] * c.shards, pos[1] + d[1] * c.shards, pos[2] + d[2] * c.shards];
+          position[0] += d[0] * c.shards;
+          position[1] += d[1] * c.shards;
+          position[2] += d[2] * c.shards;
         }
-        const v = this.rotate(pos, cosY, sinY, cosX, sinX);
-        const n = this.rotate(q.p, cosY, sinY, cosX, sinX);
+        this.rotate(position, cosY, sinY, cosX, sinX, v);
+        this.rotate(q.p, cosY, sinY, cosX, sinX, n);
         // generating: concentric waves travelling from the centre of the disc
         let lift = 0;
         if (c.waves > 0.01) {
@@ -545,12 +589,12 @@ const HoloOrb = (function (root) {
           v[1] *= r;
           v[2] *= r;
         }
-        const sp = this.project(v, R, cx, cy);
+        this.project(v, R, cx, cy, sp);
         const fres = Math.pow(1 - Math.abs(n[2]), 1.8);
         const front = 0.5 + 0.5 * ((n[2] + 1) / 2);
         // reasoning: a bright scan line rising and falling
         const scan = c.scan > 0.01 ? c.scan * Math.max(0, 1 - Math.abs(q.lat - scanY) / 0.08) : 0;
-        const hue = H + c.spread * Math.sin(q.lat * 2.4 + q.lon + t * 0.4) + fres * 8;
+        const hue = H + c.spread * Math.sin(q.huePhase + t * 0.4) + fres * 8;
         const a =
           ((0.08 + 0.92 * fres) * front * E * (1 - k * 0.4) + k * 0.14 + scan * 0.8 + lift * 0.5) *
           edge(sp[0], sp[1]);
@@ -676,7 +720,9 @@ const HoloOrb = (function (root) {
     }
 
     destroy() {
-      if (this.raf) root.cancelAnimationFrame(this.raf);
+      this.destroyed = true;
+      this.stopLoop();
+      this.sprites.clear();
       if (root.document) root.document.removeEventListener('visibilitychange', this.onVisibility);
     }
   }
