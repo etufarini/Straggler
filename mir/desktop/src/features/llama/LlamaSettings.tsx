@@ -48,8 +48,11 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
       </div>
       <div className="field-grid">
         <label className="setting-field">
-          <span>Build backend</span>
+          <span>
+            Hardware target <code className="tech-term">Build backend</code>
+          </span>
           <select
+            aria-label="Hardware target"
             value={backend}
             disabled={building}
             onChange={(event) => setBackend(event.target.value)}
@@ -60,14 +63,14 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
               </option>
             ))}
           </select>
-          <small>{config.capabilities.buildNote}</small>
+          <small>Options depend on your system.</small>
         </label>
         <NumberField
-          label="Compiler jobs"
+          label="Parallel build jobs"
           value={jobs}
           onChange={setJobs}
           disabled={building}
-          hint="1–64 compiler jobs. This is separate from inference CPU threads."
+          hint="1–64. Used only while building, not while chatting."
         />
       </div>
       <label className="setting-field">
@@ -98,7 +101,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
           disabled={busy || building || active || !native}
           onClick={() => void requestBuild()}
         >
-          Install / change build
+          Install or change build
         </button>
         <button
           disabled={busy || building || active || !config.build || !native}
@@ -111,6 +114,8 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
           onClick={() =>
             confirm({
               title: 'Restore previous build?',
+              actionLabel: 'Restore previous build',
+              destructive: true,
               text: 'Switch to the previous verified llama.cpp build? Model settings and conversations will be kept.',
               action: async () => {
                 accept(await operation('restore'));
@@ -122,7 +127,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
         </button>
       </div>
       <p role="status" className="job-status">
-        Build status: {job.phase}
+        {job.phase === 'idle' ? 'No build running' : `Build status: ${job.phase}`}
       </p>
       {job.error && (
         <Feedback title="llama.cpp build failed" details={job.error}>
@@ -135,6 +140,8 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
           onClick={() =>
             confirm({
               title: 'Cancel build?',
+              actionLabel: 'Cancel build',
+              destructive: true,
               text: 'Stop the current build and keep the working installation?',
               action: async () => {
                 await invoke('cancel_build');

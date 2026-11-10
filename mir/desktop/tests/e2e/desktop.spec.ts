@@ -9,9 +9,9 @@ async function mockDesktop(page: Page, mode = 'normal') {
 }
 
 async function loadModel(page: Page) {
-  await page.getByRole('button', { name: /^Models/ }).click();
+  await page.getByRole('button', { name: 'Choose model' }).click();
   await page.getByRole('button', { name: 'Load model' }).click();
-  await expect(page.getByText('Running on your device')).toBeVisible();
+  await expect(page.locator('.local-badge')).toContainText('Ready');
 }
 
 test('browser preview reports that native services are unavailable', async ({ page }) => {
@@ -46,7 +46,7 @@ test('model selection, Markdown, persistence, reopening and confirmed deletion',
     page.getByRole('button', { name: 'Explain local inference', exact: true }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Delete Explain local inference' }).click();
-  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button').last().click();
   await expect(page.getByText('What’s on your mind?')).toBeVisible();
 });
 
@@ -131,7 +131,7 @@ test('empty setup gives a usable message and keeps launch disabled', async ({ pa
   await mockDesktop(page, 'empty');
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Install / change build' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Install or change build' })).toBeVisible();
   await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByText('No GGUF models found', { exact: true })).toBeVisible();
   await expect(
@@ -146,13 +146,13 @@ test('settings retain generation and performance values through profile operatio
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('textbox', { name: /^Seed/ }).fill('42');
-  await page.getByRole('textbox', { name: /^Maximum output tokens/ }).fill('512');
-  await page.getByRole('combobox', { name: 'Sampling preset' }).selectOption('focused');
+  await page.getByRole('textbox', { name: /^Longest reply/ }).fill('512');
+  await page.getByRole('combobox', { name: 'Reply style' }).selectOption('focused');
   await expect(page.getByRole('textbox', { name: /^Seed/ })).toHaveValue('42');
-  await expect(page.getByRole('textbox', { name: /^Maximum output tokens/ })).toHaveValue('512');
+  await expect(page.getByRole('textbox', { name: /^Longest reply/ })).toHaveValue('512');
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
   await page.getByRole('combobox', { name: /^Device/ }).selectOption('none');
-  await expect(page.getByRole('textbox', { name: 'GPU layers', exact: true })).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: 'Model on the GPU', exact: true })).toBeDisabled();
   await page.getByRole('textbox', { name: /^CPU threads/ }).fill('3');
   await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
   await page.getByRole('textbox', { name: 'New configuration name', exact: true }).fill('Writing');
@@ -168,7 +168,7 @@ test('settings retain generation and performance values through profile operatio
   await expect(page.locator('.local-badge')).toHaveText('Stopped');
   await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Seed/ })).toHaveValue('42');
-  await expect(page.getByRole('combobox', { name: 'Sampling preset' })).toHaveValue('focused');
+  await expect(page.getByRole('combobox', { name: 'Reply style' })).toHaveValue('focused');
 });
 
 test('folder selection separates browsing, hidden directories, cancel and confirmation', async ({
@@ -261,7 +261,7 @@ test('fatal OOM stays visible through polling, preserves partial text and suppor
   await failure.getByRole('button', { name: 'Review settings' }).click();
   await page.getByRole('combobox', { name: 'Context size', exact: true }).selectOption('4096');
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
-  await page.getByRole('combobox', { name: /^Prompt processing/ }).selectOption('low-memory');
+  await page.getByRole('combobox', { name: /^Reading your message/ }).selectOption('low-memory');
   await page.getByRole('button', { name: 'Launch server', exact: true }).last().click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await expect(failure).toHaveCount(0);
@@ -281,7 +281,7 @@ test('startup OOM is persistent without opening a modal or accepting new request
 }) => {
   await mockDesktop(page, 'oom-startup');
   await page.goto('/');
-  await page.getByRole('button', { name: /^Models/ }).click();
+  await page.getByRole('button', { name: 'Choose model' }).click();
   await page.getByRole('button', { name: 'Load model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Needs restart');
   await expect(page.getByRole('alert')).toContainText('Not enough memory');
@@ -341,8 +341,11 @@ test('history and build errors use their own context and recovery actions', asyn
   await page.goto('/?scenario=build-error');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
-  await page.getByRole('button', { name: 'Install / change build' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm', exact: true }).click();
+  await page.getByRole('button', { name: 'Install or change build' }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Build llama.cpp', exact: true })
+    .click();
   await expect(page.locator('.settings-content').getByRole('alert')).toContainText(
     'llama.cpp build failed',
   );
@@ -354,11 +357,13 @@ test('hardware scenarios preserve generic controls and unknown memory', async ({
     await page.goto(`/?scenario=${scenario}`);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Performance', exact: true }).click();
-    await expect(page.getByText('Auto uses llama.cpp defaults.', { exact: false })).toBeVisible();
+    await expect(
+      page.getByText('Auto lets llama.cpp choose for your hardware.', { exact: false }),
+    ).toBeVisible();
     if (scenario === 'multiple') {
-      await expect(page.getByText('Advanced device settings', { exact: true })).toBeVisible();
+      await expect(page.getByText('Advanced: several devices', { exact: true })).toBeVisible();
     } else {
-      await expect(page.getByText('Advanced device settings', { exact: true })).toHaveCount(0);
+      await expect(page.getByText('Advanced: several devices', { exact: true })).toHaveCount(0);
     }
     if (scenario === 'unknown-memory')
       await expect(page.getByText('Available RAM: Unavailable')).toBeVisible();
@@ -369,19 +374,15 @@ test('occupying listeners require separate normal and force confirmations', asyn
   await page.goto('/?scenario=occupied');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Server & port', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: 'Force stop process…', exact: true }),
-  ).toBeDisabled();
-  await page.getByRole('button', { name: 'Stop process using port', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Force quit…', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Close programs using it', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('SIGTERM');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: 'Force stop process…', exact: true }),
-  ).toBeDisabled();
-  await page.getByRole('button', { name: 'Stop process using port', exact: true }).click();
-  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
-  await page.getByRole('button', { name: 'Force stop process…', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Force quit…', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Close programs using it', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button').last().click();
+  await page.getByRole('button', { name: 'Force quit…', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('SIGKILL');
-  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
-  await expect(page.getByText('Port 9931: FREE')).toBeVisible();
+  await page.getByRole('alertdialog').getByRole('button').last().click();
+  await expect(page.getByText('Port 9931 is free')).toBeVisible();
 });

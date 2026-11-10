@@ -1,9 +1,78 @@
 use crate::Result;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GenerationMetrics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_per_second: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generation_ms: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_ms: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<uuid::Uuid>,
+}
+
+impl GenerationMetrics {
+    pub fn merge(&mut self, newer: &Self) {
+        fn update<T: Clone>(value: &mut Option<T>, newer: &Option<T>) {
+            if newer.is_some() {
+                value.clone_from(newer);
+            }
+        }
+        update(&mut self.context_tokens, &newer.context_tokens);
+        update(&mut self.context_source, &newer.context_source);
+        update(&mut self.output_tokens, &newer.output_tokens);
+        update(&mut self.tokens_per_second, &newer.tokens_per_second);
+        update(&mut self.generation_ms, &newer.generation_ms);
+        update(&mut self.prompt_ms, &newer.prompt_ms);
+        update(&mut self.run_id, &newer.run_id);
+    }
+}
+
+fn metrics(event: &Value) -> Option<GenerationMetrics> {
+    let timings = &event["timings"];
+    let usage = &event["usage"];
+    let number = |key: &str| timings[key].as_f64().filter(|n| n.is_finite() && *n >= 0.0);
+    let timing_tokens = timings["cache_n"]
+        .as_u64()
+        .zip(timings["prompt_n"].as_u64())
+        .and_then(|(cached, prompt)| cached.checked_add(prompt))
+        .zip(timings["predicted_n"].as_u64())
+        .and_then(|(prompt, output)| prompt.checked_add(output));
+    let usage_tokens = usage["total_tokens"].as_u64();
+    if !timings.is_object() && !usage.is_object() {
+        return None;
+    }
+    Some(GenerationMetrics {
+        context_tokens: usage_tokens.or(timing_tokens),
+        context_source: if usage_tokens.is_some() {
+            Some("usage".into())
+        } else {
+            timing_tokens.map(|_| "timings".into())
+        },
+        output_tokens: usage["completion_tokens"]
+            .as_u64()
+            .or(timings["predicted_n"].as_u64()),
+        tokens_per_second: number("predicted_per_second"),
+        generation_ms: number("predicted_ms"),
+        prompt_ms: number("prompt_ms"),
+        run_id: None,
+    })
+}
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Delta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<GenerationMetrics>,
     pub content: String,
     pub reasoning: String,
 }
@@ -61,6 +130,7 @@ pub fn parse(data: &str) -> Result<(Delta, Option<String>)> {
     let delta = &choice["delta"];
     Ok((
         Delta {
+            metrics: metrics(&event),
             content: delta["content"].as_str().unwrap_or("").into(),
             reasoning: delta["reasoning_content"]
                 .as_str()
@@ -75,6 +145,36 @@ pub fn parse(data: &str) -> Result<(Delta, Option<String>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timings_and_usage_only_chunks_preserve_real_measurements() {
+        let (delta, _) = parse(r#"{"choices":[{"delta":{"reasoning_content":"Thinking"}}],"timings":{"cache_n":236,"prompt_n":1,"predicted_n":35,"predicted_ms":661.064,"predicted_per_second":52.9449,"prompt_ms":30.958}}"#).unwrap();
+        let mut current = delta.metrics.unwrap();
+        assert_eq!(current.context_tokens, Some(272));
+        let (delta, finish) = parse(r#"{"choices":[],"usage":{"prompt_tokens":237,"completion_tokens":36,"total_tokens":273}}"#).unwrap();
+        assert!(delta.content.is_empty());
+        assert!(finish.is_none());
+        current.merge(&delta.metrics.unwrap());
+        assert_eq!(current.context_tokens, Some(273));
+        assert_eq!(current.context_source.as_deref(), Some("usage"));
+        assert_eq!(current.output_tokens, Some(36));
+        assert_eq!(current.tokens_per_second, Some(52.9449));
+        assert_eq!(current.generation_ms, Some(661.064));
+        assert!(parse(r#"{"choices":[{"delta":{"content":"text"}}]}"#)
+            .unwrap()
+            .0
+            .metrics
+            .is_none());
+        assert!(
+            parse(r#"{"choices":[],"timings":{"predicted_n":-2,"predicted_per_second":-1}}"#)
+                .unwrap()
+                .0
+                .metrics
+                .unwrap()
+                .tokens_per_second
+                .is_none()
+        );
+    }
 
     #[test]
     fn fragmented_unicode_crlf_comments_and_multiple_events() {

@@ -3,6 +3,7 @@ import FieldError from './FieldError';
 
 export default function NumberField({
   label,
+  term,
   value,
   onChange,
   disabled = false,
@@ -10,6 +11,7 @@ export default function NumberField({
   error,
 }: {
   label: string;
+  term?: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -19,7 +21,10 @@ export default function NumberField({
   const id = useId();
   return (
     <label className="setting-field">
-      <span>{label}</span>
+      <span>
+        {label}
+        {term && <code className="tech-term">{term}</code>}
+      </span>
       <input
         disabled={disabled}
         aria-label={label}

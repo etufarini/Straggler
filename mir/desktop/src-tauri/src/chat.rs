@@ -1,4 +1,4 @@
-use crate::{stream, ChatMessage, ChatRequest, Result, Runtime};
+use crate::{stream, ChatRequest, Result, Runtime};
 use futures_util::StreamExt;
 use serde_json::{json, Value};
 use tokio_util::sync::CancellationToken;
@@ -60,7 +60,7 @@ impl Runtime {
             biased;
             _ = failed.cancelled() => Err("The inference backend cannot continue. Check the server log and restart it.".into()),
             _ = token.cancelled() => Ok("stopped".into()),
-            result = self.receive(&url, &request.messages, &mut emit) => result,
+            result = self.receive(&url, &request, &mut emit) => result,
         };
         let mut state = self.server.lock().map_err(|e| e.to_string())?;
         if state.run == run {
@@ -80,13 +80,54 @@ impl Runtime {
     async fn receive(
         &self,
         url: &str,
-        messages: &[ChatMessage],
+        request: &ChatRequest,
         emit: &mut impl FnMut(stream::Delta) -> Result<()>,
     ) -> Result<String> {
+        let mut body = json!({
+            "messages": request.messages,
+            "stream": true,
+            "stream_options": {"include_usage": true},
+            "timings_per_token": true,
+        });
+        let reasoning = request.options.reasoning.as_deref().unwrap_or("auto");
+        let effort = request.options.effort.as_deref().unwrap_or("auto");
+        if !matches!(reasoning, "auto" | "on" | "off") {
+            return Err("Reasoning must use the model default, on or off.".into());
+        }
+        if reasoning != "auto"
+            || effort != "auto"
+            || request.messages.iter().any(|m| m.role == "system")
+        {
+            let details = self.server_details().await?;
+            if request.messages.iter().any(|m| m.role == "system")
+                && details.system_role_supported == Some(false)
+            {
+                return Err("The loaded chat template does not support a system prompt.".into());
+            }
+            if reasoning != "auto" && details.reasoning_supported != Some(true) {
+                return Err(
+                    "Reasoning controls are unavailable for this server and chat template.".into(),
+                );
+            }
+            if reasoning != "off"
+                && effort != "auto"
+                && !details.effort_levels.iter().any(|level| level == effort)
+            {
+                return Err("The selected reasoning effort is not advertised by the loaded chat template. Choose its default or a supported level.".into());
+            }
+        }
+        if reasoning != "auto" {
+            body["chat_template_kwargs"] = json!({"enable_thinking": reasoning == "on"});
+        }
+        if reasoning == "off" {
+            body["reasoning_effort"] = json!("none");
+        } else if effort != "auto" {
+            body["reasoning_effort"] = json!(effort);
+        }
         let response = self
             .client
             .post(format!("{url}/v1/chat/completions"))
-            .json(&json!({"messages": messages, "stream": true}))
+            .json(&body)
             .send()
             .await
             .map_err(|e| format!("Cannot contact the local model: {e}"))?;
@@ -122,7 +163,10 @@ impl Runtime {
                     .into());
                 }
                 let (delta, reason) = stream::parse(&data)?;
-                if !delta.content.is_empty() || !delta.reasoning.is_empty() {
+                if !delta.content.is_empty()
+                    || !delta.reasoning.is_empty()
+                    || delta.metrics.is_some()
+                {
                     emit(delta)?;
                 }
                 if reason.is_some() {

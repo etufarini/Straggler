@@ -24,8 +24,8 @@ export default function SavedConfigurations({ controller }: { controller: Settin
     <>
       <h2>Saved configurations</h2>
       <p className="field-help">
-        Profiles save model, generation and server settings. Folders and conversations stay
-        separate.
+        A configuration stores your model, reply and server settings. Folders and conversations are
+        not included.
       </p>
       <label className="setting-field">
         <span>Configuration</span>
@@ -53,16 +53,18 @@ export default function SavedConfigurations({ controller }: { controller: Settin
           Load configuration
         </button>
         <button
-          disabled={!config.currentProfile || busy || !native}
+          disabled={!profile || busy || !native}
           onClick={() =>
             confirm({
-              title: 'Update current configuration?',
-              text: `Replace “${config.currentProfile}” with the current settings?`,
-              action: () => saveProfile(config.currentProfile!, true),
+              title: 'Save to selected configuration?',
+              actionLabel: 'Replace configuration',
+              destructive: true,
+              text: `Replace “${profile}” with the current settings?`,
+              action: () => saveProfile(profile, true),
             })
           }
         >
-          Update current
+          Save to selected
         </button>
         <label className="setting-field">
           <span>New configuration name</span>
@@ -81,7 +83,9 @@ export default function SavedConfigurations({ controller }: { controller: Settin
           onClick={() =>
             confirm({
               title: 'Delete configuration?',
-              text: `Delete “${profile}”? Current model settings and conversations will be kept.`,
+              actionLabel: 'Delete configuration',
+              destructive: true,
+              text: `Delete “${profile}”? Your current settings and conversations stay as they are.`,
               action: async () => {
                 const value = await operation('delete-profile', [profile, 'confirm']);
                 accept(value);

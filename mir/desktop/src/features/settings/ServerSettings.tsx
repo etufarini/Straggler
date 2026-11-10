@@ -20,11 +20,12 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
     <>
       <h2>Server & port</h2>
       <NumberField
-        label="TCP port"
+        label="Port"
+        term="TCP"
         value={draft.port}
         error={fieldError('port')}
         onChange={(value) => change('port', value)}
-        hint="A port from 1 to 65535. The desktop server listens on 127.0.0.1."
+        hint="A number from 1 to 65535. Only this computer can connect (127.0.0.1)."
       />
       <button
         className="text-button"
@@ -36,9 +37,13 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
         }
       >
         <RefreshCw size={14} />
-        Refresh port status
+        Check port again
       </button>
-      <pre className="process-details">{config.portStatus}</pre>
+      <pre className="process-details">
+        {config.portStatus
+          .replace(/Port (\d+): FREE/, 'Port $1 is free')
+          .replace(/Port (\d+): IN USE/, 'Port $1 is in use')}
+      </pre>
       <div className="row-actions">
         <button
           disabled={
@@ -46,19 +51,19 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
           }
           onClick={() => stopListeners(false)}
         >
-          Stop process using port
+          Close programs using it
         </button>
         <button
           className="danger-button"
           disabled={busy || active || draft.port !== config.settings.port || !forceTargets.length}
           onClick={() => stopListeners(true)}
         >
-          Force stop process…
+          Force quit…
         </button>
       </div>
       <p className="field-help">
-        Processes are rechecked before signaling. SIGTERM requests normal shutdown; SIGKILL requires
-        a separate confirmation. Unidentified listeners still block launch.
+        Mir.cpp checks again before stopping anything and asks before forcing a quit. A program it
+        can’t identify still blocks the launch.
       </p>
     </>
   );

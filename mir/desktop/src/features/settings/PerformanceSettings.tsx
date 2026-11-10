@@ -7,7 +7,9 @@ export default function PerformanceSettings({ controller }: { controller: Settin
   return (
     <>
       <h2>Performance</h2>
-      <p className="field-help">Auto uses llama.cpp defaults. Flash Attention remains automatic.</p>
+      <p className="field-help">
+        Auto lets llama.cpp choose for your hardware. Flash Attention is always automatic.
+      </p>
       <label className="setting-field">
         <span>Device</span>
         <select
@@ -16,7 +18,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
           aria-describedby={fieldError('device') ? 'device-error' : undefined}
           onChange={(event) => change('device', event.target.value)}
         >
-          <option value="auto">Auto: let llama.cpp choose</option>
+          <option value="auto">Auto (llama.cpp chooses)</option>
           <option value="none">CPU only</option>
           {!['auto', 'none', ...config.devices.map((device) => device.name)].includes(
             draft.device,
@@ -35,10 +37,11 @@ export default function PerformanceSettings({ controller }: { controller: Settin
           value={draft.threads}
           error={fieldError('threads')}
           onChange={(value) => change('threads', value)}
-          hint="Auto or a positive count. More threads are not always faster."
+          hint="Auto or a number. More is not always faster."
         />
         <NumberField
-          label="GPU layers"
+          label="Model on the GPU"
+          term="GPU layers"
           value={draft.gpu_layers}
           error={fieldError('gpu_layers')}
           disabled={draft.device === 'none'}
@@ -46,13 +49,16 @@ export default function PerformanceSettings({ controller }: { controller: Settin
           hint={
             draft.device === 'none'
               ? 'Ignored: CPU only always disables GPU layers.'
-              : 'Auto, all or a nonnegative count. All may exceed available memory.'
+              : 'How many layers run on the graphics card: Auto, All, or a number. All may not fit in memory.'
           }
         />
       </div>
       <label className="setting-field">
-        <span>Prompt processing</span>
+        <span>
+          Reading your message <code className="tech-term">Prompt processing</code>
+        </span>
         <select
+          aria-label="Reading your message"
           value={draft.prompt_processing}
           aria-invalid={fieldError('prompt_processing') ? true : undefined}
           aria-describedby={fieldError('prompt_processing') ? 'prompt-processing-error' : undefined}
@@ -64,8 +70,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
         </select>
         <FieldError id="prompt-processing-error" message={fieldError('prompt_processing')} />
         <small>
-          Controls input processing. Large batch uses more memory and does not guarantee faster
-          answer generation.
+          Large batch reads long messages faster but uses more memory. It does not speed up replies.
         </small>
       </label>
       {(config.capabilities.multipleDevices ||
@@ -82,10 +87,9 @@ export default function PerformanceSettings({ controller }: { controller: Settin
               : undefined
           }
         >
-          <summary>Advanced device settings</summary>
+          <summary>Advanced: several devices</summary>
           <p className="field-help">
-            Device names and proportions follow the selected device order. Memory margins are
-            fitting targets in MiB, not allocation guarantees.
+            Values follow the device order. Margins are targets, not guarantees.
           </p>
           <label className="setting-field">
             <span>Device names</span>
@@ -94,11 +98,14 @@ export default function PerformanceSettings({ controller }: { controller: Settin
               value={draft.device}
               onChange={(event) => change('device', event.target.value)}
             />
-            <small>Auto, none, or comma-separated names from the installed server.</small>
+            <small>Auto, none, or device names separated by commas.</small>
           </label>
           <label className="setting-field">
-            <span>Split mode</span>
+            <span>
+              How to split the model <code className="tech-term">Split mode</code>
+            </span>
             <select
+              aria-label="How to split the model"
               value={draft.split_mode}
               aria-invalid={fieldError('split_mode') ? true : undefined}
               aria-describedby={fieldError('split_mode') ? 'split-mode-error' : undefined}
@@ -119,14 +126,15 @@ export default function PerformanceSettings({ controller }: { controller: Settin
             value={draft.tensor_split}
             error={fieldError('tensor_split')}
             onChange={(value) => change('tensor_split', value)}
-            hint="Relative values in device order, for example 2,1. Leave empty for Auto."
+            hint="Share of the model per device, for example 2,1. Empty is Auto."
           />
           <NumberField
-            label="Fitting margins (MiB)"
+            label="Memory margins (MiB)"
+            term="Fitting margins"
             value={draft.fit_target}
             error={fieldError('fit_target')}
             onChange={(value) => change('fit_target', value)}
-            hint="Comma-separated nonnegative MiB targets or Auto."
+            hint="A target per device, separated by commas, or Auto."
           />
         </details>
       )}

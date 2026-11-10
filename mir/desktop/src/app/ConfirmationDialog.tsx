@@ -22,8 +22,12 @@ export default function ConfirmationDialog({ controller }: { controller: Workspa
           <button disabled={confirmBusy} onClick={() => setConfirmation(null)}>
             Cancel
           </button>
-          <button className="primary-button" disabled={confirmBusy} onClick={() => void confirm()}>
-            {confirmBusy ? 'Working…' : confirmation.actionLabel || 'Confirm'}
+          <button
+            className={confirmation.destructive ? 'danger-button' : 'primary-button'}
+            disabled={confirmBusy}
+            onClick={() => void confirm()}
+          >
+            {confirmBusy ? 'Working…' : confirmation.actionLabel}
           </button>
         </div>
       </section>

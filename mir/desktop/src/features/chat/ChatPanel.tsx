@@ -1,3 +1,6 @@
+import ReasoningMenu from './ReasoningMenu';
+import SystemPromptMenu from './SystemPromptMenu';
+import ContextCounter from './ContextCounter';
 import Markdown from './Markdown';
 import { ArrowUp, HardDrive, LoaderCircle, Check, Copy, Square } from 'lucide-react';
 import { fileName } from '../../domain/types';
@@ -5,10 +8,21 @@ import { messageStatusLabel } from '../../components/statusLabels';
 import Feedback from '../../components/Feedback';
 import StorageFeedback from './StorageFeedback';
 import type { WorkspaceController } from '../../app/useWorkspace';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { errorDetail } from '../../domain/errors';
 export default function ChatPanel({ controller }: { controller: WorkspaceController }) {
   const [copied, setCopied] = useState('');
+  const composerRef = useRef<HTMLFormElement>(null);
+  const [composerWidth, setComposerWidth] = useState<number | null>(null);
+  useEffect(() => {
+    const element = composerRef.current;
+    if (!element) return;
+    const measure = () => setComposerWidth(element.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const [copyError, setCopyError] = useState<{ messageId: string; detail: string } | null>(null);
   const {
     follow,
@@ -40,10 +54,6 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
       >
         {chat.messages.length === 0 ? (
           <div className="welcome">
-            <div className="welcome-mark">
-              <span /> <span /> <span />
-            </div>
-            <span className="eyebrow">A SPACE FOR YOUR IDEAS</span>
             <h1>What’s on your mind?</h1>
             <p>
               A conversation, a fresh perspective, a place to think.
@@ -172,7 +182,8 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
       <div className="composer-wrap">
         <StorageFeedback controller={controller} />
         <form
-          className="composer"
+          ref={composerRef}
+          className={`composer ${composerWidth !== null && composerWidth <= 700 ? 'is-narrow' : ''} ${composerWidth !== null && composerWidth <= 480 ? 'is-small' : ''}`}
           onSubmit={(event) => {
             event.preventDefault();
             if (canSend) {
@@ -204,12 +215,13 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
             }}
           />
           <div className="composer-footer">
-            <span>
-              <span className="privacy-dot" />
-              Local by design
-            </span>
-            <div>
+            <div className="composer-tools" role="group" aria-label="Message options">
+              <SystemPromptMenu controller={controller} />
+              <ReasoningMenu controller={controller} />
+            </div>
+            <div className="composer-send">
               <span className="keyboard-hint">Shift + Enter for a new line</span>
+              <ContextCounter controller={controller} />
               {generating ? (
                 <button
                   type="button"

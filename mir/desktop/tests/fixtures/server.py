@@ -34,7 +34,12 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
 
     def do_GET(self):
-        body = json.dumps({'status': 'ok', 'pid': os.getpid()}).encode()
+        data = {'status': 'ok', 'pid': os.getpid()}
+        if self.path == '/props':
+            data = {'default_generation_settings': {'n_ctx': 4096},
+                    'chat_template_caps': {'supports_system_role': True, 'supports_reasoning_effort': True,
+                                           'reasoning_effort_levels': ['low', 'high']}}
+        body = json.dumps(data).encode()
         self.send_response(200)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
@@ -42,6 +47,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        if self.path == '/apply-template':
+            thinking = request.get('chat_template_kwargs', {}).get('enable_thinking', True)
+            body = json.dumps({'prompt': '<think>' if thinking else '</think>'}).encode()
+            self.send_response(200)
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         with open(os.environ['TEST_REQUEST'], 'w') as record:
             json.dump(request, record)
         # Failed assistant turns are omitted, so consecutive user turns can be
@@ -69,7 +82,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.close_connection = True
         try:
-            event = 'data: ' + json.dumps({'choices': [{'delta': {'content': 'caffè ☕', 'reasoning_content': 'Thinking'}}]}, ensure_ascii=False) + '\r\n\r\n'
+            event = 'data: ' + json.dumps({'choices': [{'delta': {'content': 'caffè ☕', 'reasoning_content': 'Thinking'}}], 'timings': {'cache_n': 10, 'prompt_n': 20, 'predicted_n': 2, 'predicted_ms': 100, 'predicted_per_second': 20, 'prompt_ms': 30}}, ensure_ascii=False) + '\r\n\r\n'
             for byte in event.encode():
                 self.wfile.write(bytes([byte]))
                 self.wfile.flush()
@@ -90,7 +103,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.flush()
                     time.sleep(0.02)
             elif prompt != 'interrupted':
-                self.wfile.write(b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')
+                self.wfile.write(b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":30,"completion_tokens":2,"total_tokens":32}}\n\ndata: [DONE]\n\n')
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             pass

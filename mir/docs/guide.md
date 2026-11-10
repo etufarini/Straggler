@@ -20,17 +20,26 @@ Settings has six sections:
 
 | Section | Controls |
 | --- | --- |
-| Model settings | GGUF selection, context, K/V cache formats, sampling, seed and output length |
+| Model settings | GGUF selection, context, K/V cache formats, sampling, seed, output length and Chat defaults |
 | Performance | Device, CPU threads, GPU layers, prompt processing and conditional advanced device settings |
 | Server & port | TCP port, listener details, normal and separately confirmed force shutdown |
-| Saved configurations | Load for review, update current, save as new and confirmed deletion |
+| Saved configurations | Load for review, save to selected, save as new and confirmed deletion |
 | Folders | llama.cpp and recursively searched model directories |
 | llama.cpp | Managed installation, updates, cancellation, rollback and build logs |
 
 The model selector, server controls and logs remain available from chat. Edited
 settings are distinct from the running configuration. Apply validates a draft;
 loading a profile does not launch. Modified compares the draft with saved fields;
-Restart required compares it with the active server settings.
+Restart required compares server-launch fields with the active server settings;
+Chat defaults do not require a restart. The clickable server badge opens the log
+and shows restart needs even outside Settings. Configuration identity sits under
+the model name in chat. Profile-backed settings keep Apply changes visible while
+scrolling; Folders and llama.cpp have their own save or operation actions.
+
+The sidebar collapses to a 68px rail. The assistant presence panel collapses to a
+60px rail; below 1100px it opens over the chat. Both choices are remembered in
+native desktop preferences, separately from browser preferences and profiles.
+State is written beside the decorative orb, including in the rail.
 
 An empty model folder is allowed. Folder navigation does not save until Use this
 folder is accepted. Hidden folders can be displayed or entered by path. Existing
@@ -65,6 +74,43 @@ length may be Auto, -1 for no fixed limit, zero for input evaluation only or a
 positive token count. A seed does not promise identical output across devices.
 Reasoning text is displayed when returned by the server; removed launcher reasoning
 settings in older profiles are ignored. Model behavior remains native.
+
+System prompt and Reasoning in the composer apply from the next message. A chat
+can inherit the applied defaults or store its own system prompt; an explicitly
+empty per-chat prompt sends no system message. Chat defaults in Model settings
+belong to saved configurations and count toward Modified. Editing a draft does
+not change applied chat defaults until Apply changes or a profile save succeeds.
+New defaults are an empty system prompt and no reasoning or effort override, so
+older configurations retain the server's behavior.
+
+On and Off send request-time controls, not server launch arguments. The native
+service checks `/props` capabilities and uses `/apply-template` without inference
+to check the reasoning switch. Effort choices are the template's advertised
+`chat_template_caps.reasoning_effort_levels`; absent levels are not replaced with
+invented budgets. Unavailable capabilities disable those controls, not server
+controls. A selected effort that the running template does not advertise is
+reported explicitly. Separate reasoning text is shown only when the server
+returns it; raw thoughts in ordinary content cannot be classified as a reasoning
+stream by Mir.cpp.
+
+The context counter beside Send uses the running server's
+`default_generation_settings.n_ctx`, never training context or edited settings.
+Tokens come from the current chat's last reported response usage, or streaming
+`cache_n + prompt_n + predicted_n` timings. The counter identifies that source;
+it is not a token estimate for an unsent draft. Data from an earlier server run is
+not reused. Missing usage or capacity is unavailable, not zero. Thresholds are
+under 75%, 75% to under 90%, and 90% or more; the displayed percentage is rounded.
+After a context shift, response totals can include discarded tokens and are not a
+measurement of retained KV tokens. Counts above the window are not silently
+rewritten to fit the ring.
+
+In the pinned upstream contract, context shift is disabled by default. A reply
+can stop at the context limit; an input prompt that already exceeds the window
+is rejected. When context shift is enabled and supported, the server can discard
+part of the earlier context and continue. A `length` finish reason can also mean
+an output-token limit. Mir.cpp does not claim which occurred without evidence.
+See the pinned [server contract](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/README.md)
+and [context implementation](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-context.cpp).
 
 ## Devices and memory
 
@@ -120,8 +166,8 @@ Mir.cpp reports saved data only after the write succeeds.
 An explicit fatal backend failure changes the server status to **Needs restart**.
 For confirmed memory exhaustion, the persistent banner says **Not enough memory**.
 Stop server asks for confirmation and releases the supervised server. The banner
-then offers Review settings: consider a smaller context, Performance → Prompt
-processing → Low memory, or a less demanding model/quantization before restarting.
+then offers Review settings: consider a smaller context, Performance → Reading your message
+(Prompt processing) → Low memory, or a less demanding model/quantization before restarting.
 Settings and profiles are never changed automatically. These choices can reduce
 memory demand; they do not guarantee that a model fits.
 
@@ -138,7 +184,7 @@ another operating system from terminating processes when resources are exhausted
 | --- | --- |
 | Saved folders | `${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/paths.conf` |
 | Named configurations | `${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/profiles/*.conf` |
-| Desktop history and session lock | `${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/desktop/` |
+| Desktop history, UI preferences and session lock | `${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/desktop/` |
 | Managed llama.cpp builds | `${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/llama.cpp/` |
 | Private desktop toolchains | `${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/toolchains/` |
 | Verified desktop builds | `${XDG_CACHE_HOME:-$HOME/.cache}/mir.cpp/desktop/` |
@@ -147,14 +193,20 @@ another operating system from terminating processes when resources are exhausted
 Profiles are plain `key=value` data. Current fields are model, context, port,
 device, threads, gpu_layers, prompt_processing, cache_type_k, cache_type_v,
 split_mode, tensor_split, fit_target, temperature, top_p, top_k, min_p,
-repeat_penalty, presence_penalty, frequency_penalty, seed and max_tokens.
+repeat_penalty, presence_penalty, frequency_penalty, seed, max_tokens, chat_system_prompt, chat_reasoning and
+chat_reasoning_effort.
 
 Only model is required on load. Missing fields use port 9931, `q4_0` for both
-cache types and Auto for the remaining controls, independently of current settings
+cache types, an empty prompt, and Auto for the remaining controls, independently of current settings
 or environment overrides. Unknown/removed keys are ignored. Invalid recognized
 fields, duplicates and malformed lines reject the entire load. Older desktop
 profiles, including their removed reasoning field, remain readable. Loading never
 rewrites a file; saving writes current fields. Paths and chats stay separate.
+The system prompt is a JSON string on one literal profile line, preserving
+multiline Unicode text without sourcing or evaluating it. It accepts up to 65536
+UTF-8 bytes without NUL. `chat_reasoning` is `auto`, `on` or `off`;
+`chat_reasoning_effort=auto` omits an override. The old removed `reasoning` key
+remains ignored and is distinct from these fields.
 
 Names accept letters, numbers, spaces, dots, underscores and hyphens, start with
 an alphanumeric character and have at most 80 characters. Overwrite and deletion
@@ -310,13 +362,30 @@ Frontend code is grouped into app composition, feature components/hooks, shared
 controls, domain types and the desktop service. Native modules separate commands,
 workspace/bridge, server supervision, diagnostics, chat streaming, builds and history.
 The launcher owns setting validation and returns field identifiers through the
-private bridge. The UI uses shared Feedback and FieldError components; each feature
+private bridge. The UI uses shared Feedback, FieldError, popover and reasoning controls; each feature
 owns the placement and recovery actions for its errors.
 
 ```text
 React features → desktop service → Tauri runtime → mir.sh --desktop
                                               → local llama-server HTTP API
 ```
+
+Assistant presence is a presentation boundary accepting only its seven-state
+contract and optional response measurements. `domain/presence.ts` maps actual
+server and stream states; responses from earlier server runs cannot leave stale
+stopped/error presence. `features/presence/createRenderer.ts` selects the renderer
+at one point. A replacement implements mount, setState, setPaused, resize and
+destroy. Canvas and particle details stay inside the current orb renderer.
+The supplied 1.11 engine is packaged as an ES module; its rendering algorithm is
+unchanged. It caps at 30 fps, comes to rest in quiet states, uses a still with
+reduced motion and is destroyed on unmount. Visibility combines DOM state with
+read-only native window visibility/minimization checks to handle the desktop
+window lifecycle independently of the webview. Native
+visibility checks are canceled when the presence component unmounts.
+
+Production layouts use explicit React classes instead of `:has()`. Composer width
+observation also handles webviews without container queries, and the save bar has
+a fallback layout for missing sticky positioning. The design's type floor is 11px.
 
 The private bridge reuses launcher validation, profiles, discovery and native
 argument construction. Platform services own OS operations and build metadata;

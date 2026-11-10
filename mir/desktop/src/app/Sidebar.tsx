@@ -1,6 +1,12 @@
-import { Plus, HardDrive, MessageSquare, Trash2, Settings2, Terminal } from 'lucide-react';
-import { newConversation, fileName } from '../domain/types';
-import { statusLabel } from '../components/statusLabels';
+import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  MessageSquare,
+  Trash2,
+  Settings2,
+} from 'lucide-react';
+import { newConversation } from '../domain/types';
 import { invoke } from '../services/desktop';
 import type { WorkspaceController } from './useWorkspace';
 export default function Sidebar({ controller }: { controller: WorkspaceController }) {
@@ -10,7 +16,6 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
     setInput,
     setPanel,
     panel,
-    config,
     conversations,
     chat,
     openConversation,
@@ -18,11 +23,13 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
     saveQueue,
     setConversations,
     chatRef,
-    server,
+    preferences,
+    preferencesReady,
+    changePreferences,
     storageError,
   } = controller;
   return (
-    <aside className="sidebar">
+    <aside id="sidebar" className={`sidebar ${preferences.sidebarCollapsed ? 'is-compact' : ''}`}>
       <div className="brand">
         <span className="brand-symbol">
           m<span>·</span>
@@ -30,9 +37,26 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         <span>
           Mir.cpp<small>YOUR LOCAL SPACE</small>
         </span>
+        <button
+          className="sidebar-toggle"
+          aria-expanded={!preferences.sidebarCollapsed}
+          aria-controls="sidebar"
+          aria-label={preferences.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={preferences.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          disabled={!preferencesReady}
+          onClick={() => changePreferences({ sidebarCollapsed: !preferences.sidebarCollapsed })}
+        >
+          {preferences.sidebarCollapsed ? (
+            <PanelLeftOpen size={18} />
+          ) : (
+            <PanelLeftClose size={18} />
+          )}
+        </button>
       </div>
       <button
         className="new-chat"
+        aria-label="New chat"
+        title="New chat"
         disabled={generating || (!!storageError && chat.messages.length > 0)}
         onClick={() => {
           updateChat(newConversation());
@@ -40,17 +64,8 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
           setPanel(null);
         }}
       >
-        <Plus size={17} /> New chat
+        <Plus size={17} /> <span className="sidebar-label">New chat</span>
       </button>
-      <nav aria-label="Workspace">
-        <button
-          className={panel === 'models' ? 'nav-item selected' : 'nav-item'}
-          onClick={() => setPanel('models')}
-        >
-          <HardDrive size={17} /> Models{' '}
-          <span className="count">{config?.models.length ?? '—'}</span>
-        </button>
-      </nav>
       <div className="section-label">CONVERSATIONS</div>
       <div className="conversation-list">
         {conversations.length === 0 && (
@@ -83,6 +98,8 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
               onClick={() =>
                 setConfirmation({
                   title: 'Delete conversation?',
+                  actionLabel: 'Delete conversation',
+                  destructive: true,
                   text: `“${value.title}” will be permanently removed from this device.`,
                   action: async () => {
                     await saveQueue.current.catch(() => {});
@@ -99,20 +116,16 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         ))}
       </div>
       <div className="sidebar-bottom">
-        <button className="nav-item" onClick={() => setPanel('settings')}>
-          <Settings2 size={17} /> Settings
+        <button
+          className={`nav-item ${panel === 'settings' ? 'selected' : ''}`}
+          aria-label="Settings"
+          aria-current={panel === 'settings' ? 'page' : undefined}
+          title="Settings"
+          onClick={() => setPanel('settings')}
+        >
+          <Settings2 size={17} /> <span className="sidebar-label">Settings</span>
         </button>
-        <button className="server-card" onClick={() => setPanel('logs')}>
-          <span className={`status-dot ${server.phase}`} />
-          <span>
-            {statusLabel[server.phase]}
-            <small>{server.model ? fileName(server.model) : 'Local inference engine'}</small>
-          </span>
-          <Terminal size={16} />
-        </button>
-        <span className="version">
-          MIR.CPP <span>Desktop preview · 0.1</span>
-        </span>
+        <span className="version">Desktop preview · 0.1</span>
       </div>
     </aside>
   );

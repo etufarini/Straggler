@@ -2,6 +2,8 @@ mod builds;
 mod chat;
 pub mod diagnostics;
 pub mod history;
+pub mod model;
+pub mod preferences;
 mod server;
 pub mod stream;
 pub mod workspace;
@@ -26,6 +28,7 @@ pub type Result<T> = std::result::Result<T, String>;
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
+    pub run_id: Uuid,
     pub phase: String,
     pub model: Option<String>,
     pub url: Option<String>,
@@ -53,7 +56,9 @@ pub struct Runtime {
     server: Arc<Mutex<Server>>,
     client: reqwest::Client,
     active: Mutex<Generation>,
+    model_details: Mutex<Option<model::ServerDetails>>,
     pub history: History,
+    pub preferences: preferences::Preferences,
     workspace: Mutex<workspace::Workspace>,
     job: Arc<Mutex<workspace::Job>>,
     _instance: File,
@@ -70,6 +75,15 @@ struct Generation {
 pub struct ChatRequest {
     pub request_id: Uuid,
     pub messages: Vec<ChatMessage>,
+    #[serde(default)]
+    pub options: ChatOptions,
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChatOptions {
+    pub reasoning: Option<String>,
+    pub effort: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -108,6 +122,7 @@ impl Runtime {
             launcher,
             bash,
             history,
+            preferences: preferences::Preferences::new(data.clone()),
             _instance: instance,
             workspace: Mutex::new(workspace::Workspace::default()),
             job: Arc::new(Mutex::new(workspace::Job::default())),
@@ -123,6 +138,7 @@ impl Runtime {
                 diagnostics: diagnostics::Diagnostics::default(),
             })),
             active: Mutex::new(Generation::default()),
+            model_details: Mutex::new(None),
             client: reqwest::Client::builder()
                 .no_proxy()
                 .redirect(reqwest::redirect::Policy::none())

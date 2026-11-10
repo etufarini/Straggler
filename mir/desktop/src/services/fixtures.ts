@@ -5,6 +5,8 @@ import type {
   JobStatus,
   Settings,
   ServerStatus,
+  UiPreferences,
+  ServerDetails,
 } from '../domain/types';
 import { emptyServer } from '../domain/types';
 
@@ -24,10 +26,19 @@ export type Scenario =
   | 'oom-and-save-error'
   | 'build-error'
   | 'history-error'
-  | 'compute-error';
+  | 'compute-error'
+  | 'no-metrics'
+  | 'no-reasoning'
+  | 'effort-levels'
+  | 'context-high'
+  | 'context-full'
+  | 'reasoning-stream';
 
 // Development data deliberately uses generic device names and no personal paths.
 export const defaultSettings: Settings = {
+  chat_system_prompt: '',
+  chat_reasoning: 'auto',
+  chat_reasoning_effort: 'auto',
   model: '/fixture/models/example.gguf',
   context: 'auto',
   port: '9931',
@@ -68,6 +79,12 @@ export const scenarios: Scenario[] = [
   'build-error',
   'history-error',
   'compute-error',
+  'no-metrics',
+  'no-reasoning',
+  'effort-levels',
+  'context-high',
+  'context-full',
+  'reasoning-stream',
 ];
 
 export function createFixture(scenario: Scenario) {
@@ -150,6 +167,17 @@ export function createFixture(scenario: Scenario) {
 
   async function invoke(command: string, args: Record<string, unknown> = {}): Promise<unknown> {
     switch (command) {
+      case 'preferences_read':
+        return JSON.parse(
+          localStorage.getItem('mir-fixture-ui-preferences') ||
+            '{"sidebarCollapsed":false,"presenceExpanded":null}',
+        );
+      case 'preferences_save':
+        localStorage.setItem(
+          'mir-fixture-ui-preferences',
+          JSON.stringify(args.preferences as UiPreferences),
+        );
+        return;
       case 'configuration':
         return configuration();
       case 'apply_settings': {
@@ -160,12 +188,27 @@ export function createFixture(scenario: Scenario) {
         settings = structuredClone(next);
         return configuration();
       }
+      case 'server_details':
+        return {
+          runId: status.runId!,
+          contextSize: 4096,
+          reasoningSupported: scenario !== 'no-reasoning',
+          effortLevels:
+            scenario === 'no-reasoning'
+              ? []
+              : scenario === 'effort-levels'
+                ? ['minimal', 'xhigh']
+                : ['low', 'medium', 'high'],
+          systemRoleSupported: true,
+          error: null,
+        } satisfies ServerDetails;
       case 'server_status':
         return structuredClone(status);
       case 'start_server':
         if (occupied) throw new Error(`Port ${settings.port}: IN USE`);
         status = {
           phase: 'ready',
+          runId: crypto.randomUUID(),
           model: String(args.model),
           url: 'http://127.0.0.1:9931',
           logs: ['Fixture server ready'],
@@ -276,15 +319,34 @@ export function createFixture(scenario: Scenario) {
         persistHistory();
         return;
       case 'generate': {
+        localStorage.setItem('mir-fixture-request', JSON.stringify(args.request));
         if (scenario === 'compute-error') throw new Error('Compute error.');
         if (scenario === 'model-error') throw new Error('Unsupported chat template');
         const delta: Delta = {
+          ...(scenario === 'no-metrics'
+            ? {}
+            : {
+                metrics: {
+                  contextTokens:
+                    scenario === 'context-full' ? 3930 : scenario === 'context-high' ? 3360 : 212,
+                  contextSource: 'usage' as const,
+                  outputTokens: 35,
+                  tokensPerSecond: 52.9,
+                  generationMs: 661.1,
+                  promptMs: 31,
+                },
+              }),
           content:
             'A **local** answer.\n\n```bash\necho hello\n```\n\n![remote](https://example.com/tracker.png)\n<script>alert(1)</script>',
           reasoning: 'Example reasoning text.',
         };
         const channel = args.onDelta as { onmessage: (delta: Delta) => void };
-        channel.onmessage(delta);
+        if (scenario === 'reasoning-stream') {
+          channel.onmessage({ content: '', reasoning: delta.reasoning });
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+          channel.onmessage({ ...delta, reasoning: '' });
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        } else channel.onmessage(delta);
         if (['oom', 'oom-and-save-error'].includes(scenario) && !memoryFailureSeen) {
           failMemory();
           if (scenario === 'oom-and-save-error') failedWrites = 1;

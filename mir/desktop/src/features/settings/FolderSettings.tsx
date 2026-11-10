@@ -6,6 +6,7 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
   return (
     <>
       <h2>Folders</h2>
+      <p className="autosave-note">Saved automatically once a folder is validated.</p>
       {[
         ['llama', 'llama.cpp folder', config.llamaDir],
         ['models', 'Models folder', config.modelsDir],
@@ -23,9 +24,8 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
         </div>
       ))}
       <p className="field-help">
-        Changes are saved automatically after validation. An empty models folder is allowed. An
-        existing llama.cpp folder must contain executable build/bin/llama-server or
-        bin/llama-server.
+        The models folder can be empty. The llama.cpp folder must contain llama-server, in bin or
+        build/bin.
       </p>
       <button onClick={() => setSection('llama')}>Install / update llama.cpp</button>
     </>

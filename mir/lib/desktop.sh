@@ -21,6 +21,8 @@ desktop_request() {
             context) CTX_SIZE=$value ;;
             model|port|device|threads|gpu_layers|prompt_processing|cache_type_k|cache_type_v|split_mode|tensor_split|fit_target)
                 printf -v "${key^^}" '%s' "$value" ;;
+            chat_system_prompt) CHAT_SYSTEM_PROMPT_JSON=$value ;;
+            chat_reasoning|chat_reasoning_effort) printf -v "${key^^}" '%s' "$value" ;;
             @llamaDir) LLAMA_CPP_PATH=$value ;;
             @modelsDir) MODELS_DIR=$value ;;
             @target) TARGET_PIDS+=("${value%%$'\t'*}"); TARGET_IDENTITIES+=("${value#*$'\t'}") ;;

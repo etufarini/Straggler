@@ -1,7 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Local desktop window events and explicit window destruction after shutdown.",
-  "windows": ["main"],
-  "permissions": ["core:event:default", "core:window:allow-destroy"]
+  "description": "Local desktop window events, visibility reads and explicit destruction after shutdown.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-destroy",
+    "core:window:allow-is-visible",
+    "core:window:allow-is-minimized"
+  ]
 }

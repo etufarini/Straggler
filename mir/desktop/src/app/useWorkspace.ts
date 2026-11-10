@@ -1,3 +1,5 @@
+import { useServerDetails } from '../features/server/useServerDetails';
+import { useUiPreferences } from './useUiPreferences';
 import { useConversation } from '../features/chat/useConversation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
@@ -42,7 +44,10 @@ export function useWorkspace() {
   const mounted = useRef(true);
   const closeAction = useRef<() => void>(() => {});
   const native = isTauri();
+  const ui = useUiPreferences();
   const {
+    generationPhase,
+    setChatOptions,
     conversations,
     setConversations,
     chat,
@@ -63,7 +68,8 @@ export function useWorkspace() {
     cancel,
     send,
     openConversation,
-  } = useConversation(server);
+  } = useConversation(server, config?.settings);
+  const serverDetails = useServerDetails(server);
 
   function reviewSettings(section: Section) {
     setSettingsSection(section);
@@ -195,6 +201,7 @@ export function useWorkspace() {
   function requestStop() {
     setConfirmation({
       title: 'Stop server?',
+      destructive: true,
       text: 'Shut down the local server? Conversations are kept.',
       actionLabel: 'Stop server',
       action: stop,
@@ -204,11 +211,13 @@ export function useWorkspace() {
   closeAction.current = () =>
     setConfirmation({
       title: 'Close Mir.cpp?',
+      destructive: true,
       text: 'Any active response will be stopped and saved. Active builds will be canceled and the server started by this app will be shut down.',
       action: async () => {
         await invoke('cancel_build');
         await stop();
         await saveQueue.current;
+        await ui.preferenceSaveQueue.current;
         await getCurrentWindow().destroy();
       },
       actionLabel: 'Close Mir.cpp',
@@ -238,6 +247,7 @@ export function useWorkspace() {
     if (serverActive(server)) {
       setConfirmation({
         title: 'Restart server?',
+        destructive: true,
         text: 'Stop the current server and load the selected configuration? Any active response will be stopped and saved.',
         action: async () => {
           await stop();
@@ -269,6 +279,10 @@ export function useWorkspace() {
     native && server.phase === 'ready' && historyReady && !storageError && !generating && !busy;
 
   return {
+    ...ui,
+    generationPhase,
+    setChatOptions,
+    serverDetails,
     generating,
     updateChat,
     setInput,

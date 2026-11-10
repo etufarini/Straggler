@@ -44,7 +44,6 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
       >
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">STATION CONTROL</span>
             <h2>{panel === 'models' ? 'Local models' : 'Server log'}</h2>
           </div>
           <button aria-label="Close panel" onClick={() => setPanel(null)}>
@@ -53,7 +52,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
         </div>
         {panel === 'models' && (
           <>
-            <p className="panel-intro">Choose a GGUF model from your configured models folder.</p>
+            <p className="panel-intro">Choose a model from your models folder.</p>
             <button
               className="text-button"
               disabled={!native || busy}
@@ -108,8 +107,8 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
               ))}
             </div>
             <p className="capability-note">
-              Context, chat templates and reasoning depend on the model and your llama.cpp build.
-              Available memory limits what you can load.
+              What a model can do depends on the model and your llama.cpp version. Larger models
+              need more memory.
             </p>
             <div className="panel-actions">
               {active ? (
@@ -151,7 +150,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
               {server.logs.join('\n') || 'Server output will appear here when a model is loaded.'}
             </pre>
             <p className="capability-note">
-              Showing the latest 300 log lines. Logs may include model paths.
+              Latest 300 lines. Logs can include file paths, so check them before sharing.
             </p>
             {active && (
               <button

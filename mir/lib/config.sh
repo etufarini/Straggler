@@ -49,6 +49,15 @@ valid_cache_type() { [[ "$1" =~ ^[a-z][a-z0-9_]{0,31}$ ]]; }
 
 valid_port() { [[ "$1" =~ ^[0-9]{1,5}$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 )); }
 
+# Prompt text is JSON-encoded as one literal profile line, never shell code.
+valid_chat_prompt() {
+    [[ "$1" == '""' ]] || python3 "$MIR_ROOT/lib/desktop.py" chat-prompt "$1" >/dev/null 2>&1
+}
+
+valid_chat_reasoning() { case "$1" in auto|on|off) return 0 ;; *) return 1 ;; esac; }
+
+valid_chat_effort() { [[ "$1" =~ ^[a-z][a-z0-9_-]{0,31}$ ]]; }
+
 # The first seven fields are sampling settings; seed and length stay separate.
 generation_preset_values() {
     case "$1" in
@@ -144,6 +153,9 @@ initialize_config() {
     PROFILES_DIR="$CONFIG_DIR/profiles"
     declare -ga GPU_DEVICE_NAMES=()
     declare -gA DEVICE_FREE=()
+    CHAT_SYSTEM_PROMPT_JSON='""'
+    CHAT_REASONING=auto
+    CHAT_REASONING_EFFORT=auto
     CURRENT_PROFILE=""
     SAVED_PROFILE=""
     CAPABILITIES_SERVER=""
@@ -172,5 +184,8 @@ validate_config() {
     for key in "${GENERATION_KEYS[@]}"; do
         valid_generation_value "$key" "${GENERATION[$key]}" || invalid_setting "$key" "Invalid MIR_${key^^}. Use auto or a valid generation value."
     done
+    valid_chat_prompt "$CHAT_SYSTEM_PROMPT_JSON" || invalid_setting chat_system_prompt 'System prompt must be valid text of at most 65536 UTF-8 bytes.'
+    valid_chat_reasoning "$CHAT_REASONING" || invalid_setting chat_reasoning 'Reasoning must use the model default, on or off.'
+    valid_chat_effort "$CHAT_REASONING_EFFORT" || invalid_setting chat_reasoning_effort 'Use a reasoning effort advertised by the loaded chat template or the model default.'
     check_dependencies runtime || exit 1
 }

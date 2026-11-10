@@ -1,3 +1,4 @@
+import { measureNativeOrb } from './native-orb-performance.mjs';
 // Real Tauri/WebKit window, real launcher and a test server; no model inference.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -166,7 +167,10 @@ try {
     );
   } else {
     await until(
-      () => evaluate('globalThis.isTauri && document.querySelector(".count")?.textContent === "1"'),
+      () =>
+        evaluate(
+          'document.querySelector(".model-switch")?.textContent.includes("test-model.gguf") && !document.querySelector(".header-controls .primary-button").disabled',
+        ),
       'native configuration',
     );
     await evaluate(
@@ -201,7 +205,7 @@ try {
       'corrected settings',
     );
     await evaluate('document.querySelector(".settings-heading button").click()');
-    await evaluate('document.querySelector("nav button").click()');
+    await evaluate('document.querySelector(".model-switch").click()');
     await until(
       () => evaluate('!!document.querySelector(".panel .primary-button:not(:disabled)")'),
       'model selection',
@@ -260,9 +264,9 @@ try {
       return failed.messages[3]?.status === 'error' && failed.messages[3]?.content === 'caffè ☕';
     }, 'saved partial response after OOM');
     assert.equal(await evaluate('document.querySelector(".send-button").disabled'), true);
-    await evaluate('document.querySelector(".server-card").click()');
+    await evaluate('document.querySelector(".local-badge").click()');
     await evaluate('document.querySelector(".danger-button").click()');
-    await evaluate('document.querySelector(".confirmation .primary-button").click()');
+    await evaluate('document.querySelector(".confirmation .danger-button").click()');
     await until(
       () => evaluate('document.querySelector(".local-badge")?.textContent === "Stopped"'),
       'owned server shutdown',
@@ -272,7 +276,7 @@ try {
       'completed stop confirmation',
     );
     await evaluate('document.querySelector(".panel-heading button").click()');
-    await evaluate('document.querySelector("nav button").click()');
+    await evaluate('document.querySelector(".model-switch").click()');
     await evaluate('document.querySelector(".panel .primary-button").click()');
     await until(
       () => evaluate('document.querySelector(".local-badge")?.textContent === "Ready"'),
@@ -290,7 +294,16 @@ try {
         ),
       'active partial response',
     );
-    if (process.env.MIR_TEST_SHUTDOWN === 'signal') {
+    if (process.env.MIR_MEASURE_ORB === '1') {
+      await measureNativeOrb({
+        pid: app.pid,
+        evaluate,
+        hide: () =>
+          evaluate('window.__TAURI_INTERNALS__.invoke("test_window_visibility",{visible:false})'),
+        output: path.join(desktop, 'test-results/native-orb-cpu.json'),
+      });
+    }
+    if (process.env.MIR_TEST_SHUTDOWN === 'signal' || process.env.MIR_MEASURE_ORB === '1') {
       app.kill('SIGTERM');
     } else {
       await evaluate(
@@ -309,14 +322,14 @@ try {
         'window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {event:"tauri://close-requested", payload:null})',
       );
       await until(
-        () => evaluate('!!document.querySelector(".confirmation .primary-button")'),
+        () => evaluate('!!document.querySelector(".confirmation .danger-button")'),
         'second close confirmation',
       );
-      await evaluate('document.querySelector(".confirmation .primary-button").click()');
+      await evaluate('document.querySelector(".confirmation .danger-button").click()');
     }
     await until(() => app.exitCode !== null, 'native window exit');
     const final = JSON.parse(await readFile(conversationFile, 'utf8'));
-    if (process.env.MIR_TEST_SHUTDOWN !== 'signal') {
+    if (process.env.MIR_TEST_SHUTDOWN !== 'signal' && process.env.MIR_MEASURE_ORB !== '1') {
       assert.equal(final.messages[5].status, 'stopped');
       assert.equal(final.messages[5].content, 'caffè ☕');
     }
@@ -325,7 +338,7 @@ try {
     await once(released, 'listening');
     await new Promise((resolve) => released.close(resolve));
     console.log(
-      `PASS: real Tauri/WebKit window, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.MIR_TEST_SHUTDOWN === 'signal' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
+      `PASS: real Tauri/WebKit window, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.MIR_TEST_SHUTDOWN === 'signal' || process.env.MIR_MEASURE_ORB === '1' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
     );
     console.log('Screenshot: test-results/native-chat.png (test server; no model inference)');
   }

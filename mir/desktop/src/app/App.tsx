@@ -1,5 +1,7 @@
-import { Cpu, ChevronDown, Square } from 'lucide-react';
-import { fileName, equalSettings, displayValue } from '../domain/types';
+import PresencePanel from '../features/presence/PresencePanel';
+import { assistantState } from '../domain/presence';
+import { Cpu, ChevronDown, Square, Terminal } from 'lucide-react';
+import { fileName, equalSettings, sameServerConfiguration } from '../domain/types';
 import { statusLabel } from '../components/statusLabels';
 import { isFixture } from '../services/desktop';
 import SettingsPage from '../features/settings/Settings';
@@ -41,35 +43,74 @@ export default function App() {
     setSettingsFailure,
     reportSettingsError,
   } = controller;
+  const restartRequired = !!(
+    active &&
+    draft &&
+    server.runningSettings &&
+    !sameServerConfiguration(draft, server.runningSettings)
+  );
+  const lastResponse = controller.chat.messages
+    .filter((message) => message.role === 'assistant')
+    .at(-1);
+  const presence = assistantState({
+    serverPhase: server.phase,
+    generating: controller.generating,
+    generationPhase: controller.generationPhase,
+    serverRunId: server.runId,
+    responseRunId: lastResponse?.serverRunId,
+    responseStatus: lastResponse?.status,
+  });
+  const modified = !!(
+    draft &&
+    config?.savedSettings &&
+    !equalSettings(draft, config.savedSettings)
+  );
   return (
     <div className="app-shell">
       <Sidebar controller={controller} />
 
-      <main className="workspace">
+      <main
+        className={`workspace ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
+      >
         <header className="topbar">
-          <button className="model-switch" onClick={() => setPanel('models')}>
+          <button
+            className="model-switch"
+            aria-label="Choose model"
+            aria-expanded={panel === 'models'}
+            onClick={() => setPanel('models')}
+          >
             <span className="model-icon">
               <Cpu size={17} />
             </span>
             <span>
               {displayModel ? fileName(displayModel) : 'Choose a local model'}
-              <small>
-                {server.phase === 'ready'
-                  ? 'Running on your device'
-                  : 'Your models. Your conversations.'}
-              </small>
+              {panel !== 'settings' && (
+                <small>
+                  {config?.currentProfile || 'Unsaved configuration'}
+                  {modified ? ' · Modified' : ''}
+                </small>
+              )}
             </span>
             <ChevronDown size={15} />
           </button>
           <div className="header-controls">
-            <span className="local-badge">
+            <button
+              className="local-badge"
+              aria-label={`Server log · ${statusLabel[server.phase]}${restartRequired ? ' · Restart required' : ''}`}
+              aria-expanded={panel === 'logs'}
+              onClick={() => setPanel('logs')}
+            >
               <span className={`status-dot ${server.phase}`} />
               {statusLabel[server.phase]}
-            </span>
+              {restartRequired && server.phase !== 'needs-restart' && (
+                <span className="restart-label">Restart required</span>
+              )}
+              <Terminal size={14} />
+            </button>
             {active ? (
               <button disabled={busy || server.phase === 'stopping'} onClick={requestStop}>
                 <Square size={14} />
-                Stop
+                Stop server
               </button>
             ) : (
               <button
@@ -101,6 +142,17 @@ export default function App() {
           </div>
         )}
         <ServerFeedback controller={controller} />
+        {controller.preferenceError && (
+          <div className="workspace-feedback">
+            <Feedback
+              title="Desktop preferences could not be saved"
+              details={controller.preferenceError}
+            >
+              Your layout remains usable for this session.
+            </Feedback>
+          </div>
+        )}
+
         {error && (
           <div className="workspace-feedback">
             <Feedback
@@ -118,28 +170,9 @@ export default function App() {
           </div>
         )}
 
-        {config && draft && (
-          <div className="configuration-strip">
-            <span>
-              Configuration: {config.currentProfile || 'Not saved'}
-              {config.savedSettings && !equalSettings(draft, config.savedSettings)
-                ? ' · Modified'
-                : ''}
-            </span>
-            <span>
-              Context: {displayValue((active ? server.runningSettings : draft)?.context || 'auto')}
-            </span>
-            <span>
-              Device: {displayValue((active ? server.runningSettings : draft)?.device || 'auto')}
-            </span>
-            <span>Port: {active ? server.runningSettings?.port || config.port : draft.port}</span>
-            {active && server.runningSettings && !equalSettings(draft, server.runningSettings) && (
-              <b>Restart required</b>
-            )}
-          </div>
-        )}
         {panel === 'settings' && config && draft ? (
           <SettingsPage
+            serverDetails={controller.serverDetails}
             config={config}
             draft={draft}
             setDraft={setDraft}
@@ -152,13 +185,22 @@ export default function App() {
             failure={settingsFailure}
             section={settingsSection}
             setSection={setSettingsSection}
-            onStart={() => void start()}
-            onStop={controller.stop}
             onBack={() => setPanel(null)}
             onJob={setJob}
           />
         ) : (
-          <ChatPanel controller={controller} />
+          <div className="chat-body">
+            <div className="chat-main">
+              <ChatPanel controller={controller} />
+            </div>
+            <PresencePanel
+              state={presence}
+              metrics={lastResponse?.metrics}
+              preferences={controller.preferences}
+              onPreferences={controller.changePreferences}
+              ready={controller.preferencesReady}
+            />
+          </div>
         )}
       </main>
 

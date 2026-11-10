@@ -95,6 +95,7 @@ impl Runtime {
         }
         let state = self.server.lock().map_err(|e| e.to_string())?;
         Ok(Status {
+            run_id: state.run,
             phase: if state.diagnostics.issue.is_some()
                 && matches!(state.phase.as_str(), "loading" | "ready")
             {

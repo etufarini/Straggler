@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react';
 import { invoke, isTauri } from '../../services/desktop';
-import { equalSettings, samplingPreset, serverActive } from '../../domain/types';
+import {
+  equalSettings,
+  sameServerConfiguration,
+  samplingPreset,
+  serverActive,
+} from '../../domain/types';
 import type { SettingsFailure } from '../../domain/errors';
 import type { Section } from './sections';
 import type {
+  ServerDetails,
   Configuration,
   Confirmation,
   JobStatus,
@@ -20,16 +26,16 @@ export function useSettings({
   accept,
   confirm,
   onError,
-  onStart,
-  onStop,
   onBack,
   onJob,
   section,
   setSection,
   failure,
   onClearError,
+  serverDetails,
 }: {
   config: Configuration;
+  serverDetails: ServerDetails | null;
   draft: Values;
   setDraft: (value: Values) => void;
   server: ServerStatus;
@@ -37,8 +43,6 @@ export function useSettings({
   accept: (value: Configuration) => void;
   confirm: (value: Confirmation) => void;
   onError: (error: unknown) => void;
-  onStart: () => void;
-  onStop: () => Promise<void>;
   onBack: () => void;
   onJob: (value: JobStatus) => void;
   section: Section;
@@ -65,7 +69,8 @@ export function useSettings({
   const building = ['running', 'stopping'].includes(job.phase);
   const dirty = !equalSettings(draft, config.settings);
   const modified = config.savedSettings ? !equalSettings(draft, config.savedSettings) : false;
-  const restart = !!server.runningSettings && !equalSettings(draft, server.runningSettings);
+  const restart =
+    !!server.runningSettings && !sameServerConfiguration(draft, server.runningSettings);
   const preset = samplingPreset(draft, config.presets);
   const change = (key: keyof Values, value: string) => setDraft({ ...draft, [key]: value });
   const fieldError = (key: keyof Values) =>
@@ -107,6 +112,8 @@ export function useSettings({
     if (config.profiles.includes(target))
       confirm({
         title: 'Replace configuration?',
+        actionLabel: 'Replace configuration',
+        destructive: true,
         text: `Replace “${target}” with the current settings?`,
         action: () => saveProfile(target, true),
       });
@@ -140,6 +147,7 @@ export function useSettings({
       });
       confirm({
         title: 'Build llama.cpp?',
+        actionLabel: 'Build llama.cpp',
         text: `Download and compile ${release} (${selectedBackend}) with ${jobs} compiler jobs? The working build will be kept until verification succeeds.${plan.packages.length ? ` Required packages: ${plan.packages.join(', ')}. Installation requests any required system authorization.` : ''}`,
         action: async () => {
           await invoke('start_build', { tag: release, backend: selectedBackend, jobs });
@@ -156,8 +164,12 @@ export function useSettings({
   function stopListeners(force: boolean) {
     const targets = force ? forceTargets : config.listeners;
     confirm({
-      title: force ? 'Force stop these processes?' : 'Stop processes using this port?',
-      text: `${force ? 'Send SIGKILL' : 'Send SIGTERM'} to the following processes? Other services may be affected.\n\n${targets.map((target) => target.details).join('\n')}`,
+      title: force
+        ? 'Force these programs to quit?'
+        : `Close the programs using port ${draft.port}?`,
+      actionLabel: force ? 'Force quit' : 'Close programs',
+      destructive: true,
+      text: `${force ? 'They stop at once (SIGKILL) and may lose unsaved work.' : 'Mir.cpp asks them to close normally (SIGTERM). Anything that depends on them may stop working.'}\n\n${targets.map((target) => target.details).join('\n')}`,
       action: async () => {
         const value = await operation('stop-listeners', [force ? 'KILL' : 'TERM'], targets);
         accept(value);
@@ -175,6 +187,7 @@ export function useSettings({
   }
 
   return {
+    serverDetails,
     config,
     draft,
     setDraft,
@@ -183,8 +196,6 @@ export function useSettings({
     accept,
     confirm,
     onError,
-    onStart,
-    onStop,
     onBack,
     onJob,
     section,

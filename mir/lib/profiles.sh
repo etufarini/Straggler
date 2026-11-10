@@ -7,6 +7,7 @@ profile_data() {
     printf 'model=%s\ncontext=%s\nport=%s\ndevice=%s\nthreads=%s\ngpu_layers=%s\nprompt_processing=%s\ncache_type_k=%s\ncache_type_v=%s\n' \
         "$MODEL" "$CTX_SIZE" "$PORT" "$DEVICE" "$THREADS" "$GPU_LAYERS" "$PROMPT_PROCESSING" "$CACHE_TYPE_K" "$CACHE_TYPE_V"
     printf 'split_mode=%s\ntensor_split=%s\nfit_target=%s\n' "$SPLIT_MODE" "$TENSOR_SPLIT" "$FIT_TARGET"
+    printf 'chat_system_prompt=%s\nchat_reasoning=%s\nchat_reasoning_effort=%s\n' "$CHAT_SYSTEM_PROMPT_JSON" "$CHAT_REASONING" "$CHAT_REASONING_EFFORT"
     for key in "${GENERATION_KEYS[@]}"; do printf '%s=%s\n' "$key" "${GENERATION[$key]}"; done
 }
 
@@ -26,7 +27,7 @@ load_profile() {
         [[ "$line" == *=* ]] || return 1
         key="${line%%=*}"
         case "$key" in
-            model|context|port|device|threads|gpu_layers|prompt_processing|cache_type_k|cache_type_v|split_mode|tensor_split|fit_target|temperature|top_p|top_k|min_p|repeat_penalty|presence_penalty|frequency_penalty|seed|max_tokens) ;;
+            model|context|port|device|threads|gpu_layers|prompt_processing|cache_type_k|cache_type_v|split_mode|tensor_split|fit_target|temperature|top_p|top_k|min_p|repeat_penalty|presence_penalty|frequency_penalty|seed|max_tokens|chat_system_prompt|chat_reasoning|chat_reasoning_effort) ;;
             *) continue ;;
         esac
         [[ ! -v "settings[$key]" ]] || return 1
@@ -39,6 +40,14 @@ load_profile() {
     done
     settings[port]=${settings[port]-9931}
     for key in cache_type_k cache_type_v; do settings[$key]=${settings[$key]-q4_0}; done
+    settings[chat_system_prompt]=${settings[chat_system_prompt]-'""'}
+    settings[chat_reasoning]=${settings[chat_reasoning]-auto}
+    settings[chat_reasoning_effort]=${settings[chat_reasoning_effort]-auto}
+    if [[ ${settings[chat_system_prompt]} != '""' ]]; then
+        settings[chat_system_prompt]=$(python3 "$MIR_ROOT/lib/desktop.py" chat-prompt "${settings[chat_system_prompt]}") || return 1
+    fi
+    valid_chat_reasoning "${settings[chat_reasoning]}" || return 1
+    valid_chat_effort "${settings[chat_reasoning_effort]}" || return 1
     [[ -f "${settings[model]}" && "${settings[model],,}" == *.gguf ]] || return 1
     valid_context "${settings[context]}" || return 1
     valid_port "${settings[port]}" || return 1
@@ -51,6 +60,9 @@ load_profile() {
     valid_cache_type "${settings[cache_type_k]}" && valid_cache_type "${settings[cache_type_v]}" || return 1
     case "${settings[prompt_processing]}" in auto|low-memory|large-batch) ;; *) return 1 ;; esac
     for key in "${GENERATION_KEYS[@]}"; do valid_generation_value "$key" "${settings[$key]}" || return 1; done
+    CHAT_SYSTEM_PROMPT_JSON=${settings[chat_system_prompt]}
+    CHAT_REASONING=${settings[chat_reasoning]}
+    CHAT_REASONING_EFFORT=${settings[chat_reasoning_effort]}
     MODEL="${settings[model]}"
     CTX_SIZE="${settings[context]}"
     PORT=$((10#${settings[port]}))

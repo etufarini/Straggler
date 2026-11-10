@@ -21,6 +21,8 @@ export const isTauri = () => !!fixture || nativeAvailable();
 export const isFixture = () => !!fixture;
 
 export type DesktopCommand =
+  | 'preferences_read'
+  | 'preferences_save'
   | 'configuration'
   | 'apply_settings'
   | 'workspace_action'
@@ -29,6 +31,7 @@ export type DesktopCommand =
   | 'cancel_build'
   | 'start_server'
   | 'server_status'
+  | 'server_details'
   | 'stop_server'
   | 'generate'
   | 'cancel_generation'
@@ -75,4 +78,50 @@ export function listen<T>(
   handler: (event: { payload: T }) => void,
 ): Promise<UnlistenFn> {
   return fixture ? Promise.resolve(() => {}) : nativeListen<T>(event, handler);
+}
+
+// DOM visibility and native window state are distinct lifecycle contracts.
+// Window state is read only; background focus loss alone does not pause animation.
+export async function watchWindowVisibility(
+  onVisibility: (visible: boolean) => void,
+  onError: (error: unknown) => void,
+): Promise<UnlistenFn> {
+  if (fixture || !nativeAvailable()) return () => {};
+  const window = nativeWindow();
+  let disposed = false;
+  let checking = false;
+  async function updateVisibility() {
+    if (disposed || checking) return;
+    checking = true;
+    try {
+      const [visible, minimized] = await Promise.all([window.isVisible(), window.isMinimized()]);
+      if (!disposed) onVisibility(visible && !minimized);
+    } catch (error) {
+      if (!disposed) onError(error);
+    } finally {
+      checking = false;
+    }
+  }
+  const subscriptions = await Promise.allSettled([
+    window.onResized(() => void updateVisibility()),
+    window.onFocusChanged(() => void updateVisibility()),
+  ]);
+  const events = subscriptions
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value);
+  const failure = subscriptions.find((result) => result.status === 'rejected');
+  if (failure) {
+    disposed = true;
+    events.forEach((unlisten) => unlisten());
+    throw failure.reason;
+  }
+  void updateVisibility();
+  // Some native hide/minimize transitions produce neither a DOM visibility event
+  // nor a focus event. A bounded native check covers those transitions too.
+  const timer = setInterval(() => void updateVisibility(), 1000);
+  return () => {
+    disposed = true;
+    clearInterval(timer);
+    events.forEach((unlisten) => unlisten());
+  };
 }

@@ -3,6 +3,9 @@ export interface Model {
   label: string;
 }
 export interface Settings {
+  chat_system_prompt: string;
+  chat_reasoning: 'auto' | 'on' | 'off';
+  chat_reasoning_effort: string;
   model: string;
   context: string;
   port: string;
@@ -43,7 +46,8 @@ export interface Confirmation {
   title: string;
   text: string;
   action: () => Promise<void>;
-  actionLabel?: string;
+  actionLabel: string;
+  destructive?: boolean;
 }
 export interface Configuration {
   llamaDir: string;
@@ -75,6 +79,7 @@ export interface Configuration {
   restartRequired: boolean;
 }
 export interface ServerStatus {
+  runId?: string;
   phase: 'stopped' | 'loading' | 'ready' | 'stopping' | 'error' | 'needs-restart';
   model: string | null;
   url: string | null;
@@ -92,6 +97,8 @@ export interface Message {
   reasoning: string;
   status: MessageStatus;
   error?: string;
+  metrics?: GenerationMetrics;
+  serverRunId?: string;
 }
 export interface Conversation {
   id: string;
@@ -100,8 +107,10 @@ export interface Conversation {
   updatedAt: number;
   model: string | null;
   messages: Message[];
+  options?: ChatOptions;
 }
 export interface Delta {
+  metrics?: GenerationMetrics;
   content: string;
   reasoning: string;
 }
@@ -123,16 +132,17 @@ export const serverActive = (server: ServerStatus) =>
 export const fileName = (path: string) => path.split('/').pop() || path;
 export const equalSettings = (a: Settings, b: Settings) =>
   Object.keys(a).every((key) => a[key as keyof Settings] === b[key as keyof Settings]);
-export const displayValue = (value: string) =>
-  ({
-    auto: 'Auto',
-    none: 'CPU only',
-    all: 'All',
-    on: 'On',
-    off: 'Off',
-    'low-memory': 'Low memory',
-    'large-batch': 'Large batch',
-  })[value] || value;
+export const chatSettingKeys = [
+  'chat_system_prompt',
+  'chat_reasoning',
+  'chat_reasoning_effort',
+] as const;
+export const sameServerConfiguration = (a: Settings, b: Settings) =>
+  Object.keys(a).every(
+    (key) =>
+      (chatSettingKeys as readonly string[]).includes(key) ||
+      a[key as keyof Settings] === b[key as keyof Settings],
+  );
 export const samplingKeys = [
   'temperature',
   'top_p',
@@ -170,4 +180,32 @@ export function requestMessages(messages: Message[]) {
     else result.push({ role: message.role, content: message.content });
   }
   return result;
+}
+
+export interface UiPreferences {
+  sidebarCollapsed: boolean;
+  presenceExpanded: boolean | null;
+}
+
+export interface ServerDetails {
+  runId: string;
+  contextSize: number | null;
+  reasoningSupported: boolean | null;
+  effortLevels: string[];
+  systemRoleSupported: boolean | null;
+  error: string | null;
+}
+export interface GenerationMetrics {
+  contextTokens?: number;
+  contextSource?: 'usage' | 'timings';
+  outputTokens?: number;
+  tokensPerSecond?: number;
+  generationMs?: number;
+  promptMs?: number;
+  runId?: string;
+}
+export interface ChatOptions {
+  systemPrompt: string | null;
+  reasoning: 'auto' | 'on' | 'off' | null;
+  effort: string | null;
 }

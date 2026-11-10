@@ -134,8 +134,8 @@ export default function FolderBrowser({
           </label>
         </div>
         <p className="field-help">
-          Select a folder to open it. Use this folder confirms the current location; Cancel keeps
-          your previous setting.
+          Open folders to browse. Use this folder picks the one you are in; Cancel keeps the
+          previous one.
         </p>
         {error && (
           <Feedback title="Folder unavailable" details={error}>

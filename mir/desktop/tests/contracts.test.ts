@@ -66,15 +66,34 @@ describe('desktop contract', () => {
       mkdirSync(profiles, { recursive: true });
       const legacyFields = Object.entries(config.settings).filter(
         ([key]) =>
-          !['cache_type_k', 'cache_type_v', 'split_mode', 'tensor_split', 'fit_target'].includes(
-            key,
-          ),
+          ![
+            'cache_type_k',
+            'cache_type_v',
+            'split_mode',
+            'tensor_split',
+            'fit_target',
+            'chat_system_prompt',
+            'chat_reasoning',
+            'chat_reasoning_effort',
+          ].includes(key),
       );
       const legacy =
         legacyFields.map(([key, value]) => `${key}=${value}`).join('\n') + '\nreasoning=on\n';
       writeFileSync(path.join(profiles, 'Desktop.conf'), legacy);
       expect(invoke('load-profile', ['Desktop']).settings).toEqual(config.settings);
       invoke('save-profile', ['Release', 'new'], { settings: config.settings });
+      const chatDefaults = {
+        ...config.settings,
+        chat_system_prompt: 'Literal instructions\n$(touch executed)\nUnicode: caffè ☕',
+        chat_reasoning: 'off',
+        chat_reasoning_effort: 'xhigh',
+      };
+      invoke('save-profile', ['Chat defaults', 'new'], { settings: chatDefaults });
+      expect(invoke('load-profile', ['Chat defaults']).settings).toEqual(chatDefaults);
+      expect(invoke('load-profile', ['Release']).settings).toEqual(config.settings);
+      expect(() =>
+        invoke('inspect', [], { settings: { ...chatDefaults, chat_reasoning: 'maybe' } }),
+      ).toThrow();
     } finally {
       rmSync(temporary, { recursive: true, force: true });
     }

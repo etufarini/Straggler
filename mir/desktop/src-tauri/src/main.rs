@@ -17,10 +17,24 @@ struct Response {
     content: String,
     reasoning: String,
     error: Option<String>,
+    metrics: Option<mir_desktop::stream::GenerationMetrics>,
 }
 
 fn runtime(state: &State<'_, Application>) -> Result<Arc<Runtime>> {
     state.0.clone()
+}
+
+// Native automation needs an actual hidden window when a runner's window manager
+// ignores minimize requests. This command is absent from production builds.
+#[cfg(feature = "native-tests")]
+#[tauri::command]
+fn test_window_visibility(visible: bool, window: tauri::WebviewWindow) -> Result<()> {
+    if visible {
+        window.show()
+    } else {
+        window.hide()
+    }
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -107,6 +121,13 @@ async fn server_status(state: State<'_, Application>) -> Result<Status> {
 }
 
 #[tauri::command]
+async fn server_details(
+    state: State<'_, Application>,
+) -> Result<mir_desktop::model::ServerDetails> {
+    runtime(&state)?.server_details().await
+}
+
+#[tauri::command]
 async fn generate(
     request: ChatRequest,
     on_delta: Channel<mir_desktop::stream::Delta>,
@@ -114,8 +135,14 @@ async fn generate(
 ) -> Result<Response> {
     let mut content = String::new();
     let mut reasoning = String::new();
+    let mut metrics = mir_desktop::stream::GenerationMetrics::default();
+    let mut has_metrics = false;
     let result = runtime(&state)?
         .generate(request, |delta| {
+            if let Some(value) = &delta.metrics {
+                metrics.merge(value);
+                has_metrics = true;
+            }
             content.push_str(&delta.content);
             reasoning.push_str(&delta.reasoning);
             on_delta.send(delta).map_err(|e| e.to_string())
@@ -128,6 +155,7 @@ async fn generate(
     // The final snapshot is authoritative even if IPC deltas are still queued.
     Ok(Response {
         status,
+        metrics: has_metrics.then_some(metrics),
         content,
         reasoning,
         error,
@@ -159,6 +187,27 @@ async fn history_save(conversation: Conversation, state: State<'_, Application>)
 async fn history_delete(id: Uuid, state: State<'_, Application>) -> Result<()> {
     let runtime = runtime(&state)?;
     tauri::async_runtime::spawn_blocking(move || runtime.history.delete(id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn preferences_read(
+    state: State<'_, Application>,
+) -> Result<mir_desktop::preferences::UiPreferences> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.preferences.read())
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn preferences_save(
+    preferences: mir_desktop::preferences::UiPreferences,
+    state: State<'_, Application>,
+) -> Result<()> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.preferences.save(&preferences))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -251,6 +300,8 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            #[cfg(feature = "native-tests")]
+            test_window_visibility,
             configuration,
             apply_settings,
             workspace_action,
@@ -260,11 +311,14 @@ fn main() {
             start_server,
             stop_server,
             server_status,
+            server_details,
             generate,
             cancel_generation,
             history_list,
             history_save,
-            history_delete
+            history_delete,
+            preferences_read,
+            preferences_save
         ])
         .build(context)
         .expect("Could not start Mir.cpp desktop");

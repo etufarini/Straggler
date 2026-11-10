@@ -9,7 +9,7 @@ import sys
 FIELDS = (
     'model context port device threads gpu_layers prompt_processing cache_type_k cache_type_v '
     'split_mode tensor_split fit_target temperature top_p top_k min_p repeat_penalty '
-    'presence_penalty frequency_penalty seed max_tokens'
+    'presence_penalty frequency_penalty seed max_tokens chat_system_prompt chat_reasoning chat_reasoning_effort'
 ).split()
 
 
@@ -17,6 +17,12 @@ def literal(value):
     if not isinstance(value, str) or '\0' in value or '\n' in value or '\r' in value:
         raise ValueError('Settings must be single-line text values.')
     return value
+
+
+def canonical_chat_prompt(value):
+    if not isinstance(value, str) or '\0' in value or len(value.encode('utf-8')) > 65536:
+        raise ValueError('System prompt must be text containing at most 65536 UTF-8 bytes without NUL characters.')
+    return json.dumps(value, ensure_ascii=True, separators=(',', ':'))
 
 
 def decode():
@@ -29,7 +35,7 @@ def decode():
         settings = request['settings']
         if not isinstance(settings, dict) or set(settings) != set(FIELDS):
             raise ValueError('A complete configuration needs every supported field.')
-        lines.extend(f'{key}={literal(settings[key])}' for key in FIELDS)
+        lines.extend(f'{key}={canonical_chat_prompt(settings[key]) if key == "chat_system_prompt" else literal(settings[key])}' for key in FIELDS)
     for key in ('llamaDir', 'modelsDir'):
         if key in request:
             lines.append(f'@{key}={literal(request[key])}')
@@ -47,6 +53,7 @@ def snapshot(args):
     settings = dict(line.split('=', 1) for line in next(values).splitlines())
     if set(settings) != set(FIELDS):
         raise ValueError('Launcher configuration fields do not match the desktop contract.')
+    settings['chat_system_prompt'] = json.loads(settings['chat_system_prompt'])
     files = [next(values) for _ in range(int(next(values)))]
     devices = [dict(name=next(values), label=next(values)) for _ in range(int(next(values)))]
     listeners = [dict(pid=int(next(values)), identity=next(values), details=next(values))
@@ -112,6 +119,8 @@ try:
                               cacheTypesV=arguments[1].splitlines(),
                               splitModes=arguments[2].splitlines(),
                               multipleDevices=arguments[3] == 'true', buildNote=arguments[4])))
+    elif operation == 'chat-prompt':
+        print(canonical_chat_prompt(json.loads(arguments[0])))
     elif operation == 'decode':
         decode()
     elif operation == 'fingerprint':

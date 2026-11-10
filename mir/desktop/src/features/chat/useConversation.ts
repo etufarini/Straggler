@@ -1,16 +1,28 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Channel, invoke, isTauri } from '../../services/desktop';
 import { newConversation, requestMessages } from '../../domain/types';
+import { inheritedChatOptions, resolveChatOptions } from '../../domain/chat';
 import { errorDetail } from '../../domain/errors';
-import type { Conversation, Delta, Message, Response, ServerStatus } from '../../domain/types';
+import type {
+  Conversation,
+  Delta,
+  Message,
+  Response,
+  ServerStatus,
+  Settings,
+  ChatOptions,
+} from '../../domain/types';
 
-export function useConversation(server: ServerStatus) {
+export function useConversation(server: ServerStatus, settings?: Settings) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
   const [input, setInput] = useState('');
   const [storageError, setStorageError] = useState('');
   const [historyReady, setHistoryReady] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generationPhase, setGenerationPhase] = useState<'waiting' | 'reasoning' | 'generating'>(
+    'waiting',
+  );
   const chatRef = useRef(chat);
   const requestRef = useRef<string | null>(null);
   const cancelledRef = useRef<string | null>(null);
@@ -84,6 +96,7 @@ export function useConversation(server: ServerStatus) {
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     setGenerating(true);
+    setGenerationPhase('waiting');
     setInput('');
     follow.current = true;
     const user: Message = {
@@ -96,6 +109,7 @@ export function useConversation(server: ServerStatus) {
     const assistant: Message = {
       id: crypto.randomUUID(),
       role: 'assistant',
+      serverRunId: server.runId,
       content: '',
       reasoning: '',
       status: 'streaming',
@@ -115,6 +129,10 @@ export function useConversation(server: ServerStatus) {
       if (requestRef.current !== requestId) return;
       assistant.content += delta.content;
       assistant.reasoning += delta.reasoning;
+      if (delta.metrics)
+        assistant.metrics = { ...assistant.metrics, ...delta.metrics, runId: server.runId };
+      if (delta.content) setGenerationPhase('generating');
+      else if (delta.reasoning) setGenerationPhase('reasoning');
       current = {
         ...current,
         messages: [...current.messages.slice(0, -1), { ...assistant }],
@@ -126,6 +144,7 @@ export function useConversation(server: ServerStatus) {
         void save(current).catch(() => {});
       }
     };
+    const options = resolveChatOptions(current.options, settings);
     try {
       // Persist the user's message before asking the server to generate.
       await save(current);
@@ -134,12 +153,23 @@ export function useConversation(server: ServerStatus) {
         cancelledRef.current === requestId
           ? { status: 'stopped', content: '', reasoning: '', error: null }
           : await invoke<Response>('generate', {
-              request: { requestId, messages: requestMessages(current.messages.slice(0, -1)) },
+              request: {
+                requestId,
+                messages: [
+                  ...(options.systemPrompt
+                    ? [{ role: 'system', content: options.systemPrompt }]
+                    : []),
+                  ...requestMessages(current.messages.slice(0, -1)),
+                ],
+                options: { reasoning: options.reasoning, effort: options.effort },
+              },
               onDelta,
             });
       assistant.status = response.status;
       assistant.content = response.content;
       assistant.reasoning = response.reasoning;
+      if (response.metrics)
+        assistant.metrics = { ...assistant.metrics, ...response.metrics, runId: server.runId };
       if (response.error) assistant.error = response.error;
     } catch (e) {
       assistant.status = 'error';
@@ -159,6 +189,17 @@ export function useConversation(server: ServerStatus) {
     }
   }
 
+  function setChatOptions(patch: Partial<ChatOptions>) {
+    if (requestRef.current) return;
+    const value = {
+      ...chatRef.current,
+      options: { ...inheritedChatOptions, ...chatRef.current.options, ...patch },
+      updatedAt: Date.now(),
+    };
+    updateChat(value);
+    if (value.messages.length) void save(value).catch(() => {});
+  }
+
   function openConversation(value: Conversation) {
     if (generating) return;
     updateChat(structuredClone(value));
@@ -167,6 +208,8 @@ export function useConversation(server: ServerStatus) {
   }
 
   return {
+    generationPhase,
+    setChatOptions,
     conversations,
     setConversations,
     chat,

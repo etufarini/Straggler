@@ -10,6 +10,9 @@ use std::{
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Settings {
+    pub chat_system_prompt: String,
+    pub chat_reasoning: String,
+    pub chat_reasoning_effort: String,
     pub model: String,
     pub context: String,
     pub port: String,
@@ -31,6 +34,16 @@ pub struct Settings {
     pub frequency_penalty: String,
     pub seed: String,
     pub max_tokens: String,
+}
+
+impl Settings {
+    pub fn same_server_configuration(&self, other: &Self) -> bool {
+        let mut candidate = self.clone();
+        candidate.chat_system_prompt = other.chat_system_prompt.clone();
+        candidate.chat_reasoning = other.chat_reasoning.clone();
+        candidate.chat_reasoning_effort = other.chat_reasoning_effort.clone();
+        candidate == *other
+    }
 }
 
 /// Validation belongs to the launcher; IPC carries its field identifier intact.
@@ -307,7 +320,7 @@ impl Runtime {
             && server
                 .settings
                 .as_ref()
-                .is_some_and(|running| running != &next.settings);
+                .is_some_and(|running| !running.same_server_configuration(&next.settings));
         workspace.configuration = Some(next.clone());
         Ok(next)
     }

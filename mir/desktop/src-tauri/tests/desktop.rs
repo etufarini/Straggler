@@ -146,6 +146,7 @@ async fn wait_build(runtime: &Runtime, expected: &str) {
 
 fn request(id: Uuid, content: &str) -> ChatRequest {
     ChatRequest {
+        options: Default::default(),
         request_id: id,
         messages: vec![ChatMessage {
             role: "user".into(),
@@ -519,10 +520,72 @@ async fn explicit_settings_reach_the_server_and_pending_changes_require_restart(
         runtime.status().await.unwrap().running_settings.unwrap(),
         settings
     );
+    settings.chat_system_prompt = "Changed request instructions\nLiteral $(touch unsafe)".into();
+    settings.chat_reasoning = "on".into();
+    settings.chat_reasoning_effort = "high".into();
+    assert!(
+        !runtime
+            .configure(settings.clone())
+            .unwrap()
+            .restart_required
+    );
     settings.context = "2048".into();
     assert!(runtime.configure(settings).unwrap().restart_required);
     runtime.stop().unwrap();
     assert!(!runtime.inspect().unwrap().restart_required);
+}
+
+#[tokio::test]
+async fn model_properties_request_switches_and_stream_usage_match_upstream_contracts() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    fixture.ready(&runtime).await;
+    let details = runtime.server_details().await.unwrap();
+    assert_eq!(details.context_size, Some(4096));
+    assert_eq!(details.effort_levels, ["low", "high"]);
+    assert_eq!(details.reasoning_supported, Some(true));
+    let mut query = request(Uuid::new_v4(), "hello");
+    query.options.reasoning = Some("on".into());
+    query.options.effort = Some("high".into());
+    let mut metrics = mir_desktop::stream::GenerationMetrics::default();
+    runtime
+        .generate(query, |delta| {
+            if let Some(value) = delta.metrics {
+                metrics.merge(&value);
+            }
+            Ok(())
+        })
+        .await
+        .unwrap();
+    assert_eq!(metrics.context_tokens, Some(32));
+    assert_eq!(metrics.tokens_per_second, Some(20.0));
+    let recorded: serde_json::Value =
+        serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
+    assert_eq!(recorded["chat_template_kwargs"]["enable_thinking"], true);
+    assert_eq!(recorded["reasoning_effort"], "high");
+    assert_eq!(recorded["stream_options"]["include_usage"], true);
+    assert_eq!(recorded["timings_per_token"], true);
+    let mut query = request(Uuid::new_v4(), "hello");
+    query.options.reasoning = Some("off".into());
+    query.options.effort = Some("unavailable".into());
+    runtime.generate(query, |_| Ok(())).await.unwrap();
+    let recorded: serde_json::Value =
+        serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
+    assert_eq!(recorded["reasoning_effort"], "none");
+    assert_eq!(recorded["chat_template_kwargs"]["enable_thinking"], false);
+    let mut query = request(Uuid::new_v4(), "hello");
+    query.options.effort = Some("medium".into());
+    assert!(runtime
+        .generate(query, |_| Ok(()))
+        .await
+        .unwrap_err()
+        .contains("not advertised"));
+    runtime.stop().unwrap();
+    fixture.ready(&runtime).await;
+    assert_ne!(
+        runtime.server_details().await.unwrap().run_id,
+        details.run_id
+    );
 }
 
 #[tokio::test]

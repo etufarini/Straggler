@@ -14,6 +14,10 @@ pub struct Message {
     pub status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<crate::stream::GenerationMetrics>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_run_id: Option<Uuid>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -25,6 +29,16 @@ pub struct Conversation {
     pub updated_at: u64,
     pub model: Option<String>,
     pub messages: Vec<Message>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<ConversationOptions>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ConversationOptions {
+    pub system_prompt: Option<String>,
+    pub reasoning: Option<String>,
+    pub effort: Option<String>,
 }
 
 pub struct History {
@@ -103,6 +117,23 @@ fn validate(conversation: &Conversation) -> Result<()> {
     if conversation.title.trim().is_empty() || conversation.title.len() > 1024 {
         return Err("Conversation title must contain between 1 and 1024 bytes.".into());
     }
+    if let Some(options) = &conversation.options {
+        if options
+            .system_prompt
+            .as_ref()
+            .is_some_and(|value| value.len() > 65536 || value.contains('\0'))
+            || options
+                .reasoning
+                .as_deref()
+                .is_some_and(|value| !matches!(value, "auto" | "on" | "off"))
+            || options
+                .effort
+                .as_deref()
+                .is_some_and(|value| !crate::model::valid_effort(value))
+        {
+            return Err("Invalid conversation options.".into());
+        }
+    }
     for message in &conversation.messages {
         if !matches!(message.role.as_str(), "user" | "assistant")
             || !matches!(
@@ -127,6 +158,7 @@ mod tests {
             created_at: 1,
             updated_at: 2,
             model: None,
+            options: None,
             messages: vec![Message {
                 id: Uuid::new_v4(),
                 role: "assistant".into(),
@@ -134,6 +166,8 @@ mod tests {
                 reasoning: String::new(),
                 status: "streaming".into(),
                 error: None,
+                metrics: None,
+                server_run_id: None,
             }],
         }
     }

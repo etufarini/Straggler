@@ -1,4 +1,4 @@
-import { ArrowLeft, Save, Square } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import FolderBrowser from '../../components/FolderBrowser';
 import { useSettings } from './useSettings';
 import type { SettingsProps } from './useSettings';
@@ -24,11 +24,7 @@ export default function Settings(props: SettingsProps) {
     config,
     draft,
     setDraft,
-    server,
     accept,
-    confirm,
-    onStart,
-    onStop,
     onBack,
     section,
     setSection,
@@ -39,7 +35,6 @@ export default function Settings(props: SettingsProps) {
     setFolder,
     native,
     active,
-    building,
     dirty,
     modified,
     restart,
@@ -56,7 +51,7 @@ export default function Settings(props: SettingsProps) {
           Back to chat
         </button>
         <h1>Settings</h1>
-        <p>Configure the local model and the engine that runs it.</p>
+        <p>Choose how the model runs on this computer.</p>
       </div>
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
@@ -64,6 +59,7 @@ export default function Settings(props: SettingsProps) {
             <button
               key={key}
               className={section === key ? 'selected' : ''}
+              aria-current={section === key ? 'page' : undefined}
               onClick={() => setSection(key)}
             >
               {label}
@@ -87,88 +83,55 @@ export default function Settings(props: SettingsProps) {
                 Loading…
               </p>
             )}
-            <div className="configuration-heading">
-              <span>
-                {config.currentProfile || 'Not saved'}
-                {modified && <b>Modified</b>}
-                {dirty && <b>Unapplied changes</b>}
-                {active && restart && <b>Restart required</b>}
-              </span>
-              <button
-                disabled={busy || !native}
-                onClick={() =>
-                  void run(async () => {
-                    await apply();
-                    setMessage('Settings applied.');
-                  })
-                }
-              >
-                <Save size={14} />
-                Apply changes
-              </button>
-            </div>
-            {message && (
-              <p role="status" className="success-message">
-                {message}
-              </p>
-            )}
-            {section === 'model' && <ModelSettings controller={controller} />}
-            {section === 'performance' && <PerformanceSettings controller={controller} />}
-            {section === 'server' && <ServerSettings controller={controller} />}
-            {section === 'profiles' && <SavedConfigurations controller={controller} />}
-            {section === 'folders' && <FolderSettings controller={controller} />}
-            {section === 'llama' && <LlamaSettings controller={controller} />}
-            <div className="memory-summary">
-              <h3>Memory</h3>
-              <span>
-                Available RAM:{' '}
-                {config.memory.availableRamMiB === null
-                  ? 'Unavailable'
-                  : `${(config.memory.availableRamMiB / 1024).toFixed(1)} GiB`}
-              </span>
-              {config.memory.devices.map((device) => (
-                <span key={device.name}>
-                  {device.name}: {(device.availableMiB / 1024).toFixed(1)} GiB reported free
+            {section !== 'folders' && section !== 'llama' && (
+              <div className="configuration-heading">
+                <span>
+                  {config.currentProfile || 'Unsaved configuration'}
+                  {modified && <b>Modified</b>}
+                  {dirty && <b>Unapplied changes</b>}
+                  {active && restart && <b>Restart required</b>}
                 </span>
-              ))}
-              <small>
-                Measurements may be unavailable. llama.cpp determines whether the configuration can
-                run.
-              </small>
-            </div>
-            <div className="settings-launch">
-              {active ? (
-                <>
-                  <button
-                    disabled={busy || server.phase === 'stopping'}
-                    onClick={() =>
-                      confirm({
-                        title: 'Stop server?',
-                        text: 'Stop the server started by this app? Conversations are kept.',
-                        action: onStop,
-                      })
-                    }
-                  >
-                    <Square size={14} />
-                    Stop server
-                  </button>
-                  <button
-                    className="primary-button"
-                    disabled={busy || server.phase === 'stopping'}
-                    onClick={onStart}
-                  >
-                    Restart server
-                  </button>
-                </>
-              ) : (
                 <button
-                  className="primary-button"
-                  disabled={busy || building || !native || !config.serverAvailable || !draft.model}
-                  onClick={onStart}
+                  disabled={busy || !native}
+                  onClick={() =>
+                    void run(async () => {
+                      await apply();
+                      setMessage('Settings applied.');
+                    })
+                  }
                 >
-                  Launch server
+                  <Save size={14} />
+                  Apply changes
                 </button>
+              </div>
+            )}
+            <div className="settings-section">
+              {message && (
+                <p role="status" className="success-message">
+                  {message}
+                </p>
               )}
+              {section === 'model' && <ModelSettings controller={controller} />}
+              {section === 'performance' && <PerformanceSettings controller={controller} />}
+              {section === 'server' && <ServerSettings controller={controller} />}
+              {section === 'profiles' && <SavedConfigurations controller={controller} />}
+              {section === 'folders' && <FolderSettings controller={controller} />}
+              {section === 'llama' && <LlamaSettings controller={controller} />}
+              <div className="memory-summary">
+                <h3>Memory</h3>
+                <span>
+                  Available RAM:{' '}
+                  {config.memory.availableRamMiB === null
+                    ? 'Unavailable'
+                    : `${(config.memory.availableRamMiB / 1024).toFixed(1)} GiB`}
+                </span>
+                {config.memory.devices.map((device) => (
+                  <span key={device.name}>
+                    {device.name}: {(device.availableMiB / 1024).toFixed(1)} GiB reported free
+                  </span>
+                ))}
+                <small>An estimate. llama.cpp makes the final check when the server starts.</small>
+              </div>
             </div>
           </fieldset>
         </div>
