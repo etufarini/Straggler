@@ -693,3 +693,29 @@ async fn managed_build_update_restore_failure_and_cancellation_preserve_working_
     assert_eq!(runtime.job_status().unwrap().phase, "canceled");
     assert_eq!(runtime.inspect().unwrap().llama_dir, first.llama_dir);
 }
+
+#[tokio::test]
+async fn tokenization_counts_text_and_rendered_prompts_without_generation() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    fixture.ready(&runtime).await;
+    let count = runtime.tokenize_text("caffè ☕").await.unwrap();
+    assert_eq!(count, "caffè ☕".len().div_ceil(4));
+    let recorded: serde_json::Value = serde_json::from_slice(
+        &fs::read(format!("{}.tokenize", fixture.record.display())).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(recorded["parse_special"], false);
+    let count = runtime
+        .prompt_tokens(vec![ChatMessage {
+            role: "user".into(),
+            content: "Attachment text".into(),
+        }])
+        .await
+        .unwrap();
+    assert!(count.templated);
+    assert_eq!(count.tokens, "Attachment text<think>".len().div_ceil(4));
+    assert!(!fixture.record.exists());
+    runtime.stop().unwrap();
+    assert!(runtime.tokenize_text("offline").await.is_err());
+}

@@ -5,13 +5,15 @@ import {
   isTauri,
   saveConversationExport,
   chooseConversationImport,
+  estimatePromptTokens,
 } from '../../services/desktop';
-import { newConversation, requestMessages } from '../../domain/types';
+import { newConversation } from '../../domain/types';
 import { inheritedChatOptions, resolveChatOptions } from '../../domain/chat';
 import { replaceMessage, regenerationHistory } from '../../domain/messageActions';
 import { materializeImport } from '../../domain/conversationImport';
 import type { ImportedConversation } from '../../domain/conversationImport';
 import { fileName } from '../../domain/types';
+import { composeRequest } from '../../domain/attachments';
 import { exportFileName, serializeConversation } from '../../domain/conversationExport';
 import { errorDetail } from '../../domain/errors';
 import type {
@@ -24,10 +26,15 @@ import type {
   ChatOptions,
 } from '../../domain/types';
 
-export function useConversation(server: ServerStatus, settings?: Settings) {
+export function useConversation(
+  server: ServerStatus,
+  settings?: Settings,
+  contextSize?: number | null,
+) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
   const [input, setInput] = useState('');
+  const [contextError, setContextError] = useState('');
   const [editor, setEditor] = useState<{ messageId: string; text: string } | null>(null);
   const [editingBusy, setEditingBusy] = useState(false);
   const mutation = useRef(false);
@@ -129,7 +136,6 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
     requestRef.current = requestId;
     setGenerating(true);
     setGenerationPhase('waiting');
-    if (!replacement) setInput('');
     follow.current = true;
     const user: Message = {
       id: crypto.randomUUID(),
@@ -154,7 +160,26 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
       title: chatRef.current.messages.length ? chatRef.current.title : text.slice(0, 80),
       messages: [...(replacement ?? [...chatRef.current.messages, user]), assistant],
     };
-    if (!replacement) updateChat(current);
+    const options = resolveChatOptions(current.options, settings);
+    const messages = composeRequest(
+      current.messages.slice(0, -1),
+      options.systemPrompt,
+      current.attachments ?? [],
+    );
+    const estimate = await estimatePromptTokens(messages);
+    if (contextSize && estimate.tokens > contextSize) {
+      setContextError(
+        `The prompt and attachments exceed the ${contextSize.toLocaleString('en-US')}-token context. Remove files, shorten your message or increase the context size.`,
+      );
+      requestRef.current = null;
+      setGenerating(false);
+      return;
+    }
+    setContextError('');
+    if (!replacement) {
+      setInput('');
+      updateChat(current);
+    }
     const onDelta = new Channel<Delta>();
     let generationStarted = false;
     let lastSave = Date.now();
@@ -177,7 +202,6 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
         void save(current).catch(() => {});
       }
     };
-    const options = resolveChatOptions(current.options, settings);
     try {
       // Persist the user's message before asking the server to generate.
       await save(current);
@@ -190,12 +214,7 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
           : await invoke<Response>('generate', {
               request: {
                 requestId,
-                messages: [
-                  ...(options.systemPrompt
-                    ? [{ role: 'system', content: options.systemPrompt }]
-                    : []),
-                  ...requestMessages(current.messages.slice(0, -1)),
-                ],
+                messages,
                 options: { reasoning: options.reasoning, effort: options.effort },
               },
               onDelta,
@@ -223,6 +242,32 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
       }
       setGenerating(false);
       textarea.current?.focus();
+    }
+  }
+
+  function acceptStoredConversation(value: Conversation) {
+    updateChat(value);
+    setConversations((values) =>
+      [value, ...values.filter((item) => item.id !== value.id)].sort(
+        (a, b) => b.updatedAt - a.updatedAt,
+      ),
+    );
+  }
+
+  async function runConversationMutation(operation: () => Promise<void>) {
+    if (requestRef.current || mutation.current)
+      throw new Error('Wait for the current conversation operation to finish.');
+    mutation.current = true;
+    setEditingBusy(true);
+    try {
+      await saveQueue.current;
+      await save(chatRef.current);
+      const pending = operation();
+      saveQueue.current = pending;
+      await pending;
+    } finally {
+      mutation.current = false;
+      setEditingBusy(false);
     }
   }
 
@@ -334,6 +379,9 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
   }
 
   return {
+    runConversationMutation,
+    acceptStoredConversation,
+    contextError,
     importChat,
     importBusy,
     importError,
@@ -372,3 +420,5 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
     openConversation,
   };
 }
+
+export type ConversationController = ReturnType<typeof useConversation>;

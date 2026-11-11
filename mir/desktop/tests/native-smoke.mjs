@@ -217,7 +217,7 @@ try {
     );
     await sendMessage('Native test question');
     await until(
-      () => evaluate('!!document.querySelector(".copy-button")'),
+      () => evaluate(`!!document.querySelector('[aria-label="Copy response"]')`),
       'native streaming response',
     );
     assert.match(
@@ -243,6 +243,72 @@ try {
       path.join(desktop, 'test-results/native-chat.png'),
       Buffer.from(shot, 'base64'),
     );
+    // Exercise file commands against real IPC and temporary documents, then use
+    // the native window to reopen and remove the stored attachment conversation.
+    const attachmentChatId = crypto.randomUUID();
+    const attachmentChat = {
+      id: attachmentChatId,
+      title: 'Attachment contract',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      model: null,
+      messages: [],
+    };
+    const invokeNative = (command, args) =>
+      evaluate(
+        `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)})`,
+      );
+    await invokeNative('history_create', { conversation: attachmentChat });
+    const source = path.join(stage, 'attachment.txt');
+    await writeFile(source, 'Native attachment text ☕');
+    const attached = await invokeNative('attachment_add', { id: attachmentChatId, path: source });
+    assert.equal(attached.attachments[0].text, 'Native attachment text ☕');
+    await rm(source);
+    const downloaded = path.join(stage, 'download.txt');
+    await invokeNative('attachment_download', {
+      id: attachmentChatId,
+      attachmentId: attached.attachments[0].id,
+      destination: downloaded,
+    });
+    assert.equal(await readFile(downloaded, 'utf8'), 'Native attachment text ☕');
+    const exported = path.join(stage, 'export.json');
+    await invokeNative('write_export', {
+      path: exported,
+      contents: JSON.stringify([{ role: 'user', content: 'Imported text' }]),
+    });
+    const imported = await invokeNative('read_conversation_import', { path: exported });
+    assert.equal(imported.messages[0].content, 'Imported text');
+    await evaluate('location.reload()');
+    await until(
+      () => evaluate(`!!document.querySelector('[title="Attachment contract"]')`),
+      'native attachment history',
+    );
+    await evaluate(`document.querySelector('[title="Attachment contract"]').click()`);
+    await until(
+      () => evaluate('document.querySelector(".file-name")?.textContent === "attachment.txt"'),
+      'native attachment rail',
+    );
+    await evaluate(
+      `document.querySelector('[aria-label="Options for Attachment contract"]').click()`,
+    );
+    await until(
+      () => evaluate('!!document.querySelector(".chat-menu")'),
+      'native conversation menu',
+    );
+    await evaluate(
+      `document.querySelector('[role="menuitem"][aria-label="Delete Attachment contract"]').click()`,
+    );
+    await until(
+      () => evaluate('!!document.querySelector(".confirmation .danger-button")'),
+      'native delete confirmation',
+    );
+    await evaluate('document.querySelector(".confirmation .danger-button").click()');
+    await until(
+      () => evaluate('!document.querySelector(".confirmation")'),
+      'native attachment deletion',
+    );
+    assert.ok(!(await readdir(history)).includes(attachmentChatId));
+    await evaluate(`document.querySelector('[title="Native test question"]').click()`);
     await sendMessage('oom-stream');
     await until(
       () =>

@@ -1,3 +1,4 @@
+import type { DragDropEvent } from '@tauri-apps/api/webview';
 import type {
   Configuration,
   Conversation,
@@ -291,6 +292,60 @@ export function createFixture(scenario: Scenario) {
         }
         return configuration();
       }
+      case 'tokenize_text':
+        if (status.phase !== 'ready' || localStorage.getItem('mir-fixture-tokenize-unavailable'))
+          throw new Error('Tokenization unavailable');
+        return Math.ceil(new TextEncoder().encode(String(args.content)).length / 4);
+      case 'prompt_tokens': {
+        if (status.phase !== 'ready' || localStorage.getItem('mir-fixture-tokenize-unavailable'))
+          throw new Error('Tokenization unavailable');
+        const messages = args.messages as { content: string }[];
+        return {
+          tokens:
+            Number(localStorage.getItem('mir-fixture-prompt-tokens')) ||
+            Math.ceil(
+              new TextEncoder().encode(messages.map((message) => message.content).join('\n\n'))
+                .length / 4,
+            ),
+          templated: true,
+        };
+      }
+      case 'attachment_add': {
+        while (localStorage.getItem('mir-fixture-reading-paused'))
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        const conversation = structuredClone(history.find((item) => item.id === args.id));
+        if (!conversation) throw new Error('Conversation does not exist');
+        const name = String(args.path).split('/').at(-1)!;
+        const extension = name.split('.').at(-1)!;
+        if (extension === 'ppt')
+          throw new Error(
+            'PowerPoint 97–2003 (.ppt) is not supported. Save it as .pptx and add it again.',
+          );
+        if (!['txt', 'md', 'docx', 'xlsx', 'pptx'].includes(extension))
+          throw new Error('This file type is not supported.');
+        const text = `Extracted fixture text from ${name}.`;
+        conversation.attachments = [
+          ...(conversation.attachments || []),
+          { id: crypto.randomUUID(), name, extension: extension as 'txt', size: 1234, text },
+        ];
+        conversation.updatedAt = Date.now();
+        history[history.findIndex((item) => item.id === args.id)] = conversation;
+        persistHistory();
+        return conversation;
+      }
+      case 'attachment_remove': {
+        const conversation = structuredClone(history.find((item) => item.id === args.id));
+        if (!conversation) throw new Error('Conversation does not exist');
+        conversation.attachments = conversation.attachments?.filter(
+          (item) => item.id !== args.attachmentId,
+        );
+        history[history.findIndex((item) => item.id === args.id)] = conversation;
+        persistHistory();
+        return conversation;
+      }
+      case 'attachment_download':
+        localStorage.setItem('mir-fixture-download', String(args.attachmentId));
+        return;
       case 'read_conversation_import':
         if (localStorage.getItem('mir-fixture-import-error'))
           throw new Error('Message 2 has an unsupported role: tool.');
@@ -412,5 +467,15 @@ export function createFixture(scenario: Scenario) {
       ? null
       : '/fixture/import.json';
   }
-  return { invoke, chooseSavePath, chooseImportPath };
+  function chooseAttachmentFiles(): string[] {
+    return JSON.parse(
+      localStorage.getItem('mir-fixture-attachment-paths') || '["/fixture/meeting-notes.txt"]',
+    );
+  }
+  function watchAttachmentDrop(handler: (event: DragDropEvent) => void) {
+    const receive = (event: Event) => handler((event as CustomEvent<DragDropEvent>).detail);
+    window.addEventListener('mir-fixture-drag-drop', receive);
+    return () => window.removeEventListener('mir-fixture-drag-drop', receive);
+  }
+  return { invoke, chooseSavePath, chooseImportPath, chooseAttachmentFiles, watchAttachmentDrop };
 }

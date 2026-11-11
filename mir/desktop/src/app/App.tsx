@@ -68,6 +68,9 @@ export default function App() {
   return (
     <div className="app-shell">
       <Sidebar controller={controller} />
+      <span role="status" className="visually-hidden">
+        {controller.attachments.announcement}
+      </span>
 
       <main
         className={`workspace ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
@@ -195,6 +198,7 @@ export default function App() {
               <ChatPanel controller={controller} />
             </div>
             <PresencePanel
+              attachments={controller.attachments}
               state={presence}
               metrics={lastResponse?.metrics}
               preferences={controller.preferences}

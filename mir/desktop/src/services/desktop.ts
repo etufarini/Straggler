@@ -1,3 +1,6 @@
+import { getCurrentWebview } from '@tauri-apps/api/webview';
+import type { DragDropEvent } from '@tauri-apps/api/webview';
+import { approximateTokens } from '../domain/attachments';
 import type { Attachment, Conversation } from '../domain/types';
 import { save as nativeSave, open as nativeOpen } from '@tauri-apps/plugin-dialog';
 import {
@@ -37,6 +40,8 @@ export type DesktopCommand =
   | 'stop_server'
   | 'generate'
   | 'cancel_generation'
+  | 'tokenize_text'
+  | 'prompt_tokens'
   | 'attachment_add'
   | 'attachment_remove'
   | 'attachment_download'
@@ -173,4 +178,52 @@ export async function downloadAttachment(id: string, attachment: Attachment): Pr
   if (!destination) return false;
   await invoke('attachment_download', { id, attachmentId: attachment.id, destination });
   return true;
+}
+
+export type { DragDropEvent };
+export async function chooseAttachmentFiles(): Promise<string[]> {
+  if (fixture) return (await fixture).chooseAttachmentFiles();
+  const paths = await nativeOpen({
+    title: 'Attach files',
+    multiple: true,
+    directory: false,
+    filters: [
+      { name: 'Text and Office documents', extensions: ['txt', 'md', 'docx', 'xlsx', 'pptx'] },
+    ],
+  });
+  return paths || [];
+}
+export async function watchAttachmentDrop(
+  handler: (event: DragDropEvent) => void,
+): Promise<UnlistenFn> {
+  if (fixture) return (await fixture).watchAttachmentDrop(handler);
+  if (!nativeAvailable()) return () => {};
+  return getCurrentWebview().onDragDropEvent((event) => handler(event.payload));
+}
+export interface TokenEstimate {
+  tokens: number;
+  source: 'server' | 'approximate';
+  templated?: boolean;
+}
+export async function estimateTextTokens(content: string): Promise<TokenEstimate> {
+  try {
+    return { tokens: await invoke<number>('tokenize_text', { content }), source: 'server' };
+  } catch {
+    return { tokens: approximateTokens(content), source: 'approximate' };
+  }
+}
+export async function estimatePromptTokens(
+  messages: { role: string; content: string }[],
+): Promise<TokenEstimate> {
+  try {
+    const result = await invoke<{ tokens: number; templated: boolean }>('prompt_tokens', {
+      messages,
+    });
+    return { ...result, source: 'server' };
+  } catch {
+    return {
+      tokens: approximateTokens(messages.map((message) => message.content).join('\n\n')),
+      source: 'approximate',
+    };
+  }
 }

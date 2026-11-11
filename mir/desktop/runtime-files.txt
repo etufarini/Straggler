@@ -24,6 +24,7 @@ desktop/src-tauri/src/model.rs
 desktop/src-tauri/src/preferences.rs
 desktop/src-tauri/src/server.rs
 desktop/src-tauri/src/stream.rs
+desktop/src-tauri/src/tokens.rs
 desktop/src-tauri/src/workspace.rs
 desktop/src-tauri/tauri.conf.json
 desktop/src-tauri/tauri.macos.conf.json
@@ -40,6 +41,7 @@ desktop/src/components/NumberField.tsx
 desktop/src/components/Popover.tsx
 desktop/src/components/ReasoningControls.tsx
 desktop/src/components/statusLabels.ts
+desktop/src/domain/attachments.ts
 desktop/src/domain/chat.ts
 desktop/src/domain/conversationExport.ts
 desktop/src/domain/conversationImport.ts
@@ -47,12 +49,15 @@ desktop/src/domain/errors.ts
 desktop/src/domain/messageActions.ts
 desktop/src/domain/presence.ts
 desktop/src/domain/types.ts
+desktop/src/features/attachments/AttachmentSection.tsx
+desktop/src/features/attachments/useAttachments.ts
 desktop/src/features/chat/ChatPanel.tsx
 desktop/src/features/chat/ContextCounter.tsx
 desktop/src/features/chat/Markdown.tsx
 desktop/src/features/chat/ReasoningMenu.tsx
 desktop/src/features/chat/StorageFeedback.tsx
 desktop/src/features/chat/SystemPromptMenu.tsx
+desktop/src/features/chat/useContextEstimate.ts
 desktop/src/features/chat/useConversation.ts
 desktop/src/features/llama/LlamaSettings.tsx
 desktop/src/features/presence/AssistantPresence.tsx

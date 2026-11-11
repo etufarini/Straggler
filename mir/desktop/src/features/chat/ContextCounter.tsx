@@ -3,11 +3,27 @@ import { currentContext } from '../../domain/chat';
 import type { WorkspaceController } from '../../app/useWorkspace';
 
 export default function ContextCounter({ controller }: { controller: WorkspaceController }) {
-  const usage = currentContext(
+  const reported = currentContext(
     controller.chat.messages,
     controller.serverDetails,
     controller.server,
   );
+  const estimate = controller.contextEstimate;
+  const estimated = !!controller.chat.attachments?.length && !!estimate.capacity;
+  const usage = estimated
+    ? {
+        tokens: estimate.tokens,
+        capacity: estimate.capacity!,
+        percent: Math.round((estimate.tokens / estimate.capacity!) * 100),
+        source: estimate.source,
+        level:
+          estimate.tokens / estimate.capacity! >= 0.9
+            ? 'full'
+            : estimate.tokens / estimate.capacity! >= 0.75
+              ? 'high'
+              : 'normal',
+      }
+    : reported;
   const label = usage
     ? usage.level === 'full'
       ? 'Almost full'
@@ -65,8 +81,9 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
                   : 'Context is almost full. Start a new chat or increase the context size. At the limit, replies may stop; context shift, when enabled and supported, discards earlier context.'}
               </p>
               <p className="ctx-tech">
-                Last reported response {usage.source === 'usage' ? 'usage' : 'timings'} from
-                llama-server. After a context shift, response totals may include discarded context.
+                {estimated
+                  ? `${estimate.source === 'approximate' ? 'Approximate local estimate' : 'Estimated with llama-server tokenization'} of the prompt including attachments${estimate.templated ? ' and the chat template' : ''}.`
+                  : `Last reported response ${usage.source === 'usage' ? 'usage' : 'timings'} from llama-server. After a context shift, response totals may include discarded context.`}
               </p>
             </>
           ) : (

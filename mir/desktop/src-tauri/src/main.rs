@@ -193,6 +193,19 @@ async fn history_save(conversation: Conversation, state: State<'_, Application>)
 }
 
 #[tauri::command]
+async fn tokenize_text(content: String, state: State<'_, Application>) -> Result<usize> {
+    runtime(&state)?.tokenize_text(&content).await
+}
+
+#[tauri::command]
+async fn prompt_tokens(
+    messages: Vec<mir_desktop::ChatMessage>,
+    state: State<'_, Application>,
+) -> Result<mir_desktop::tokens::PromptTokens> {
+    runtime(&state)?.prompt_tokens(messages).await
+}
+
+#[tauri::command]
 async fn attachment_add(
     id: Uuid,
     path: PathBuf,
@@ -388,6 +401,8 @@ fn main() {
             history_save,
             history_delete,
             history_create,
+            tokenize_text,
+            prompt_tokens,
             attachment_add,
             attachment_remove,
             attachment_download,

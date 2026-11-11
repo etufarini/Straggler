@@ -2101,3 +2101,197 @@ select:focus-visible {
 .sidebar.is-compact .section-action span {
   display: none;
 }
+
+/* Rail: attachments only. */
+.attachments-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.presence-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.attachments-section .presence-section-heading h2 {
+  margin: 0;
+}
+.attachments-summary {
+  font-size: 11px;
+  color: var(--ui-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.dropzone {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px;
+  text-align: left;
+  border: 1px dashed #3a4c8a;
+  border-radius: var(--ui-radius);
+  background: #ffffff05;
+}
+.dropzone:hover:not(:disabled),
+.dropzone.is-dragover {
+  border-style: solid;
+  border-color: transparent;
+  background:
+    linear-gradient(#1c2750, #1c2750) padding-box,
+    var(--ui-holo) border-box;
+}
+.dropzone-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ui-accent-text);
+  background:
+    linear-gradient(#1c2750, #1c2750) padding-box,
+    var(--ui-holo-soft) border-box;
+}
+.dropzone-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.dropzone-text strong {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ui-text);
+}
+.dropzone-text span {
+  font-size: 12px;
+  color: var(--ui-accent-text);
+  overflow-wrap: anywhere;
+}
+.dropzone-types {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--ui-subtle);
+}
+.dropzone.is-compact {
+  padding: 7px 10px;
+}
+.dropzone.is-compact .dropzone-icon {
+  width: 26px;
+  height: 26px;
+}
+.dropzone.is-compact .dropzone-text {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+}
+
+/* File rows: one height, one column; colour and glyph name the type, the extension is always written. */
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.file-row {
+  --file-color: #aeb9d6;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 6px 4px 6px 7px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-raised);
+}
+.file-row.type-txt {
+  --file-color: #aeb9d6;
+}
+.file-row.type-md {
+  --file-color: #bba4ff;
+}
+.file-row.type-docx {
+  --file-color: #7fb0ff;
+}
+.file-row.type-xlsx {
+  --file-color: #5fd39a;
+}
+.file-row.type-pptx {
+  --file-color: #ff9f73;
+}
+.file-row.is-error {
+  --file-color: #edb8b2;
+  align-items: start;
+  background: #292126;
+}
+.file-tile {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--file-color) 38%, transparent);
+  border-radius: 7px;
+  color: var(--file-color);
+  background: color-mix(in srgb, var(--file-color) 16%, transparent);
+}
+.file-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.file-name {
+  font-size: 12px;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-meta {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ui-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.file-meta > span:last-child:not(.file-error) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-ext {
+  flex-shrink: 0;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--file-color);
+}
+.file-row.is-reading .file-meta {
+  color: #97a8c9;
+}
+.file-error {
+  color: #edb8b2;
+}
+.file-actions {
+  display: flex;
+}
+.file-action {
+  padding: 5px;
+  color: var(--ui-subtle);
+}
+.file-action:hover:not(:disabled) {
+  color: var(--ui-text);
+}
+
+.file-row.is-error .file-meta {
+  flex-wrap: wrap;
+}
+.context-overflow {
+  color: #ffc6d6;
+  font-size: 12px;
+  margin: 0 0 10px;
+}

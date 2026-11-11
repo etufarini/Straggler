@@ -1,5 +1,7 @@
 import { useServerDetails } from '../features/server/useServerDetails';
 import { useUiPreferences } from './useUiPreferences';
+import { useAttachments } from '../features/attachments/useAttachments';
+import { useContextEstimate } from '../features/chat/useContextEstimate';
 import { useConversation } from '../features/chat/useConversation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
@@ -45,7 +47,18 @@ export function useWorkspace() {
   const closeAction = useRef<() => void>(() => {});
   const native = isTauri();
   const ui = useUiPreferences();
+  const serverDetails = useServerDetails(server);
+  const conversation = useConversation(server, config?.settings, serverDetails?.contextSize);
+  const attachments = useAttachments(conversation, server);
+  const contextEstimate = useContextEstimate(
+    conversation.chat,
+    conversation.input,
+    config?.settings,
+    server,
+    serverDetails,
+  );
   const {
+    contextError,
     importChat,
     importBusy,
     importError,
@@ -82,8 +95,7 @@ export function useWorkspace() {
     cancel,
     send,
     openConversation,
-  } = useConversation(server, config?.settings);
-  const serverDetails = useServerDetails(server);
+  } = conversation;
 
   function reviewSettings(section: Section) {
     setSettingsSection(section);
@@ -298,10 +310,14 @@ export function useWorkspace() {
     !busy &&
     !editor &&
     !editingBusy &&
-    !importBusy;
+    !importBusy &&
+    !contextEstimate.overflow;
 
   return {
     ...ui,
+    attachments,
+    contextEstimate,
+    contextError,
     importChat,
     importBusy,
     importError,

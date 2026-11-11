@@ -9,6 +9,7 @@ pub mod model;
 pub mod preferences;
 mod server;
 pub mod stream;
+pub mod tokens;
 pub mod workspace;
 pub use workspace::{Configuration, JobStatus, Listener, Settings};
 

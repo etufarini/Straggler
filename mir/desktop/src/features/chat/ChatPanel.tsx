@@ -292,6 +292,13 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
 
       <div className="composer-wrap">
         <StorageFeedback controller={controller} />
+        {(controller.contextEstimate.overflow || controller.contextError) && (
+          <p role="alert" className="context-overflow">
+            {controller.contextEstimate.overflow
+              ? `The prompt and attachments exceed the ${controller.contextEstimate.capacity?.toLocaleString('en-US')}-token context. Remove files, shorten your message or increase the context size.`
+              : controller.contextError}
+          </p>
+        )}
         <form
           ref={composerRef}
           className={`composer ${composerWidth !== null && composerWidth <= 700 ? 'is-narrow' : ''} ${composerWidth !== null && composerWidth <= 480 ? 'is-small' : ''}`}

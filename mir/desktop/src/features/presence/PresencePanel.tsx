@@ -1,3 +1,5 @@
+import AttachmentSection from '../attachments/AttachmentSection';
+import type { AttachmentController } from '../attachments/useAttachments';
 import { useEffect, useId, useRef, useState } from 'react';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import AssistantPresence from './AssistantPresence';
@@ -10,12 +12,14 @@ export default function PresencePanel({
   preferences,
   onPreferences,
   ready,
+  attachments,
 }: {
   state: PresenceState;
   metrics?: GenerationMetrics;
   preferences: UiPreferences;
   onPreferences: (patch: Partial<UiPreferences>) => void;
   ready: boolean;
+  attachments: AttachmentController;
 }) {
   const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 1100px)').matches);
   const expanded = preferences.presenceExpanded ?? !narrow;
@@ -68,6 +72,7 @@ export default function PresencePanel({
         </button>
         <div id={id}>
           <AssistantPresence state={state} metrics={metrics} />
+          <AttachmentSection controller={attachments} />
         </div>
       </aside>
     </div>

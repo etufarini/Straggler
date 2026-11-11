@@ -47,9 +47,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        if self.path == '/tokenize':
+            assert request.get('add_special') is False
+            assert request.get('with_pieces') is False
+            with open(os.environ['TEST_REQUEST'] + '.tokenize', 'w') as record:
+                json.dump(request, record)
+            content = request['content']
+            body = json.dumps({'tokens': list(range((len(content.encode()) + 3) // 4))}).encode()
+            self.send_response(200)
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == '/apply-template':
             thinking = request.get('chat_template_kwargs', {}).get('enable_thinking', True)
-            body = json.dumps({'prompt': '<think>' if thinking else '</think>'}).encode()
+            prompt = '\n\n'.join(message['content'] for message in request['messages']) + ('<think>' if thinking else '</think>')
+            body = json.dumps({'prompt': prompt}).encode()
             self.send_response(200)
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
