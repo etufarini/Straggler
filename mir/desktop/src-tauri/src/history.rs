@@ -11,6 +11,8 @@ pub struct Message {
     pub content: String,
     #[serde(default)]
     pub reasoning: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     pub status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -96,13 +98,28 @@ impl History {
     pub fn save(&self, conversation: &Conversation) -> Result<()> {
         validate(conversation)?;
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.write(conversation, false)
+    }
+
+    pub fn create(&self, conversation: &Conversation) -> Result<()> {
+        validate(conversation)?;
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.write(conversation, true)
+    }
+
+    fn write(&self, conversation: &Conversation, create: bool) -> Result<()> {
         let mut file = tempfile::NamedTempFile::new_in(&self.directory)
             .map_err(|e| format!("Cannot create a conversation file: {e}"))?;
         serde_json::to_writer(&mut file, conversation).map_err(|e| e.to_string())?;
         file.write_all(b"\n").map_err(|e| e.to_string())?;
         file.as_file().sync_all().map_err(|e| e.to_string())?;
-        file.persist(self.directory.join(format!("{}.json", conversation.id)))
-            .map_err(|e| format!("Cannot save conversation. Previous data was kept: {e}"))?;
+        let path = self.directory.join(format!("{}.json", conversation.id));
+        let result = if create {
+            file.persist_noclobber(path)
+        } else {
+            file.persist(path)
+        };
+        result.map_err(|e| format!("Cannot save conversation. Previous data was kept: {e}"))?;
         Ok(())
     }
 
@@ -164,6 +181,7 @@ mod tests {
                 role: "assistant".into(),
                 content: "Partial response".into(),
                 reasoning: String::new(),
+                model: None,
                 status: "streaming".into(),
                 error: None,
                 metrics: None,
@@ -186,6 +204,18 @@ mod tests {
         assert_eq!(history.list().unwrap()[0].messages[0].status, "complete");
         history.delete(chat.id).unwrap();
         assert!(history.list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn creating_an_import_never_overwrites_an_existing_conversation() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::new(dir.path().to_owned()).unwrap();
+        let mut chat = conversation();
+        history.create(&chat).unwrap();
+        chat.title = "Replacement".into();
+        assert!(history.create(&chat).is_err());
+        assert_eq!(history.list().unwrap()[0].title, "A local chat");
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
     }
 
     #[test]

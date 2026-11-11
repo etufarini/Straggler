@@ -1,4 +1,4 @@
-import { save as nativeSave } from '@tauri-apps/plugin-dialog';
+import { save as nativeSave, open as nativeOpen } from '@tauri-apps/plugin-dialog';
 import {
   Channel as NativeChannel,
   invoke as nativeInvoke,
@@ -36,6 +36,8 @@ export type DesktopCommand =
   | 'stop_server'
   | 'generate'
   | 'cancel_generation'
+  | 'read_conversation_import'
+  | 'history_create'
   | 'write_export'
   | 'history_list'
   | 'history_save'
@@ -142,4 +144,14 @@ export async function saveConversationExport(
   if (!path) return false;
   await invoke('write_export', { path, contents });
   return true;
+}
+
+export async function chooseConversationImport(): Promise<string | null> {
+  if (fixture) return (await fixture).chooseImportPath();
+  return nativeOpen({
+    title: 'Import conversation',
+    multiple: false,
+    directory: false,
+    filters: [{ name: 'JSON conversation', extensions: ['json'] }],
+  });
 }

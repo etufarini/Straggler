@@ -95,6 +95,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   reasoning: string;
+  model?: string;
   status: MessageStatus;
   error?: string;
   metrics?: GenerationMetrics;

@@ -115,7 +115,11 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   <div className="message-heading">
                     {message.role === 'user' ? 'You' : 'Mir.cpp'}
                     {message.role === 'assistant' && (
-                      <span>{chat.model ? fileName(chat.model) : 'Local model'}</span>
+                      <span>
+                        {message.model || chat.model
+                          ? fileName(message.model || chat.model!)
+                          : 'Local model'}
+                      </span>
                     )}
                   </div>
                   {message.reasoning && (

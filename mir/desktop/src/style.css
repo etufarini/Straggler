@@ -2075,3 +2075,29 @@ select:focus-visible {
   color: var(--ui-muted);
   font-size: 11px;
 }
+
+.section-label.has-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.section-action {
+  gap: 5px;
+  margin: -6px -6px -6px 0;
+  padding: 5px 6px;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--ui-accent-text);
+}
+.section-action:hover:not(:disabled) {
+  color: var(--ui-text);
+}
+.sidebar.is-compact .section-label.has-action {
+  display: flex;
+  justify-content: center;
+}
+.sidebar.is-compact .section-label.has-action > span,
+.sidebar.is-compact .section-action span {
+  display: none;
+}

@@ -5,6 +5,28 @@ export default function StorageFeedback({ controller }: { controller: WorkspaceC
   const { storageError, historyReady, chat, save, loadHistory } = controller;
   return (
     <>
+      {controller.importError && (
+        <Feedback
+          title="Import failed"
+          details={controller.importError.details}
+          actions={
+            <button
+              type="button"
+              disabled={controller.importBusy}
+              onClick={() => void controller.importChat()}
+            >
+              Choose another file
+            </button>
+          }
+          onDismiss={() => controller.setImportError(null)}
+        >
+          <strong>{controller.importError.fileName}</strong>
+          <p>
+            The file could not be imported. Existing conversations have been kept.{' '}
+            {controller.importError.details}
+          </p>
+        </Feedback>
+      )}
       {controller.fileNotice && (
         <p role="status" className="success-message">
           {controller.fileNotice}

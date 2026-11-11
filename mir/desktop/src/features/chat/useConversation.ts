@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Channel, invoke, isTauri, saveConversationExport } from '../../services/desktop';
+import {
+  Channel,
+  invoke,
+  isTauri,
+  saveConversationExport,
+  chooseConversationImport,
+} from '../../services/desktop';
 import { newConversation, requestMessages } from '../../domain/types';
 import { inheritedChatOptions, resolveChatOptions } from '../../domain/chat';
 import { replaceMessage, regenerationHistory } from '../../domain/messageActions';
+import { materializeImport } from '../../domain/conversationImport';
+import type { ImportedConversation } from '../../domain/conversationImport';
+import { fileName } from '../../domain/types';
 import { exportFileName, serializeConversation } from '../../domain/conversationExport';
 import { errorDetail } from '../../domain/errors';
 import type {
@@ -24,6 +33,10 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
   const mutation = useRef(false);
   const [storageError, setStorageError] = useState('');
   const [fileError, setFileError] = useState('');
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState<{ fileName: string; details: string } | null>(
+    null,
+  );
   const [fileNotice, setFileNotice] = useState('');
   useEffect(() => {
     if (!fileNotice) return;
@@ -72,12 +85,12 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
     if (follow.current && list)
       list.scrollTo({ top: list.scrollHeight, behavior: generating ? 'instant' : 'smooth' });
   }, [chat, generating]);
-  function save(value: Conversation): Promise<void> {
+  function save(value: Conversation, create = false): Promise<void> {
     const snapshot = structuredClone(value);
     const pending = saveQueue.current
       .catch(() => {})
       .then(async () => {
-        await invoke('history_save', { conversation: snapshot });
+        await invoke(create ? 'history_create' : 'history_save', { conversation: snapshot });
         if (mounted.current) {
           setStorageError('');
           setConversations((current) =>
@@ -89,7 +102,7 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
       });
     saveQueue.current = pending;
     void pending.catch((e) => {
-      if (mounted.current) setStorageError(errorDetail(e).message);
+      if (mounted.current && !create) setStorageError(errorDetail(e).message);
     });
     return pending;
   }
@@ -129,6 +142,7 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
       id: crypto.randomUUID(),
       role: 'assistant',
       serverRunId: server.runId,
+      ...(server.model ? { model: server.model } : {}),
       content: '',
       reasoning: '',
       status: 'streaming',
@@ -212,6 +226,41 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
     }
   }
 
+  async function importChat() {
+    if (mutation.current || importBusy) return;
+    let path: string | null = null;
+    mutation.current = true;
+    setImportBusy(true);
+    try {
+      path = await chooseConversationImport();
+      if (!path) return;
+      setImportError(null);
+      const imported = await invoke<ImportedConversation>('read_conversation_import', { path });
+      // Validate before disturbing an active response or writing any conversation.
+      await cancel();
+      await sendPromise.current;
+      await saveQueue.current;
+      mutation.current = true;
+      const value = materializeImport(
+        imported,
+        Math.max(Date.now(), ...conversations.map((item) => item.updatedAt + 1)),
+      );
+      await save(value, true);
+      setEditor(null);
+      updateChat(value);
+      setInput('');
+      follow.current = true;
+    } catch (error) {
+      setImportError({
+        fileName: path ? fileName(path) : 'File selection',
+        details: errorDetail(error).message,
+      });
+    } finally {
+      mutation.current = false;
+      setImportBusy(false);
+    }
+  }
+
   async function exportChat(value: Conversation, includesReasoning: boolean) {
     setFileError('');
     try {
@@ -285,6 +334,10 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
   }
 
   return {
+    importChat,
+    importBusy,
+    importError,
+    setImportError,
     exportChat,
     fileError,
     setFileError,

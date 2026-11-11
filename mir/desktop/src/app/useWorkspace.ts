@@ -46,6 +46,10 @@ export function useWorkspace() {
   const native = isTauri();
   const ui = useUiPreferences();
   const {
+    importChat,
+    importBusy,
+    importError,
+    setImportError,
     exportChat,
     fileError,
     setFileError,
@@ -293,10 +297,15 @@ export function useWorkspace() {
     !generating &&
     !busy &&
     !editor &&
-    !editingBusy;
+    !editingBusy &&
+    !importBusy;
 
   return {
     ...ui,
+    importChat,
+    importBusy,
+    importError,
+    setImportError,
     exportChat,
     fileError,
     setFileError,

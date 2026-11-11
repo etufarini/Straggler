@@ -291,6 +291,24 @@ export function createFixture(scenario: Scenario) {
         }
         return configuration();
       }
+      case 'read_conversation_import':
+        if (localStorage.getItem('mir-fixture-import-error'))
+          throw new Error('Message 2 has an unsupported role: tool.');
+        return {
+          title: 'Imported conversation',
+          createdAt: '2026-11-10T00:00:00Z',
+          model: 'imported.gguf',
+          systemPrompt: 'Imported instructions',
+          messages: [
+            { role: 'user', content: 'Imported question', reasoning: '', model: null },
+            {
+              role: 'assistant',
+              content: 'Imported answer',
+              reasoning: 'Imported reasoning',
+              model: 'imported.gguf',
+            },
+          ],
+        };
       case 'write_export':
         if (localStorage.getItem('mir-fixture-write-error'))
           throw new Error('Destination is not writable');
@@ -304,6 +322,7 @@ export function createFixture(scenario: Scenario) {
           throw new Error('Conversation storage is unavailable');
         }
         return structuredClone(history);
+      case 'history_create':
       case 'history_save': {
         if (localStorage.getItem('mir-fixture-fail-next-save') === 'true') {
           localStorage.removeItem('mir-fixture-fail-next-save');
@@ -315,6 +334,8 @@ export function createFixture(scenario: Scenario) {
         }
         const conversation = structuredClone(args.conversation as Conversation);
         const index = history.findIndex((value) => value.id === conversation.id);
+        if (command === 'history_create' && index !== -1)
+          throw new Error('Conversation already exists');
         if (index === -1) history.push(conversation);
         else history[index] = conversation;
         persistHistory();
@@ -386,5 +407,10 @@ export function createFixture(scenario: Scenario) {
     const selected = localStorage.getItem('mir-fixture-save-path');
     return selected === 'cancel' ? null : selected || '/fixture/export.json';
   }
-  return { invoke, chooseSavePath };
+  function chooseImportPath() {
+    return localStorage.getItem('mir-fixture-import-path') === 'cancel'
+      ? null
+      : '/fixture/import.json';
+  }
+  return { invoke, chooseSavePath, chooseImportPath };
 }

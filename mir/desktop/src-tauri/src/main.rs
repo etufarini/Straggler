@@ -193,6 +193,23 @@ async fn history_save(conversation: Conversation, state: State<'_, Application>)
 }
 
 #[tauri::command]
+async fn read_conversation_import(
+    path: PathBuf,
+) -> Result<mir_desktop::conversation_import::ImportedConversation> {
+    tauri::async_runtime::spawn_blocking(move || mir_desktop::conversation_import::read(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn history_create(conversation: Conversation, state: State<'_, Application>) -> Result<()> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.history.create(&conversation))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn history_delete(id: Uuid, state: State<'_, Application>) -> Result<()> {
     let runtime = runtime(&state)?;
     tauri::async_runtime::spawn_blocking(move || runtime.history.delete(id))
@@ -327,6 +344,8 @@ fn main() {
             history_list,
             history_save,
             history_delete,
+            history_create,
+            read_conversation_import,
             preferences_read,
             preferences_save
         ])

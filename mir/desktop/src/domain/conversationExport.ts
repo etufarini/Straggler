@@ -27,7 +27,9 @@ export function serializeConversation(
     messages.push({
       role: message.role,
       content: message.content,
-      ...(message.role === 'assistant' && conversation.model ? { model: conversation.model } : {}),
+      ...(message.role === 'assistant' && (message.model || conversation.model)
+        ? { model: message.model || conversation.model! }
+        : {}),
       ...(includesReasoning && message.role === 'assistant' && message.reasoning
         ? { reasoning_content: message.reasoning }
         : {}),
