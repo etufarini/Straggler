@@ -2,7 +2,7 @@ import ReasoningMenu from './ReasoningMenu';
 import SystemPromptMenu from './SystemPromptMenu';
 import ContextCounter from './ContextCounter';
 import Markdown from './Markdown';
-import { ArrowUp, HardDrive, Check, Copy, Square } from 'lucide-react';
+import { ArrowUp, HardDrive, Check, Copy, Square, Pencil, RotateCcw } from 'lucide-react';
 import { fileName } from '../../domain/types';
 import { messageStatusLabel } from '../../components/statusLabels';
 import Feedback from '../../components/Feedback';
@@ -12,6 +12,12 @@ import { useEffect, useRef, useState } from 'react';
 import { errorDetail } from '../../domain/errors';
 export default function ChatPanel({ controller }: { controller: WorkspaceController }) {
   const [copied, setCopied] = useState('');
+  const lastEditor = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = lastEditor.current;
+    lastEditor.current = controller.editor?.messageId ?? null;
+    if (previous && !controller.editor) document.getElementById(`edit-${previous}`)?.focus();
+  }, [controller.editor?.messageId]);
   const composerRef = useRef<HTMLFormElement>(null);
   const [composerWidth, setComposerWidth] = useState<number | null>(null);
   useEffect(() => {
@@ -25,6 +31,12 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
   }, []);
   const [copyError, setCopyError] = useState<{ messageId: string; detail: string } | null>(null);
   const {
+    editor,
+    setEditor,
+    editingBusy,
+    beginEdit,
+    saveEdit,
+    regenerate,
     follow,
     chat,
     setInput,
@@ -112,9 +124,61 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                       <Markdown>{message.reasoning}</Markdown>
                     </details>
                   )}
-                  <div className="markdown">
-                    <Markdown>{message.content}</Markdown>
-                  </div>
+                  {editor?.messageId === message.id ? (
+                    <div className="message-editor">
+                      <textarea
+                        autoFocus
+                        aria-label={message.role === 'user' ? 'Edit message' : 'Edit response'}
+                        aria-describedby={`edit-note-${message.id}`}
+                        rows={message.role === 'user' ? 4 : 10}
+                        value={editor.text}
+                        disabled={editingBusy || generating}
+                        onChange={(event) => setEditor({ ...editor, text: event.target.value })}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape' && !editingBusy && !generating)
+                            setEditor(null);
+                        }}
+                      />
+                      <div className="message-editor-footer">
+                        <p className="message-editor-note" id={`edit-note-${message.id}`}>
+                          {message.role === 'user'
+                            ? chat.messages.findIndex((value) => value.id === message.id) <
+                              chat.messages.length - 2
+                              ? 'Saving replaces the response below and removes later messages.'
+                              : 'Saving replaces the response below with a new response.'
+                            : chat.messages.at(-1)?.id !== message.id
+                              ? 'Saving replaces this response and removes later messages. The model is not run again.'
+                              : 'Your text replaces this response and is used as context for later messages. The model is not run again.'}
+                        </p>
+                        <div className="message-editor-actions">
+                          <button
+                            type="button"
+                            disabled={editingBusy || generating}
+                            onClick={() => setEditor(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            disabled={
+                              editingBusy ||
+                              generating ||
+                              !editor.text.trim() ||
+                              (message.role === 'user' && server.phase !== 'ready')
+                            }
+                            onClick={() => void saveEdit().catch(() => {})}
+                          >
+                            {message.role === 'user' ? 'Save and regenerate' : 'Save response'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="markdown">
+                      <Markdown>{message.content}</Markdown>
+                    </div>
+                  )}
                   {message.status === 'streaming' && (
                     <span className="typing-indicator">
                       {message.content ? 'Generating' : 'Thinking'}
@@ -142,25 +206,69 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                         : 'The server could not complete this request. Review the details before trying again.'}
                     </Feedback>
                   )}
-                  {message.role === 'assistant' &&
-                    message.content &&
-                    message.status !== 'streaming' && (
-                      <button
-                        className="copy-button"
-                        aria-label="Copy response"
-                        onClick={async () => {
-                          setCopyError(null);
-                          try {
-                            await navigator.clipboard.writeText(message.content);
-                            setCopied(message.id);
-                            setTimeout(() => setCopied(''), 1600);
-                          } catch (e) {
-                            setCopyError({ messageId: message.id, detail: errorDetail(e).message });
-                          }
-                        }}
-                      >
-                        {copied === message.id ? <Check size={14} /> : <Copy size={14} />}
-                      </button>
+                  {editor?.messageId !== message.id &&
+                    (message.role === 'user' ||
+                      (message.status !== 'streaming' &&
+                        message.status !== 'error' &&
+                        !!message.content)) && (
+                      <div className="message-actions" role="group" aria-label="Message actions">
+                        <button
+                          type="button"
+                          className="message-action"
+                          aria-label={message.role === 'user' ? 'Copy message' : 'Copy response'}
+                          title={message.role === 'user' ? 'Copy message' : 'Copy response'}
+                          onClick={async () => {
+                            setCopyError(null);
+                            try {
+                              await navigator.clipboard.writeText(message.content);
+                              setCopied(message.id);
+                              setTimeout(() => setCopied(''), 1600);
+                            } catch (e) {
+                              setCopyError({
+                                messageId: message.id,
+                                detail: errorDetail(e).message,
+                              });
+                            }
+                          }}
+                        >
+                          {copied === message.id ? <Check size={14} /> : <Copy size={14} />}
+                        </button>
+                        <button
+                          type="button"
+                          className="message-action"
+                          aria-label={message.role === 'user' ? 'Edit message' : 'Edit response'}
+                          title={message.role === 'user' ? 'Edit message' : 'Edit response'}
+                          disabled={generating || editingBusy}
+                          aria-describedby={generating ? `actions-busy-${message.id}` : undefined}
+                          onClick={() => beginEdit(message)}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        {message.role === 'user' && (
+                          <button
+                            type="button"
+                            className="message-action"
+                            aria-label="Regenerate response"
+                            title="Regenerate response"
+                            disabled={
+                              generating ||
+                              editingBusy ||
+                              server.phase !== 'ready' ||
+                              !!controller.storageError
+                            }
+                            aria-describedby={generating ? `actions-busy-${message.id}` : undefined}
+                            onClick={() => void regenerate(message.id).catch(() => {})}
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
+                        {generating && (
+                          <p className="message-actions-note" id={`actions-busy-${message.id}`}>
+                            Edit and regenerate are available when the response finishes or is
+                            stopped.
+                          </p>
+                        )}
+                      </div>
                     )}
                   {copyError?.messageId === message.id && (
                     <Feedback

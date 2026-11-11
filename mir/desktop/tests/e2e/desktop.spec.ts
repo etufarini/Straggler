@@ -226,7 +226,8 @@ test('fatal OOM stays visible through polling, preserves partial text and suppor
   const failure = page.locator('.workspace-feedback .feedback');
   await expect(failure).toContainText('Not enough memory');
   await expect(page.locator('.local-badge')).toHaveText('Needs restart');
-  await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copy response' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Copy message' })).toBeVisible();
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this draft too');
   await expect(page.getByRole('button', { name: 'Send message' })).toBeDisabled();
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
@@ -269,7 +270,7 @@ test('fatal OOM stays visible through polling, preserves partial text and suppor
     'Keep this draft too',
   );
   await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.getByRole('button', { name: 'Copy response' })).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Copy response' })).toHaveCount(1);
   await page.reload();
   await page.getByRole('button', { name: 'Keep this response', exact: true }).click();
   await expect(page.locator('.message.assistant')).toHaveCount(2);

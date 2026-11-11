@@ -1068,12 +1068,7 @@ textarea:disabled {
 .message-status {
   color: #c5ad8f;
 }
-.copy-button {
-  color: var(--ui-subtle);
-  margin: 7px 0 0 -7px;
-  padding: 5px 7px;
-  display: flex;
-}
+
 .panel-backdrop,
 .confirmation-backdrop {
   position: fixed;
@@ -1977,4 +1972,59 @@ select:focus-visible {
 }
 .presence.is-compact .assistant-presence {
   gap: 4px;
+}
+
+.message-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 10px;
+}
+.message-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--ui-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.message-action:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--ui-raised);
+  border-color: var(--ui-border);
+}
+.message-actions-note,
+.message-editor-note {
+  color: var(--ui-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+}
+.message-editor textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  font: inherit;
+  line-height: 1.6;
+}
+.message-editor-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.message-editor-actions {
+  display: flex;
+  gap: 8px;
 }

@@ -46,6 +46,12 @@ export function useWorkspace() {
   const native = isTauri();
   const ui = useUiPreferences();
   const {
+    editor,
+    setEditor,
+    editingBusy,
+    beginEdit,
+    saveEdit,
+    regenerate,
     generationPhase,
     setChatOptions,
     conversations,
@@ -276,10 +282,23 @@ export function useWorkspace() {
   const active = serverActive(server);
   const displayModel = active ? server.model : selected;
   const canSend =
-    native && server.phase === 'ready' && historyReady && !storageError && !generating && !busy;
+    native &&
+    server.phase === 'ready' &&
+    historyReady &&
+    !storageError &&
+    !generating &&
+    !busy &&
+    !editor &&
+    !editingBusy;
 
   return {
     ...ui,
+    editor,
+    setEditor,
+    editingBusy,
+    beginEdit,
+    saveEdit,
+    regenerate,
     generationPhase,
     setChatOptions,
     serverDetails,

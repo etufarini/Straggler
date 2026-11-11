@@ -300,6 +300,10 @@ export function createFixture(scenario: Scenario) {
         }
         return structuredClone(history);
       case 'history_save': {
+        if (localStorage.getItem('mir-fixture-fail-next-save') === 'true') {
+          localStorage.removeItem('mir-fixture-fail-next-save');
+          throw new Error('Disk is full');
+        }
         if (failedWrites > 0) {
           failedWrites--;
           throw new Error('Disk is full');

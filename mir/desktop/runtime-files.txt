@@ -38,6 +38,7 @@ desktop/src/components/ReasoningControls.tsx
 desktop/src/components/statusLabels.ts
 desktop/src/domain/chat.ts
 desktop/src/domain/errors.ts
+desktop/src/domain/messageActions.ts
 desktop/src/domain/presence.ts
 desktop/src/domain/types.ts
 desktop/src/features/chat/ChatPanel.tsx

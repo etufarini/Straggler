@@ -12,6 +12,7 @@ import type { WorkspaceController } from './useWorkspace';
 export default function Sidebar({ controller }: { controller: WorkspaceController }) {
   const {
     generating,
+    editingBusy,
     updateChat,
     setInput,
     setPanel,
@@ -57,9 +58,9 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         className="new-chat"
         aria-label="New chat"
         title="New chat"
-        disabled={generating || (!!storageError && chat.messages.length > 0)}
+        disabled={editingBusy || generating || (!!storageError && chat.messages.length > 0)}
         onClick={() => {
-          updateChat(newConversation());
+          openConversation(newConversation());
           setInput('');
           setPanel(null);
         }}
@@ -81,7 +82,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             className={`conversation-row ${chat.id === value.id ? 'selected' : ''}`}
           >
             <button
-              disabled={generating || (!!storageError && chat.messages.length > 0)}
+              disabled={editingBusy || generating || (!!storageError && chat.messages.length > 0)}
               onClick={() => {
                 openConversation(value);
                 setPanel(null);
@@ -94,7 +95,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             <button
               className="delete-chat"
               aria-label={`Delete ${value.title}`}
-              disabled={generating}
+              disabled={editingBusy || generating}
               onClick={() =>
                 setConfirmation({
                   title: 'Delete conversation?',
