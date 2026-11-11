@@ -39,3 +39,12 @@ describe('materializing validated native imports', () => {
     expect(value.options?.systemPrompt).toBe('');
   });
 });
+
+it('derives a Unicode title without splitting an emoji before native storage', () => {
+  const content = 'a' + '😀'.repeat(80);
+  const chat = materializeImport(
+    { ...imported, title: null, messages: [{ role: 'user', content, reasoning: '', model: null }] },
+    42,
+  );
+  expect(chat.title).toBe('a' + '😀'.repeat(79));
+});

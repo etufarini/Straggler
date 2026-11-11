@@ -76,7 +76,7 @@ Local Cargo commands reused the existing build target cache through
 server with temporary HOME/XDG directories. No real models, GPUs, inference,
 personal configuration or local system package installation were used.
 
-Final automated counts: 39 frontend unit tests, 21 Rust unit tests and 12 Rust
+Final automated counts: 40 frontend unit tests, 21 Rust unit tests and 12 Rust
 integration tests, and 104 Chromium/WebKit browser tests. Desktop verification
 includes Prettier, ESLint, TypeScript/Vite, cargo fmt and no-default-feature Clippy.
 The additional default-feature Clippy check covers desktop command handlers.
@@ -153,3 +153,15 @@ keyboard tests now use the platform's Option-Tab sequence on that engine, retain
 the same focus assertions, and change no application or user preference.
 The supplied HTML's existing trailing whitespace was preserved with its exact
 bytes; implementation files pass `git diff --check` independently of that dossier.
+
+A final import boundary test reproduced UTF-16 surrogate splitting in long
+emoji-containing derived titles. Title derivation now truncates by Unicode code
+point, so valid imported content cannot become an invalid native storage string.
+
+Export filename truncation also uses a UTF-8 byte budget, preserving complete
+Unicode characters while leaving room for `.json` within filesystem name limits.
+
+After the platform traversal correction, all R005 keyboard checks passed on
+macOS CI. That run encountered a separate existing renderer still-paint timing
+assertion; the renderer was left unchanged and the final workflow was rerun on
+the final source revision.

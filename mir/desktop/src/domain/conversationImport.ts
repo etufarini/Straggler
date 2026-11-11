@@ -19,10 +19,12 @@ export interface ImportedConversation {
 export function materializeImport(imported: ImportedConversation, updatedAt: number): Conversation {
   const createdAt = imported.createdAt ? Date.parse(imported.createdAt) : NaN;
   const firstUser = imported.messages.find((message) => message.role === 'user');
+  const derivedTitle = Array.from(firstUser?.content.trim() ?? '')
+    .slice(0, 80)
+    .join('');
   return {
     ...newConversation(),
-    title:
-      imported.title?.trim() || firstUser?.content.trim().slice(0, 80) || 'Imported conversation',
+    title: imported.title?.trim() || derivedTitle || 'Imported conversation',
     createdAt: Number.isFinite(createdAt) && createdAt >= 0 ? createdAt : updatedAt,
     updatedAt,
     model: imported.model,

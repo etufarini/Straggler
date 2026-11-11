@@ -6,10 +6,16 @@ export function exportFileName(title: string): string {
     .replace(/[\p{Cc}/\\:*?"<>|]/gu, ' ')
     .trim()
     .replace(/^\.+|[. ]+$/g, '');
-  const stem = Array.from(safe.replace(/\.json$/i, ''))
-    .slice(0, 120)
-    .join('')
-    .trim();
+  const encoder = new TextEncoder();
+  let stem = '';
+  let bytes = 0;
+  for (const character of safe.replace(/\.json$/i, '')) {
+    const characterBytes = encoder.encode(character).length;
+    if (bytes + characterBytes > 200) break;
+    stem += character;
+    bytes += characterBytes;
+  }
+  stem = stem.trim();
   return `${stem || 'conversation'}.json`;
 }
 

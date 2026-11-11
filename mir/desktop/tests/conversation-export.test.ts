@@ -72,7 +72,10 @@ describe('Mir conversation export version 1', () => {
     expect(exportFileName('../A/B\\C: café?')).toBe('A B C  café.json');
     expect(exportFileName('...')).toBe('conversation.json');
     expect(exportFileName('Saved.json')).toBe('Saved.json');
-    expect(exportFileName('☕'.repeat(200))).toBe('☕'.repeat(120) + '.json');
+    expect(exportFileName('☕'.repeat(200))).toBe('☕'.repeat(66) + '.json');
+    expect(new TextEncoder().encode(exportFileName('😀'.repeat(200))).length).toBeLessThanOrEqual(
+      205,
+    );
   });
 });
 
