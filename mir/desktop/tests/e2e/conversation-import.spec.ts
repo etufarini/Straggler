@@ -55,3 +55,29 @@ test('canceling import leaves history empty, and a failed create does not open a
   await expect(page.getByText('What’s on your mind?')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('mir-fixture-normal'))).toBeNull();
 });
+
+test('invalid import preserves generation; a valid import stops and saves its partial response before opening', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=cancel');
+  await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Message', exact: true })
+    .fill('Keep this partial response');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.locator('.message.assistant .markdown')).toContainText('A local answer');
+  await page.evaluate(() => localStorage.setItem('mir-fixture-import-error', 'true'));
+  await page.getByRole('button', { name: 'Import conversation', exact: true }).click();
+  await expect(page.getByText('Import failed', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Stop response' })).toBeVisible();
+  await page.evaluate(() => localStorage.removeItem('mir-fixture-import-error'));
+  await page.getByRole('button', { name: 'Choose another file' }).click();
+  await expect(page.locator('.message.user')).toContainText('Imported question');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mir-fixture-cancel')!));
+  const original = saved.find(
+    (chat: { title: string }) => chat.title === 'Keep this partial response',
+  );
+  expect(original.messages[1].status).toBe('stopped');
+  expect(original.messages[1].content).toContain('A **local** answer');
+});

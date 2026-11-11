@@ -16,8 +16,12 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
   useEffect(() => {
     const previous = lastEditor.current;
     lastEditor.current = controller.editor?.messageId ?? null;
-    if (previous && !controller.editor) document.getElementById(`edit-${previous}`)?.focus();
-  }, [controller.editor?.messageId]);
+    if (controller.editor && !controller.generating) {
+      const field = document.getElementById(`edit-${controller.editor.messageId}`);
+      field?.focus();
+      field?.closest('.message-editor')?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    } else if (previous && !controller.editor) document.getElementById(`edit-${previous}`)?.focus();
+  }, [controller.editor?.messageId, controller.generating]);
   const composerRef = useRef<HTMLFormElement>(null);
   const [composerWidth, setComposerWidth] = useState<number | null>(null);
   useEffect(() => {
@@ -129,12 +133,22 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                     </details>
                   )}
                   {editor?.messageId === message.id ? (
-                    <div className="message-editor">
+                    <div
+                      className="message-editor"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape' && !editingBusy && !generating) {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setEditor(null);
+                        }
+                      }}
+                    >
                       <textarea
                         autoFocus
+                        id={`edit-${message.id}`}
                         aria-label={message.role === 'user' ? 'Edit message' : 'Edit response'}
                         aria-describedby={`edit-note-${message.id}`}
-                        rows={message.role === 'user' ? 4 : 10}
+                        rows={message.role === 'user' ? 2 : 10}
                         value={editor.text}
                         disabled={editingBusy || generating}
                         onChange={(event) => setEditor({ ...editor, text: event.target.value })}
@@ -156,6 +170,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                         </p>
                         <div className="message-editor-actions">
                           <button
+                            className="message-editor-cancel"
                             type="button"
                             disabled={editingBusy || generating}
                             onClick={() => setEditor(null)}
@@ -212,9 +227,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   )}
                   {editor?.messageId !== message.id &&
                     (message.role === 'user' ||
-                      (message.status !== 'streaming' &&
-                        message.status !== 'error' &&
-                        !!message.content)) && (
+                      (message.status !== 'streaming' && message.status !== 'error')) && (
                       <div className="message-actions" role="group" aria-label="Message actions">
                         <button
                           type="button"
@@ -240,6 +253,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                         <button
                           type="button"
                           className="message-action"
+                          id={`edit-${message.id}`}
                           aria-label={message.role === 'user' ? 'Edit message' : 'Edit response'}
                           title={message.role === 'user' ? 'Edit message' : 'Edit response'}
                           disabled={generating || editingBusy}
@@ -280,7 +294,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                       details={copyError.detail}
                       onDismiss={() => setCopyError(null)}
                     >
-                      Select the response text and copy it manually.
+                      Select the text and copy it manually.
                     </Feedback>
                   )}
                 </div>

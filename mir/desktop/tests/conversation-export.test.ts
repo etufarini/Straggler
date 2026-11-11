@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { exportFileName, serializeConversation } from '../src/domain/conversationExport';
+import type { Conversation } from '../src/domain/types';
 import { newConversation } from '../src/domain/types';
 import { defaultSettings } from '../src/services/fixtures';
 
-function conversation() {
+function conversation(): Conversation {
   return {
     ...newConversation(),
     title: 'A local chat',
@@ -73,4 +74,24 @@ describe('Mir conversation export version 1', () => {
     expect(exportFileName('Saved.json')).toBe('Saved.json');
     expect(exportFileName('☕'.repeat(200))).toBe('☕'.repeat(120) + '.json');
   });
+});
+
+it('excludes attachment text and preserves per-response model metadata', () => {
+  const chat = {
+    ...conversation(),
+    attachments: [
+      {
+        id: 'attachment',
+        name: 'notes.txt',
+        extension: 'txt' as const,
+        size: 12,
+        text: 'Attachment-only text',
+      },
+    ],
+  };
+  chat.messages[1] = { ...chat.messages[1], model: 'earlier.gguf' };
+  const output = serializeConversation(chat, false, 'now');
+  expect(output).not.toContain('Attachment-only text');
+  expect(output).not.toContain('notes.txt');
+  expect(JSON.parse(output).conversation.messages[1].model).toBe('earlier.gguf');
 });

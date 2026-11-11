@@ -3,7 +3,7 @@ import {
   FileText,
   FileType,
   FileSpreadsheet,
-  FileSliders,
+  FileChartColumn,
   FileCode,
   FileUp,
   X,
@@ -18,7 +18,7 @@ const icons = {
   md: FileCode,
   docx: FileType,
   xlsx: FileSpreadsheet,
-  pptx: FileSliders,
+  pptx: FileChartColumn,
 };
 export default function AttachmentSection({ controller }: { controller: AttachmentController }) {
   const id = useId();
@@ -55,7 +55,9 @@ export default function AttachmentSection({ controller }: { controller: Attachme
                     {row.state === 'reading' ? (
                       <span role="status">Reading text…</span>
                     ) : row.state === 'error' ? (
-                      <span className="file-error">{row.error}</span>
+                      <span className="file-error" role="alert">
+                        {row.error}
+                      </span>
                     ) : (
                       <span>
                         {tokens?.source === 'approximate' ? '~' : ''}
@@ -126,7 +128,9 @@ export default function AttachmentSection({ controller }: { controller: Attachme
       </button>
       {controller.disabled && (
         <p className="presence-note" id={`${id}-busy`}>
-          Attachments can be changed when the response finishes.
+          {controller.generating
+            ? 'Attachments can be changed when the response finishes.'
+            : 'Wait for the current file or conversation operation to finish.'}
         </p>
       )}
       {controller.error && (

@@ -58,6 +58,7 @@ export function useWorkspace() {
     serverDetails,
   );
   const {
+    flushSaves,
     contextError,
     importChat,
     importBusy,
@@ -242,7 +243,7 @@ export function useWorkspace() {
       action: async () => {
         await invoke('cancel_build');
         await stop();
-        await saveQueue.current;
+        await flushSaves();
         await ui.preferenceSaveQueue.current;
         await getCurrentWindow().destroy();
       },

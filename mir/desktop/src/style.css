@@ -1969,57 +1969,72 @@ select:focus-visible {
 
 .message-actions {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 10px;
+  align-items: center;
+  gap: 2px;
+  margin: 7px 0 0 -7px;
 }
 .message-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--ui-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  display: flex;
+  padding: 5px 7px;
+  color: var(--ui-subtle);
 }
-.message-action:hover:not(:disabled) {
+.message-actions button:hover:not(:disabled) {
   color: var(--ui-text);
-  background: var(--ui-raised);
-  border-color: var(--ui-border);
 }
-.message-actions-note,
-.message-editor-note {
-  color: var(--ui-muted);
+.message-actions-note {
+  margin: 0 0 0 6px;
   font-size: 11px;
-  line-height: 1.5;
-  margin: 0;
+  color: var(--ui-subtle);
+}
+.message-editor {
+  margin-top: 2px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background:
+    linear-gradient(#19234a, #19234a) padding-box,
+    var(--ui-holo-soft) border-box;
+}
+.message-editor:focus-within {
+  background:
+    linear-gradient(#19234a, #19234a) padding-box,
+    var(--ui-holo) border-box;
 }
 .message-editor textarea {
-  width: 100%;
+  min-height: 0;
+  max-height: 360px;
+  height: auto;
   resize: vertical;
-  padding: 12px;
-  color: var(--ui-text);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  font: inherit;
-  line-height: 1.6;
+  padding: 14px 16px 6px;
 }
 .message-editor-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 10px;
+  gap: 8px 12px;
+  padding: 6px 10px 10px 16px;
+}
+.message-editor-note {
+  margin: 0;
+  flex: 1 1 220px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ui-muted);
 }
 .message-editor-actions {
   display: flex;
   gap: 8px;
+  margin-left: auto;
+}
+.message-editor-actions button {
+  font-size: 12px;
+  padding: 8px 14px;
+}
+.message-editor-cancel {
+  border-color: #3a4c8a;
+  background: var(--ui-raised);
+  color: #e3eaff;
 }
 
 .conversation-row .chat-menu-button {
@@ -2104,6 +2119,7 @@ select:focus-visible {
 
 /* Rail: attachments only. */
 .attachments-section {
+  margin-top: 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;

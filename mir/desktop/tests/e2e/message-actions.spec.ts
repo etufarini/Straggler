@@ -31,6 +31,7 @@ test('keyboard editing, cancel and save regenerate replace an earlier exchange',
   await editor.fill('Canceled edit');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.locator('.message.user').first()).toContainText('First question');
+  await expect(edit).toBeFocused();
   await edit.click();
   await editor.fill('Revised question');
   await page.getByRole('button', { name: 'Save and regenerate' }).click();
@@ -103,4 +104,71 @@ test('failed edit persistence preserves the response and the editor text', async
   );
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.locator('.message.assistant .markdown')).toContainText('A local answer.');
+});
+
+test('failed user replacement preserves later turns and the edit without requesting a new response', async ({
+  page,
+}) => {
+  await start(page);
+  await send(page, 'First question');
+  await send(page, 'Later question');
+  await page.getByRole('button', { name: 'Edit message', exact: true }).first().click();
+  const editor = page.getByRole('textbox', { name: 'Edit message', exact: true });
+  await editor.fill('Keep this proposed edit');
+  await page.evaluate(() => localStorage.setItem('mir-fixture-fail-next-save', 'true'));
+  await page.getByRole('button', { name: 'Save and regenerate' }).click();
+  await expect(page.getByText('Conversation not saved', { exact: true })).toBeVisible();
+  await expect(editor).toHaveValue('Keep this proposed edit');
+  await expect(page.locator('.message.assistant')).toHaveCount(2);
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('mir-fixture-normal')!)[0],
+  );
+  expect(saved.messages).toHaveLength(4);
+  expect(saved.messages[0].content).toBe('First question');
+  expect(saved.messages[2].content).toBe('Later question');
+  const request = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('mir-fixture-request')!),
+  );
+  expect(request.messages.at(-1).content).toBe('Later question');
+});
+
+test('an empty stopped response can be edited without running the model', async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'mir-fixture-normal',
+      JSON.stringify([
+        {
+          id: crypto.randomUUID(),
+          title: 'Stopped before text',
+          createdAt: 1,
+          updatedAt: 1,
+          model: null,
+          messages: [
+            {
+              id: crypto.randomUUID(),
+              role: 'user',
+              content: 'A question',
+              reasoning: '',
+              status: 'complete',
+            },
+            {
+              id: crypto.randomUUID(),
+              role: 'assistant',
+              content: '',
+              reasoning: 'Read-only reasoning',
+              status: 'stopped',
+            },
+          ],
+        },
+      ]),
+    ),
+  );
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Stopped before text', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Copy response', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit response', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Edit response', exact: true }).fill('A saved response');
+  await page.getByRole('button', { name: 'Save response' }).click();
+  await expect(page.locator('.message.assistant .markdown')).toHaveText('A saved response');
+  expect(await page.evaluate(() => localStorage.getItem('mir-fixture-request'))).toBeNull();
 });

@@ -21,7 +21,12 @@ export function useAttachments(conversation: ConversationController, server: Ser
   const [dragged, setDragged] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [tokenCounts, setTokenCounts] = useState<Record<string, TokenEstimate>>({});
+  const [measured, setMeasured] = useState<{
+    key: string;
+    run?: string;
+    phase: string;
+    values: Record<string, TokenEstimate>;
+  } | null>(null);
   const current = useRef(conversation);
   current.current = conversation;
   const onDrop = useRef<(event: DragDropEvent) => void>(() => {});
@@ -36,7 +41,13 @@ export function useAttachments(conversation: ConversationController, server: Ser
     void Promise.all(
       attachments.map(async ([id, text]) => [id, await estimateTextTokens(text)] as const),
     ).then((values) => {
-      if (!disposed) setTokenCounts(Object.fromEntries(values));
+      if (!disposed)
+        setMeasured({
+          key: textKey,
+          run: server.runId,
+          phase: server.phase,
+          values: Object.fromEntries(values),
+        });
     });
     return () => {
       disposed = true;
@@ -164,6 +175,10 @@ export function useAttachments(conversation: ConversationController, server: Ser
     ...stored.map((attachment): AttachmentRow => ({ ...attachment, state: 'ready', attachment })),
     ...(pending[conversation.chat.id] ?? []),
   ]);
+  const tokenCounts =
+    measured?.key === textKey && measured.run === server.runId && measured.phase === server.phase
+      ? measured.values
+      : {};
   const estimate = (attachment: Attachment): TokenEstimate =>
     tokenCounts[attachment.id] ?? {
       tokens: approximateTokens(attachment.text),
@@ -171,6 +186,7 @@ export function useAttachments(conversation: ConversationController, server: Ser
     };
   const tokens = stored.reduce((total, attachment) => total + estimate(attachment).tokens, 0);
   return {
+    generating: conversation.generating,
     rows,
     dragged,
     disabled,

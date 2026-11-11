@@ -18,7 +18,9 @@ export default function ConversationMenu({
   const menu = useRef<HTMLDivElement>(null);
   const lastItem = useRef(false);
   const id = useId();
-  const hasReasoning = conversation.messages.some((message) => !!message.reasoning);
+  const hasReasoning = conversation.messages.some(
+    (message) => message.role === 'assistant' && !!message.reasoning,
+  );
 
   function close(restoreFocus = false) {
     setPosition(null);
@@ -99,7 +101,7 @@ export default function ConversationMenu({
             else if (event.key === 'Home') next = 0;
             else if (event.key === 'End') next = items.length - 1;
             else if (event.key === 'Tab') {
-              close();
+              close(true);
               return;
             } else return;
             event.preventDefault();
@@ -109,6 +111,7 @@ export default function ConversationMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             aria-disabled={!onExport}
             onClick={() => {
               if (onExport) {
@@ -123,6 +126,7 @@ export default function ConversationMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             aria-disabled={!onExport || !hasReasoning}
             title={!hasReasoning ? 'This conversation contains no reasoning.' : undefined}
             aria-describedby={!hasReasoning ? `${id}-reasoning` : undefined}
@@ -145,6 +149,7 @@ export default function ConversationMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             className="is-danger"
             aria-label={`Delete ${conversation.title}`}
             onClick={() => {

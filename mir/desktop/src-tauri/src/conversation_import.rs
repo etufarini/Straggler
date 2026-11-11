@@ -91,9 +91,10 @@ pub fn parse(contents: &str) -> Result<ImportedConversation> {
             }
         } else {
             let reasoning = if role == "assistant" {
-                optional_string(value, "reasoning_content")?
-                    .or(optional_string(value, "reasoning")?)
-                    .unwrap_or_default()
+                match optional_string(value, "reasoning_content")? {
+                    Some(reasoning) => reasoning,
+                    None => optional_string(value, "reasoning")?.unwrap_or_default(),
+                }
             } else {
                 String::new()
             };
@@ -148,6 +149,12 @@ mod tests {
         assert!(result.title.is_none());
         assert_eq!(result.messages[0].reasoning, "Alias");
         assert!(parse("[]").unwrap().messages.is_empty());
+    }
+
+    #[test]
+    fn canonical_reasoning_takes_precedence_over_the_alias() {
+        let imported = parse(r#"[{"role":"assistant","content":"Answer","reasoning_content":"Canonical","reasoning":42}]"#).unwrap();
+        assert_eq!(imported.messages[0].reasoning, "Canonical");
     }
 
     #[test]

@@ -11,6 +11,14 @@ export const reviewScreens = [
   'CHAT-06',
   'CHAT-07',
   'CHAT-08',
+  'CHAT-09',
+  'CHAT-10',
+  'CHAT-12',
+  'CHAT-13',
+  'CHAT-15',
+  'CHAT-16',
+  'CHAT-17',
+  'CHAT-18',
   'MODEL-01',
   'SET-01',
   'SET-01B',
@@ -27,9 +35,80 @@ export const reviewScreens = [
   'FOLDER-01',
   'SET-06',
   'BUILD-01',
+  'CHAT-11',
+  'SET-01C',
+  'SET-01D',
+  'SET-02C',
+  'SET-02D',
+  'FOLDER-02',
+  'BUILD-02',
+  'BUILD-03',
+  'BUILD-04',
+  'STATE-02',
+  'STATE-03',
+  'DIALOG-05',
 ];
 
-export async function prepareDesignScreen(page, screen) {
+export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.0.1:1420') {
+  const derived = {
+    'SET-01C': 'SET-01B',
+    'SET-01D': 'SET-01B',
+    'SET-02C': 'SET-02',
+    'SET-02D': 'SET-02B',
+    'FOLDER-02': 'FOLDER-01',
+    'BUILD-02': 'SET-06',
+    'BUILD-03': 'SET-06',
+    'BUILD-04': 'BUILD-01',
+    'STATE-02': 'STATE-01',
+    'STATE-03': 'SET-04',
+    'DIALOG-05': 'SET-04',
+  };
+  if (derived[screen]) {
+    await prepareDesignScreen(page, derived[screen], baseUrl);
+    const button = (name) => page.getByRole('button', { name, exact: true });
+    if (['SET-01C', 'SET-02D', 'BUILD-04'].includes(screen)) {
+      await page.locator('.settings-page').evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+    }
+    if (screen === 'SET-01D')
+      await page
+        .locator('.sampling-details')
+        .evaluate((element) => element.scrollIntoView({ block: 'start' }));
+    if (screen === 'SET-02C')
+      await page
+        .getByText('Advanced: several devices', { exact: true })
+        .evaluate((element) => element.scrollIntoView({ block: 'start' }));
+    if (screen === 'FOLDER-02') {
+      await button('.hidden').click();
+      await expect(page.getByRole('textbox', { name: 'Folder path' })).toHaveValue(
+        '/fixture/.hidden',
+      );
+    }
+    if (['BUILD-02', 'BUILD-03'].includes(screen)) {
+      await button('Install or change build').click();
+      await expect(page.getByRole('alertdialog')).toBeVisible();
+      if (screen === 'BUILD-03') {
+        await page
+          .getByRole('alertdialog')
+          .getByRole('button', { name: 'Build llama.cpp', exact: true })
+          .click();
+        await expect(button('Cancel build')).toBeVisible();
+      }
+    }
+    if (screen === 'STATE-02') {
+      await button('Apply changes').click();
+      await expect(page.getByText('Settings applied.', { exact: true })).toBeVisible();
+    }
+    if (screen === 'STATE-03') {
+      await button('Launch server').click();
+      await button('Settings').click();
+      await button('Model settings').click();
+    }
+    if (screen === 'DIALOG-05') await button('Save to selected').click();
+    return;
+  }
+
   const scenarios = {
     'CHAT-01': 'empty',
     'CHAT-03': 'cancel',
@@ -37,6 +116,8 @@ export async function prepareDesignScreen(page, screen) {
     'CHAT-05': 'interrupted',
     'CHAT-06': 'save-error',
     'CHAT-07': 'model-error',
+    'CHAT-09': 'no-metrics',
+    'CHAT-11': 'history-error',
     'SET-02': 'multiple',
     'SET-02B': 'unknown-memory',
     'SET-03B': 'occupied',
@@ -45,7 +126,7 @@ export async function prepareDesignScreen(page, screen) {
     'BUILD-01': 'build-error',
   };
   await page.goto(
-    `http://127.0.0.1:1420/${screen === 'CHAT-08' ? '' : `?scenario=${scenarios[screen] || 'normal'}`}`,
+    `${baseUrl}/${screen === 'CHAT-08' ? '' : `?scenario=${scenarios[screen] || 'normal'}`}`,
   );
   const button = (name) => page.getByRole('button', { name, exact: true });
   if (screen === 'CHAT-01') await button('Back to chat').click();
@@ -58,6 +139,13 @@ export async function prepareDesignScreen(page, screen) {
     'CHAT-05',
     'CHAT-06',
     'CHAT-07',
+    'CHAT-09',
+    'CHAT-12',
+    'CHAT-13',
+    'CHAT-15',
+    'CHAT-16',
+    'CHAT-17',
+    'CHAT-18',
   ];
   if (conversationScreens.includes(screen)) {
     await button('Launch server').click();
@@ -73,6 +161,61 @@ export async function prepareDesignScreen(page, screen) {
         await expect(button('Stop response')).toHaveCount(0);
       }
     } else await expect(button('Stop response')).toHaveCount(0);
+  }
+  if (screen === 'CHAT-10') {
+    await button('Launch server').click();
+    await expect(page.locator('.local-badge')).toHaveText('Ready');
+    await button('Reasoning').click();
+  }
+  if (screen === 'CHAT-09') await button('Context').click();
+  if (screen === 'CHAT-12') await button('Edit message').click();
+  if (screen === 'CHAT-13') await button('Edit response').click();
+  if (screen === 'CHAT-15') {
+    const expand = button('Expand assistant panel');
+    if (await expand.isVisible()) await expand.click();
+    await page.evaluate(() =>
+      localStorage.setItem(
+        'mir-fixture-attachment-paths',
+        JSON.stringify([
+          '/fixture/meeting-notes.txt',
+          '/fixture/readme.md',
+          '/fixture/project-brief.docx',
+          '/fixture/budget.xlsx',
+          '/fixture/legacy.ppt',
+        ]),
+      ),
+    );
+    await button('Choose files').click();
+    await expect(page.locator('.file-row')).toHaveCount(5);
+    await expect(button('Choose files')).toBeEnabled();
+    await page.evaluate(() => {
+      localStorage.setItem('mir-fixture-reading-paused', 'true');
+      localStorage.setItem('mir-fixture-attachment-paths', '["/fixture/kickoff-slides.pptx"]');
+    });
+    await button('Choose files').click();
+    await expect(page.getByText('Reading text…', { exact: true })).toBeVisible();
+  }
+  if (screen === 'CHAT-16') {
+    const expand = button('Expand assistant panel');
+    if (await expand.isVisible()) await expand.click();
+    await page.evaluate(() =>
+      window.dispatchEvent(
+        new CustomEvent('mir-fixture-drag-drop', {
+          detail: {
+            type: 'enter',
+            paths: ['/fixture/notes.txt', '/fixture/brief.docx'],
+            position: { x: 900, y: 600 },
+          },
+        }),
+      ),
+    );
+    await expect(page.locator('.dropzone')).toHaveClass(/is-dragover/);
+  }
+  if (screen === 'CHAT-17') await button('Options for Explain how local chat works.').click();
+  if (screen === 'CHAT-18') {
+    await page.evaluate(() => localStorage.setItem('mir-fixture-import-error', 'true'));
+    await button('Import conversation').click();
+    await expect(page.getByText('Import failed', { exact: true })).toBeVisible();
   }
   if (screen === 'SERVER-01') await page.getByRole('button', { name: /Server log/ }).click();
   if (screen === 'DIALOG-02') await button('Stop server').click();

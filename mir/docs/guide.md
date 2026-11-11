@@ -93,16 +93,58 @@ reported explicitly. Separate reasoning text is shown only when the server
 returns it; raw thoughts in ordinary content cannot be classified as a reasoning
 stream by Mir.cpp.
 
-The context counter beside Send uses the running server's
-`default_generation_settings.n_ctx`, never training context or edited settings.
-Tokens come from the current chat's last reported response usage, or streaming
-`cache_n + prompt_n + predicted_n` timings. The counter identifies that source;
-it is not a token estimate for an unsent draft. Data from an earlier server run is
-not reused. Missing usage or capacity is unavailable, not zero. Thresholds are
-under 75%, 75% to under 90%, and 90% or more; the displayed percentage is rounded.
-After a context shift, response totals can include discarded tokens and are not a
-measurement of retained KV tokens. Counts above the window are not silently
-rewritten to fit the ring.
+User messages have visible Copy, Edit and Regenerate actions. Save and regenerate
+replaces the following response; editing or regenerating an earlier message also
+removes later turns. The inline editor explains this before saving. Assistant
+responses can be edited as Markdown without running the model. Reasoning stays
+read-only and response statistics continue to describe the generated response.
+Stopped and interrupted partial responses remain editable. A failed save keeps
+the previous response and the editor text available.
+
+The conversation row's options menu contains Export chat…, Export with reasoning…
+and the existing Delete action. Export opens the native save dialog directly and
+writes one UTF-8 `mir.cpp/conversation` version 1 JSON file. Ordinary exports omit
+reasoning. Both exports omit attachments, statistics and request options other
+than the system prompt. Import in the CONVERSATIONS heading accepts that format
+or a plain array of `{role, content}` messages. It accepts `reasoning` as an alias
+of `reasoning_content`. Import always creates and opens a new conversation; it
+never merges or replaces existing history. Invalid files change nothing on disk
+and show Import failed with the filename, explanation, details and Choose another
+file. A valid import during generation stops and saves the partial response before
+opening the imported conversation.
+
+Attachments belong to the conversation and are included with every request as
+blocks labelled with their filenames, in insertion order. Add files in the
+assistant rail using the native chooser or native window drag-and-drop. Supported
+formats are UTF-8 `.txt` and `.md`, `.docx`, `.xlsx` and `.pptx`; files larger than
+10 MiB (shown as 10 MB in the interface) are rejected. Legacy Office formats, PDF,
+CSV and OpenDocument are unsupported. Text extraction reads document text runs,
+slides in declared presentation order, and one labelled tab-separated block per
+spreadsheet sheet. Images, formatting and uncached spreadsheet formula results
+are not extracted.
+
+Original attachment copies are kept under
+`desktop/conversations/<conversation-id>/attachments/` within the XDG data path;
+extracted text is stored in the conversation's atomic JSON record. Download saves
+a copy of the stored original even if the source file has moved. Remove deletes
+the stored original and extracted text; Delete removes the conversation and its
+attachments. The file list sorts by type and name for display while storage and
+requests keep insertion order. Failed reads stay in the current session's file
+list and can be removed; they are not stored as successful attachments.
+
+The Context counter uses the running server's `default_generation_settings.n_ctx`,
+never training context or an edited setting. Without attachments it continues to
+show the last reported response usage or streaming timings. With attachments it
+shows an estimate of the current prompt including attachment text and the draft.
+Text estimates use `/tokenize`; prompt estimates first use `/apply-template` when
+available. If tokenization is unavailable, a clearly marked approximate estimate
+uses UTF-8 bytes divided by four. Template or tokenizer differences can affect
+estimates; Mir.cpp does not silently truncate input. Send is disabled when the
+estimated prompt exceeds the known context size, and a fresh count checks the
+request before generation. Unknown capacity remains unavailable; the server can
+still report a context error. Missing telemetry does not block server controls.
+Thresholds are under 75%, 75% to under 90%, and 90% or more; the displayed
+percentage is rounded. Data from an earlier server run is not reused.
 
 In the pinned upstream contract, context shift is disabled by default. A reply
 can stop at the context limit; an input prompt that already exceeds the window

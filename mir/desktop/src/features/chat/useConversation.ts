@@ -64,6 +64,17 @@ export function useConversation(
   const messageList = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    setContextError('');
+  }, [input, chat.attachments, contextSize]);
+
+  async function flushSaves() {
+    let pending: Promise<void>;
+    do {
+      pending = saveQueue.current;
+      await pending;
+    } while (pending !== saveQueue.current);
+  }
   function updateChat(value: Conversation) {
     chatRef.current = value;
     setChat(value);
@@ -90,7 +101,13 @@ export function useConversation(
   useLayoutEffect(() => {
     const list = messageList.current;
     if (follow.current && list)
-      list.scrollTo({ top: list.scrollHeight, behavior: generating ? 'instant' : 'smooth' });
+      list.scrollTo({
+        top: list.scrollHeight,
+        behavior:
+          generating || matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'instant'
+            : 'smooth',
+      });
   }, [chat, generating]);
   function save(value: Conversation, create = false): Promise<void> {
     const snapshot = structuredClone(value);
@@ -285,10 +302,9 @@ export function useConversation(
       await cancel();
       await sendPromise.current;
       await saveQueue.current;
-      mutation.current = true;
       const value = materializeImport(
         imported,
-        Math.max(Date.now(), ...conversations.map((item) => item.updatedAt + 1)),
+        conversations.reduce((latest, item) => Math.max(latest, item.updatedAt + 1), Date.now()),
       );
       await save(value, true);
       setEditor(null);
@@ -379,6 +395,7 @@ export function useConversation(
   }
 
   return {
+    flushSaves,
     runConversationMutation,
     acceptStoredConversation,
     contextError,

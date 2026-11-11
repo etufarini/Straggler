@@ -67,3 +67,12 @@ node_modules or target in the runtime manifest.
 
 See the [guide](../docs/guide.md#development-on-one-computer) for architecture,
 settings, contracts, preparation, data paths and release maintenance.
+
+R005 file and context checks use generated tiny Office ZIP packages, temporary
+storage, native file IPC and local `/tokenize` responses. The tokenization fixture
+follows the pinned [server tokenization and template contract](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/README.md#post-tokenize-tokenize-a-given-text).
+The dialog implementation follows the [Tauri 2 dialog API](https://v2.tauri.app/plugin/dialog/).
+Browser drag fixtures use the native enter/over/drop/leave payload shape, rather
+than HTML5 drop events. The native smoke test exercises actual storage, download,
+export/import commands and attachment/menu rendering; OS file-dialog interaction
+still requires a manual check on each target platform.
