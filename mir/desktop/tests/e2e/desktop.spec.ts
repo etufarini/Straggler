@@ -40,12 +40,14 @@ test('model selection, Markdown, persistence, reopening and confirmed deletion',
   await page.reload();
   await page.getByRole('button', { name: 'Explain local inference', exact: true }).click();
   await expect(page.locator('.markdown strong')).toHaveText('local');
-  await page.getByRole('button', { name: 'Delete Explain local inference' }).click();
+  await page.getByRole('button', { name: 'Options for Explain local inference' }).click();
+  await page.getByRole('menuitem', { name: 'Delete Explain local inference' }).click();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Explain local inference', exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Delete Explain local inference' }).click();
+  await page.getByRole('button', { name: 'Options for Explain local inference' }).click();
+  await page.getByRole('menuitem', { name: 'Delete Explain local inference' }).click();
   await page.getByRole('alertdialog').getByRole('button').last().click();
   await expect(page.getByText('What’s on your mind?')).toBeVisible();
 });

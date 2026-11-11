@@ -1,11 +1,5 @@
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-  MessageSquare,
-  Trash2,
-  Settings2,
-} from 'lucide-react';
+import ConversationMenu from './ConversationMenu';
+import { PanelLeftClose, PanelLeftOpen, Plus, MessageSquare, Settings2 } from 'lucide-react';
 import { newConversation } from '../domain/types';
 import { invoke } from '../services/desktop';
 import type { WorkspaceController } from './useWorkspace';
@@ -92,11 +86,10 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
               <MessageSquare size={15} />
               <span>{value.title}</span>
             </button>
-            <button
-              className="delete-chat"
-              aria-label={`Delete ${value.title}`}
+            <ConversationMenu
+              conversation={value}
               disabled={editingBusy || generating}
-              onClick={() =>
+              onDelete={() =>
                 setConfirmation({
                   title: 'Delete conversation?',
                   actionLabel: 'Delete conversation',
@@ -110,9 +103,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
                   },
                 })
               }
-            >
-              <Trash2 size={14} />
-            </button>
+            />
           </div>
         ))}
       </div>
