@@ -1,6 +1,7 @@
 mod builds;
 mod chat;
 pub mod diagnostics;
+pub mod files;
 pub mod history;
 pub mod model;
 pub mod preferences;

@@ -291,6 +291,11 @@ export function createFixture(scenario: Scenario) {
         }
         return configuration();
       }
+      case 'write_export':
+        if (localStorage.getItem('mir-fixture-write-error'))
+          throw new Error('Destination is not writable');
+        localStorage.setItem('mir-fixture-export', String(args.contents));
+        return;
       case 'history_list':
         if (
           scenario === 'history-error' &&
@@ -376,5 +381,10 @@ export function createFixture(scenario: Scenario) {
         throw new Error(`Unexpected fixture command: ${command}`);
     }
   }
-  return { invoke };
+  function chooseSavePath(defaultPath: string) {
+    localStorage.setItem('mir-fixture-save-name', defaultPath);
+    const selected = localStorage.getItem('mir-fixture-save-path');
+    return selected === 'cancel' ? null : selected || '/fixture/export.json';
+  }
+  return { invoke, chooseSavePath };
 }

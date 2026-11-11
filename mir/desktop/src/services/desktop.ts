@@ -1,3 +1,4 @@
+import { save as nativeSave } from '@tauri-apps/plugin-dialog';
 import {
   Channel as NativeChannel,
   invoke as nativeInvoke,
@@ -35,6 +36,7 @@ export type DesktopCommand =
   | 'stop_server'
   | 'generate'
   | 'cancel_generation'
+  | 'write_export'
   | 'history_list'
   | 'history_save'
   | 'history_delete';
@@ -124,4 +126,20 @@ export async function watchWindowVisibility(
     clearInterval(timer);
     events.forEach((unlisten) => unlisten());
   };
+}
+
+export async function saveConversationExport(
+  defaultPath: string,
+  contents: string,
+): Promise<boolean> {
+  const path = fixture
+    ? (await fixture).chooseSavePath(defaultPath)
+    : await nativeSave({
+        title: 'Export conversation',
+        defaultPath,
+        filters: [{ name: 'JSON conversation', extensions: ['json'] }],
+      });
+  if (!path) return false;
+  await invoke('write_export', { path, contents });
+  return true;
 }

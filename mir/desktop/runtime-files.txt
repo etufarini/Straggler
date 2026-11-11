@@ -14,6 +14,7 @@ desktop/src-tauri/icons/icon.svg
 desktop/src-tauri/src/builds.rs
 desktop/src-tauri/src/chat.rs
 desktop/src-tauri/src/diagnostics.rs
+desktop/src-tauri/src/files.rs
 desktop/src-tauri/src/history.rs
 desktop/src-tauri/src/lib.rs
 desktop/src-tauri/src/main.rs
@@ -38,6 +39,7 @@ desktop/src/components/Popover.tsx
 desktop/src/components/ReasoningControls.tsx
 desktop/src/components/statusLabels.ts
 desktop/src/domain/chat.ts
+desktop/src/domain/conversationExport.ts
 desktop/src/domain/errors.ts
 desktop/src/domain/messageActions.ts
 desktop/src/domain/presence.ts

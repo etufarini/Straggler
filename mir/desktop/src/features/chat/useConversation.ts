@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Channel, invoke, isTauri } from '../../services/desktop';
+import { Channel, invoke, isTauri, saveConversationExport } from '../../services/desktop';
 import { newConversation, requestMessages } from '../../domain/types';
 import { inheritedChatOptions, resolveChatOptions } from '../../domain/chat';
 import { replaceMessage, regenerationHistory } from '../../domain/messageActions';
+import { exportFileName, serializeConversation } from '../../domain/conversationExport';
 import { errorDetail } from '../../domain/errors';
 import type {
   Conversation,
@@ -22,6 +23,13 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
   const [editingBusy, setEditingBusy] = useState(false);
   const mutation = useRef(false);
   const [storageError, setStorageError] = useState('');
+  const [fileError, setFileError] = useState('');
+  const [fileNotice, setFileNotice] = useState('');
+  useEffect(() => {
+    if (!fileNotice) return;
+    const timer = setTimeout(() => setFileNotice(''), 3500);
+    return () => clearTimeout(timer);
+  }, [fileNotice]);
   const [historyReady, setHistoryReady] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generationPhase, setGenerationPhase] = useState<'waiting' | 'reasoning' | 'generating'>(
@@ -204,6 +212,23 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
     }
   }
 
+  async function exportChat(value: Conversation, includesReasoning: boolean) {
+    setFileError('');
+    try {
+      const snapshot = value.id === chatRef.current.id ? chatRef.current : value;
+      const contents = serializeConversation(
+        snapshot,
+        includesReasoning,
+        new Date().toISOString(),
+        settings,
+      );
+      if (await saveConversationExport(exportFileName(snapshot.title), contents))
+        setFileNotice('Conversation exported.');
+    } catch (error) {
+      setFileError(errorDetail(error).message);
+    }
+  }
+
   function beginEdit(message: Message) {
     if (requestRef.current || mutation.current) return;
     setEditor({ messageId: message.id, text: message.content });
@@ -260,6 +285,10 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
   }
 
   return {
+    exportChat,
+    fileError,
+    setFileError,
+    fileNotice,
     editor,
     setEditor,
     editingBusy,

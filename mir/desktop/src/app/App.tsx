@@ -164,11 +164,12 @@ export default function App() {
             </Feedback>
           </div>
         )}
-        {storageError && panel === 'settings' && (
-          <div className="workspace-feedback">
-            <StorageFeedback controller={controller} />
-          </div>
-        )}
+        {(storageError || controller.fileError || controller.fileNotice) &&
+          panel === 'settings' && (
+            <div className="workspace-feedback">
+              <StorageFeedback controller={controller} />
+            </div>
+          )}
 
         {panel === 'settings' && config && draft ? (
           <SettingsPage

@@ -168,6 +168,15 @@ fn cancel_generation(request_id: Uuid, state: State<'_, Application>) -> Result<
 }
 
 #[tauri::command]
+async fn write_export(path: PathBuf, contents: String) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        mir_desktop::files::write_atomic(&path, contents.as_bytes())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn history_list(state: State<'_, Application>) -> Result<Vec<Conversation>> {
     let runtime = runtime(&state)?;
     tauri::async_runtime::spawn_blocking(move || runtime.history.list())
@@ -285,7 +294,7 @@ fn main() {
         println!("Mir.cpp desktop {}", env!("CARGO_PKG_VERSION"));
         return;
     }
-    let builder = tauri::Builder::default();
+    let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
     #[cfg(all(feature = "native-tests", debug_assertions))]
     let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
     let app = builder
@@ -314,6 +323,7 @@ fn main() {
             server_details,
             generate,
             cancel_generation,
+            write_export,
             history_list,
             history_save,
             history_delete,

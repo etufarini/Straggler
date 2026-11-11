@@ -88,6 +88,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             </button>
             <ConversationMenu
               conversation={value}
+              onExport={(includesReasoning) => void controller.exportChat(value, includesReasoning)}
               disabled={editingBusy || generating}
               onDelete={() =>
                 setConfirmation({
