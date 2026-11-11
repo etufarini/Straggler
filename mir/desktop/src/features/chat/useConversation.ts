@@ -116,7 +116,7 @@ export function useConversation(
       .then(async () => {
         await invoke(create ? 'history_create' : 'history_save', { conversation: snapshot });
         if (mounted.current) {
-          setStorageError('');
+          if (historyReady) setStorageError('');
           setConversations((current) =>
             [snapshot, ...current.filter((c) => c.id !== snapshot.id)].sort(
               (a, b) => b.updatedAt - a.updatedAt,

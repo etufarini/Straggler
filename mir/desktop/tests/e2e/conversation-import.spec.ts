@@ -81,3 +81,17 @@ test('invalid import preserves generation; a valid import stops and saves its pa
   expect(original.messages[1].status).toBe('stopped');
   expect(original.messages[1].content).toContain('A **local** answer');
 });
+
+test('a successful import keeps history-loading feedback until history recovers', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=history-error');
+  await expect(page.getByText('Conversation history unavailable', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Import conversation', exact: true }).click();
+  await expect(page.locator('.message.user')).toContainText('Imported question');
+  await expect(page.getByText('Conversation history unavailable', { exact: true })).toBeVisible();
+  await page.evaluate(() => localStorage.setItem('mir-fixture-history-recovered', 'true'));
+  await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
+  await expect(page.getByText('Conversation history unavailable', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.message.user')).toContainText('Imported question');
+});

@@ -77,7 +77,7 @@ server with temporary HOME/XDG directories. No real models, GPUs, inference,
 personal configuration or local system package installation were used.
 
 Final automated counts: 40 frontend unit tests, 21 Rust unit tests and 12 Rust
-integration tests, and 104 Chromium/WebKit browser tests. Desktop verification
+integration tests, and 106 Chromium/WebKit browser tests. Desktop verification
 includes Prettier, ESLint, TypeScript/Vite, cargo fmt and no-default-feature Clippy.
 The additional default-feature Clippy check covers desktop command handlers.
 The native smoke test exercises real Tauri/WebKit, embedded resources, IPC,
@@ -165,3 +165,7 @@ After the platform traversal correction, all R005 keyboard checks passed on
 macOS CI. That run encountered a separate existing renderer still-paint timing
 assertion; the renderer was left unchanged and the final workflow was rerun on
 the final source revision.
+
+Successful file operations preserve a prior history-loading error until loading
+actually recovers. A dedicated import/history regression verifies that a valid
+new conversation does not hide unavailable history or overwrite its files.
