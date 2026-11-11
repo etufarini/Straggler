@@ -104,7 +104,7 @@ export interface Message {
 export interface Attachment {
   id: string;
   name: string;
-  extension: 'txt' | 'md' | 'docx' | 'xlsx' | 'pptx';
+  extension: 'txt' | 'md' | 'docx' | 'xlsx' | 'pptx' | 'pdf';
   size: number;
   text: string;
 }

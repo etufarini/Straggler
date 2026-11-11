@@ -30,7 +30,7 @@ pub struct ExtractedFile {
 }
 
 pub fn supported(extension: &str) -> bool {
-    matches!(extension, "txt" | "md" | "docx" | "xlsx" | "pptx")
+    matches!(extension, "txt" | "md" | "docx" | "xlsx" | "pptx" | "pdf")
 }
 
 pub fn extract(path: &Path) -> Result<ExtractedFile> {
@@ -49,7 +49,7 @@ pub fn extract(path: &Path) -> Result<ExtractedFile> {
         return Err(if let Some((family, replacement)) = legacy {
             format!("{family} 97–2003 (.{extension}) is not supported. Save it as .{replacement} and add it again.")
         } else {
-            "This file type is not supported. Choose .txt, .md, .docx, .xlsx or .pptx.".into()
+            "This file type is not supported. Choose .txt, .md, .docx, .xlsx, .pptx or .pdf.".into()
         });
     }
     let name = path
@@ -88,6 +88,7 @@ pub fn extract(path: &Path) -> Result<ExtractedFile> {
         }
         "pptx" => presentation_text(&original)?,
         "xlsx" => spreadsheet_text(&original)?,
+        "pdf" => pdf_text(&original)?,
         _ => unreachable!(),
     };
     Ok(ExtractedFile {
@@ -100,6 +101,22 @@ pub fn extract(path: &Path) -> Result<ExtractedFile> {
         },
         original,
     })
+}
+
+fn pdf_text(original: &[u8]) -> Result<String> {
+    let text = pdf_extract::extract_text_from_mem(original).map_err(|error| match error {
+        pdf_extract::OutputError::PdfError(pdf_extract::Error::Decryption(
+            pdf_extract::encryption::DecryptionError::IncorrectPassword,
+        )) => "This PDF requires a password. Save an unlocked copy and add it again.".into(),
+        _ => format!("Cannot extract text from this PDF: {error}"),
+    })?;
+    if text.trim().is_empty() {
+        return Err(
+            "This PDF has no extractable text. Scanned PDFs need OCR before they can be attached."
+                .into(),
+        );
+    }
+    Ok(text)
 }
 
 fn read_part(archive: &mut ZipArchive<Cursor<&[u8]>>, name: &str) -> Result<String> {
@@ -260,6 +277,11 @@ fn spreadsheet_text(original: &[u8]) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::history::{Conversation, History};
+    use pdf_extract::{
+        content::{Content, Operation},
+        dictionary, Document, Object, Stream,
+    };
     use std::{fs, io::Write};
     use zip::{write::SimpleFileOptions, ZipWriter};
 
@@ -272,6 +294,154 @@ mod tests {
             writer.write_all(contents.as_bytes()).unwrap();
         }
         writer.finish().unwrap();
+    }
+
+    fn pdf_document(pages: &[&[u8]]) -> Document {
+        let mut document = Document::with_version("1.4");
+        let pages_id = document.new_object_id();
+        let font = document.add_object(dictionary! {
+            "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica",
+            "Encoding" => "WinAnsiEncoding",
+        });
+        let mut children = Vec::<Object>::new();
+        for text in pages {
+            let content = Content {
+                operations: vec![
+                    Operation::new("BT", vec![]),
+                    Operation::new("Tf", vec!["F1".into(), 12.into()]),
+                    Operation::new("Td", vec![40.into(), 750.into()]),
+                    Operation::new("Tj", vec![Object::string_literal(*text)]),
+                    Operation::new("ET", vec![]),
+                ],
+            };
+            let content =
+                document.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+            let page = document.add_object(dictionary! {
+                "Type" => "Page", "Parent" => pages_id, "Contents" => content,
+            });
+            children.push(page.into());
+        }
+        document.objects.insert(
+            pages_id,
+            dictionary! {
+                "Type" => "Pages", "Count" => children.len() as i64, "Kids" => children,
+                "Resources" => dictionary! {"Font" => dictionary! {"F1" => font}},
+                "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+            }
+            .into(),
+        );
+        let catalog = document.add_object(dictionary! {"Type" => "Catalog", "Pages" => pages_id});
+        document.trailer.set("Root", catalog);
+        document.compress();
+        document
+    }
+
+    #[test]
+    fn pdf_text_keeps_page_order_non_ascii_text_and_original_bytes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("report.PDF");
+        pdf_document(&[b"First page: caf\xe9", b"Second page: the final paragraph"])
+            .save(&path)
+            .unwrap();
+        let extracted = extract(&path).unwrap();
+        let text = &extracted.attachment.text;
+        assert!(text.contains("First page: café"));
+        assert!(text.find("First page").unwrap() < text.find("Second page").unwrap());
+        assert_eq!(extracted.attachment.extension, "pdf");
+        assert_eq!(extracted.attachment.name, "report.PDF");
+        assert_eq!(extracted.attachment.size, extracted.original.len() as u64);
+        assert_eq!(extracted.original, fs::read(path).unwrap());
+    }
+
+    #[test]
+    fn pdf_failures_preserve_history_and_valid_files_round_trip() {
+        let directory = tempfile::tempdir().unwrap();
+        let storage = directory.path().join("history");
+        let history = History::new(storage.clone()).unwrap();
+        let chat = Conversation {
+            id: Uuid::new_v4(),
+            title: "PDF attachments".into(),
+            created_at: 1,
+            updated_at: 1,
+            model: None,
+            messages: vec![],
+            attachments: vec![],
+            options: None,
+        };
+        history.save(&chat).unwrap();
+        let record = storage.join(format!("{}.json", chat.id));
+        let saved = fs::read(&record).unwrap();
+        let source = directory.path().join("invalid.pdf");
+        fs::write(&source, b"%PDF-1.4\nbroken").unwrap();
+        assert!(history
+            .add_attachment(chat.id, &source)
+            .unwrap_err()
+            .contains("Cannot extract text"));
+        File::create(&source)
+            .unwrap()
+            .set_len(MAX_FILE_BYTES + 1)
+            .unwrap();
+        assert!(history
+            .add_attachment(chat.id, &source)
+            .unwrap_err()
+            .contains("10 MB"));
+        pdf_document(&[b""]).save(&source).unwrap();
+        assert!(history
+            .add_attachment(chat.id, &source)
+            .unwrap_err()
+            .contains("no extractable text"));
+
+        let mut protected = pdf_document(&[b"Password-protected text"]);
+        let file_id = Object::string_literal(b"0123456789abcdef".as_slice());
+        protected.trailer.set("ID", vec![file_id.clone(), file_id]);
+        let encryption =
+            pdf_extract::EncryptionState::try_from(pdf_extract::EncryptionVersion::V2 {
+                document: &protected,
+                owner_password: "owner",
+                user_password: "reader",
+                key_length: 128,
+                permissions: pdf_extract::Permissions::COPYABLE,
+            })
+            .unwrap();
+        protected.encrypt(&encryption).unwrap();
+        protected.save(&source).unwrap();
+        assert!(history
+            .add_attachment(chat.id, &source)
+            .unwrap_err()
+            .contains("requires a password"));
+        assert_eq!(fs::read(record).unwrap(), saved);
+        assert_eq!(fs::read_dir(&storage).unwrap().count(), 1);
+        assert!(history.list().unwrap()[0].attachments.is_empty());
+
+        pdf_document(&[b"Stored PDF text"]).save(&source).unwrap();
+        let original = fs::read(&source).unwrap();
+        let attached = history.add_attachment(chat.id, &source).unwrap();
+        let attachment = &attached.attachments[0];
+        fs::remove_file(source).unwrap();
+        assert!(history.list().unwrap()[0].attachments[0]
+            .text
+            .contains("Stored PDF text"));
+        let destination = directory.path().join("download.pdf");
+        history
+            .download_attachment(chat.id, attachment.id, &destination)
+            .unwrap();
+        assert_eq!(fs::read(destination).unwrap(), original);
+        history.remove_attachment(chat.id, attachment.id).unwrap();
+        assert!(history.list().unwrap()[0].attachments.is_empty());
+        assert_eq!(
+            fs::read_dir(storage.join(chat.id.to_string()).join("attachments"))
+                .unwrap()
+                .count(),
+            0
+        );
+        let replacement = directory.path().join("replacement.pdf");
+        pdf_document(&[b"Delete with the conversation"])
+            .save(&replacement)
+            .unwrap();
+        history.add_attachment(chat.id, &replacement).unwrap();
+        history.delete(chat.id).unwrap();
+        assert!(history.list().unwrap().is_empty());
+        assert!(!storage.join(chat.id.to_string()).exists());
     }
 
     #[test]
@@ -297,7 +467,7 @@ mod tests {
             assert!(error.contains("97–2003"));
             assert!(error.contains(&format!("Save it as .{extension}x")));
         }
-        assert!(extract(&directory.path().join("unsupported.pdf"))
+        assert!(extract(&directory.path().join("unsupported.csv"))
             .unwrap_err()
             .contains("not supported"));
     }

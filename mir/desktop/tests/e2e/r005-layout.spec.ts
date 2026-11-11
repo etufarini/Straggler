@@ -14,7 +14,7 @@ for (const width of [960, 1200, 1440]) {
     const expand = page.getByRole('button', { name: 'Expand assistant panel' });
     if (await expand.isVisible()) await expand.click();
     const longName =
-      'A document with a very long name that should truncate in the attachment rail.docx';
+      'A document with a very long name that should truncate in the attachment rail.pdf';
     await page.evaluate(
       (name) =>
         localStorage.setItem(

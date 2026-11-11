@@ -9,6 +9,7 @@ import type { AttachmentRow } from '../src/domain/attachments';
 import type { Attachment, Message } from '../src/domain/types';
 
 const files: Attachment[] = [
+  { id: 'pdf', name: 'report.pdf', extension: 'pdf', size: 100, text: 'PDF text' },
   { id: 'md', name: 'b.md', extension: 'md', size: 12, text: 'Markdown text' },
   { id: 'txt', name: 'a.txt', extension: 'txt', size: 12, text: 'Plain text' },
 ];
@@ -20,9 +21,15 @@ describe('conversation attachments', () => {
       ...files.map((attachment): AttachmentRow => ({ ...attachment, state: 'ready' })),
       { id: 'other', name: 'c.txt', extension: 'txt', size: 1, state: 'reading' },
     ];
-    expect(sortAttachmentRows(rows).map((row) => row.id)).toEqual(['txt', 'other', 'md', 'failed']);
+    expect(sortAttachmentRows(rows).map((row) => row.id)).toEqual([
+      'txt',
+      'other',
+      'md',
+      'pdf',
+      'failed',
+    ]);
     expect(rows[0].id).toBe('failed');
-    expect(files.map((file) => file.id)).toEqual(['md', 'txt']);
+    expect(files.map((file) => file.id)).toEqual(['pdf', 'md', 'txt']);
   });
   it('delimits attachment text by file name in deterministic insertion order on every request', () => {
     const messages: Message[] = [
@@ -31,6 +38,8 @@ describe('conversation attachments', () => {
     const first = composeRequest(messages, 'Instructions', files);
     expect(first[0]).toEqual({ role: 'system', content: 'Instructions' });
     expect(first[1].content).toBe(attachmentBlocks(files) + '\n\nQuestion');
+    expect(first[1].content).toContain('--- BEGIN ATTACHMENT "report.pdf" ---\nPDF text\n');
+    expect(first[1].content.indexOf('report.pdf')).toBeLessThan(first[1].content.indexOf('b.md'));
     expect(first[1].content.indexOf('b.md')).toBeLessThan(first[1].content.indexOf('a.txt'));
     expect(composeRequest(messages, 'Instructions', files)).toEqual(first);
     expect(messages[0].content).toBe('Question');

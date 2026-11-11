@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useId } from 'react';
 import Feedback from '../../components/Feedback';
+import { attachmentTypes } from '../../domain/attachments';
 import { fileName } from '../../domain/types';
 import type { AttachmentController } from './useAttachments';
 
@@ -19,6 +20,7 @@ const icons = {
   docx: FileType,
   xlsx: FileSpreadsheet,
   pptx: FileChartColumn,
+  pdf: FileText,
 };
 export default function AttachmentSection({ controller }: { controller: AttachmentController }) {
   const id = useId();
@@ -122,7 +124,9 @@ export default function AttachmentSection({ controller }: { controller: Attachme
                 : 'or choose files'}
           </span>
           {!controller.rows.length && (
-            <small className="dropzone-types">.txt · .md · .docx · .xlsx · .pptx</small>
+            <small className="dropzone-types">
+              {attachmentTypes.map((extension) => `.${extension}`).join(' · ')}
+            </small>
           )}
         </span>
       </button>

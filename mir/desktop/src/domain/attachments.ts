@@ -1,7 +1,7 @@
 import { requestMessages } from './types';
 import type { Attachment, Message } from './types';
 
-export const attachmentTypes = ['txt', 'md', 'docx', 'xlsx', 'pptx'] as const;
+export const attachmentTypes = ['txt', 'md', 'docx', 'xlsx', 'pptx', 'pdf'] as const;
 export type AttachmentRow = {
   id: string;
   name: string;

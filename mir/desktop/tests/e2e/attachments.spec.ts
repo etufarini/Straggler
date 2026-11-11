@@ -20,22 +20,25 @@ test('CHAT-10 can attach before the first message; CHAT-15 sorts files and expos
 }) => {
   await ready(page);
   await expect(page.getByText('Drop files here', { exact: true })).toBeVisible();
+  await expect(page.locator('.dropzone-types')).toContainText('.pdf');
   await choose(page, [
     '/fixture/z.md',
     '/fixture/a.txt',
     '/fixture/brief.docx',
     '/fixture/budget.xlsx',
     '/fixture/slides.pptx',
+    '/fixture/report.PDF',
     '/fixture/legacy.ppt',
   ]);
   const rows = page.locator('.file-row');
-  await expect(rows).toHaveCount(6);
+  await expect(rows).toHaveCount(7);
   await expect(page.locator('.file-name')).toHaveText([
     'a.txt',
     'z.md',
     'brief.docx',
     'budget.xlsx',
     'slides.pptx',
+    'report.PDF',
     'legacy.ppt',
   ]);
   await expect(
@@ -43,24 +46,31 @@ test('CHAT-10 can attach before the first message; CHAT-15 sorts files and expos
   ).toBeVisible();
   await expect(page.locator('.type-docx .file-tile')).toHaveCSS('color', 'rgb(127, 176, 255)');
   await expect(page.locator('.type-xlsx .file-ext')).toHaveCSS('color', 'rgb(95, 211, 154)');
-  await expect(page.getByRole('button', { name: 'Download a.txt' })).toBeVisible();
-  await page.getByRole('button', { name: 'Download a.txt' }).click();
+  await expect(page.locator('.type-pdf .file-ext')).toHaveText('.pdf');
+  await expect(page.locator('.type-pdf .file-tile')).toHaveCSS('color', 'rgb(255, 143, 159)');
+  await expect(page.getByRole('button', { name: 'Download report.PDF' })).toBeVisible();
+  await page.getByRole('button', { name: 'Download report.PDF' }).click();
   await expect(page.getByText('Attachment downloaded.', { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('mir-fixture-save-name'))).toBe('a.txt');
+  expect(await page.evaluate(() => localStorage.getItem('mir-fixture-save-name'))).toBe(
+    'report.PDF',
+  );
   await page.getByRole('button', { name: 'Remove legacy.ppt' }).click();
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(6);
   await page.getByRole('button', { name: 'Remove a.txt' }).click();
-  await expect(rows).toHaveCount(4);
+  await expect(rows).toHaveCount(5);
   await page.reload();
   await page.getByRole('button', { name: 'New conversation', exact: true }).click();
-  await expect(rows).toHaveCount(4);
+  await expect(rows).toHaveCount(5);
+  await expect(page.locator('.type-pdf .file-name')).toHaveText('report.PDF');
+  await page.getByRole('button', { name: 'Remove report.PDF' }).click();
+  await expect(page.locator('.type-pdf')).toHaveCount(0);
 });
 
 test('CHAT-02 includes attachment blocks in every request and Context includes their text', async ({
   page,
 }) => {
   await ready(page);
-  await choose(page, ['/fixture/notes.txt']);
+  await choose(page, ['/fixture/report.pdf']);
   await expect(page.locator('.file-row.is-ready')).toHaveCount(1);
   await page.getByRole('button', { name: 'Context', exact: true }).click();
   await expect(
@@ -74,8 +84,8 @@ test('CHAT-02 includes attachment blocks in every request and Context includes t
     const request = await page.evaluate(() =>
       JSON.parse(localStorage.getItem('mir-fixture-request')!),
     );
-    expect(request.messages[0].content).toContain('--- BEGIN ATTACHMENT "notes.txt" ---');
-    expect(request.messages[0].content).toContain('Extracted fixture text from notes.txt.');
+    expect(request.messages[0].content).toContain('--- BEGIN ATTACHMENT "report.pdf" ---');
+    expect(request.messages[0].content).toContain('Extracted fixture text from report.pdf.');
   }
   await expect(page.getByText('Add files', { exact: true })).toBeVisible();
 });

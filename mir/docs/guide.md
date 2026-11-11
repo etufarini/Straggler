@@ -116,11 +116,13 @@ opening the imported conversation.
 Attachments belong to the conversation and are included with every request as
 blocks labelled with their filenames, in insertion order. Add files in the
 assistant rail using the native chooser or native window drag-and-drop. Supported
-formats are UTF-8 `.txt` and `.md`, `.docx`, `.xlsx` and `.pptx`; files larger than
-10 MiB (shown as 10 MB in the interface) are rejected. Legacy Office formats, PDF,
+formats are UTF-8 `.txt` and `.md`, `.docx`, `.xlsx`, `.pptx` and `.pdf`; files larger
+than 10 MiB (shown as 10 MB in the interface) are rejected. Legacy Office formats,
 CSV and OpenDocument are unsupported. Text extraction reads document text runs,
-slides in declared presentation order, and one labelled tab-separated block per
-spreadsheet sheet. Images, formatting and uncached spreadsheet formula results
+slides in declared presentation order, one labelled tab-separated block per
+spreadsheet sheet, and PDF text in page order. PDFs without extractable text need
+OCR before attachment; PDFs that require a password must first be saved as
+unlocked copies. Images, formatting and uncached spreadsheet formula results
 are not extracted.
 
 Original attachment copies are kept under

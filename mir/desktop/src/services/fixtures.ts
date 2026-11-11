@@ -10,6 +10,7 @@ import type {
   ServerDetails,
 } from '../domain/types';
 import { emptyServer } from '../domain/types';
+import { attachmentTypes } from '../domain/attachments';
 
 export type Scenario =
   | 'normal'
@@ -316,17 +317,17 @@ export function createFixture(scenario: Scenario) {
         const conversation = structuredClone(history.find((item) => item.id === args.id));
         if (!conversation) throw new Error('Conversation does not exist');
         const name = String(args.path).split('/').at(-1)!;
-        const extension = name.split('.').at(-1)!;
-        if (extension === 'ppt')
+        const suffix = name.split('.').at(-1)!.toLowerCase();
+        if (suffix === 'ppt')
           throw new Error(
             'PowerPoint 97–2003 (.ppt) is not supported. Save it as .pptx and add it again.',
           );
-        if (!['txt', 'md', 'docx', 'xlsx', 'pptx'].includes(extension))
-          throw new Error('This file type is not supported.');
+        const extension = attachmentTypes.find((type) => type === suffix);
+        if (!extension) throw new Error('This file type is not supported.');
         const text = `Extracted fixture text from ${name}.`;
         conversation.attachments = [
           ...(conversation.attachments || []),
-          { id: crypto.randomUUID(), name, extension: extension as 'txt', size: 1234, text },
+          { id: crypto.randomUUID(), name, extension, size: 1234, text },
         ];
         conversation.updatedAt = Date.now();
         history[history.findIndex((item) => item.id === args.id)] = conversation;

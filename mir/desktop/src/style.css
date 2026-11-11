@@ -2239,6 +2239,9 @@ select:focus-visible {
 .file-row.type-pptx {
   --file-color: #ff9f73;
 }
+.file-row.type-pdf {
+  --file-color: #ff8f9f;
+}
 .file-row.is-error {
   --file-color: #edb8b2;
   align-items: start;

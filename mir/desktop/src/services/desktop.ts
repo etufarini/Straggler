@@ -1,6 +1,6 @@
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
-import { approximateTokens } from '../domain/attachments';
+import { approximateTokens, attachmentTypes } from '../domain/attachments';
 import type { Attachment, Conversation } from '../domain/types';
 import { save as nativeSave, open as nativeOpen } from '@tauri-apps/plugin-dialog';
 import {
@@ -187,9 +187,7 @@ export async function chooseAttachmentFiles(): Promise<string[]> {
     title: 'Attach files',
     multiple: true,
     directory: false,
-    filters: [
-      { name: 'Text and Office documents', extensions: ['txt', 'md', 'docx', 'xlsx', 'pptx'] },
-    ],
+    filters: [{ name: 'Documents', extensions: [...attachmentTypes] }],
   });
   return paths || [];
 }

@@ -25,6 +25,28 @@ const binary =
   process.env.MIR_TEST_NATIVE || path.join(desktop, 'src-tauri/target/debug/mir-desktop');
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+function pdfFixture() {
+  const text = 'BT /F1 12 Tf 40 750 Td (Native PDF attachment text) Tj ET';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${Buffer.byteLength(text)} >>\nstream\n${text}\nendstream`,
+  ];
+  let document = '%PDF-1.4\n';
+  const offsets = [];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(document));
+    document += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(document);
+  document += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  document += offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  document += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(document);
+}
+
 async function freePort() {
   const socket = net.createServer();
   socket.listen(0, '127.0.0.1');
@@ -259,18 +281,25 @@ try {
         `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)})`,
       );
     await invokeNative('history_create', { conversation: attachmentChat });
-    const source = path.join(stage, 'attachment.txt');
-    await writeFile(source, 'Native attachment text ☕');
-    const attached = await invokeNative('attachment_add', { id: attachmentChatId, path: source });
-    assert.equal(attached.attachments[0].text, 'Native attachment text ☕');
-    await rm(source);
-    const downloaded = path.join(stage, 'download.txt');
-    await invokeNative('attachment_download', {
-      id: attachmentChatId,
-      attachmentId: attached.attachments[0].id,
-      destination: downloaded,
-    });
-    assert.equal(await readFile(downloaded, 'utf8'), 'Native attachment text ☕');
+    for (const [extension, original, text] of [
+      ['txt', Buffer.from('Native attachment text ☕'), 'Native attachment text ☕'],
+      ['pdf', pdfFixture(), 'Native PDF attachment text'],
+    ]) {
+      const source = path.join(stage, `attachment.${extension}`);
+      await writeFile(source, original);
+      const attached = await invokeNative('attachment_add', { id: attachmentChatId, path: source });
+      const attachment = attached.attachments.at(-1);
+      assert.equal(attachment.extension, extension);
+      assert.ok(attachment.text.includes(text));
+      await rm(source);
+      const downloaded = path.join(stage, `download.${extension}`);
+      await invokeNative('attachment_download', {
+        id: attachmentChatId,
+        attachmentId: attachment.id,
+        destination: downloaded,
+      });
+      assert.deepEqual(await readFile(downloaded), original);
+    }
     const exported = path.join(stage, 'export.json');
     await invokeNative('write_export', {
       path: exported,
@@ -287,6 +316,13 @@ try {
     await until(
       () => evaluate('document.querySelector(".file-name")?.textContent === "attachment.txt"'),
       'native attachment rail',
+    );
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".type-pdf .file-name")?.textContent === "attachment.pdf"',
+        ),
+      'native PDF attachment rail',
     );
     await evaluate(
       `document.querySelector('[aria-label="Options for Attachment contract"]').click()`,
