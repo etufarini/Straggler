@@ -1,3 +1,4 @@
+pub mod attachments;
 mod builds;
 mod chat;
 pub mod conversation_import;

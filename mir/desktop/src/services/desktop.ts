@@ -1,3 +1,4 @@
+import type { Attachment, Conversation } from '../domain/types';
 import { save as nativeSave, open as nativeOpen } from '@tauri-apps/plugin-dialog';
 import {
   Channel as NativeChannel,
@@ -36,6 +37,9 @@ export type DesktopCommand =
   | 'stop_server'
   | 'generate'
   | 'cancel_generation'
+  | 'attachment_add'
+  | 'attachment_remove'
+  | 'attachment_download'
   | 'read_conversation_import'
   | 'history_create'
   | 'write_export'
@@ -154,4 +158,19 @@ export async function chooseConversationImport(): Promise<string | null> {
     directory: false,
     filters: [{ name: 'JSON conversation', extensions: ['json'] }],
   });
+}
+
+export async function addAttachment(id: string, path: string) {
+  return invoke<Conversation>('attachment_add', { id, path });
+}
+export async function removeAttachment(id: string, attachmentId: string) {
+  return invoke<Conversation>('attachment_remove', { id, attachmentId });
+}
+export async function downloadAttachment(id: string, attachment: Attachment): Promise<boolean> {
+  const destination = fixture
+    ? (await fixture).chooseSavePath(attachment.name)
+    : await nativeSave({ title: 'Download attachment', defaultPath: attachment.name });
+  if (!destination) return false;
+  await invoke('attachment_download', { id, attachmentId: attachment.id, destination });
+  return true;
 }

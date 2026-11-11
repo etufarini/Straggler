@@ -193,6 +193,49 @@ async fn history_save(conversation: Conversation, state: State<'_, Application>)
 }
 
 #[tauri::command]
+async fn attachment_add(
+    id: Uuid,
+    path: PathBuf,
+    state: State<'_, Application>,
+) -> Result<Conversation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.history.add_attachment(id, &path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn attachment_remove(
+    id: Uuid,
+    attachment_id: Uuid,
+    state: State<'_, Application>,
+) -> Result<Conversation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime.history.remove_attachment(id, attachment_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn attachment_download(
+    id: Uuid,
+    attachment_id: Uuid,
+    destination: PathBuf,
+    state: State<'_, Application>,
+) -> Result<()> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime
+            .history
+            .download_attachment(id, attachment_id, &destination)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn read_conversation_import(
     path: PathBuf,
 ) -> Result<mir_desktop::conversation_import::ImportedConversation> {
@@ -345,6 +388,9 @@ fn main() {
             history_save,
             history_delete,
             history_create,
+            attachment_add,
+            attachment_remove,
+            attachment_download,
             read_conversation_import,
             preferences_read,
             preferences_save

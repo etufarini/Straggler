@@ -11,6 +11,7 @@ desktop/src-tauri/icons/128x128@2x.png
 desktop/src-tauri/icons/32x32.png
 desktop/src-tauri/icons/icon.png
 desktop/src-tauri/icons/icon.svg
+desktop/src-tauri/src/attachments.rs
 desktop/src-tauri/src/builds.rs
 desktop/src-tauri/src/chat.rs
 desktop/src-tauri/src/conversation_import.rs
