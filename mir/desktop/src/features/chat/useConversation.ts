@@ -383,7 +383,7 @@ export function useConversation(
       updatedAt: Date.now(),
     };
     updateChat(value);
-    if (value.messages.length) void save(value).catch(() => {});
+    if (value.messages.length || value.attachments?.length) void save(value).catch(() => {});
   }
 
   function openConversation(value: Conversation) {
@@ -395,6 +395,7 @@ export function useConversation(
   }
 
   return {
+    chatOptionsDisabled: generating || editingBusy || importBusy,
     flushSaves,
     runConversationMutation,
     acceptStoredConversation,

@@ -58,6 +58,7 @@ export function useWorkspace() {
     serverDetails,
   );
   const {
+    chatOptionsDisabled,
     flushSaves,
     contextError,
     importChat,
@@ -316,6 +317,7 @@ export function useWorkspace() {
 
   return {
     ...ui,
+    chatOptionsDisabled,
     attachments,
     contextEstimate,
     contextError,

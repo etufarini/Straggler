@@ -5,7 +5,7 @@ import { resolveChatOptions } from '../../domain/chat';
 import type { WorkspaceController } from '../../app/useWorkspace';
 
 export default function ReasoningMenu({ controller }: { controller: WorkspaceController }) {
-  const { chat, config, serverDetails, generating, setChatOptions } = controller;
+  const { chat, config, serverDetails, chatOptionsDisabled, setChatOptions } = controller;
   const options = resolveChatOptions(chat.options, config?.settings);
   const available = serverDetails?.reasoningSupported === true;
   const label = !available
@@ -22,7 +22,7 @@ export default function ReasoningMenu({ controller }: { controller: WorkspaceCon
       label="Reasoning"
       valueLabel={label}
       className={`reasoning-menu ${available && options.reasoning === 'on' ? 'is-on' : ''}`}
-      disabled={generating || !available}
+      disabled={chatOptionsDisabled || !available}
       trigger={
         <>
           <Lightbulb size={14} />
@@ -34,6 +34,7 @@ export default function ReasoningMenu({ controller }: { controller: WorkspaceCon
     >
       {() => (
         <ReasoningControls
+          disabled={chatOptionsDisabled}
           effortPresentation="segments"
           reasoning={options.reasoning}
           effort={options.effort}

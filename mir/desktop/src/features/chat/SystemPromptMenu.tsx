@@ -80,7 +80,7 @@ function SystemPromptEditor({
         <button
           type="button"
           className="primary-button"
-          disabled={source === 'chat' && tooLong}
+          disabled={controller.chatOptionsDisabled || (source === 'chat' && tooLong)}
           onClick={() => {
             setChatOptions({ systemPrompt: source === 'default' ? null : text });
             close();
@@ -102,7 +102,7 @@ export default function SystemPromptMenu({ controller }: { controller: Workspace
           ? 'From Settings'
           : 'Custom instructions for this chat'
       }
-      disabled={controller.generating}
+      disabled={controller.chatOptionsDisabled}
       className="system-menu"
       trigger={
         <>

@@ -169,3 +169,7 @@ the final source revision.
 Successful file operations preserve a prior history-loading error until loading
 actually recovers. A dedicated import/history regression verifies that a valid
 new conversation does not hide unavailable history or overwrite its files.
+
+Per-chat options wait for file mutations to complete, keeping an open options
+draft intact. Options on attachment-only conversations are persisted even before
+the first message; the reading-state browser regression covers that boundary.

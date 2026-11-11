@@ -139,17 +139,45 @@ test('CHAT-16 uses native-shaped enter, over, leave and drop events and announce
   await expect(page.locator('.file-row.is-ready')).toHaveCount(1);
 });
 
-test('reading rows disable Download; offline estimates are labelled approximate', async ({
+test('reading rows serialize request options and persist attachment-only chat options', async ({
   page,
 }) => {
   await page.goto('/?scenario=normal');
-  await page.evaluate(() => localStorage.setItem('mir-fixture-reading-paused', 'true'));
-  await choose(page, ['/fixture/notes.txt']);
+  await page.getByRole('button', { name: 'System prompt', exact: true }).click();
+  await page.getByRole('radio', { name: /This chat/ }).check();
+  await page
+    .getByRole('textbox', { name: 'System prompt instructions' })
+    .fill('Preserve this attachment chat prompt');
+  await page.evaluate(() => {
+    localStorage.setItem('mir-fixture-reading-paused', 'true');
+    window.dispatchEvent(
+      new CustomEvent('mir-fixture-drag-drop', {
+        detail: { type: 'drop', paths: ['/fixture/notes.txt'], position: { x: 100, y: 100 } },
+      }),
+    );
+  });
   await expect(page.getByText('Reading text…', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download notes.txt' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Apply to this chat' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'System prompt', exact: true })).toBeDisabled();
   await page.evaluate(() => localStorage.removeItem('mir-fixture-reading-paused'));
   await expect(page.locator('.file-row.is-ready')).toHaveCount(1);
   await expect(page.locator('.file-meta')).toContainText('~');
+  await expect(page.getByRole('button', { name: 'Apply to this chat' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Apply to this chat' }).click();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('mir-fixture-normal')!)[0].options?.systemPrompt,
+      ),
+    )
+    .toBe('Preserve this attachment chat prompt');
+  await page.reload();
+  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await page.getByRole('button', { name: 'System prompt', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'System prompt instructions' })).toHaveValue(
+    'Preserve this attachment chat prompt',
+  );
 });
 
 test('context overflow blocks Send, keeps input and never sends generation', async ({ page }) => {
