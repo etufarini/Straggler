@@ -1,8 +1,10 @@
+import { tabToNextControl } from './keyboard';
 import { expect, test } from '@playwright/test';
 
 for (const width of [960, 1200, 1440]) {
   test(`R005 controls remain usable at ${width}px with long names and reduced motion`, async ({
     page,
+    browserName,
   }, testInfo) => {
     await page.setViewportSize({ width, height: width === 960 ? 720 : width === 1200 ? 820 : 900 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -40,9 +42,9 @@ for (const width of [960, 1200, 1440]) {
     await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
     await page.getByRole('button', { name: 'Edit response', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save response' })).toBeInViewport();
-    await page.keyboard.press('Tab');
+    await tabToNextControl(page, browserName);
     await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
-    await page.keyboard.press('Tab');
+    await tabToNextControl(page, browserName);
     await expect(page.getByRole('button', { name: 'Save response' })).toBeFocused();
     await expect(page.getByRole('button', { name: 'Save response' })).toBeInViewport();
     await page.keyboard.press('Escape');

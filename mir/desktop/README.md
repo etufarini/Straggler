@@ -76,3 +76,8 @@ Browser drag fixtures use the native enter/over/drop/leave payload shape, rather
 than HTML5 drop events. The native smoke test exercises actual storage, download,
 export/import commands and attachment/menu rendering; OS file-dialog interaction
 still requires a manual check on each target platform.
+
+Keyboard traversal tests use Option-Tab in macOS WebKit, matching the platform's
+control traversal behavior without changing user preferences. See the
+[Apple keyboard shortcut guidance](https://support.apple.com/en-lamr/guide/safari/cpsh003/mac)
+and [Playwright's platform behavior discussion](https://github.com/microsoft/playwright/issues/41808).

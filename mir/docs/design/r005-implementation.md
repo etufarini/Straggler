@@ -146,3 +146,10 @@ are used by their owning module; no unused dependency was found.
 The supplied R005 dossier, its embedded baseline references and the original
 `mir/docs/design/mir-ui-design.html` remain unchanged. No tags, releases,
 deployment, main-branch merge or pull request were created.
+
+Final cross-platform validation also identified a test assumption: bare Tab
+skips buttons under the macOS WebKit keyboard-navigation default. The R005
+keyboard tests now use the platform's Option-Tab sequence on that engine, retain
+the same focus assertions, and change no application or user preference.
+The supplied HTML's existing trailing whitespace was preserved with its exact
+bytes; implementation files pass `git diff --check` independently of that dossier.

@@ -1,7 +1,9 @@
+import { tabToNextControl } from './keyboard';
 import { expect, test } from '@playwright/test';
 
 test('conversation menu supports keyboard navigation, dismissal and Delete parity', async ({
   page,
+  browserName,
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Choose model', exact: true }).click();
@@ -25,7 +27,7 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   await expect(trigger).toBeFocused();
   await expect(page.getByRole('menu')).toHaveCount(0);
   await page.keyboard.press('Enter');
-  await page.keyboard.press('Tab');
+  await tabToNextControl(page, browserName);
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeFocused();
   await trigger.click();
   await page.getByRole('textbox', { name: 'Message', exact: true }).click();
