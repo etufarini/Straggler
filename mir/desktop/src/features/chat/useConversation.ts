@@ -81,8 +81,10 @@ export function useConversation(
   }, [input, chat.attachments, contextSize]);
 
   async function flushSaves() {
+    await projects?.flush();
     await flushStorage(saveQueue);
-    if (projects?.error) throw new Error(projects.error);
+    if (storageError && (chatRef.current.messages.length || chatRef.current.attachments?.length))
+      throw new Error(storageError);
   }
   function updateChat(value: Conversation) {
     chatRef.current = value;

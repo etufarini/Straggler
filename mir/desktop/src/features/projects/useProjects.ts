@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Project, ProjectMutation } from '../../domain/projects';
 import type { ServerDetails, ServerStatus, Settings } from '../../domain/types';
 import { errorDetail } from '../../domain/errors';
-import { flushStorage, serializeStorage } from '../../domain/storageQueue';
+import { flushStorage, serializeStorage, trackStorageWork } from '../../domain/storageQueue';
 import type { StorageQueue } from '../../domain/storageQueue';
 import {
   estimateProjectTokens,
@@ -37,6 +37,7 @@ export function useProjects(
     values: Record<string, TokenEstimate>;
   } | null>(null);
   const mounted = useRef(true);
+  const pendingWork = useRef(new Set<Promise<unknown>>());
 
   function accept(project: Project) {
     current.current = [...current.current.filter((value) => value.id !== project.id), project];
@@ -44,8 +45,8 @@ export function useProjects(
   }
   const load = useCallback(async () => {
     try {
-      await flushStorage(queue).catch(() => {});
-      const values = await projectService.list();
+      await flushStorage(queue, pendingWork.current).catch(() => {});
+      const values = await serializeStorage(queue, () => projectService.list());
       if (!mounted.current) return;
       current.current = values;
       setProjects(values);
@@ -109,7 +110,10 @@ export function useProjects(
       return projectService.save(value);
     });
   }
-  async function addFiles(id: string, paths?: string[]) {
+  function addFiles(id: string, paths?: string[]) {
+    return trackStorageWork(pendingWork.current, () => addFileBatch(id, paths));
+  }
+  async function addFileBatch(id: string, paths?: string[]) {
     let selected: string[];
     try {
       selected = paths ?? (await chooseAttachmentFiles());
@@ -126,25 +130,31 @@ export function useProjects(
       size: null,
     }));
     setPendingFiles((values) => ({ ...values, [id]: [...(values[id] ?? []), ...rows] }));
-    for (const [index, path] of selected.entries()) {
-      const row = rows[index];
-      try {
-        await mutation(() => projectService.addFile(id, path));
-        setPendingFiles((values) => ({
-          ...values,
-          [id]: (values[id] ?? []).filter((value) => value.id !== row.id),
-        }));
-      } catch (failure) {
-        setPendingFiles((values) => ({
-          ...values,
-          [id]: (values[id] ?? []).map((value) =>
-            value.id === row.id
-              ? { ...value, state: 'error', error: errorDetail(failure).message }
-              : value,
-          ),
-        }));
+    await run(async () => {
+      let warning: string | undefined;
+      for (const [index, path] of selected.entries()) {
+        const row = rows[index];
+        try {
+          const result = await projectService.addFile(id, path);
+          accept(result.project);
+          setPendingFiles((values) => ({
+            ...values,
+            [id]: (values[id] ?? []).filter((value) => value.id !== row.id),
+          }));
+        } catch (failure) {
+          warning = errorDetail(failure).message;
+          setPendingFiles((values) => ({
+            ...values,
+            [id]: (values[id] ?? []).map((value) =>
+              value.id === row.id
+                ? { ...value, state: 'error', error: errorDetail(failure).message }
+                : value,
+            ),
+          }));
+        }
       }
-    }
+      return { warning };
+    });
   }
 
   const prefixes = useMemo(
@@ -215,6 +225,7 @@ export function useProjects(
     notice,
     setNotice,
     load,
+    flush: () => flushStorage(queue, pendingWork.current),
     accept,
     update,
     addFiles,

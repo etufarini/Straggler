@@ -10,10 +10,31 @@ export function serializeStorage<T>(queue: StorageQueue, operation: () => Promis
   return pending;
 }
 
-export async function flushStorage(queue: StorageQueue): Promise<void> {
+export function trackStorageWork<T>(
+  work: Set<Promise<unknown>>,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const pending = Promise.resolve().then(operation);
+  work.add(pending);
+  void pending.then(
+    () => work.delete(pending),
+    () => work.delete(pending),
+  );
+  return pending;
+}
+
+export async function flushStorage(
+  queue: StorageQueue,
+  work?: Set<Promise<unknown>>,
+): Promise<void> {
   let pending: Promise<void>;
+  let failure: PromiseRejectedResult | undefined;
   do {
     pending = queue.current;
-    await pending;
-  } while (pending !== queue.current);
+    const settled = await Promise.allSettled([pending, ...(work ?? [])]);
+    failure ??= settled.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+  } while (pending !== queue.current || work?.size);
+  if (failure) throw failure.reason;
 }
