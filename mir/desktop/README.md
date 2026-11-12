@@ -102,11 +102,31 @@ Use `npm ci` for reproducible setup. After dependency updates, run `npm audit`,
 `npm outdated`, `npm ls --all` and the full test runner. Review changed install
 scripts before updating the version-pinned `allowScripts` entries.
 
-The last recorded audit on 2026-11-12 reported 10 moderate development-dependency
-entries for [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249),
-with none in production dependencies. ESLint/TypeScript ESLint require minimatch
-10; the fix begins at 11. Do not force an incompatible major override. Recheck the
-advisory and parent releases before updating dependencies.
+The dependency review on 2026-11-12 updated the transitive browser compatibility
+data in `baseline-browser-mapping` from 2.11.36 to 2.11.37. It found no deprecated
+packages, unused direct dependencies or required peer conflicts. `npm ls --all`
+also lists optional packages for other platforms and unused integrations; these
+do not require installation. Keep the lockfile's platform packages for Linux/macOS
+portability.
+
+The audit reports 10 moderate development-dependency entries from one advisory,
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), with none
+in production dependencies. The affected package is `minimatch@10.2.6`, reached
+through `eslint@10.14.0`, `@eslint/config-array@0.23.5` and
+`@typescript-eslint/typescript-estree@8.72.2`. Their latest stable releases still
+require minimatch 10; the fix begins at 11.0.1. The issue concerns excessive CPU
+and memory use when processing attacker-controlled glob patterns at optimization
+level 2 or higher. It remains unresolved in the development toolchain.
+
+Do not force minimatch 11 outside its parents' declared ranges or apply the audit's
+suggested ESLint/TypeScript ESLint downgrades. Recheck the advisory and parent
+releases for a supported fix. Keep audit output visible.
+
+`npm outdated` reports newer major versions of Vite, its React plugin, TypeScript,
+Lucide React and Node types. Retain the current compatible versions: these updates
+do not fix the advisory, TypeScript ESLint currently requires TypeScript below
+6.1, and Node types follow the Node 24 CI environment. Review the build pipeline
+and icon changes separately before migrating those majors.
 
 Use the [packaging guide](../docs/guide.md#building-packages) to produce GUI packages
 with the pinned backend. Plain `npm run bundle` is a Tauri build and does not
