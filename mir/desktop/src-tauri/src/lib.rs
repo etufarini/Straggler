@@ -1,5 +1,6 @@
 pub mod attachments;
 mod builds;
+pub mod bundled_backend;
 mod chat;
 pub mod conversation_import;
 pub mod diagnostics;

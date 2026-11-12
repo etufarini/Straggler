@@ -18,6 +18,7 @@ default = ["desktop"]
 desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-dialog"]
 custom-protocol = ["desktop", "tauri/custom-protocol"]
 native-tests = ["desktop", "dep:tauri-plugin-wdio-webdriver"]
+packaging-probe = []
 
 [dependencies]
 zip = { version = "8.6", default-features = false, features = ["deflate"] }

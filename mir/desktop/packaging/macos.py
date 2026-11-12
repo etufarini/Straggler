@@ -39,6 +39,8 @@ def macho_dependencies(binary, cpu_type):
     dependencies = []
     offset = 32
     for _ in range(count):
+        if offset + 8 > end:
+            raise ValueError("Truncated Mach-O load command")
         command, length = struct.unpack_from("<II", binary, offset)
         if length < 8 or offset + length > end:
             raise ValueError("Invalid Mach-O command length")

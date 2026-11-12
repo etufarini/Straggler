@@ -1,6 +1,9 @@
 #[cfg(all(feature = "native-tests", not(debug_assertions)))]
 compile_error!("Desktop automation must never be included in a release build.");
 
+#[cfg(feature = "packaging-probe")]
+mod packaging_probe;
+
 use mir_desktop::{
     default_data_dir, history::Conversation, ChatRequest, Configuration, JobStatus, Listener,
     Result, Runtime, Settings, Status,
@@ -456,6 +459,11 @@ fn main() {
             std::process::exit(1);
         }
         println!("Mir.cpp desktop {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if cfg!(feature = "packaging-probe") {
+        #[cfg(feature = "packaging-probe")]
+        packaging_probe::run(context);
         return;
     }
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());

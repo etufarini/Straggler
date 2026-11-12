@@ -13,6 +13,7 @@ desktop/src-tauri/icons/icon.png
 desktop/src-tauri/icons/icon.svg
 desktop/src-tauri/src/attachments.rs
 desktop/src-tauri/src/builds.rs
+desktop/src-tauri/src/bundled_backend.rs
 desktop/src-tauri/src/chat.rs
 desktop/src-tauri/src/conversation_import.rs
 desktop/src-tauri/src/diagnostics.rs
@@ -21,6 +22,7 @@ desktop/src-tauri/src/history.rs
 desktop/src-tauri/src/lib.rs
 desktop/src-tauri/src/main.rs
 desktop/src-tauri/src/model.rs
+desktop/src-tauri/src/packaging_probe.rs
 desktop/src-tauri/src/preferences.rs
 desktop/src-tauri/src/projects.rs
 desktop/src-tauri/src/server.rs
