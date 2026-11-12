@@ -11,6 +11,7 @@ import type {
 } from '../domain/types';
 import { emptyServer } from '../domain/types';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
+import { createProjectFixture } from './projectFixtures';
 
 export type Scenario =
   | 'normal'
@@ -104,6 +105,13 @@ export function createFixture(scenario: Scenario) {
   let finish: (() => void) | undefined;
   let occupied = scenario === 'occupied';
   let memoryFailureSeen = false;
+  let generatingConversation: string | null = null;
+  const projectFixture = createProjectFixture(
+    `mir-fixture-projects-${scenario}`,
+    history,
+    persistHistory,
+    () => generatingConversation,
+  );
 
   function failMemory() {
     memoryFailureSeen = true;
@@ -168,6 +176,8 @@ export function createFixture(scenario: Scenario) {
   }
 
   async function invoke(command: string, args: Record<string, unknown> = {}): Promise<unknown> {
+    if (command === 'projects_list' || command.startsWith('project_'))
+      return projectFixture.invoke(command, args);
     switch (command) {
       case 'preferences_read':
         return JSON.parse(
@@ -193,7 +203,9 @@ export function createFixture(scenario: Scenario) {
       case 'server_details':
         return {
           runId: status.runId!,
-          contextSize: 4096,
+          contextSize: localStorage.getItem('mir-fixture-context-unavailable')
+            ? null
+            : Number(localStorage.getItem('mir-fixture-context-size')) || 4096,
           reasoningSupported: scenario !== 'no-reasoning',
           effortLevels:
             scenario === 'no-reasoning'
@@ -395,6 +407,7 @@ export function createFixture(scenario: Scenario) {
         return;
       }
       case 'history_delete':
+        projectFixture.assertChatWritable(history.find((value) => value.id === args.id)!);
         history.splice(
           history.findIndex((value) => value.id === args.id),
           1,
@@ -403,8 +416,19 @@ export function createFixture(scenario: Scenario) {
         return;
       case 'generate': {
         localStorage.setItem('mir-fixture-request', JSON.stringify(args.request));
+        const request = args.request as { conversationId?: string };
+        if (request.conversationId) {
+          const current = history.find((value) => value.id === request.conversationId);
+          if (current?.projectId && projectFixture.find(current.projectId).archived)
+            throw new Error('Restore this project to make changes.');
+        }
+        if (localStorage.getItem('mir-fixture-context-rejection'))
+          throw new Error(
+            'HTTP 400: {"error":{"code":400,"type":"exceed_context_size_error","message":"request (5000 tokens) exceeds the available context size (4096 tokens), try increasing it","n_prompt_tokens":5000,"n_ctx":4096}}',
+          );
         if (scenario === 'compute-error') throw new Error('Compute error.');
         if (scenario === 'model-error') throw new Error('Unsupported chat template');
+        generatingConversation = request.conversationId ?? null;
         const delta: Delta = {
           ...(scenario === 'no-metrics'
             ? {}
@@ -431,6 +455,7 @@ export function createFixture(scenario: Scenario) {
           await new Promise((resolve) => setTimeout(resolve, 1200));
         } else channel.onmessage(delta);
         if (['oom', 'oom-and-save-error'].includes(scenario) && !memoryFailureSeen) {
+          generatingConversation = null;
           failMemory();
           if (scenario === 'oom-and-save-error') failedWrites = 1;
           return { ...delta, status: 'error', error: 'Compute error.' };
@@ -440,6 +465,7 @@ export function createFixture(scenario: Scenario) {
             finish = resolve;
           });
         else await new Promise((resolve) => setTimeout(resolve, 120));
+        generatingConversation = null;
         return {
           ...delta,
           status:

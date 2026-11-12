@@ -7,6 +7,7 @@ pub mod files;
 pub mod history;
 pub mod model;
 pub mod preferences;
+pub mod projects;
 mod server;
 pub mod stream;
 pub mod tokens;
@@ -62,6 +63,7 @@ pub struct Runtime {
     active: Mutex<Generation>,
     model_details: Mutex<Option<model::ServerDetails>>,
     pub history: History,
+    pub projects: projects::Projects,
     pub preferences: preferences::Preferences,
     workspace: Mutex<workspace::Workspace>,
     job: Arc<Mutex<workspace::Job>>,
@@ -72,12 +74,15 @@ pub struct Runtime {
 struct Generation {
     current: Option<(Uuid, CancellationToken)>,
     cancelled: Option<Uuid>,
+    conversation_id: Option<Uuid>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatRequest {
     pub request_id: Uuid,
+    #[serde(default)]
+    pub conversation_id: Option<Uuid>,
     pub messages: Vec<ChatMessage>,
     #[serde(default)]
     pub options: ChatOptions,
@@ -122,10 +127,12 @@ impl Runtime {
         if unsafe { libc::flock(instance.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
             return Err("Another Mir.cpp desktop session is already open.".into());
         }
+        let projects = projects::Projects::new(data.join("projects"), &history)?;
         Ok(Self {
             launcher,
             bash,
             history,
+            projects,
             preferences: preferences::Preferences::new(data.clone()),
             _instance: instance,
             workspace: Mutex::new(workspace::Workspace::default()),

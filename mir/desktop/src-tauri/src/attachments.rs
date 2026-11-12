@@ -367,6 +367,8 @@ mod tests {
             messages: vec![],
             attachments: vec![],
             options: None,
+            project_id: None,
+            own_system_prompt: None,
         };
         history.save(&chat).unwrap();
         let record = storage.join(format!("{}.json", chat.id));

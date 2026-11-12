@@ -3,7 +3,13 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Write, os::unix::fs::DirBuilderExt, path::PathBuf, sync::Mutex};
+use std::{
+    fs,
+    io::Write,
+    os::unix::fs::DirBuilderExt,
+    path::PathBuf,
+    sync::{Arc, Mutex, OnceLock},
+};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -38,6 +44,21 @@ pub struct Conversation {
     pub attachments: Vec<Attachment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<ConversationOptions>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<Uuid>,
+    #[serde(
+        default,
+        deserialize_with = "read_own_prompt",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub own_system_prompt: Option<Option<String>>,
+}
+
+// Absence means a legacy record; explicit null preserves Settings inheritance.
+fn read_own_prompt<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(deserializer).map(Some)
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -49,8 +70,9 @@ pub struct ConversationOptions {
 }
 
 pub struct History {
-    directory: PathBuf,
-    writer: Mutex<()>,
+    pub(crate) directory: PathBuf,
+    pub(crate) writer: Arc<Mutex<()>>,
+    pub(crate) project_storage: OnceLock<PathBuf>,
 }
 
 impl History {
@@ -62,12 +84,18 @@ impl History {
             .map_err(|e| format!("Cannot create conversation storage: {e}"))?;
         Ok(Self {
             directory,
-            writer: Mutex::new(()),
+            writer: Arc::new(Mutex::new(())),
+            project_storage: OnceLock::new(),
         })
     }
 
     pub fn list(&self) -> Result<Vec<Conversation>> {
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
+        self.list_unlocked()
+    }
+
+    pub(crate) fn list_unlocked(&self) -> Result<Vec<Conversation>> {
         let mut conversations = Vec::new();
         for entry in fs::read_dir(&self.directory).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
@@ -103,16 +131,20 @@ impl History {
     pub fn save(&self, conversation: &Conversation) -> Result<()> {
         validate(conversation)?;
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
+        self.ensure_writable(conversation)?;
         self.write(conversation, false)
     }
 
     pub fn create(&self, conversation: &Conversation) -> Result<()> {
         validate(conversation)?;
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
+        self.ensure_writable(conversation)?;
         self.write(conversation, true)
     }
 
-    fn write(&self, conversation: &Conversation, create: bool) -> Result<()> {
+    pub(crate) fn write(&self, conversation: &Conversation, create: bool) -> Result<()> {
         let mut file = tempfile::NamedTempFile::new_in(&self.directory)
             .map_err(|e| format!("Cannot create a conversation file: {e}"))?;
         serde_json::to_writer(&mut file, conversation).map_err(|e| e.to_string())?;
@@ -128,7 +160,7 @@ impl History {
         Ok(())
     }
 
-    fn read_one(&self, id: Uuid) -> Result<Conversation> {
+    pub(crate) fn read_one(&self, id: Uuid) -> Result<Conversation> {
         let bytes = fs::read(self.directory.join(format!("{id}.json")))
             .map_err(|e| format!("Cannot read conversation: {e}"))?;
         let conversation: Conversation =
@@ -150,7 +182,9 @@ impl History {
     pub fn add_attachment(&self, id: Uuid, path: &std::path::Path) -> Result<Conversation> {
         let extracted = attachments::extract(path)?;
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
         let mut conversation = self.read_one(id)?;
+        self.ensure_writable(&conversation)?;
         let original_path = self.original_path(id, &extracted.attachment);
         let parent = original_path
             .parent()
@@ -181,7 +215,9 @@ impl History {
 
     pub fn remove_attachment(&self, id: Uuid, attachment_id: Uuid) -> Result<Conversation> {
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
         let previous = self.read_one(id)?;
+        self.ensure_writable(&previous)?;
         let mut conversation = previous.clone();
         let index = conversation
             .attachments
@@ -210,6 +246,7 @@ impl History {
         destination: &std::path::Path,
     ) -> Result<()> {
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
         let conversation = self.read_one(id)?;
         let attachment = conversation
             .attachments
@@ -221,8 +258,43 @@ impl History {
         crate::files::write_atomic(destination, &original)
     }
 
+    pub(crate) fn project_directory(&self) -> Result<PathBuf> {
+        self.project_storage
+            .get()
+            .cloned()
+            .ok_or_else(|| "Project storage is unavailable.".into())
+    }
+
+    pub(crate) fn recover(&self) -> Result<()> {
+        if let Some(projects) = self.project_storage.get() {
+            crate::projects::recover(projects, &self.directory)?;
+        }
+        Ok(())
+    }
+
+    fn ensure_writable(&self, conversation: &Conversation) -> Result<()> {
+        if let Some(id) = conversation.project_id {
+            crate::projects::ensure_active_at(&self.project_directory()?, id)?;
+        }
+        let path = self.directory.join(format!("{}.json", conversation.id));
+        if path.exists() {
+            let previous = self.read_one(conversation.id)?;
+            if let Some(id) = previous.project_id {
+                crate::projects::ensure_active_at(&self.project_directory()?, id)?;
+            }
+            if previous.project_id != conversation.project_id {
+                return Err(
+                    "Move the conversation through the project action before saving.".into(),
+                );
+            }
+        }
+        Ok(())
+    }
+
     pub fn delete(&self, id: Uuid) -> Result<()> {
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
+        self.ensure_writable(&self.read_one(id)?)?;
         let attachments = self.directory.join(id.to_string());
         if attachments.exists() {
             fs::remove_dir_all(attachments)
@@ -243,6 +315,14 @@ fn timestamp() -> u64 {
 fn validate(conversation: &Conversation) -> Result<()> {
     if conversation.title.trim().is_empty() || conversation.title.len() > 1024 {
         return Err("Conversation title must contain between 1 and 1024 bytes.".into());
+    }
+    if conversation
+        .own_system_prompt
+        .as_ref()
+        .and_then(Option::as_ref)
+        .is_some_and(|value| value.len() > 65536 || value.contains('\0'))
+    {
+        return Err("Invalid conversation system prompt.".into());
     }
     if let Some(options) = &conversation.options {
         if options
@@ -296,6 +376,8 @@ mod tests {
             updated_at: 2,
             model: None,
             options: None,
+            project_id: None,
+            own_system_prompt: None,
             attachments: Vec::new(),
             messages: vec![Message {
                 id: Uuid::new_v4(),
@@ -385,6 +467,35 @@ mod tests {
         fs::write(dir.path().join("broken.json"), b"not JSON").unwrap();
         assert!(history.list().unwrap_err().contains("file was kept"));
         assert!(dir.path().join("broken.json").exists());
+    }
+
+    #[test]
+    fn loading_pre_project_history_preserves_original_bytes_and_prompt_semantics() {
+        let directory = tempfile::tempdir().unwrap();
+        let history = History::new(directory.path().join("conversations")).unwrap();
+        let id = Uuid::new_v4();
+        let original = format!(
+            r#"{{
+  "id": "{id}", "title": "Legacy ☕", "createdAt": 1, "updatedAt": 2,
+  "model": null, "messages": [],
+  "options": {{"systemPrompt": "", "reasoning": null, "effort": null}}
+}}
+"#
+        );
+        let path = history.directory.join(format!("{id}.json"));
+        fs::write(&path, &original).unwrap();
+        let loaded = history.list().unwrap();
+        assert!(loaded[0].project_id.is_none());
+        assert!(loaded[0].own_system_prompt.is_none());
+        assert_eq!(
+            loaded[0].options.as_ref().unwrap().system_prompt.as_deref(),
+            Some("")
+        );
+        assert_eq!(fs::read(&path).unwrap(), original.as_bytes());
+        let mut invalid = serde_json::to_value(&loaded[0]).unwrap();
+        invalid["projectId"] = serde_json::json!("../outside");
+        assert!(serde_json::from_value::<Conversation>(invalid).is_err());
+        assert_eq!(fs::read(path).unwrap(), original.as_bytes());
     }
 
     #[test]

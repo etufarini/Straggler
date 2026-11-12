@@ -268,9 +268,99 @@ async fn history_create(conversation: Conversation, state: State<'_, Application
 #[tauri::command]
 async fn history_delete(id: Uuid, state: State<'_, Application>) -> Result<()> {
     let runtime = runtime(&state)?;
-    tauri::async_runtime::spawn_blocking(move || runtime.history.delete(id))
+    tauri::async_runtime::spawn_blocking(move || runtime.delete_conversation(id))
         .await
         .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn projects_list(
+    state: State<'_, Application>,
+) -> Result<Vec<mir_desktop::projects::ProjectView>> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.projects.list(&runtime.history))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn project_save(
+    project: mir_desktop::projects::Project,
+    state: State<'_, Application>,
+) -> Result<mir_desktop::projects::ProjectMutation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.save_project(project))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn project_file_add(
+    project_id: Uuid,
+    path: PathBuf,
+    state: State<'_, Application>,
+) -> Result<mir_desktop::projects::ProjectMutation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime
+            .projects
+            .add_file(&runtime.history, project_id, &path)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn project_file_remove(
+    project_id: Uuid,
+    file_id: Uuid,
+    state: State<'_, Application>,
+) -> Result<mir_desktop::projects::ProjectMutation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime
+            .projects
+            .remove_file(&runtime.history, project_id, file_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn project_move_chat(
+    conversation_id: Uuid,
+    project_id: Option<Uuid>,
+    state: State<'_, Application>,
+) -> Result<mir_desktop::projects::ProjectMutation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime.move_project_chat(conversation_id, project_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn project_delete(
+    project_id: Uuid,
+    delete_chats: bool,
+    state: State<'_, Application>,
+) -> Result<mir_desktop::projects::ProjectMutation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.delete_project(project_id, delete_chats))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn project_undo(
+    token: Uuid,
+    state: State<'_, Application>,
+) -> Result<mir_desktop::projects::ProjectMutation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.undo_project(token))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -407,6 +497,13 @@ fn main() {
             attachment_remove,
             attachment_download,
             read_conversation_import,
+            projects_list,
+            project_save,
+            project_file_add,
+            project_file_remove,
+            project_move_chat,
+            project_delete,
+            project_undo,
             preferences_read,
             preferences_save
         ])
