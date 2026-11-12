@@ -109,14 +109,10 @@ impl Runtime {
         if !matches!(reasoning, "auto" | "on" | "off") {
             return Err("Reasoning must use the model default, on or off.".into());
         }
-        if reasoning != "auto"
-            || effort != "auto"
-            || request.messages.iter().any(|m| m.role == "system")
-        {
+        let has_system_prompt = request.messages.iter().any(|m| m.role == "system");
+        if reasoning != "auto" || effort != "auto" || has_system_prompt {
             let details = self.server_details().await?;
-            if request.messages.iter().any(|m| m.role == "system")
-                && details.system_role_supported == Some(false)
-            {
+            if has_system_prompt && details.system_role_supported == Some(false) {
                 return Err("The loaded chat template does not support a system prompt.".into());
             }
             if reasoning != "auto" && details.reasoning_supported != Some(true) {

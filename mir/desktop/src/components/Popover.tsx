@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { containTabFocus } from './focus';
 
 export default function Popover({
   label,
@@ -42,22 +43,7 @@ export default function Popover({
       )
     )?.focus();
     function keydown(event: KeyboardEvent) {
-      if (containFocus && event.key === 'Tab') {
-        const nodes = root.current?.querySelectorAll<HTMLElement>(
-          '.composer-popover button:not(:disabled), .composer-popover input:not(:disabled), .composer-popover textarea:not(:disabled), .composer-popover select:not(:disabled), .composer-popover [tabindex="0"]',
-        );
-        if (nodes?.length) {
-          const first = nodes[0],
-            last = nodes[nodes.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }
-      }
+      if (containFocus) containTabFocus(event, root.current?.querySelector('.composer-popover'));
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();

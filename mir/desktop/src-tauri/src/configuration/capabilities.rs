@@ -1,4 +1,7 @@
-use super::{environment::Environment, settings::token};
+use super::{
+    environment::Environment,
+    settings::{cache_type, token},
+};
 use crate::{
     workspace::{Device, Settings},
     Result,
@@ -109,10 +112,7 @@ pub fn cache_types(help: &str, flag: &str) -> Vec<String> {
             .split(|character: char| character.is_whitespace() || character == ',')
             .filter(|word| !word.is_empty())
         {
-            if !token(word, "_", 32)
-                || !word.as_bytes()[0].is_ascii_lowercase()
-                || word.bytes().any(|byte| byte.is_ascii_uppercase())
-            {
+            if !cache_type(word) {
                 return result;
             }
             result.push(word.into());

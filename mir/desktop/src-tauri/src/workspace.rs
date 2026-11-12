@@ -150,7 +150,7 @@ impl Runtime {
     }
 
     pub fn configure(&self, settings: Settings) -> Result<Configuration> {
-        self.configure_action("inspect", &[], Some(settings.validated()?))
+        self.configure_action("inspect", &[], Some(settings))
     }
 
     pub fn workspace_action(

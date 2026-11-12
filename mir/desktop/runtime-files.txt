@@ -49,6 +49,7 @@ desktop/src/components/FolderBrowser.tsx
 desktop/src/components/NumberField.tsx
 desktop/src/components/Popover.tsx
 desktop/src/components/ReasoningControls.tsx
+desktop/src/components/focus.ts
 desktop/src/components/statusLabels.ts
 desktop/src/domain/attachments.ts
 desktop/src/domain/chat.ts

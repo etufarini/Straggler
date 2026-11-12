@@ -1,5 +1,5 @@
 use super::environment::Environment;
-use crate::{workspace::Settings, Result};
+use crate::{model::valid_effort, workspace::Settings, Result};
 use serde_json::json;
 use std::collections::BTreeMap;
 
@@ -104,7 +104,7 @@ pub fn token(value: &str, extras: &str, maximum: usize) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || extras.contains(byte as char))
 }
 
-fn cache_type(value: &str) -> bool {
+pub(super) fn cache_type(value: &str) -> bool {
     value.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
         && token(value, "_", 32)
         && !value.bytes().any(|byte| byte.is_ascii_uppercase())
@@ -201,10 +201,11 @@ impl Settings {
     }
 
     pub fn validated(mut self) -> Result<Self> {
-        for (name, value) in self.fields() {
-            if name != "chat_system_prompt" && !literal(&value) {
+        let fields = self.fields();
+        for (name, value) in &fields {
+            if name != "chat_system_prompt" && !literal(value) {
                 return Err(field_error(
-                    &name,
+                    name,
                     "Settings must be single-line text values.",
                 ));
             }
@@ -223,14 +224,13 @@ impl Settings {
             ("prompt_processing", matches!(self.prompt_processing.as_str(), "auto" | "low-memory" | "large-batch"), "MIR_PROMPT_PROCESSING must be auto, low-memory or large-batch."),
             ("chat_system_prompt", self.chat_system_prompt.len() <= 65536 && !self.chat_system_prompt.contains('\0'), "System prompt must be valid text of at most 65536 UTF-8 bytes."),
             ("chat_reasoning", matches!(self.chat_reasoning.as_str(), "auto" | "on" | "off"), "Reasoning must use the model default, on or off."),
-            ("chat_reasoning_effort", self.chat_reasoning_effort.as_bytes().first().is_some_and(u8::is_ascii_lowercase) && token(&self.chat_reasoning_effort, "_-", 32) && !self.chat_reasoning_effort.bytes().any(|byte| byte.is_ascii_uppercase()), "Use a reasoning effort advertised by the loaded chat template or the model default."),
+            ("chat_reasoning_effort", valid_effort(&self.chat_reasoning_effort), "Use a reasoning effort advertised by the loaded chat template or the model default."),
         ];
         for (name, valid, message) in checks {
             if !valid {
                 return Err(field_error(name, message));
             }
         }
-        let fields = self.fields();
         for name in SAMPLING_FIELDS
             .iter()
             .copied()

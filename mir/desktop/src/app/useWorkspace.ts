@@ -4,6 +4,7 @@ import { useAttachments } from '../features/attachments/useAttachments';
 import { useContextEstimate } from '../features/chat/useContextEstimate';
 import { useConversation } from '../features/chat/useConversation';
 import { useProjects } from '../features/projects/useProjects';
+import { containTabFocus } from '../components/focus';
 import type { Conversation } from '../domain/types';
 import { newConversation } from '../domain/types';
 import { ownSystemPrompt } from '../domain/projects';
@@ -305,20 +306,7 @@ export function useWorkspace() {
           setProjectDialog(null);
         else setPanel(null);
       }
-      if (event.key !== 'Tab') return;
-      const nodes = dialog?.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
-      );
-      if (!nodes?.length) return;
-      const first = nodes[0],
-        last = nodes[nodes.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      containTabFocus(event, dialog);
     }
     document.addEventListener('keydown', onKey);
     return () => {
