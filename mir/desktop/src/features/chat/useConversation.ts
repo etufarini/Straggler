@@ -370,6 +370,7 @@ export function useConversation(
       updateChat(value);
       setInput('');
       follow.current = true;
+      return value;
     } catch (error) {
       setImportError({
         fileName: path ? fileName(path) : 'File selection',
