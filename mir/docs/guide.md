@@ -576,6 +576,13 @@ selects a certificate already present in the developer's keychain; no certificat
 is created, exported or uploaded. This command does not notarize, publish, or
 submit the application to the Store.
 
+The ad hoc helper omits Hardened Runtime because
+[library validation](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.cs.disable-library-validation)
+requires a shared signing Team ID, which ad hoc signatures do not provide. The parent keeps
+Hardened Runtime. Certificate signing enables it for both executables; that path
+still needs validation with a suitable certificate. Both signing modes retain the
+same sandbox entitlements, without a library-validation exception.
+
 The parent enables App Sandbox, user-selected read-only files and client/server
 network access. The helper has exactly `app-sandbox` and `inherit`; it obtains
 the parent's static permissions. The generated configuration replaces launcher
@@ -583,6 +590,11 @@ resources with the archive license and provenance. It uses the distinct applicat
 identifier `io.github.etufarini.mir.packaging-check` for native diagnostic storage.
 Python, Node, Rust and command line build tools are developer requirements, not
 dependencies of the resulting diagnostic app.
+
+Resource mappings place the license and provenance directly in `Contents/Resources`.
+The diagnostic configuration removes the launcher's resource mappings during the
+Tauri merge. Before signing, the build checks the bundled resource paths and bytes
+against preparation and rejects bundles that still include the launcher.
 
 Launch the app to check `--version` and `--help`, including whether the backend
 reports the pinned commit. Its result dialog gives the path to the atomic
@@ -630,6 +642,28 @@ Packaging follows [Tauri sidecars](https://v2.tauri.app/develop/sidecar/),
 and Apple's [embedded helper signing guidance](https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app).
 Apple documents [file access and bookmarks](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox)
 separately; passing a pathname alone must be tested in the signed sandbox.
+
+### Local ARM64 validation, 2026-11-12
+
+The prototype was exercised on macOS 26.6.2 (25G83), ARM64, with candidate `b12248`
+at source commit `3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8` and local ad hoc signing.
+`codesign --verify --deep --strict` passed. Runtime sandbox inspection confirmed
+the parent and model-loading helper were sandboxed. With system-only `PATH`, the
+app ran version/help checks, matched the pinned commit and saved its report in its
+separate application container.
+
+Canceling the native picker recorded `selectionCancelled: true` without loading a
+model. Selecting the existing local `gpt_oss_20b_q4_k_m.gguf` granted the helper
+read access. The CPU loading check reached loopback health readiness with context
+512, one slot and no warmup, then completed normal shutdown. The child was reaped,
+the listener disappeared and the port could be reused. No response was generated.
+Sending SIGTERM to the diagnostic app during another load recorded cancellation,
+reaped its sandboxed helper and released its port without SIGKILL.
+
+These observations cover this local prototype only. They do not validate Intel,
+macOS 13.5, certificate signing, notarization, Store distribution or persistent
+model permissions after relaunch. Required automated checks continue to use fake
+servers and temporary data; real model loading remains optional.
 
 ## Troubleshooting
 

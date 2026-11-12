@@ -74,8 +74,12 @@ class PackagingTests(unittest.TestCase):
         prepared = self.prepare(self.archive())
         config = json.loads((prepared / "tauri.backend-check.json").read_text())
         self.assertEqual(config["app"]["windows"], [])
-        self.assertIsInstance(config["bundle"]["resources"], list)
-        self.assertEqual(len(config["bundle"]["resources"]), 2)
+        base = json.loads((packaging.DESKTOP / "src-tauri/tauri.conf.json").read_text())
+        self.assertEqual(config["bundle"]["resources"], {
+            **{source: None for source in base["bundle"]["resources"]},
+            str(prepared / "LICENSE.llama.cpp"): "LICENSE.llama.cpp",
+            str(prepared / "backend-provenance.json"): "backend-provenance.json",
+        })
         self.assertEqual({p.name for p in (prepared / "libraries").iterdir()},
                          {"libllama.0.dylib", "libggml.dylib"})
         self.assertFalse((prepared / "unneeded-tool").exists())
@@ -83,6 +87,29 @@ class PackagingTests(unittest.TestCase):
         self.assertTrue((prepared / f"mir-llama-server-{TARGET}").stat().st_mode & 0o111)
         provenance = json.loads((prepared / "backend-provenance.json").read_text())
         self.assertEqual(provenance["target"], TARGET)
+
+    def test_bundle_resources_must_be_at_the_runtime_paths_and_match_preparation(self):
+        prepared = self.prepare(self.archive())
+        app = self.root / "Backend Check.app"
+        resources = app / "Contents/Resources"
+        resources.mkdir(parents=True)
+        for name in ("LICENSE.llama.cpp", "backend-provenance.json"):
+            (resources / name).write_bytes((prepared / name).read_bytes())
+        packaging.verify_bundle_resources(app, prepared)
+        provenance = resources / "backend-provenance.json"
+        provenance.write_text("{}")
+        with self.assertRaisesRegex(ValueError, "backend-provenance.json"):
+            packaging.verify_bundle_resources(app, prepared)
+        provenance.unlink()
+        nested = resources / "_root_/build"
+        nested.mkdir(parents=True)
+        (nested / provenance.name).write_bytes((prepared / provenance.name).read_bytes())
+        with self.assertRaisesRegex(ValueError, "backend-provenance.json"):
+            packaging.verify_bundle_resources(app, prepared)
+        provenance.write_bytes((prepared / provenance.name).read_bytes())
+        (resources / "launcher").mkdir()
+        with self.assertRaisesRegex(ValueError, "launcher"):
+            packaging.verify_bundle_resources(app, prepared)
 
     def test_failed_checksum_preserves_prepared_backend(self):
         archive = self.archive()

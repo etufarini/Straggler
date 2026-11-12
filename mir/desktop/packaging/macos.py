@@ -24,6 +24,7 @@ PACKAGING = Path(__file__).resolve().parent
 DESKTOP = PACKAGING.parent
 PRODUCT = "Mir.cpp Backend Check"
 CPU_TYPES = {"aarch64-apple-darwin": 0x100000C, "x86_64-apple-darwin": 0x1000007}
+BACKEND_RESOURCES = ("LICENSE.llama.cpp", "backend-provenance.json")
 
 
 def macho_dependencies(binary, cpu_type):
@@ -156,14 +157,18 @@ def prepare(target, archive_path=None):
             provenance = {key: manifest[key] for key in ("repository", "tag", "commit", "purpose")}
             provenance.update(target=target, archive=artifact["name"], sha256=digest, url=url)
             (stage / "backend-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+            desktop_config = json.loads((DESKTOP / "src-tauri/tauri.conf.json").read_text())
+            launcher_resources = desktop_config["bundle"]["resources"]
+            # Tauri merges resource maps; null removes the normal launcher's entries.
+            resources = {source: None for source in launcher_resources}
+            resources.update({str(destination / name): name for name in BACKEND_RESOURCES})
             config = {
                 "productName": PRODUCT,
                 "identifier": "io.github.etufarini.mir.packaging-check",
                 "app": {"windows": []},
                 "bundle": {
                     "targets": ["app"],
-                    "resources": [str(destination / "LICENSE.llama.cpp"),
-                                  str(destination / "backend-provenance.json")],
+                    "resources": resources,
                     "externalBin": [str(destination / "mir-llama-server")],
                     "macOS": {
                         "minimumSystemVersion": "13.5",
@@ -194,6 +199,16 @@ def run(*arguments, **kwargs):
     subprocess.run(arguments, check=True, **kwargs)
 
 
+def verify_bundle_resources(app, prepared):
+    resources = app / "Contents/Resources"
+    for name in BACKEND_RESOURCES:
+        bundled = resources / name
+        if not bundled.is_file() or bundled.read_bytes() != (prepared / name).read_bytes():
+            raise ValueError(f"Missing or incorrect bundled backend resource: {name}")
+    if (resources / "launcher").exists():
+        raise ValueError("The packaging check must not include launcher resources")
+
+
 def sign_bundle(app, identity):
     contents = app / "Contents"
     # The upstream executables use @loader_path; their libraries live in Frameworks.
@@ -201,7 +216,9 @@ def sign_bundle(app, identity):
     run("install_name_tool", "-add_rpath", "@executable_path/../Frameworks", str(helper))
     for library in sorted((contents / "Frameworks").glob("*.dylib")):
         run("codesign", "--force", "--sign", identity, str(library))
-    run("codesign", "--force", "--sign", identity, "--options", "runtime", "--entitlements",
+    # Hardened library validation requires a common Team ID, absent from ad hoc signatures.
+    helper_options = [] if identity == "-" else ["--options", "runtime"]
+    run("codesign", "--force", "--sign", identity, *helper_options, "--entitlements",
         str(PACKAGING / "helper.entitlements.plist"), str(helper))
     run("codesign", "--force", "--sign", identity, "--options", "runtime", "--entitlements",
         str(PACKAGING / "app.entitlements.plist"), str(app))
@@ -228,6 +245,7 @@ def main():
             "--features", "packaging-probe", "--config", str(prepared / "tauri.backend-check.json"),
             "--no-sign", cwd=DESKTOP, env=environment)
         app = build / args.target / "release/bundle/macos" / (PRODUCT + ".app")
+        verify_bundle_resources(app, prepared)
         sign_bundle(app, args.signing_identity)
         print(f"Local packaging check: {app}")
     else:

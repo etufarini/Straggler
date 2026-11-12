@@ -37,9 +37,14 @@ async fn inspect(app: &tauri::AppHandle, cancelled: &AtomicBool) -> Result<serde
         .resource_dir()
         .map_err(|e| e.to_string())?
         .join("backend-provenance.json");
-    let provenance: serde_json::Value =
-        serde_json::from_slice(&fs::read(provenance).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
+    let provenance_bytes = fs::read(&provenance).map_err(|error| {
+        format!(
+            "Cannot read bundled backend provenance {}: {error}",
+            provenance.display()
+        )
+    })?;
+    let provenance: serde_json::Value = serde_json::from_slice(&provenance_bytes)
+        .map_err(|error| format!("Invalid bundled backend provenance: {error}"))?;
     let commit = provenance["commit"]
         .as_str()
         .filter(|value| value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
