@@ -653,6 +653,17 @@ architectures and builds/extracts/verifies Debian packages on Ubuntu 24.04 x64
 and ARM64. Candidate packages and diagnostic screenshots are retained as workflow
 artifacts. It is not a replacement for the normal Linux/macOS CI checks.
 
+On a development branch where GitHub has not registered the optional workflow
+on the default branch yet, dispatch the existing checks workflow with packaging
+enabled. It calls the packaging workflow from the same commit:
+
+```bash
+gh workflow run check.yml --ref YOUR_BRANCH -f packaging=true
+```
+
+Normal pushes keep the backend download/build experiment disabled. Both paths
+retain candidate artifacts in GitHub Actions; neither submits anything to Apple.
+
 Before adopting this packaging for releases, run it on the target Macs and verify
 native model selection, cancellation, loading, shutdown and report storage. The
 current experiment does not implement persistent security-scoped bookmarks or
@@ -844,9 +855,12 @@ window/process tests passed on both. The runtime suite passed on ARM64; under x6
 emulation, the missing-executable diagnostic fixture returns child exit 127 rather
 than a spawn error, and the unrelated-listener shutdown fixture reports an
 unimplemented `pidfd` syscall. Those two existing checks therefore fail under this
-emulator; they pass on native ARM64 Linux. The full macOS runtime check
-also reports two existing occupied-port/listener failures in the wildcard port
-probe; a complete runtime-suite pass on macOS is not claimed. These observations do
+emulator; they pass on native ARM64 Linux. The macOS port probe now checks wildcard
+and assigned interface addresses: a reused wildcard bind can coexist with an
+existing loopback listener on macOS. Regression checks cover occupied IPv4/IPv6
+addresses and reuse after a closed connection. The complete macOS runtime suite
+passes after this correction, including listener identity and confirmed shutdown.
+These observations do
 not validate a distribution certificate/profile pair, Store submission, Intel
 macOS or the minimum macOS version. The optional CI matrix supplies the matching
 architecture build procedures; a configured job is not evidence that it has run.

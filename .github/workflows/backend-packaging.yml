@@ -4,6 +4,7 @@ name: Optional desktop backend packaging
 # Normal checks remain offline with respect to llama.cpp and inference services.
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
