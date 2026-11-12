@@ -35,6 +35,7 @@ desktop/src/app/ConversationMenu.tsx
 desktop/src/app/Sidebar.tsx
 desktop/src/app/useUiPreferences.ts
 desktop/src/app/useWorkspace.ts
+desktop/src/components/ActionMenu.tsx
 desktop/src/components/Feedback.tsx
 desktop/src/components/FieldError.tsx
 desktop/src/components/FolderBrowser.tsx
@@ -53,6 +54,7 @@ desktop/src/domain/projectContext.ts
 desktop/src/domain/projects.ts
 desktop/src/domain/storageQueue.ts
 desktop/src/domain/types.ts
+desktop/src/features/attachments/AttachmentRow.tsx
 desktop/src/features/attachments/AttachmentSection.tsx
 desktop/src/features/attachments/useAttachments.ts
 desktop/src/features/chat/ChatPanel.tsx

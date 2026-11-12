@@ -9,6 +9,11 @@ export default function Popover({
   children,
   className = '',
   disabled = false,
+  controlId,
+  closeControlId,
+  containFocus = false,
+  popoverClassName = '',
+  heading,
 }: {
   label: string;
   valueLabel?: string;
@@ -16,6 +21,11 @@ export default function Popover({
   children: (close: () => void) => ReactNode;
   className?: string;
   disabled?: boolean;
+  controlId?: string;
+  closeControlId?: string;
+  containFocus?: boolean;
+  popoverClassName?: string;
+  heading?: string;
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -25,12 +35,29 @@ export default function Popover({
   useEffect(() => {
     if (!open) return;
     const opener = button.current;
-    root.current
-      ?.querySelector<HTMLElement>(
+    (
+      root.current?.querySelector<HTMLElement>('[data-initial-focus]') ??
+      root.current?.querySelector<HTMLElement>(
         '.composer-popover button, .composer-popover input, .composer-popover textarea',
       )
-      ?.focus();
+    )?.focus();
     function keydown(event: KeyboardEvent) {
+      if (containFocus && event.key === 'Tab') {
+        const nodes = root.current?.querySelectorAll<HTMLElement>(
+          '.composer-popover button:not(:disabled), .composer-popover input:not(:disabled), .composer-popover textarea:not(:disabled), .composer-popover select:not(:disabled), .composer-popover [tabindex="0"]',
+        );
+        if (nodes?.length) {
+          const first = nodes[0],
+            last = nodes[nodes.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      }
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
@@ -47,11 +74,12 @@ export default function Popover({
       document.removeEventListener('pointerdown', outside);
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [open, containFocus]);
   return (
     <div ref={root} className={`composer-menu ${className}`}>
       <button
         ref={button}
+        data-control-id={controlId}
         type="button"
         className="composer-chip"
         aria-label={label}
@@ -70,10 +98,24 @@ export default function Popover({
         </span>
       )}
       {open && (
-        <section className="composer-popover" id={id} role="dialog" aria-label={label}>
+        <section
+          className={`composer-popover ${popoverClassName}`}
+          id={id}
+          role="dialog"
+          aria-label={label}
+        >
           <div className="popover-header">
-            <strong>{label}</strong>
-            <button type="button" aria-label={`Close ${label.toLowerCase()}`} onClick={close}>
+            <strong>{heading ?? label}</strong>
+            <button
+              type="button"
+              data-control-id={closeControlId}
+              aria-label={
+                closeControlId === 'button-close-project-instructions'
+                  ? 'Close project instructions'
+                  : `Close ${label.toLowerCase()}`
+              }
+              onClick={close}
+            >
               <X size={16} />
             </button>
           </div>
