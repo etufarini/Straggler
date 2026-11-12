@@ -16,8 +16,8 @@ import {
   projectService,
 } from '../../services/desktop';
 import type { TokenEstimate } from '../../services/desktop';
+import { pendingAttachmentRow } from '../../domain/attachments';
 import type { AttachmentRow } from '../../domain/attachments';
-import { fileName } from '../../domain/types';
 
 export function useProjects(
   queue: StorageQueue,
@@ -113,6 +113,12 @@ export function useProjects(
   function addFiles(id: string, paths?: string[]) {
     return trackStorageWork(pendingWork.current, () => addFileBatch(id, paths));
   }
+  function updatePendingFiles(id: string, update: (rows: AttachmentRow[]) => AttachmentRow[]) {
+    setPendingFiles((values) => ({ ...values, [id]: update(values[id] ?? []) }));
+  }
+  function removePendingFile(id: string, fileId: string) {
+    updatePendingFiles(id, (rows) => rows.filter((row) => row.id !== fileId));
+  }
   async function addFileBatch(id: string, paths?: string[]) {
     let selected: string[];
     try {
@@ -122,14 +128,8 @@ export function useProjects(
       return;
     }
     if (!selected.length) return;
-    const rows = selected.map((path): AttachmentRow => ({
-      id: crypto.randomUUID(),
-      name: fileName(path),
-      extension: fileName(path).split('.').at(-1)?.toLowerCase() ?? '',
-      state: 'reading',
-      size: null,
-    }));
-    setPendingFiles((values) => ({ ...values, [id]: [...(values[id] ?? []), ...rows] }));
+    const rows = selected.map(pendingAttachmentRow);
+    updatePendingFiles(id, (values) => [...values, ...rows]);
     await run(async () => {
       let warning: string | undefined;
       for (const [index, path] of selected.entries()) {
@@ -137,20 +137,15 @@ export function useProjects(
         try {
           const result = await projectService.addFile(id, path);
           accept(result.project);
-          setPendingFiles((values) => ({
-            ...values,
-            [id]: (values[id] ?? []).filter((value) => value.id !== row.id),
-          }));
+          removePendingFile(id, row.id);
         } catch (failure) {
-          warning = errorDetail(failure).message;
-          setPendingFiles((values) => ({
-            ...values,
-            [id]: (values[id] ?? []).map((value) =>
-              value.id === row.id
-                ? { ...value, state: 'error', error: errorDetail(failure).message }
-                : value,
+          const message = errorDetail(failure).message;
+          warning = message;
+          updatePendingFiles(id, (values) =>
+            values.map((value) =>
+              value.id === row.id ? { ...value, state: 'error', error: message } : value,
             ),
-          }));
+          );
         }
       }
       return { warning };
@@ -217,11 +212,7 @@ export function useProjects(
     setError,
     busy: busy > 0,
     pendingFiles,
-    removePendingFile: (projectId: string, fileId: string) =>
-      setPendingFiles((values) => ({
-        ...values,
-        [projectId]: (values[projectId] ?? []).filter((row) => row.id !== fileId),
-      })),
+    removePendingFile,
     notice,
     setNotice,
     load,

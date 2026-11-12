@@ -732,20 +732,14 @@ fn same_content(a: &Project, b: &Project) -> bool {
 }
 
 fn change_membership(chat: &mut Conversation, project_id: Option<Uuid>) {
+    let prompt = chat.own_system_prompt.clone().unwrap_or_else(|| {
+        chat.options
+            .as_ref()
+            .and_then(|options| options.system_prompt.clone())
+    });
     if chat.project_id.is_none() && project_id.is_some() {
-        let prompt = chat.own_system_prompt.clone().unwrap_or_else(|| {
-            chat.options
-                .as_ref()
-                .and_then(|options| options.system_prompt.clone())
-        });
         chat.own_system_prompt = Some(prompt);
-    }
-    if project_id.is_none() {
-        let prompt = chat.own_system_prompt.clone().unwrap_or_else(|| {
-            chat.options
-                .as_ref()
-                .and_then(|options| options.system_prompt.clone())
-        });
+    } else if project_id.is_none() {
         if let Some(options) = &mut chat.options {
             options.system_prompt = prompt;
         } else if prompt.is_some() {

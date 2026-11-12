@@ -9,7 +9,11 @@ import {
   isTauri,
 } from '../../services/desktop';
 import type { DragDropEvent, TokenEstimate } from '../../services/desktop';
-import { approximateTokens, sortAttachmentRows } from '../../domain/attachments';
+import {
+  approximateTokens,
+  pendingAttachmentRow,
+  sortAttachmentRows,
+} from '../../domain/attachments';
 import type { AttachmentRow } from '../../domain/attachments';
 import { errorDetail } from '../../domain/errors';
 import { fileName } from '../../domain/types';
@@ -68,16 +72,7 @@ export function useAttachments(
       return;
     }
     const id = current.current.chatRef.current.id;
-    const rows = paths.map((path): AttachmentRow => {
-      const name = fileName(path);
-      return {
-        id: crypto.randomUUID(),
-        name,
-        extension: name.split('.').at(-1)?.toLowerCase() ?? '',
-        size: null,
-        state: 'reading',
-      };
-    });
+    const rows = paths.map(pendingAttachmentRow);
     updatePending(id, (values) => [...values, ...rows]);
     setError('');
     try {

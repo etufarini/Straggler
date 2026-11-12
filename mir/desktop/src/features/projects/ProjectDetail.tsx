@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { ArrowLeft, ArrowUp, Star, Trash2, FileUp, RotateCcw, Pencil } from 'lucide-react';
 import type { WorkspaceController } from '../../app/useWorkspace';
 import type { Project } from '../../domain/projects';
+import { attachmentTypes } from '../../domain/attachments';
 import { ProjectCapacity, ProjectLimitFeedback } from './ProjectCapacity';
 import Feedback from '../../components/Feedback';
 import AttachmentRow from '../attachments/AttachmentRow';
@@ -202,7 +203,6 @@ export default function ProjectDetail({
                   </button>
                   <ConversationMenu
                     conversation={chat}
-                    disabled={false}
                     controlId={`button-options-in-project-${controlSlug(chat.title)}`}
                     readOnly={project.archived}
                     actionBusyReason={
@@ -371,7 +371,7 @@ export default function ProjectDetail({
                 <span className="dropzone-text">
                   <strong>Add files</strong>
                   <small className="dropzone-types" id="project-file-types">
-                    .txt · .md · .docx · .xlsx · .pptx · .pdf
+                    {attachmentTypes.map((extension) => `.${extension}`).join(' · ')}
                   </small>
                 </span>
               </button>

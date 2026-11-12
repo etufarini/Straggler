@@ -60,6 +60,8 @@ export default function ProjectMenu({
           label: 'Archive…',
           controlId: 'button-archive-project-menu',
           icon: <Archive size={15} />,
+          disabled: !!busyReason,
+          disabledReason: busyReason,
           onSelect: onArchive,
         },
         {
@@ -68,20 +70,11 @@ export default function ProjectMenu({
           icon: <Trash2 size={15} />,
           destructive: true,
           separatorBefore: true,
+          disabled: !!busyReason,
+          disabledReason: busyReason,
           onSelect: onDelete,
         },
-      ].map((item) => ({
-        ...item,
-        disabled:
-          !!busyReason &&
-          (item.controlId === 'button-archive-project-menu' ||
-            item.controlId === 'button-delete-project-menu'),
-        disabledReason:
-          item.controlId === 'button-archive-project-menu' ||
-          item.controlId === 'button-delete-project-menu'
-            ? busyReason
-            : undefined,
-      }));
+      ];
   return (
     <ActionMenu
       label={`Options for project ${project.name}`}

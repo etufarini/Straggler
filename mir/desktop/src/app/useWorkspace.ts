@@ -177,14 +177,11 @@ export function useWorkspace() {
     sendPromise.current = pending;
     void pending;
   }
-  function acceptMember(value: Conversation) {
-    conversation.acceptStoredConversation(value);
-  }
   async function moveChat(value: Conversation, target: string | null) {
     if (value.id === chatRef.current.id) await save(chatRef.current);
     const previous = projects.current.current.find((project) => project.id === value.projectId);
     const result = await projects.moveChat(value.id, target);
-    acceptMember(result.conversation);
+    conversation.acceptStoredConversation(result.conversation);
     const destination = projects.current.current.find((project) => project.id === target);
     projects.setNotice({
       message: destination
@@ -195,7 +192,7 @@ export function useWorkspace() {
   }
   async function undoProjectAction(token: string) {
     const result = await projects.undo(token);
-    if (result.conversation) acceptMember(result.conversation);
+    if (result.conversation) conversation.acceptStoredConversation(result.conversation);
     projects.setNotice({ message: 'Undone.' });
   }
   function requestDeleteChat(value: Conversation) {
