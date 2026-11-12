@@ -51,6 +51,16 @@ impl Fixture {
             Some(libc::ESRCH)
         );
     }
+
+    async fn cancel_when_started(&self, cancelled: &AtomicBool) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !self.directory.path().join("pid.txt").exists()
+            && std::time::Instant::now() < deadline
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        cancelled.store(true, Ordering::Relaxed);
+    }
 }
 
 #[tokio::test]
@@ -126,7 +136,7 @@ async fn model_load_errors_and_loading_timeouts_keep_the_backend_log_and_cleanup
             &fixture.server,
             &fixture.model,
             &AtomicBool::new(false),
-            Duration::from_secs(1),
+            Duration::from_secs(5),
             &mut |_| false,
         )
         .await;
@@ -149,11 +159,8 @@ async fn cancellation_and_timeout_reap_owned_processes() {
         fixture.flag("wait");
         let cancelled = AtomicBool::new(false);
         let cancellation = async {
-            while !fixture.directory.path().join("pid.txt").exists() {
-                tokio::time::sleep(Duration::from_millis(10)).await;
-            }
             if cancel {
-                cancelled.store(true, Ordering::Relaxed);
+                fixture.cancel_when_started(&cancelled).await;
             }
         };
         let mut refuse_force = |_| false;
@@ -161,7 +168,7 @@ async fn cancellation_and_timeout_reap_owned_processes() {
             &fixture.server,
             "--version",
             &cancelled,
-            Duration::from_secs(1),
+            Duration::from_secs(5),
             &mut refuse_force,
         );
         let (result, ()) = tokio::join!(check, cancellation);
@@ -180,21 +187,23 @@ async fn sigkill_requires_a_separate_confirmation_after_sigterm() {
     fixture.flag("wait");
     fixture.flag("ignore-term");
     let mut confirmations = 0;
-    let result = check_command(
+    let cancelled = AtomicBool::new(false);
+    let mut confirm_force = |pid: u32| {
+        confirmations += 1;
+        assert_eq!(
+            fs::read_to_string(fixture.directory.path().join("pid.txt")).unwrap(),
+            pid.to_string()
+        );
+        true
+    };
+    let check = check_command(
         &fixture.server,
         "--version",
-        &AtomicBool::new(false),
-        Duration::from_secs(1),
-        &mut |pid| {
-            confirmations += 1;
-            assert_eq!(
-                fs::read_to_string(fixture.directory.path().join("pid.txt")).unwrap(),
-                pid.to_string()
-            );
-            true
-        },
-    )
-    .await;
+        &cancelled,
+        Duration::from_secs(10),
+        &mut confirm_force,
+    );
+    let (result, ()) = tokio::join!(check, fixture.cancel_when_started(&cancelled));
     assert!(!result.success);
     assert_eq!(confirmations, 1);
     fixture.assert_reaped();

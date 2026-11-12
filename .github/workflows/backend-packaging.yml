@@ -1,0 +1,80 @@
+name: Optional macOS backend packaging
+
+# Downloads the pinned upstream backend, but never downloads or loads a model.
+# Normal checks remain offline with respect to llama.cpp and inference services.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packaging:
+    name: Sandbox check on ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mir/desktop
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mir/desktop/package-lock.json
+      - name: Prepare build tools
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add "${{ matrix.target }}"
+          npm ci --no-audit --no-fund
+      - name: Build and sign the sandboxed packaging check
+        run: python3 packaging/macos.py bundle --target "${{ matrix.target }}"
+      - name: Run with system tools only and no model
+        env:
+          CHECK_TARGET: ${{ matrix.target }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import tempfile
+
+          generated = Path('packaging/generated').resolve()
+          app = generated / 'build' / os.environ['CHECK_TARGET'] / 'release/bundle/macos/Mir.cpp Backend Check.app'
+          executable = app / 'Contents/MacOS/mir-desktop'
+          environment = {key: value for key, value in os.environ.items()
+                         if not key.startswith(('MIR_', 'LLAMA_'))}
+          environment['PATH'] = '/usr/bin:/bin:/usr/sbin:/sbin'
+          with tempfile.TemporaryDirectory(prefix='mir-packaging-run-') as work:
+              result = subprocess.run([str(executable), '--no-dialog', '--allow-force-stop'],
+                                      cwd=work, env=environment, capture_output=True, text=True, timeout=150)
+          (generated / 'check-stdout.txt').write_text(result.stdout)
+          (generated / 'check-stderr.txt').write_text(result.stderr)
+          print(result.stdout)
+          print(result.stderr)
+          result.check_returncode()
+          report = json.loads(next(line for line in reversed(result.stdout.splitlines()) if line.startswith('{')))
+          assert report['success'] is True, report
+          assert report['modelCheckRequested'] is False, report
+          assert [check['operation'] for check in report['checks']] == ['--version', '--help'], report
+          PY
+      - name: Retain diagnostic output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-check-${{ matrix.target }}
+          path: mir/desktop/packaging/generated/check-*.txt
+          if-no-files-found: warn

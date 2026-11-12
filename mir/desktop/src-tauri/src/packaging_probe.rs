@@ -127,21 +127,22 @@ pub fn run(context: tauri::Context<tauri::Wry>) {
         .setup(move |app| {
             let handle = app.handle().clone();
             let signal_cancel = worker_cancel.clone();
-            tauri::async_runtime::spawn(async move {
+            let (mut terminate, mut interrupt, mut hangup) = tauri::async_runtime::block_on(async {
                 use tokio::signal::unix::{signal, SignalKind};
-                if let (Ok(mut terminate), Ok(mut interrupt), Ok(mut hangup)) = (
-                    signal(SignalKind::terminate()),
-                    signal(SignalKind::interrupt()),
-                    signal(SignalKind::hangup()),
-                ) {
-                    tokio::select! { _ = terminate.recv() => {}, _ = interrupt.recv() => {}, _ = hangup.recv() => {} }
-                    signal_cancel.store(true, Ordering::Relaxed);
-                }
+                Ok::<_, std::io::Error>((
+                    signal(SignalKind::terminate())?,
+                    signal(SignalKind::interrupt())?,
+                    signal(SignalKind::hangup())?,
+                ))
+            })?;
+            tauri::async_runtime::spawn(async move {
+                tokio::select! { _ = terminate.recv() => {}, _ = interrupt.recv() => {}, _ = hangup.recv() => {} }
+                signal_cancel.store(true, Ordering::Relaxed);
             });
             // Blocking native dialogs run away from the application event loop.
             std::thread::spawn(move || {
                 let result = tauri::async_runtime::block_on(inspect(&handle, &worker_cancel));
-                let report =
+                let mut report =
                     result.unwrap_or_else(|error| json!({"success": false, "error": error}));
                 let saved = (|| -> Result<_> {
                     let directory = handle.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -153,12 +154,10 @@ pub fn run(context: tauri::Context<tauri::Wry>) {
                     )?;
                     Ok(path)
                 })();
-                println!("{report}");
-                let mut success = report["success"] == true;
                 let message = match saved {
                     Ok(path) => format!(
                         "Backend check {}. Report: {}",
-                        if success {
+                        if report["success"] == true {
                             "passed"
                         } else {
                             "failed or cancelled"
@@ -166,10 +165,13 @@ pub fn run(context: tauri::Context<tauri::Wry>) {
                         path.display()
                     ),
                     Err(error) => {
-                        success = false;
+                        report["success"] = json!(false);
+                        report["storageError"] = json!(&error);
                         format!("Cannot save the packaging report: {error}")
                     }
                 };
+                let success = report["success"] == true;
+                println!("{report}");
                 eprintln!("{message}");
                 if !std::env::args().any(|arg| arg == "--no-dialog") && !worker_cancel.load(Ordering::Relaxed) {
                     handle

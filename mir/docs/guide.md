@@ -416,6 +416,7 @@ bash mir/tests/run.sh          # Common, platform, desktop and available native-
 bash mir/tests/run.sh common   # Launcher and preparation tests
 bash mir/tests/run.sh desktop  # Frontend, contracts, Rust and browser flows
 bash mir/tests/run.sh native   # Real desktop window with local test server
+bash mir/tests/run.sh packaging # Offline archive and backend lifecycle checks
 ```
 
 The runner prepares missing npm dependencies and Playwright browsers. It never
@@ -526,6 +527,109 @@ for the approved version, regenerate the installer, and test its exact archive.
 Removing the old interface affects documented behavior and must be reflected in
 the version and release notes. Obtain approval for version, full candidate SHA and
 notes before creating a tag or publishing. Never move an existing tag.
+
+## macOS backend packaging experiment
+
+This branch includes a local packaging experiment, not a distributable desktop
+release. The same Tauri executable can be built in `packaging-probe` mode to check
+an included official `llama-server` without starting the Bash/Python bridge or
+loading profiles, conversations or preferences. Normal desktop startup still
+uses the existing launcher. Ubuntu packaging and migration of configuration into
+Rust are subsequent work.
+
+`mir/desktop/packaging/llama-runtime.json` pins candidate upstream release `b12248`,
+its full source commit, and independent SHA-256 digests for macOS ARM64 and Intel.
+This candidate is not the backend of a published Mir.cpp release. Preparation
+verifies the entire archive before reading its members, follows the server's
+transitive Mach-O library dependencies, rejects external installation paths, and
+copies only the server, required libraries, archive license and provenance. It
+never extracts archive paths or creates archive-provided links. Failed preparation
+keeps the previous prepared backend; an interrupted directory replacement leaves
+a `.previous` directory that must be recovered before retrying.
+
+From `mir/desktop`, inspect and prepare either target on Linux or macOS:
+
+```bash
+python3 packaging/macos.py prepare --target aarch64-apple-darwin
+python3 packaging/macos.py prepare --target x86_64-apple-darwin
+```
+
+Preparation requires Python 3.9+ and network access to the pinned GitHub asset.
+`--archive /absolute/path/to/archive.tar.gz` accepts an already downloaded archive
+and still checks its pinned digest. Generated files stay in the ignored
+`packaging/generated/` directory. No model is downloaded or executed by preparation.
+
+On a Mac with the existing frontend/Rust development tools and Xcode command line
+tools, build the matching architecture:
+
+```bash
+npm ci --no-audit --no-fund
+python3 packaging/macos.py bundle --target aarch64-apple-darwin
+```
+
+Use `x86_64-apple-darwin` on Intel. The command builds an `.app` named
+`Mir.cpp Backend Check.app`, includes the pinned server and libraries, adjusts the
+server's library search path, signs nested libraries and the helper before the
+application, then verifies the signatures and the helper's entitlements. The
+default identity is `-`, a local ad hoc signature. `--signing-identity "IDENTITY"`
+selects a certificate already present in the developer's keychain; no certificate
+is created, exported or uploaded. This command does not notarize, publish, or
+submit the application to the Store.
+
+The parent enables App Sandbox, user-selected read-only files and client/server
+network access. The helper has exactly `app-sandbox` and `inherit`; it obtains
+the parent's static permissions. The generated configuration replaces launcher
+resources with the archive license and provenance. It uses the distinct application
+identifier `io.github.etufarini.mir.packaging-check` for native diagnostic storage.
+Python, Node, Rust and command line build tools are developer requirements, not
+dependencies of the resulting diagnostic app.
+
+Launch the app to check `--version` and `--help`, including whether the backend
+reports the pinned commit. Its result dialog gives the path to the atomic
+`backend-check.json` report in that application's native data directory. A failure
+to save the report is itself a failed check. For unattended execution:
+
+```bash
+"packaging/generated/build/aarch64-apple-darwin/release/bundle/macos/Mir.cpp Backend Check.app/Contents/MacOS/mir-desktop" --no-dialog --allow-force-stop
+```
+
+`--allow-force-stop` explicitly permits SIGKILL only for a still-owned diagnostic
+child that fails to exit after SIGTERM. Interactive runs request separate native
+confirmation. Refusing SIGKILL keeps waiting with ownership of the child; a
+noninteractive run without the flag also keeps waiting instead of forcing exit.
+Quit requests confirm cancellation and wait for cleanup. SIGINT, SIGTERM and
+SIGHUP request cancellation directly.
+
+For the optional model access check, launch with `--select-model`. Choose a local
+GGUF in the native picker, or cancel. The helper loads it with GPU layers disabled,
+a context of 512, one slot and warmup disabled, checks loopback `/health`, and stops
+without generating a response. This may require significant RAM and is an optional
+integration diagnostic. No real model or hardware is required by automated tests.
+The report contains logs which can include the selected model's private path;
+review it before sharing. Model readiness is not evidence of successful inference.
+
+The `Optional macOS backend packaging` workflow is manually dispatched on Apple
+Silicon and Intel CPU runners. It builds with local signing and runs only version
+and help checks with system-only `PATH`, without model weights or Homebrew tools
+available to the app. Diagnostic output is retained; this experiment publishes no
+installers. It is not a replacement for the normal Linux/macOS CI checks.
+
+Before adopting this packaging for releases, run it on the target Macs and verify
+native model selection, cancellation, loading, shutdown and report storage. The
+current experiment does not implement persistent security-scoped bookmarks or
+demonstrate reopening a model after relaunch. Distribution signing, notarization,
+Store provisioning, dependency notices and the minimum supported macOS version
+still need validation. In particular, the upstream Intel artifact disables Metal;
+backend availability must be discovered from each selected artifact.
+
+The fixture flags and health statuses follow the candidate's
+[argument definitions](https://github.com/ggml-org/llama.cpp/blob/b12248/common/arg.cpp)
+and [server contract](https://github.com/ggml-org/llama.cpp/blob/b12248/tools/server/README.md).
+Packaging follows [Tauri sidecars](https://v2.tauri.app/develop/sidecar/),
+[Tauri macOS bundles](https://v2.tauri.app/distribute/macos-application-bundle/),
+and Apple's [embedded helper signing guidance](https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app).
+Apple documents [file access and bookmarks](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox)
+separately; passing a pathname alone must be tested in the signed sandbox.
 
 ## Troubleshooting
 

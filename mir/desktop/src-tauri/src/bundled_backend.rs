@@ -68,10 +68,10 @@ impl Process {
         // An unreaped owned child reserves its PID. Never signal a discovered listener.
         let pid = self.child.id();
         if unsafe { libc::kill(-(pid as i32), libc::SIGTERM) } != 0 {
-            return Err(format!(
-                "Cannot stop backend PID {pid}: {}",
-                std::io::Error::last_os_error()
-            ));
+            let error = std::io::Error::last_os_error();
+            if error.raw_os_error() != Some(libc::ESRCH) {
+                return Err(format!("Cannot stop backend PID {pid}: {error}"));
+            }
         }
         let mut deadline = Instant::now() + Duration::from_secs(5);
         loop {
@@ -83,10 +83,12 @@ impl Process {
                     // The child is still owned and unreaped, including across the confirmation.
                     if self.child.try_wait().map_err(|e| e.to_string())?.is_none() {
                         if unsafe { libc::kill(-(pid as i32), libc::SIGKILL) } != 0 {
-                            return Err(format!(
-                                "Cannot force stop backend PID {pid}: {}",
-                                std::io::Error::last_os_error()
-                            ));
+                            let error = std::io::Error::last_os_error();
+                            if error.raw_os_error() != Some(libc::ESRCH) {
+                                return Err(format!(
+                                    "Cannot force stop backend PID {pid}: {error}"
+                                ));
+                            }
                         }
                         self.child.wait().map_err(|e| e.to_string())?;
                     }

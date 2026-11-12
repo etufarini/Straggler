@@ -7,7 +7,7 @@ if [[ "$RUNTIME_BASH" != "$BASH" ]]; then exec "$RUNTIME_BASH" "${BASH_SOURCE[0]
 # Test subprocesses use the same compatible interpreter as this runner.
 export PATH="${BASH%/*}:$PATH"
 suite=${1:-all}
-case "$suite" in common|linux|macos|desktop|native|all) ;; *) printf 'Usage: bash mir/tests/run.sh [common|linux|macos|desktop|native|all]\n' >&2; exit 1 ;; esac
+case "$suite" in common|linux|macos|desktop|native|packaging|all) ;; *) printf 'Usage: bash mir/tests/run.sh [common|linux|macos|desktop|native|packaging|all]\n' >&2; exit 1 ;; esac
 if (( $# > 1 )); then exit 1; fi
 lint_pids=()
 finish_lint() {
@@ -30,6 +30,7 @@ run() {
 }
 if [[ "$suite" == common || "$suite" == all ]]; then
     run architecture.sh
+    python3 -I "$MIR_ROOT/desktop/tests/test_macos_packaging.py"
     test_scripts=("$MIR_ROOT"/tests/*.sh "$MIR_ROOT"/tests/helpers/*.sh "$MIR_ROOT"/tests/platform/*.sh "$MIR_ROOT"/tests/native/*.sh)
     source_scripts=("$MIR_ROOT/mir.sh" "$MIR_ROOT"/lib/*.sh "$MIR_ROOT"/sh/*.sh)
     if command -v shellcheck >/dev/null; then
@@ -59,6 +60,10 @@ if [[ "$suite" == common || "$suite" == all ]]; then
     run memory.sh
     run bootstrap.sh
     finish_lint
+fi
+if [[ "$suite" == packaging ]]; then
+    python3 -I "$MIR_ROOT/desktop/tests/test_macos_packaging.py"
+    cargo test --locked --manifest-path "$MIR_ROOT/desktop/src-tauri/Cargo.toml" --no-default-features --test bundled_backend
 fi
 if [[ "$suite" == linux || "$suite" == all ]]; then
     lint_adapter linux

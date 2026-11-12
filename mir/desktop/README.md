@@ -10,7 +10,7 @@ rustfmt and Clippy. Native window builds also require the platform's
 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 From the repository root, run `bash mir/tests/run.sh` for the complete automated
-suite, including the native window when a graphical session is available, or select `common`, `linux`, `macos`, `desktop` or `native`. The runner
+suite, including the native window when a graphical session is available, or select `common`, `linux`, `macos`, `desktop`, `native` or `packaging`. The runner
 prepares npm dependencies and browser downloads when needed. Tests use isolated
 directories, fake executables and a local HTTP server; no GPU, models or working
 llama.cpp installation are needed. Linux native-window tests use a private D-Bus
@@ -64,6 +64,19 @@ when updating those fixtures.
 Keep runtime-files.txt aligned with bundled sources and regenerate the standalone
 installer after moving runtime files. Do not include generated output, tests,
 node_modules or target in the runtime manifest.
+
+The `packaging` suite checks pinned-backend preparation and native process lifecycle
+with temporary directories, tiny Mach-O fixtures and a fake HTTP server. It does
+not download llama.cpp or require a Mac, model, GPU or inference service. Those
+tests also run through the regular common/desktop suites.
+
+The optional macOS packaging experiment uses the same Tauri executable compiled
+with `packaging-probe`. It bypasses the shell bridge and creates no chat window.
+It checks an upstream backend included in the bundle, writes an isolated native
+report and optionally opens a GGUF through the native picker for a CPU loading
+check. This diagnostic mode is separate from the normal desktop startup path.
+See [the packaging procedure](../docs/guide.md#macos-backend-packaging-experiment)
+for build, signing, manual checks and current limitations.
 
 See the [guide](../docs/guide.md#development-on-one-computer) for architecture,
 settings, contracts, preparation, data paths and release maintenance.
