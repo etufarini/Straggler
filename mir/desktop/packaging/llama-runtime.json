@@ -1,0 +1,16 @@
+{
+  "repository": "ggml-org/llama.cpp",
+  "tag": "b12248",
+  "commit": "3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8",
+  "purpose": "Packaging candidate; not a published Mir.cpp backend",
+  "artifacts": {
+    "aarch64-apple-darwin": {
+      "name": "llama-b12248-bin-macos-arm64.tar.gz",
+      "sha256": "7f643b4d35803ccc69270302f3368d9e8a40f56f74ef5a266e6f686d9dc7d3c6"
+    },
+    "x86_64-apple-darwin": {
+      "name": "llama-b12248-bin-macos-x64.tar.gz",
+      "sha256": "08824b35d82994979835fc40bf07ebd03a903866cba76440848e8f52f6bd03e6"
+    }
+  }
+}
