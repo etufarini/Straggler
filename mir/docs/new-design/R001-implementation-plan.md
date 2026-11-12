@@ -1,7 +1,8 @@
 # R001 implementation plan: Projects
 
-Date: 2026-11-12. Status: investigation and owner clarifications complete;
-application implementation is waiting for the owner's go-ahead.
+Date: 2026-11-12. Status: implemented and locally verified after the owner's
+go-ahead. The original plan and its decision record are retained below; final
+results are recorded in Completion and verification.
 
 ## Files to change or create
 
@@ -550,3 +551,109 @@ The GitHub connector fetch was unavailable; direct pinned raw sources were used.
 
 After this plan is committed, stop for the owner's explicit implementation
 go-ahead. Additional real design decisions require an owner answer.
+
+## Completion and verification
+
+Implementation is on `feature/projects-r001`, based on the unchanged
+`feature/r005-chat-actions-attachments-export-import` at
+`e84469ae9a3d80523f87267dea2c8807bc24a32f`. No merge, rebase, push, tag or release
+was performed. Use the following command for the complete implementation history:
+
+```bash
+git log --oneline feature/r005-chat-actions-attachments-export-import..HEAD
+```
+
+The file/control map above remains the implementation map. Additional shared
+owners introduced during implementation are `src/components/ActionMenu.tsx`,
+`src/features/attachments/AttachmentRow.tsx`, `src/features/projects/ProjectMenu.tsx`,
+`src/features/projects/ProjectCapacity.tsx`, `src/domain/storageQueue.ts` and
+`src/services/projectFixtures.ts`. The confirmation frame retains the existing
+normal-dialog title identifier while project dialogs use their own identifiers.
+
+### Implemented data and policy
+
+Projects use `desktop/projects/<UUID>/project.json` with ordered file metadata,
+and `files/<UUID>.txt` for extracted text. Native IPC returns text with metadata;
+it is not duplicated inside the on-disk JSON. Conversation JSON keeps its existing
+location with optional `projectId` and `ownSystemPrompt`. Missing, null and
+explicitly empty own prompts retain their distinct compatibility semantics.
+Reads do not migrate or rewrite earlier history. Deletion uses recoverable
+staging; a cleanup failure after a committed deletion returns its saved outcome
+and an explicit warning. Original files remain untouched.
+
+The configurable defaults all live in `mir/desktop/src/domain/projectContext.ts`:
+
+- `projectConversationReserve`: 25%, rounded up to whole tokens.
+- `projectContextThresholds`: close from 75% of available space; over above 100%.
+- `projectTokenEstimateCharacters`: 4 Unicode characters per estimated token.
+  `estimateProjectTokens` uses it, and the typed service passes it to native file
+  metadata estimation. Native code has no duplicate default and rejects zero.
+- Counts use the running tokenizer when available; `≈` marks estimates.
+
+All three owner clarifications Q1–Q3 are implemented. Unknown capacity is the
+approved deviation recorded above. Missing context telemetry is retried serially
+within the same server run until capacity becomes available; native caching does
+not retain an unknown capacity forever. The transition applies normal blocking
+without losing the draft. In-flight requests keep their snapshots;
+allowed content edits apply on the next request. Exports keep the existing format
+and use the prompt effective at export time, with no project files or metadata.
+
+### Executed checks
+
+Commands run from the repository root unless the command names a desktop npm or
+Node script; those run from `mir/desktop`.
+
+| Command                                                                                  | Result                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bash mir/tests/run.sh desktop`                                                          | Passed: formatting, lint, type/build, Rust formatting/Clippy, 73 frontend unit tests, 41 Rust unit tests, 16 native integration tests and 150 Chromium/WebKit cases.                                                                                      |
+| `LIBGL_ALWAYS_SOFTWARE=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 bash mir/tests/run.sh native` | Passed: real Linux Tauri/WebKit window, native project storage/IPC, archive/restore/deletion, prompt preservation, streaming, process cleanup and confirmed close.                                                                                        |
+| `bash mir/tests/run.sh common`                                                           | Passed, including architecture/runtime manifest, syntax/ShellCheck, configuration, profiles, persistence, preparation and process contracts.                                                                                                              |
+| `bash mir/tests/run.sh linux`                                                            | Passed, including installation rollback and native Linux socket/activation/memory checks.                                                                                                                                                                 |
+| `bash mir/tests/run.sh macos`                                                            | Adapter and managed-build fixtures passed; installer fixture failed on Linux because Apple command-line tools/SDK are absent. The identical failure was reproduced using an isolated `git archive` of the unchanged base `e84469a`; this is pre-existing. |
+| `bash mir/tests/native/macos.sh`                                                         | Reported SKIP for native macOS Bash/PATH and sockets on this Linux host.                                                                                                                                                                                  |
+| `bash -n mir/sh/install.sh`                                                              | Passed.                                                                                                                                                                                                                                                   |
+| `shellcheck -x -P mir -P SCRIPTDIR mir/sh/install.sh`                                    | Passed.                                                                                                                                                                                                                                                   |
+| `bash mir/sh/build-install.sh --check`                                                   | Passed. Only the generated runtime extraction list changed; the canonical release tag and stable README command did not change.                                                                                                                           |
+| `npx playwright test tests/e2e/projects.spec.ts --workers=2`                             | Passed: 42 project-specific browser cases before the final same-run capacity regression; its two Chromium/WebKit cases also passed separately and all 44 project cases passed in the final desktop suite. Includes all R001 screens, Q1–Q3, shared-edit snapshots, imports and unsaved-draft deletion recovery. |
+| `node tests/design-review.mjs r001`                                                      | Passed: 96 actual/reference combinations across 12 screens, two browsers and all four requested viewport sizes; 192 PNGs. No console, type-floor, horizontal-overflow or unreachable-control failures.                                                    |
+| `node tests/r001-reference.mjs`                                                          | Passed: all 12 Proposal references rendered through the actual dossier viewer.                                                                                                                                                                            |
+| Fresh independent review                                                                 | Four runtime edge cases were found, fixed and regression-tested. Targeted re-review, including the same-run capacity refresh, found no remaining runtime requirement gaps. The visual fixture options were corrected to use the native `effort` field.                                              |
+
+The initial conversation-row selector regression was corrected in production
+without weakening its existing import test. No inference workload, GPU, model
+weights or system package installation was used. Remote CI and actual macOS
+windows/file dialogs were not run; macOS native verification remains pending on
+that operating system. OS chooser interaction still needs the existing manual
+platform check; native extraction, copied-file persistence and visible actions
+were automated.
+
+One final native invocation ended with SIGTERM (exit 143) without a harness
+assertion; no test process survived. The identical command then passed. One
+capture invocation lost its Vite server when a concurrent browser run shut that
+server down; the capture was repeated with a separately owned persistent Vite
+server. These interrupted invocations are not counted as successful checks.
+
+### Evidence, deviations and cleanup
+
+Evidence remains local and ignored, as requested:
+
+- `mir/desktop/test-results/design/r001/comparison.html`: paired actual/Proposal
+  screenshots; `checks.json` records all viewport/browser checks.
+- `mir/desktop/test-results/design/r001/visual-review.md`: remaining visual
+  differences and their reasons. The live assistant rail/controls are preserved;
+  computed counts include filenames/delimiters, and the alert states the exact
+  shortfall. No unjustified layout difference remains from the reviewed captures.
+- `mir/desktop/test-results/native-project.png` and `native-chat.png`: real native
+  window with a local test server, not evidence of inference.
+- The legacy BUILD-03 capture now truthfully records its immediately completed
+  fixture as an actual-only diagnostic; the dossier has no persistent-build
+  reference for it. No reference was fabricated or changed.
+
+Unused project CSS was removed, menu/file-row/control-slug behavior was shared,
+and the changed owners/dependencies were reviewed for redundancy. No additional
+cleanup outside the approved scope was needed. No new dependencies were added.
+
+OWNER-003, dated 2026-11-12, was added locally to the dossier's `ownerDecisions`
+metadata and its register table. All other original byte ranges were copied
+unchanged using kernel range copies. The dossier, original local artifacts and
+screenshots remain uncommitted. There are no unresolved product questions.
