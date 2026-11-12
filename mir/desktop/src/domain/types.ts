@@ -49,6 +49,7 @@ export interface Configuration {
   modelsDir: string;
   serverAvailable: boolean;
   bundledAvailable: boolean;
+  appStore: boolean;
   port: number;
   portStatus: string;
   warning: string;

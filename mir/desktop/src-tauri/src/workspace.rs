@@ -99,6 +99,8 @@ pub struct Configuration {
     pub models_dir: String,
     pub server_available: bool,
     pub bundled_available: bool,
+    #[serde(default)]
+    pub app_store: bool,
     pub port: u16,
     pub port_status: String,
     pub warning: String,
@@ -132,6 +134,17 @@ pub(crate) struct Workspace {
 }
 
 impl Runtime {
+    #[cfg(all(feature = "app-store", target_os = "macos"))]
+    pub fn select_model_folder(&self, path: &std::path::Path) -> Result<Configuration> {
+        let path = path.canonicalize().map_err(|error| error.to_string())?;
+        self.native.model_access.remember(&path)?;
+        self.configure_action(
+            "set-path",
+            &["models".into(), path.to_string_lossy().into_owned()],
+            None,
+        )
+    }
+
     pub fn inspect(&self) -> Result<Configuration> {
         self.configure_action("inspect", &[], None)
     }
@@ -275,6 +288,9 @@ impl Runtime {
                 let [kind, path] = arguments else {
                     return Err("Choose a folder.".into());
                 };
+                if cfg!(feature = "app-store") && kind == "llama" {
+                    return Err("The App Store edition uses only its included backend. Backend updates arrive with application updates.".into());
+                }
                 if !crate::configuration::settings::literal(path) {
                     return Err("Choose a directory without line breaks.".into());
                 }
@@ -295,6 +311,12 @@ impl Runtime {
                         paths.llama = value;
                     }
                     "models" => {
+                        if !self.native.model_access.permits(&directory) {
+                            return Err(
+                                "Choose this folder with the native picker to grant model access."
+                                    .into(),
+                            );
+                        }
                         let models = crate::configuration::models::discover(&directory)?;
                         if !models.iter().any(|model| model.path == settings.model) {
                             settings.model = models

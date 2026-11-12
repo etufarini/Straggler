@@ -12,7 +12,32 @@ pub struct Environment {
 
 impl Environment {
     pub fn capture(bundled_server: Option<PathBuf>) -> Result<Self> {
-        Self::from_variables(std::env::vars_os().collect(), bundled_server)
+        let variables = std::env::vars_os().collect();
+        #[cfg(all(feature = "app-store", target_os = "macos"))]
+        let variables = {
+            let mut variables: BTreeMap<OsString, OsString> = variables;
+            let home = PathBuf::from(objc2_foundation::NSHomeDirectory().to_string());
+            #[cfg(all(feature = "native-tests", debug_assertions))]
+            let home = match std::env::var("MIR_STORE_TEST_SESSION") {
+                Ok(session) => {
+                    let session = uuid::Uuid::parse_str(&session)
+                        .map_err(|_| "Invalid Store test session identifier.")?;
+                    home.join(".mir-tests").join(session.to_string())
+                }
+                Err(_) => home,
+            };
+            variables.insert("HOME".into(), home.clone().into_os_string());
+            variables.insert(
+                "XDG_CONFIG_HOME".into(),
+                home.join(".config").into_os_string(),
+            );
+            variables.insert(
+                "XDG_DATA_HOME".into(),
+                home.join(".local/share").into_os_string(),
+            );
+            variables
+        };
+        Self::from_variables(variables, bundled_server)
     }
 
     pub fn from_variables(

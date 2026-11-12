@@ -25,6 +25,8 @@ desktop/src-tauri/src/history.rs
 desktop/src-tauri/src/lib.rs
 desktop/src-tauri/src/main.rs
 desktop/src-tauri/src/model.rs
+desktop/src-tauri/src/model_access.rs
+desktop/src-tauri/src/model_access/macos.rs
 desktop/src-tauri/src/packaging_probe.rs
 desktop/src-tauri/src/preferences.rs
 desktop/src-tauri/src/projects.rs

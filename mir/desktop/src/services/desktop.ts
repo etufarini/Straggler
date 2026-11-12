@@ -39,6 +39,7 @@ export type DesktopCommand =
   | 'configuration'
   | 'apply_settings'
   | 'workspace_action'
+  | 'choose_models_folder'
   | 'start_server'
   | 'server_status'
   | 'server_details'

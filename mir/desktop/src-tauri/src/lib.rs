@@ -7,6 +7,7 @@ pub mod diagnostics;
 pub mod files;
 pub mod history;
 pub mod model;
+pub mod model_access;
 pub mod platform;
 pub mod preferences;
 pub mod projects;
@@ -102,6 +103,11 @@ pub struct ChatMessage {
 }
 
 impl Runtime {
+    #[cfg(all(feature = "native-tests", debug_assertions))]
+    pub fn test_data_dir(&self) -> PathBuf {
+        self.native.store.environment.data.join("desktop")
+    }
+
     pub fn new(
         environment: configuration::environment::Environment,
         data: PathBuf,
@@ -162,16 +168,4 @@ impl Drop for Runtime {
     fn drop(&mut self) {
         let _ = self.shutdown();
     }
-}
-
-pub fn default_data_dir() -> Result<PathBuf> {
-    let root = std::env::var_os("XDG_DATA_HOME")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
-        .ok_or("HOME or XDG_DATA_HOME must be configured.")?;
-    if !root.is_absolute() {
-        return Err("The desktop data directory must be absolute.".into());
-    }
-    Ok(root.join("mir.cpp/desktop"))
 }

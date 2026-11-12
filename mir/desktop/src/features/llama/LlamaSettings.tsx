@@ -29,31 +29,38 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
         {config.llamaDir && <code>{config.llamaDir}</code>}
       </div>
       {!config.bundledAvailable && (
-        <p>This installation has no bundled backend. Select an existing llama.cpp build.</p>
+        <p>
+          {config.appStore
+            ? 'The bundled backend is missing. Reinstall Mir.cpp from the App Store.'
+            : 'This installation has no bundled backend. Select an existing llama.cpp build.'}
+        </p>
       )}
-      <div className="row-actions">
-        <button disabled={busy || active || !native} onClick={() => setFolder('llama')}>
-          Choose external build
-        </button>
-        <button
-          disabled={busy || active || !native || !config.bundledAvailable || bundled}
-          onClick={() =>
-            confirm({
-              title: 'Use the bundled backend?',
-              actionLabel: 'Use bundled backend',
-              text: 'Switch to the llama.cpp version included with Mir.cpp? Model settings and saved configurations will be kept.',
-              action: async () => {
-                accept(await operation('use-bundled'));
-              },
-            })
-          }
-        >
-          Use bundled backend
-        </button>
-      </div>
+      {!config.appStore && (
+        <div className="row-actions">
+          <button disabled={busy || active || !native} onClick={() => setFolder('llama')}>
+            Choose external build
+          </button>
+          <button
+            disabled={busy || active || !native || !config.bundledAvailable || bundled}
+            onClick={() =>
+              confirm({
+                title: 'Use the bundled backend?',
+                actionLabel: 'Use bundled backend',
+                text: 'Switch to the llama.cpp version included with Mir.cpp? Model settings and saved configurations will be kept.',
+                action: async () => {
+                  accept(await operation('use-bundled'));
+                },
+              })
+            }
+          >
+            Use bundled backend
+          </button>
+        </div>
+      )}
       <p className="field-help">
-        External builds can advertise different capabilities. Stop the server before changing its
-        backend.
+        {config.appStore
+          ? 'This edition uses the backend included with the app. Updates arrive through the App Store.'
+          : 'External builds can advertise different capabilities. Stop the server before changing its backend.'}
       </p>
     </>
   );

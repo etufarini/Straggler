@@ -117,6 +117,7 @@ export function createFixture(scenario: Scenario) {
       modelsDir,
       serverAvailable: !!llamaDir || bundledAvailable,
       bundledAvailable,
+      appStore: false,
       settings: structuredClone(settings),
       port: Number(settings.port),
       portStatus: `Port ${settings.port}: ${occupied ? 'IN USE' : 'FREE'}`,

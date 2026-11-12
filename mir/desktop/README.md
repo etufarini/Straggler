@@ -67,7 +67,7 @@ installer after moving runtime files. Do not include generated output, tests,
 node_modules or target in the runtime manifest.
 
 The `packaging` suite checks pinned-backend preparation and native process lifecycle
-with temporary directories, tiny Mach-O fixtures and a fake HTTP server. It does
+with temporary directories, tiny Mach-O/ELF fixtures and a fake HTTP server. It does
 not download llama.cpp or require a Mac, model, GPU or inference service. Those
 tests also run through the regular common/desktop suites.
 
@@ -78,8 +78,18 @@ report and optionally opens a GGUF through the native picker for a CPU loading
 check. This diagnostic mode is separate from the normal desktop startup path. Add
 `--desktop` to the macOS packaging command to build the regular GUI with the same
 pinned backend for direct distribution; that mode uses the normal identifier and
-does not enable App Sandbox. Store-specific persistence and permissions remain
-separate work.
+does not enable App Sandbox. The separate `--app-store` variant uses native
+model-folder selection, persistent
+security-scoped bookmarks, container storage and the bundled backend only.
+`--store-check --debug` selects an isolated test app/container with native WebDriver
+checks. Certificate/profile and signed `.pkg` preparation are supported without
+uploading.
+
+Ubuntu 24.04+ packages use
+`python3 packaging/ubuntu.py bundle --target aarch64-unknown-linux-gnu`
+(or `x86_64-unknown-linux-gnu`) on the matching Linux
+architecture. The `.deb` installs `mir`, the pinned CPU backend and its private
+libraries. The packager verifies the actual extracted payload and dynamic loaders.
 See [the packaging procedure](../docs/guide.md#macos-backend-packaging-experiment)
 for build, signing, manual checks and current limitations.
 

@@ -31,6 +31,7 @@ run() {
 if [[ "$suite" == common || "$suite" == all ]]; then
     run architecture.sh
     python3 -I "$MIR_ROOT/desktop/tests/test_macos_packaging.py"
+    python3 -I "$MIR_ROOT/desktop/tests/test_ubuntu_packaging.py"
     test_scripts=("$MIR_ROOT"/tests/*.sh "$MIR_ROOT"/tests/helpers/*.sh "$MIR_ROOT"/tests/platform/*.sh "$MIR_ROOT"/tests/native/*.sh)
     source_scripts=("$MIR_ROOT/mir.sh" "$MIR_ROOT"/lib/*.sh "$MIR_ROOT"/sh/*.sh)
     if command -v shellcheck >/dev/null; then
@@ -63,7 +64,11 @@ if [[ "$suite" == common || "$suite" == all ]]; then
 fi
 if [[ "$suite" == packaging ]]; then
     python3 -I "$MIR_ROOT/desktop/tests/test_macos_packaging.py"
-    cargo test --locked --manifest-path "$MIR_ROOT/desktop/src-tauri/Cargo.toml" --no-default-features --test bundled_backend
+    python3 -I "$MIR_ROOT/desktop/tests/test_ubuntu_packaging.py"
+    cargo test --locked --manifest-path "$MIR_ROOT/desktop/src-tauri/Cargo.toml" --no-default-features --test bundled_backend --test direct_start
+    if [[ "$PLATFORM_ID" == macos ]]; then
+        cargo test --locked --manifest-path "$MIR_ROOT/desktop/src-tauri/Cargo.toml" --no-default-features --features app-store --test store_distribution
+    fi
 fi
 if [[ "$suite" == linux || "$suite" == all ]]; then
     lint_adapter linux
@@ -97,6 +102,10 @@ if [[ "$suite" == desktop || "$suite" == all || "$suite" == native ]]; then
         cargo clippy --locked --manifest-path src-tauri/Cargo.toml --no-default-features --all-targets -- -D warnings
         npm test
         npm run test:runtime
+        if [[ "$PLATFORM_ID" == macos ]]; then
+            cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features --features app-store --test store_distribution
+            cargo clippy --locked --manifest-path src-tauri/Cargo.toml --features app-store --all-targets -- -D warnings
+        fi
         npm exec -- playwright install chromium webkit
         npm run test:e2e
     fi

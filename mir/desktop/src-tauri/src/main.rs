@@ -5,8 +5,7 @@ compile_error!("Desktop automation must never be included in a release build.");
 mod packaging_probe;
 
 use mir_desktop::{
-    default_data_dir, history::Conversation, ChatRequest, Configuration, Listener, Result, Runtime,
-    Settings, Status,
+    history::Conversation, ChatRequest, Configuration, Listener, Result, Runtime, Settings, Status,
 };
 use std::{path::PathBuf, sync::Arc};
 use tauri::{ipc::Channel, Emitter, Manager, State};
@@ -38,6 +37,12 @@ fn test_window_visibility(visible: bool, window: tauri::WebviewWindow) -> Result
         window.hide()
     }
     .map_err(|e| e.to_string())
+}
+
+#[cfg(all(feature = "native-tests", debug_assertions))]
+#[tauri::command]
+fn test_data_dir(state: State<'_, Application>) -> Result<PathBuf> {
+    Ok(runtime(&state)?.test_data_dir())
 }
 
 #[tauri::command]
@@ -74,6 +79,31 @@ async fn workspace_action(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(feature = "app-store")]
+#[tauri::command]
+async fn choose_models_folder(
+    app: tauri::AppHandle,
+    state: State<'_, Application>,
+) -> Result<Option<Configuration>> {
+    use tauri_plugin_dialog::DialogExt;
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let selected = app
+            .dialog()
+            .file()
+            .set_title("Choose models folder")
+            .blocking_pick_folder();
+        selected
+            .map(|selected| {
+                let path = selected.into_path().map_err(|error| error.to_string())?;
+                runtime.select_model_folder(&path)
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -364,10 +394,20 @@ async fn preferences_save(
 
 fn native_environment() -> Result<mir_desktop::configuration::environment::Environment> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    let bundled = executable
-        .parent()
-        .map(|directory| directory.join("mir-llama-server"))
-        .filter(|server| server.is_file());
+    let bundled = executable.parent().and_then(|directory| {
+        let adjacent = directory.join("mir-llama-server");
+        if adjacent.is_file() {
+            return Some(adjacent);
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let packaged = directory.join("../lib/mir.cpp/backend/llama-server");
+            if packaged.is_file() {
+                return Some(packaged);
+            }
+        }
+        None
+    });
     mir_desktop::configuration::environment::Environment::capture(bundled)
 }
 
@@ -411,6 +451,34 @@ fn shutdown_on_signals(handle: tauri::AppHandle, runtime: Arc<Runtime>) {
 }
 
 fn main() {
+    let arguments: Vec<_> = std::env::args_os().skip(1).collect();
+    // The Debian package installs the CLI entry point as mir. Application
+    // bundles retain their existing handling of platform launch arguments.
+    let cli_entry = std::env::current_exe()
+        .ok()
+        .is_some_and(|executable| executable.file_name().is_some_and(|name| name == "mir"));
+    if let Some(model) = arguments.first().filter(|argument| {
+        cli_entry && *argument != "--mir-check" && !cfg!(feature = "packaging-probe")
+    }) {
+        if model == "--help" || model == "-h" {
+            if cfg!(feature = "app-store") {
+                println!("Open Mir.cpp normally and choose your models folder in Settings.");
+            } else {
+                println!("Usage: mir [MODEL.gguf [llama-server arguments...]]\nRun without arguments to open the desktop.");
+            }
+            return;
+        }
+        use std::os::unix::process::CommandExt;
+        let command = native_environment()
+            .and_then(mir_desktop::configuration::native::NativeConfiguration::new)
+            .and_then(|native| native.direct_command(std::path::Path::new(model), &arguments[1..]));
+        let error = match command {
+            Ok(mut command) => format!("Cannot execute llama-server: {}", command.exec()),
+            Err(error) => error,
+        };
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
     let context = tauri::generate_context!();
     if std::env::args().nth(1).as_deref() == Some("--mir-check") {
         if cfg!(feature = "custom-protocol") && context.assets().get(&"index.html".into()).is_none()
@@ -432,7 +500,10 @@ fn main() {
     let app = builder
         .setup(|app| {
             let runtime = native_environment()
-                .and_then(|environment| Runtime::new(environment, default_data_dir()?))
+                .and_then(|environment| {
+                    let data = environment.data.join("desktop");
+                    Runtime::new(environment, data)
+                })
                 .map(Arc::new);
             if let Ok(runtime) = &runtime {
                 shutdown_on_signals(app.handle().clone(), runtime.clone());
@@ -443,9 +514,13 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             #[cfg(feature = "native-tests")]
             test_window_visibility,
+            #[cfg(feature = "native-tests")]
+            test_data_dir,
             configuration,
             apply_settings,
             workspace_action,
+            #[cfg(feature = "app-store")]
+            choose_models_folder,
             start_server,
             stop_server,
             server_status,

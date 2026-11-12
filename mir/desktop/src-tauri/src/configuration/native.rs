@@ -11,8 +11,10 @@ use crate::{
 };
 use serde_json::{json, Value};
 use std::{
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
+    process::Command,
     sync::{
         atomic::{AtomicBool, Ordering},
         Mutex,
@@ -31,14 +33,17 @@ struct Discovery {
 
 pub struct NativeConfiguration {
     pub store: Store,
+    pub model_access: crate::model_access::ModelAccess,
     discovery: Mutex<Discovery>,
     closing: AtomicBool,
 }
 
 impl NativeConfiguration {
     pub fn new(environment: Environment) -> Result<Self> {
+        let model_access = crate::model_access::ModelAccess::restore(&environment.data);
         Ok(Self {
             store: Store::new(environment)?,
+            model_access,
             discovery: Mutex::new(Discovery::default()),
             closing: AtomicBool::new(false),
         })
@@ -63,11 +68,96 @@ impl NativeConfiguration {
         }
     }
 
+    fn verify_bundled(&self, server: &Path) -> Result<()> {
+        let manifest = bundled_manifest();
+        let commit = manifest["commit"]
+            .as_str()
+            .ok_or("The bundled backend manifest has no source commit.")?;
+        let version =
+            capabilities::probe(&self.store.environment, server, "--version", &self.closing)?;
+        if !commit
+            .get(..7)
+            .is_some_and(|prefix| version.contains(prefix))
+        {
+            let remedy = if cfg!(feature = "app-store") {
+                "Reinstall Mir.cpp from the App Store."
+            } else {
+                "Reinstall the application or select an external build."
+            };
+            return Err(format!(
+                "The bundled backend does not report the pinned source commit. {remedy}"
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn direct_command(&self, model: &Path, trailing: &[OsString]) -> Result<Command> {
+        if cfg!(feature = "app-store") {
+            return Err("Open the App Store edition normally and choose a models folder with its native picker.".into());
+        }
+        let model = model
+            .canonicalize()
+            .map_err(|error| format!("GGUF model missing or unreadable: {error}"))?;
+        let model = model
+            .to_str()
+            .ok_or("The model path must be valid UTF-8.")?;
+        if !readable_model(model) {
+            return Err(format!("GGUF model missing or unreadable: {model}"));
+        }
+        let paths = self.store.paths();
+        let settings = Settings {
+            model: model.into(),
+            ..Settings::from_environment(&self.store.environment)?
+        };
+        let server = self.server(&paths).filter(|server| executable(server)).ok_or("llama-server is unavailable. Set an existing backend in Folders, or install a package with its bundled backend.")?;
+        if paths.llama.is_empty() {
+            self.verify_bundled(&server)?;
+        }
+        let arguments = capabilities::direct_arguments(&settings, &self.store.environment)?;
+        // Explicit endpoint options stay literal and are checked by llama.cpp's
+        // own parser/bind; trailing arguments are never rewritten here.
+        let configured_host = self.store.environment.control(
+            "HOST",
+            self.store
+                .environment
+                .value("LLAMA_HOST")
+                .unwrap_or_default(),
+        );
+        let native_endpoint = !configured_host.is_empty()
+            || self
+                .store
+                .environment
+                .value("LLAMA_ARG_HOST")
+                .is_some_and(|host| !host.is_empty())
+            || trailing
+                .iter()
+                .filter_map(|argument| argument.to_str())
+                .any(|argument| {
+                    matches!(argument, "--port" | "--host")
+                        || argument.starts_with("--port=")
+                        || argument.starts_with("--host=")
+                });
+        let port = settings
+            .port
+            .parse::<u16>()
+            .map_err(|error| error.to_string())?;
+        if !native_endpoint && platform::inspect_port(port)?.occupied {
+            return Err(format!("Port {}: IN USE. Choose another port.", port));
+        }
+        let mut command = self.store.environment.command(server);
+        command.args(arguments).args(trailing);
+        Ok(command)
+    }
+
     pub fn snapshot(&self, paths: &Paths, mut settings: Settings) -> Result<Configuration> {
         if self.is_closing() {
             return Err("Mir.cpp is closing.".into());
         }
         let mut warning = paths.warning.clone();
+        let access_warning = self.model_access.warning();
+        if !access_warning.is_empty() {
+            warning.push_str(&format!("\n{access_warning}"));
+        }
         let discovered_models = match models::discover(Path::new(&paths.models)) {
             Ok(models) => models,
             Err(error) => {
@@ -116,16 +206,9 @@ impl NativeConfiguration {
                     discovery.devices = capabilities::devices(&output);
                 }
                 if paths.llama.is_empty() {
-                    let manifest = bundled_manifest();
-                    let commit = manifest["commit"]
-                        .as_str()
-                        .ok_or("The bundled backend manifest has no source commit.")?;
-                    discovery.valid = commit.get(..7).is_some_and(|prefix| {
-                        capabilities::probe(environment, server, "--version", &self.closing)
-                            .is_ok_and(|version| version.contains(prefix))
-                    });
-                    if !discovery.valid {
-                        discovery.warning.push_str("\nThe bundled backend does not report the pinned source commit. Reinstall the application or select an external build.");
+                    if let Err(error) = self.verify_bundled(server) {
+                        discovery.valid = false;
+                        discovery.warning.push_str(&format!("\n{error}"));
                     }
                 }
             }
@@ -180,6 +263,7 @@ impl NativeConfiguration {
                 .bundled_server
                 .as_ref()
                 .is_some_and(|server| executable(server)),
+            app_store: cfg!(feature = "app-store"),
             port,
             port_status,
             warning: warning.trim().into(),
@@ -201,8 +285,20 @@ impl NativeConfiguration {
     }
 
     pub fn launch(&self, paths: &Paths, settings: &Settings) -> Result<(PathBuf, Vec<String>)> {
+        let model = Path::new(&settings.model)
+            .canonicalize()
+            .unwrap_or_default();
+        if !self.model_access.permits(&model) {
+            return Err(
+                "Choose the model's folder in Settings to grant access before launching.".into(),
+            );
+        }
         let server = self.server(paths).filter(|server| executable(server))
-            .ok_or("llama-server not found. Select an existing build in Folders, or install a Mir.cpp package with its bundled backend.")?;
+            .ok_or(if cfg!(feature = "app-store") {
+                "The bundled llama-server is missing. Reinstall Mir.cpp from the App Store."
+            } else {
+                "llama-server not found. Select an existing build in Folders, or install a Mir.cpp package with its bundled backend."
+            })?;
         if !readable_model(&settings.model) {
             return Err(format!(
                 "GGUF model missing or unreadable: {}",

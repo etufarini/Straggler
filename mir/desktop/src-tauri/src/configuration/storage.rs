@@ -185,6 +185,12 @@ impl Store {
                 .filter(|value| !value.is_empty())
                 .unwrap_or(paths.models),
         );
+        if cfg!(feature = "app-store") && !paths.llama.is_empty() {
+            paths.llama.clear();
+            paths
+                .warning
+                .push_str("The App Store edition uses only its included backend.\n");
+        }
         paths
     }
 

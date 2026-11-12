@@ -19,18 +19,21 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
                 ? 'Bundled with Mir.cpp'
                 : 'Not configured')}
           </code>
-          <button
-            disabled={busy || !native || (kind === 'llama' && active)}
-            onClick={() => setFolder(kind as 'llama' | 'models')}
-          >
-            <Folder size={15} />
-            Choose folder
-          </button>
+          {!(kind === 'llama' && config.appStore) && (
+            <button
+              disabled={busy || !native || (kind === 'llama' && active)}
+              onClick={() => setFolder(kind as 'llama' | 'models')}
+            >
+              <Folder size={15} />
+              Choose folder
+            </button>
+          )}
         </div>
       ))}
       <p className="field-help">
-        The models folder can be empty. The llama.cpp folder must contain llama-server, in bin or
-        build/bin.
+        {config.appStore
+          ? 'Choose a models folder to allow access after restarting the app. The folder can be empty.'
+          : 'The models folder can be empty. The llama.cpp folder must contain llama-server, in bin or build/bin.'}
       </p>
       <button onClick={() => setSection('llama')}>Backend details</button>
     </>

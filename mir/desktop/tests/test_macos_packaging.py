@@ -7,13 +7,16 @@ import json
 from pathlib import Path
 import plistlib
 import struct
+import sys
 import tarfile
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 
 PACKAGING = Path(__file__).resolve().parents[1] / "packaging"
+sys.path.insert(0, str(PACKAGING))
 spec = importlib.util.spec_from_file_location("macos_packaging", PACKAGING / "macos.py")
 packaging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(packaging)
@@ -77,6 +80,7 @@ class PackagingTests(unittest.TestCase):
         base = json.loads((packaging.DESKTOP / "src-tauri/tauri.conf.json").read_text())
         self.assertEqual(config["bundle"]["resources"], {
             **{source: None for source in base["bundle"]["resources"]},
+            str(prepared / "LICENSE.Mir.cpp"): "LICENSE.Mir.cpp",
             str(prepared / "LICENSE.llama.cpp"): "LICENSE.llama.cpp",
             str(prepared / "backend-provenance.json"): "backend-provenance.json",
         })
@@ -105,7 +109,7 @@ class PackagingTests(unittest.TestCase):
         app = self.root / "Backend Check.app"
         resources = app / "Contents/Resources"
         resources.mkdir(parents=True)
-        for name in ("LICENSE.llama.cpp", "backend-provenance.json"):
+        for name in packaging.BUNDLE_RESOURCES:
             (resources / name).write_bytes((prepared / name).read_bytes())
         packaging.verify_bundle_resources(app, prepared)
         provenance = resources / "backend-provenance.json"
@@ -135,7 +139,7 @@ class PackagingTests(unittest.TestCase):
     def test_failed_download_preserves_prepared_backend(self):
         prepared = self.prepare(self.archive())
         with patch.object(packaging, "PACKAGING", self.root), \
-                patch.object(packaging.urllib.request, "urlopen", side_effect=OSError("offline")):
+                patch.object(packaging.backend.urllib.request, "urlopen", side_effect=OSError("offline")):
             with self.assertRaisesRegex(OSError, "offline"):
                 packaging.prepare(TARGET)
         self.assertTrue((prepared / f"mir-llama-server-{TARGET}").is_file())
@@ -191,6 +195,43 @@ class PackagingTests(unittest.TestCase):
         parent = plistlib.loads((PACKAGING / "app.entitlements.plist").read_bytes())
         self.assertNotIn("com.apple.security.inherit", parent)
         self.assertTrue(parent["com.apple.security.files.user-selected.read-only"])
+
+    def test_store_gui_has_its_own_entitlements_and_preparation_directory(self):
+        archive = self.archive()
+        with patch.object(packaging, "PACKAGING", self.root), \
+                patch.object(packaging, "store_entitlements", return_value={"fixture": True}):
+            prepared = packaging.prepare(TARGET, archive, desktop=True, app_store=True, store_check=True)
+        config = json.loads((prepared / "tauri.backend-check.json").read_text())
+        self.assertTrue(config["identifier"].endswith(".store-check"))
+        self.assertEqual(config["app"], {})
+        self.assertTrue(prepared.name.endswith("-app-store-check"))
+        self.assertEqual(plistlib.loads((prepared / "store.entitlements.plist").read_bytes()), {"fixture": True})
+        self.assertEqual(config["bundle"]["macOS"]["entitlements"], str(prepared / "store.entitlements.plist"))
+
+    def test_store_profile_must_be_current_and_match_the_exact_application_and_team(self):
+        identifier = "io.github.etufarini.mir"
+        profile = {
+            "TeamIdentifier": ["TEAM"],
+            "Platform": ["OSX"],
+            "ExpirationDate": datetime.now(timezone.utc) + timedelta(days=1),
+            "Entitlements": {"com.apple.application-identifier": "TEAM." + identifier,
+                             "com.apple.developer.team-identifier": "TEAM"},
+        }
+        entitlements = packaging.store_entitlements(profile, identifier)
+        self.assertTrue(entitlements["com.apple.security.files.bookmarks.app-scope"])
+        self.assertTrue(entitlements["com.apple.security.files.user-selected.read-write"])
+        self.assertNotIn("com.apple.security.inherit", entitlements)
+        for change in ({"TeamIdentifier": ["OTHER"]}, {"TeamIdentifier": []}, {"Platform": ["iOS"]}, {"ProvisionedDevices": ["device"]},
+                       {"ExpirationDate": datetime.now(timezone.utc) - timedelta(days=1)}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                packaging.store_entitlements({**profile, **change}, identifier)
+        with self.assertRaises(ValueError):
+            packaging.store_entitlements(profile, identifier + ".different")
+        legacy_prefix = {**profile, "ApplicationIdentifierPrefix": ["PREFIX"],
+                         "Entitlements": {**profile["Entitlements"],
+                                          "com.apple.application-identifier": "PREFIX." + identifier}}
+        self.assertEqual(packaging.store_entitlements(legacy_prefix, identifier)[
+            "com.apple.application-identifier"], "PREFIX." + identifier)
 
 
 if __name__ == "__main__":

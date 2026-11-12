@@ -19,6 +19,7 @@ desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-dialog"]
 custom-protocol = ["desktop", "tauri/custom-protocol"]
 native-tests = ["desktop", "dep:tauri-plugin-wdio-webdriver"]
 packaging-probe = []
+app-store = ["dep:objc2", "dep:objc2-foundation"]
 
 [dependencies]
 zip = { version = "8.6", default-features = false, features = ["deflate"] }
@@ -41,6 +42,8 @@ socket2 = "0.6"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libproc = "0.14.11"
+objc2 = { version = "0.6.3", optional = true }
+objc2-foundation = { version = "0.3.2", optional = true, default-features = false, features = ["std", "NSArray", "NSData", "NSError", "NSString", "NSURL", "NSPathUtilities"] }
 
 [build-dependencies]
 tauri-build = { version = "2", optional = true , features = [] }
