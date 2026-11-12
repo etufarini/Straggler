@@ -1,11 +1,11 @@
+use crate::{
+    configuration::storage::{executable, server_path, Paths},
+    platform,
+};
 use crate::{Result, Runtime};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::{
-    collections::VecDeque,
-    io::Write,
-    process::{Child, Command, Stdio},
-};
+use serde_json::Value;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -46,7 +46,7 @@ impl Settings {
     }
 }
 
-/// Validation belongs to the launcher; IPC carries its field identifier intact.
+/// Native validation carries its field identifier intact through IPC.
 #[derive(Debug, Serialize)]
 pub struct ConfigurationError {
     pub field: Option<String>,
@@ -77,12 +77,6 @@ impl From<String> for ConfigurationError {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BuildBackend {
-    pub id: String,
-    pub label: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Model {
     pub path: String,
     pub label: String,
@@ -104,6 +98,7 @@ pub struct Configuration {
     pub llama_dir: String,
     pub models_dir: String,
     pub server_available: bool,
+    pub bundled_available: bool,
     pub port: u16,
     pub port_status: String,
     pub warning: String,
@@ -115,7 +110,6 @@ pub struct Configuration {
     pub memory: Value,
     pub build: Value,
     pub profiles: Vec<String>,
-    pub backends: Vec<BuildBackend>,
     pub capabilities: Value,
     pub presets: std::collections::BTreeMap<String, Vec<String>>,
     #[serde(default)]
@@ -133,105 +127,17 @@ pub(crate) struct Workspace {
     pub(crate) configuration: Option<Configuration>,
     profile: Option<String>,
     saved: Option<Settings>,
-}
-
-#[derive(Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BridgeRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub settings: Option<Settings>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub llama_dir: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub models_dir: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub targets: Vec<Listener>,
-}
-
-impl From<&Configuration> for BridgeRequest {
-    fn from(value: &Configuration) -> Self {
-        Self {
-            settings: Some(value.settings.clone()),
-            llama_dir: Some(value.llama_dir.clone()),
-            models_dir: Some(value.models_dir.clone()),
-            targets: Vec::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct JobStatus {
-    pub phase: String,
-    pub logs: Vec<String>,
-    pub error: Option<String>,
-}
-
-pub(crate) struct Job {
-    pub(crate) child: Option<Child>,
-    pub(crate) id: u64,
-    pub(crate) phase: String,
-    pub(crate) logs: VecDeque<String>,
-    pub(crate) error: Option<String>,
-    pub(crate) activated: Option<String>,
-    pub(crate) success: bool,
-}
-impl Default for Job {
-    fn default() -> Self {
-        Self {
-            child: None,
-            id: 0,
-            phase: "idle".into(),
-            logs: VecDeque::new(),
-            error: None,
-            activated: None,
-            success: false,
-        }
-    }
+    term_targets: BTreeMap<u32, String>,
+    paths: Option<Paths>,
 }
 
 impl Runtime {
-    pub(crate) fn job_busy(&self) -> Result<bool> {
-        let job = self.job.lock().map_err(|e| e.to_string())?;
-        Ok(job.child.is_some() || matches!(job.phase.as_str(), "running" | "stopping"))
-    }
-
-    pub(crate) fn bridge(
-        &self,
-        action: &str,
-        arguments: &[String],
-        request: &BridgeRequest,
-    ) -> Result<Value> {
-        let mut child = Command::new(&self.bash)
-            .arg(&self.launcher)
-            .args(["--desktop", action])
-            .args(arguments)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        let input = serde_json::to_vec(request).map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(&input).map_err(|e| e.to_string())?;
-        }
-        let output = child.wait_with_output().map_err(|e| e.to_string())?;
-        if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
-        }
-        if action == "latest" {
-            return Ok(json!({"tag": String::from_utf8_lossy(&output.stdout).trim()}));
-        }
-        serde_json::from_slice(&output.stdout)
-            .map_err(|e| format!("Invalid launcher response: {e}"))
-    }
-
     pub fn inspect(&self) -> Result<Configuration> {
         self.configure_action("inspect", &[], None)
     }
 
     pub fn configure(&self, settings: Settings) -> Result<Configuration> {
-        self.configure_action("inspect", &[], Some(settings))
+        self.configure_action("inspect", &[], Some(settings.validated()?))
     }
 
     pub fn workspace_action(
@@ -241,42 +147,77 @@ impl Runtime {
         targets: Vec<Listener>,
     ) -> Result<Value> {
         match action {
-            "load-profile" | "save-profile" | "delete-profile" | "set-path" | "restore" => {
-                if (action == "restore"
+            "load-profile" | "save-profile" | "delete-profile" | "set-path" | "use-bundled" => {
+                if (action == "use-bundled"
                     || (action == "set-path"
                         && arguments.first().map(String::as_str) == Some("llama")))
                     && self
                         .server
                         .lock()
-                        .map_err(|e| e.to_string())?
+                        .map_err(|error| error.to_string())?
                         .child
                         .is_some()
                 {
-                    return Err("Stop the server before restoring its build.".into());
+                    return Err("Stop the server before changing its build.".into());
                 }
                 serde_json::to_value(self.configure_action(action, &arguments, None)?)
-                    .map_err(|e| e.to_string())
+                    .map_err(|error| error.to_string())
             }
-            "stop-listeners" | "browse" | "build-plan" | "latest" | "build-log" => {
-                if action == "stop-listeners" {
-                    let state = self.server.lock().map_err(|e| e.to_string())?;
-                    if state.child.is_some() {
-                        return Err("Use Stop server for the server started by this app.".into());
-                    }
-                    if arguments.len() != 1 || !matches!(arguments[0].as_str(), "TERM" | "KILL") {
-                        return Err("Invalid listener shutdown request.".into());
-                    }
+            "browse" => {
+                if arguments.len() > 2
+                    || arguments
+                        .get(1)
+                        .is_some_and(|value| !matches!(value.as_str(), "true" | "false"))
+                {
+                    return Err("Invalid folder browsing request.".into());
                 }
+                self.native.browse(
+                    arguments.first().map_or("", String::as_str),
+                    arguments.get(1).is_some_and(|value| value == "true"),
+                )
+            }
+            "stop-listeners" => {
+                if self
+                    .server
+                    .lock()
+                    .map_err(|error| error.to_string())?
+                    .child
+                    .is_some()
+                {
+                    return Err("Use Stop server for the server started by this app.".into());
+                }
+                let signal = match arguments.as_slice() {
+                    [signal] if signal == "TERM" => libc::SIGTERM,
+                    [signal] if signal == "KILL" => libc::SIGKILL,
+                    _ => return Err("Invalid listener shutdown request.".into()),
+                };
                 let config = self.inspect()?;
-                let mut request = BridgeRequest::from(&config);
-                request.targets = targets;
-                let value = self.bridge(action, &arguments, &request)?;
-                if action == "stop-listeners" {
-                    return serde_json::to_value(self.inspect()?).map_err(|e| e.to_string());
+                {
+                    let mut workspace = self.workspace.lock().map_err(|error| error.to_string())?;
+                    if signal == libc::SIGKILL
+                        && targets.iter().any(|target| {
+                            workspace.term_targets.get(&target.pid) != Some(&target.identity)
+                        })
+                    {
+                        return Err("Request a normal stop before confirming a force stop.".into());
+                    }
+                    platform::stop_listeners(config.port, &targets, signal)?;
+                    if signal == libc::SIGTERM {
+                        for target in targets {
+                            workspace.term_targets.insert(target.pid, target.identity);
+                        }
+                    } else {
+                        for target in targets {
+                            workspace.term_targets.remove(&target.pid);
+                        }
+                    }
                 }
-                Ok(value)
+                serde_json::to_value(self.inspect()?).map_err(|error| error.to_string())
             }
-            _ => Err("Unknown configuration operation.".into()),
+            _ => Err(
+                "Unknown configuration operation. Backend updates are supplied with Mir.cpp."
+                    .into(),
+            ),
         }
     }
 
@@ -286,18 +227,109 @@ impl Runtime {
         arguments: &[String],
         settings: Option<Settings>,
     ) -> Result<Configuration> {
-        let mut workspace = self.workspace.lock().map_err(|e| e.to_string())?;
-        let mut request = workspace
-            .configuration
-            .as_ref()
-            .map(BridgeRequest::from)
-            .unwrap_or_default();
-        if let Some(settings) = settings {
-            request.settings = Some(settings);
+        let mut workspace = self.workspace.lock().map_err(|error| error.to_string())?;
+        let mut paths = workspace
+            .paths
+            .clone()
+            .unwrap_or_else(|| self.native.store.paths());
+        let mut settings = match settings.or_else(|| {
+            workspace
+                .configuration
+                .as_ref()
+                .map(|configuration| configuration.settings.clone())
+        }) {
+            Some(settings) => settings.validated()?,
+            None => Settings::from_environment(&self.native.store.environment)?,
+        };
+        match action {
+            "inspect" => {
+                if !arguments.is_empty() {
+                    return Err("Invalid configuration arguments.".into());
+                }
+            }
+            "load-profile" => {
+                let [name] = arguments else {
+                    return Err("Choose a saved configuration.".into());
+                };
+                settings = self.native.store.load_profile(name)?;
+            }
+            "save-profile" => {
+                let [name, confirmation] = arguments else {
+                    return Err(
+                        "Choose a configuration name and confirm replacement when needed.".into(),
+                    );
+                };
+                self.native
+                    .store
+                    .save_profile(name, &settings, confirmation == "replace")?;
+            }
+            "delete-profile" => {
+                let [name, confirmation] = arguments else {
+                    return Err("Confirm configuration deletion.".into());
+                };
+                self.native
+                    .store
+                    .delete_profile(name, confirmation == "confirm")?;
+            }
+            "set-path" => {
+                let [kind, path] = arguments else {
+                    return Err("Choose a folder.".into());
+                };
+                if !crate::configuration::settings::literal(path) {
+                    return Err("Choose a directory without line breaks.".into());
+                }
+                let directory = std::path::Path::new(path)
+                    .canonicalize()
+                    .map_err(|error| format!("Choose a readable directory: {error}"))?;
+                std::fs::read_dir(&directory)
+                    .map_err(|error| format!("Choose a readable directory: {error}"))?;
+                let value = directory
+                    .to_str()
+                    .ok_or("The folder path must be valid UTF-8.")?
+                    .to_owned();
+                match kind.as_str() {
+                    "llama" => {
+                        if !executable(&server_path(&value)) {
+                            return Err("The llama.cpp folder must contain executable build/bin/llama-server or bin/llama-server.".into());
+                        }
+                        paths.llama = value;
+                    }
+                    "models" => {
+                        let models = crate::configuration::models::discover(&directory)?;
+                        if !models.iter().any(|model| model.path == settings.model) {
+                            settings.model = models
+                                .first()
+                                .map(|model| model.path.clone())
+                                .unwrap_or_default();
+                        }
+                        paths.models = value;
+                    }
+                    _ => return Err("Invalid folder setting.".into()),
+                }
+                self.native.store.save_paths(&paths)?;
+                paths.warning.clear();
+            }
+            "use-bundled" => {
+                if !arguments.is_empty()
+                    || !self
+                        .native
+                        .store
+                        .environment
+                        .bundled_server
+                        .as_ref()
+                        .is_some_and(|path| executable(path))
+                {
+                    return Err(
+                        "The bundled llama-server is unavailable in this installation.".into(),
+                    );
+                }
+                paths.llama.clear();
+                self.native.store.save_paths(&paths)?;
+                paths.warning.clear();
+            }
+            _ => return Err("Unknown configuration operation.".into()),
         }
-        let mut next: Configuration =
-            serde_json::from_value(self.bridge(action, arguments, &request)?)
-                .map_err(|e| e.to_string())?;
+        let mut next = self.native.snapshot(&paths, settings)?;
         match action {
             "load-profile" | "save-profile" => {
                 workspace.profile = arguments.first().cloned();
@@ -315,13 +347,22 @@ impl Runtime {
             .saved
             .as_ref()
             .is_some_and(|saved| saved != &next.settings);
-        let server = self.server.lock().map_err(|e| e.to_string())?;
+        let server = self.server.lock().map_err(|error| error.to_string())?;
         next.restart_required = server.child.is_some()
             && server
                 .settings
                 .as_ref()
                 .is_some_and(|running| !running.same_server_configuration(&next.settings));
+        workspace.paths = Some(paths);
         workspace.configuration = Some(next.clone());
         Ok(next)
+    }
+}
+
+pub(crate) fn configuration_paths(configuration: &Configuration) -> Paths {
+    Paths {
+        llama: configuration.llama_dir.clone(),
+        models: configuration.models_dir.clone(),
+        warning: String::new(),
     }
 }

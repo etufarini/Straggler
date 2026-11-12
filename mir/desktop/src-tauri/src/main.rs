@@ -5,8 +5,8 @@ compile_error!("Desktop automation must never be included in a release build.");
 mod packaging_probe;
 
 use mir_desktop::{
-    default_data_dir, history::Conversation, ChatRequest, Configuration, JobStatus, Listener,
-    Result, Runtime, Settings, Status,
+    default_data_dir, history::Conversation, ChatRequest, Configuration, Listener, Result, Runtime,
+    Settings, Status,
 };
 use std::{path::PathBuf, sync::Arc};
 use tauri::{ipc::Channel, Emitter, Manager, State};
@@ -74,32 +74,6 @@ async fn workspace_action(
     })
     .await
     .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-async fn start_build(
-    tag: String,
-    backend: String,
-    jobs: String,
-    state: State<'_, Application>,
-) -> Result<()> {
-    let runtime = runtime(&state)?;
-    tauri::async_runtime::spawn_blocking(move || runtime.start_build(tag, backend, jobs))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-async fn job_status(state: State<'_, Application>) -> Result<JobStatus> {
-    runtime(&state)?.job_status()
-}
-
-#[tauri::command]
-async fn cancel_build(state: State<'_, Application>) -> Result<()> {
-    let runtime = runtime(&state)?;
-    tauri::async_runtime::spawn_blocking(move || runtime.cancel_build())
-        .await
-        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -388,24 +362,13 @@ async fn preferences_save(
         .map_err(|e| e.to_string())?
 }
 
-fn launcher(app: &tauri::App) -> Result<PathBuf> {
-    if let Some(root) = std::env::var_os("MIR_ROOT") {
-        return Ok(PathBuf::from(root).join("mir.sh"));
-    }
-    let bundled = app
-        .path()
-        .resource_dir()
-        .map_err(|e| e.to_string())?
-        .join("launcher/mir.sh");
-    if bundled.is_file() {
-        return Ok(bundled);
-    }
-    #[cfg(debug_assertions)]
-    {
-        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../mir.sh"))
-    }
-    #[cfg(not(debug_assertions))]
-    Err("Bundled launcher is missing. Reinstall Mir.cpp desktop.".into())
+fn native_environment() -> Result<mir_desktop::configuration::environment::Environment> {
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let bundled = executable
+        .parent()
+        .map(|directory| directory.join("mir-llama-server"))
+        .filter(|server| server.is_file());
+    mir_desktop::configuration::environment::Environment::capture(bundled)
 }
 
 fn shutdown_on_signals(handle: tauri::AppHandle, runtime: Arc<Runtime>) {
@@ -430,13 +393,10 @@ fn shutdown_on_signals(handle: tauri::AppHandle, runtime: Arc<Runtime>) {
                 _ = hangup.recv() => {},
             }
             let runtime = runtime.clone();
-            let result = tauri::async_runtime::spawn_blocking(move || {
-                runtime.cancel_build()?;
-                runtime.stop()
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|result| result);
+            let result = tauri::async_runtime::spawn_blocking(move || runtime.shutdown())
+                .await
+                .map_err(|e| e.to_string())
+                .and_then(|result| result);
             match result {
                 Ok(()) => {
                     handle.exit(0);
@@ -471,8 +431,8 @@ fn main() {
     let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
     let app = builder
         .setup(|app| {
-            let runtime = launcher(app)
-                .and_then(|launcher| Runtime::new(launcher, default_data_dir()?))
+            let runtime = native_environment()
+                .and_then(|environment| Runtime::new(environment, default_data_dir()?))
                 .map(Arc::new);
             if let Ok(runtime) = &runtime {
                 shutdown_on_signals(app.handle().clone(), runtime.clone());
@@ -486,9 +446,6 @@ fn main() {
             configuration,
             apply_settings,
             workspace_action,
-            start_build,
-            job_status,
-            cancel_build,
             start_server,
             stop_server,
             server_status,
@@ -521,8 +478,7 @@ fn main() {
     app.run(|handle, event| {
         if let tauri::RunEvent::Exit = event {
             if let Ok(runtime) = &handle.state::<Application>().0 {
-                let _ = runtime.cancel_build();
-                let _ = runtime.stop();
+                let _ = runtime.shutdown();
             }
         }
     });

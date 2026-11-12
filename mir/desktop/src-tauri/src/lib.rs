@@ -1,5 +1,4 @@
 pub mod attachments;
-mod builds;
 pub mod bundled_backend;
 mod chat;
 pub mod configuration;
@@ -8,13 +7,14 @@ pub mod diagnostics;
 pub mod files;
 pub mod history;
 pub mod model;
+pub mod platform;
 pub mod preferences;
 pub mod projects;
 mod server;
 pub mod stream;
 pub mod tokens;
 pub mod workspace;
-pub use workspace::{Configuration, JobStatus, Listener, Settings};
+pub use workspace::{Configuration, Listener, Settings};
 
 use history::History;
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ use std::{
     fs::{File, OpenOptions},
     os::{fd::AsRawFd, unix::fs::OpenOptionsExt},
     path::PathBuf,
-    process::{Child, Command},
+    process::Child,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -58,8 +58,7 @@ struct Server {
 }
 
 pub struct Runtime {
-    launcher: PathBuf,
-    bash: PathBuf,
+    native: configuration::native::NativeConfiguration,
     server: Arc<Mutex<Server>>,
     client: reqwest::Client,
     active: Mutex<Generation>,
@@ -68,7 +67,6 @@ pub struct Runtime {
     pub projects: projects::Projects,
     pub preferences: preferences::Preferences,
     workspace: Mutex<workspace::Workspace>,
-    job: Arc<Mutex<workspace::Job>>,
     _instance: File,
 }
 
@@ -104,18 +102,11 @@ pub struct ChatMessage {
 }
 
 impl Runtime {
-    pub fn new(launcher: PathBuf, data: PathBuf) -> Result<Self> {
-        if !launcher.is_file() {
-            return Err(format!("Launcher not found: {}", launcher.display()));
-        }
-        let bash = [std::env::var_os("MIR_DESKTOP_BASH").map(PathBuf::from),
-            Some(PathBuf::from("bash")),
-            Some(PathBuf::from("/opt/homebrew/bin/bash")),
-            Some(PathBuf::from("/usr/local/bin/bash"))]
-            .into_iter().flatten().find(|path| Command::new(path)
-                .args(["-c", "(( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4) ))"])
-                .status().is_ok_and(|status| status.success()))
-            .ok_or("Mir.cpp requires Bash 4.4 or newer. Install a current Bash and retry.")?;
+    pub fn new(
+        environment: configuration::environment::Environment,
+        data: PathBuf,
+    ) -> Result<Self> {
+        let native = configuration::native::NativeConfiguration::new(environment)?;
         let history = History::new(data.join("conversations"))?;
         let instance = OpenOptions::new()
             .read(true)
@@ -131,14 +122,12 @@ impl Runtime {
         }
         let projects = projects::Projects::new(data.join("projects"), &history)?;
         Ok(Self {
-            launcher,
-            bash,
+            native,
             history,
             projects,
             preferences: preferences::Preferences::new(data.clone()),
             _instance: instance,
             workspace: Mutex::new(workspace::Workspace::default()),
-            job: Arc::new(Mutex::new(workspace::Job::default())),
             server: Arc::new(Mutex::new(Server {
                 child: None,
                 settings: None,
@@ -162,10 +151,16 @@ impl Runtime {
     }
 }
 
+impl Runtime {
+    pub fn shutdown(&self) -> Result<()> {
+        self.native.cancel_discovery()?;
+        self.stop()
+    }
+}
+
 impl Drop for Runtime {
     fn drop(&mut self) {
-        let _ = self.cancel_build();
-        let _ = self.stop();
+        let _ = self.shutdown();
     }
 }
 

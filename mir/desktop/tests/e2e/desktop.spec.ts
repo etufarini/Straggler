@@ -133,7 +133,7 @@ test('empty setup gives a usable message and keeps launch disabled', async ({ pa
   await mockDesktop(page, 'empty');
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Install or change build' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose external build' })).toBeVisible();
   await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByText('No GGUF models found', { exact: true })).toBeVisible();
   await expect(
@@ -332,7 +332,7 @@ test('unknown compute errors stay with the response and do not diagnose an OOM',
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeEnabled();
 });
 
-test('history and build errors use their own context and recovery actions', async ({ page }) => {
+test('history and backend errors use their own context and recovery actions', async ({ page }) => {
   await mockDesktop(page, 'history-error');
   await page.goto('/');
   await expect(page.locator('.composer-wrap').getByRole('alert')).toContainText(
@@ -341,16 +341,16 @@ test('history and build errors use their own context and recovery actions', asyn
   await page.evaluate(() => localStorage.setItem('mir-fixture-history-recovered', 'true'));
   await page.getByRole('button', { name: 'Retry loading' }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.goto('/?scenario=build-error');
+  await page.goto('/?scenario=backend-error');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
-  await page.getByRole('button', { name: 'Install or change build' }).click();
+  await page.getByRole('button', { name: 'Use bundled backend', exact: true }).click();
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: 'Build llama.cpp', exact: true })
+    .getByRole('button', { name: 'Use bundled backend', exact: true })
     .click();
   await expect(page.locator('.settings-content').getByRole('alert')).toContainText(
-    'llama.cpp build failed',
+    'llama.cpp operation failed',
   );
   await expect(page.locator('.workspace-feedback')).toHaveCount(0);
 });

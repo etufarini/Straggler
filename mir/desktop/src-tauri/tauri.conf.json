@@ -10,7 +10,16 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "label": "main", "title": "Mir.cpp", "width": 1200, "height": 820, "minWidth": 760, "minHeight": 560 }],
+    "windows": [
+      {
+        "label": "main",
+        "title": "Mir.cpp",
+        "width": 1200,
+        "height": 820,
+        "minWidth": 760,
+        "minHeight": 560
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-src 'none'",
       "devCsp": "default-src 'self'; connect-src ipc: http://ipc.localhost ws://127.0.0.1:1420; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-src 'none'"
@@ -18,17 +27,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb"],
+    "targets": [
+      "deb"
+    ],
     "category": "Utility",
     "shortDescription": "Chat with local GGUF models",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png"],
-    "resources": {
-      "../../mir.sh": "launcher/mir.sh",
-      "../../lib/": "launcher/lib/",
-      "../../sh/": "launcher/sh/"
-    },
-    "linux": {
-      "deb": { "depends": ["bash (>= 4.4)", "python3", "curl", "iproute2", "procps", "coreutils", "findutils"] }
-    }
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ],
+    "resources": []
   }
 }

@@ -15,13 +15,7 @@ import { errorDetail, settingsFailure as describeSettingsFailure } from '../doma
 import type { SettingsFailure } from '../domain/errors';
 import { fieldSection } from '../features/settings/sections';
 import type { Section } from '../features/settings/sections';
-import type {
-  Configuration,
-  ServerStatus,
-  Settings,
-  JobStatus,
-  Confirmation,
-} from '../domain/types';
+import type { Configuration, ServerStatus, Settings, Confirmation } from '../domain/types';
 type Panel = 'models' | 'settings' | 'logs' | null;
 
 export interface ProjectDialog {
@@ -34,9 +28,7 @@ export function useWorkspace() {
   const [config, setConfig] = useState<Configuration | null>(null);
   const [server, setServer] = useState<ServerStatus>(emptyServer);
   const [draft, setDraft] = useState<Settings | null>(null);
-  const [job, setJob] = useState<JobStatus>({ phase: 'idle', logs: [], error: null });
   const configRef = useRef<Configuration | null>(null);
-  const jobPhase = useRef('idle');
   const firstConfiguration = useRef(true);
   const selected = draft?.model || '';
   function setSelected(model: string) {
@@ -263,20 +255,10 @@ export function useWorkspace() {
     let ticks = 0;
     async function poll() {
       try {
-        const [value, build] = await Promise.all([
-          invoke<ServerStatus>('server_status'),
-          invoke<JobStatus>('job_status'),
-        ]);
+        const value = await invoke<ServerStatus>('server_status');
         if (!disposed) {
           setServer(value);
-          setJob(build);
-          if (
-            (['running', 'stopping'].includes(jobPhase.current) &&
-              ['ready', 'failed', 'canceled'].includes(build.phase)) ||
-            (value.phase === 'ready' && ++ticks % 5 === 0)
-          )
-            void loadConfiguration();
-          jobPhase.current = build.phase;
+          if (value.phase === 'ready' && ++ticks % 5 === 0) void loadConfiguration();
         }
       } catch (e) {
         if (!disposed) setError(String(e));
@@ -370,9 +352,8 @@ export function useWorkspace() {
     setConfirmation({
       title: 'Close Mir.cpp?',
       destructive: true,
-      text: 'Any active response will be stopped and saved. Active builds will be canceled and the server started by this app will be shut down.',
+      text: 'Any active response will be stopped and saved. The server started by this app will be shut down.',
       action: async () => {
-        await invoke('cancel_build');
         await stop();
         await flushSaves();
         await ui.preferenceSaveQueue.current;
@@ -511,7 +492,6 @@ export function useWorkspace() {
     stop,
     native,
     selected,
-    job,
     start,
     error,
     setError,
@@ -523,7 +503,6 @@ export function useWorkspace() {
     setDraft,
     acceptConfiguration,
     confirm,
-    setJob,
     follow,
     textarea,
     messageList,

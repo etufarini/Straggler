@@ -140,20 +140,8 @@ fn generation(field: &str, value: &str) -> bool {
 
 impl Default for Settings {
     fn default() -> Self {
-        let mut fields: BTreeMap<String, String> = PROFILE_FIELDS
-            .iter()
-            .map(|name| ((*name).into(), "auto".into()))
-            .collect();
-        for (name, value) in [
-            ("model", ""),
-            ("port", "9931"),
-            ("cache_type_k", "q4_0"),
-            ("cache_type_v", "q4_0"),
-            ("chat_system_prompt", ""),
-        ] {
-            fields.insert(name.into(), value.into());
-        }
-        Self::from_fields(fields).expect("Documented configuration defaults must match Settings")
+        serde_json::from_str(include_str!("defaults.json"))
+            .expect("Documented configuration defaults must match Settings")
     }
 }
 

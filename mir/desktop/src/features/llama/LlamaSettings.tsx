@@ -1,177 +1,60 @@
 import type { SettingsController } from '../settings/useSettings';
-import Feedback from '../../components/Feedback';
-import NumberField from '../../components/NumberField';
-import { invoke } from '../../services/desktop';
-import type { JobStatus } from '../../domain/types';
 
 export default function LlamaSettings({ controller }: { controller: SettingsController }) {
-  const {
-    config,
-    job,
-    accept,
-    confirm,
-    onJob,
-    busy,
-    backend,
-    setBackend,
-    version,
-    setVersion,
-    tag,
-    setTag,
-    jobs,
-    setJobs,
-    native,
-    active,
-    building,
-    run,
-    operation,
-    requestBuild,
-  } = controller;
+  const { config, busy, active, native, setFolder, confirm, accept, operation } = controller;
+  const bundled = !config.llamaDir && config.serverAvailable;
   return (
     <>
       <h2>llama.cpp</h2>
+      <p>
+        The bundled backend is pinned to a version tested with Mir.cpp. Backend updates are
+        delivered with application updates.
+      </p>
       <div className="build-summary">
-        {config.build ? (
+        <strong>
+          {config.serverAvailable
+            ? bundled
+              ? 'Bundled backend'
+              : 'External build'
+            : 'Backend unavailable'}
+        </strong>
+        {config.build && (
           <>
-            <strong>
+            <span>
               {config.build.tag} · {config.build.backend}
-            </strong>
+            </span>
             <code>{config.build.commit}</code>
           </>
-        ) : (
-          <p>
-            {config.serverAvailable
-              ? 'Using an external llama.cpp build.'
-              : 'No llama.cpp build configured. Install one below or select an existing folder.'}
-          </p>
         )}
+        {config.llamaDir && <code>{config.llamaDir}</code>}
       </div>
-      <div className="field-grid">
-        <label className="setting-field">
-          <span>
-            Hardware target <code className="tech-term">Build backend</code>
-          </span>
-          <select
-            aria-label="Hardware target"
-            value={backend}
-            disabled={building}
-            onChange={(event) => setBackend(event.target.value)}
-          >
-            {config.backends.map((value) => (
-              <option key={value.id} value={value.id}>
-                {value.label}
-              </option>
-            ))}
-          </select>
-          <small>Options depend on your system.</small>
-        </label>
-        <NumberField
-          label="Parallel build jobs"
-          value={jobs}
-          onChange={setJobs}
-          disabled={building}
-          hint="1–64. Used only while building, not while chatting."
-        />
-      </div>
-      <label className="setting-field">
-        <span>Source version</span>
-        <select
-          disabled={building}
-          value={version}
-          onChange={(event) => setVersion(event.target.value)}
-        >
-          <option value="latest">Latest published release</option>
-          <option value="tag">Specific release tag</option>
-        </select>
-      </label>
-      {version === 'tag' && (
-        <label className="setting-field">
-          <span>Release tag</span>
-          <input
-            value={tag}
-            disabled={building}
-            onChange={(event) => setTag(event.target.value)}
-            placeholder="Official release tag"
-          />
-        </label>
+      {!config.bundledAvailable && (
+        <p>This installation has no bundled backend. Select an existing llama.cpp build.</p>
       )}
       <div className="row-actions">
-        <button
-          className="primary-button"
-          disabled={busy || building || active || !native}
-          onClick={() => void requestBuild()}
-        >
-          Install or change build
+        <button disabled={busy || active || !native} onClick={() => setFolder('llama')}>
+          Choose external build
         </button>
         <button
-          disabled={busy || building || active || !config.build || !native}
-          onClick={() => void requestBuild(true)}
-        >
-          Check for updates
-        </button>
-        <button
-          disabled={busy || building || active || !config.build?.previous || !native}
+          disabled={busy || active || !native || !config.bundledAvailable || bundled}
           onClick={() =>
             confirm({
-              title: 'Restore previous build?',
-              actionLabel: 'Restore previous build',
-              destructive: true,
-              text: 'Switch to the previous verified llama.cpp build? Model settings and conversations will be kept.',
+              title: 'Use the bundled backend?',
+              actionLabel: 'Use bundled backend',
+              text: 'Switch to the llama.cpp version included with Mir.cpp? Model settings and saved configurations will be kept.',
               action: async () => {
-                accept(await operation('restore'));
+                accept(await operation('use-bundled'));
               },
             })
           }
         >
-          Restore previous build
+          Use bundled backend
         </button>
       </div>
-      <p role="status" className="job-status">
-        {job.phase === 'idle' ? 'No build running' : `Build status: ${job.phase}`}
+      <p className="field-help">
+        External builds can advertise different capabilities. Stop the server before changing its
+        backend.
       </p>
-      {job.error && (
-        <Feedback title="llama.cpp build failed" details={job.error}>
-          The working installation has been kept. Review the build log before trying again.
-        </Feedback>
-      )}
-      {building && (
-        <button
-          className="danger-button"
-          onClick={() =>
-            confirm({
-              title: 'Cancel build?',
-              actionLabel: 'Cancel build',
-              destructive: true,
-              text: 'Stop the current build and keep the working installation?',
-              action: async () => {
-                await invoke('cancel_build');
-                onJob(await invoke<JobStatus>('job_status'));
-              },
-            })
-          }
-        >
-          Cancel build
-        </button>
-      )}
-      <button
-        className="text-button"
-        disabled={busy || !native}
-        onClick={() =>
-          void run(async () => {
-            const value = await invoke<{ logs: string[] }>('workspace_action', {
-              action: 'build-log',
-              arguments: [],
-              targets: [],
-            });
-            onJob({ ...job, logs: value.logs });
-          })
-        }
-      >
-        View build log
-      </button>
-      <pre className="build-log" tabIndex={0}>
-        {job.logs.join('\n') || 'Build output appears here.'}
-      </pre>
     </>
   );
 }

@@ -2,7 +2,7 @@ import type { SettingsController } from './useSettings';
 import { Folder } from 'lucide-react';
 
 export default function FolderSettings({ controller }: { controller: SettingsController }) {
-  const { config, setSection, busy, setFolder, native, active, building } = controller;
+  const { config, setSection, busy, setFolder, native, active } = controller;
   return (
     <>
       <h2>Folders</h2>
@@ -13,9 +13,14 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
       ].map(([kind, label, path]) => (
         <div className="folder-setting" key={kind}>
           <h3>{label}</h3>
-          <code>{path || 'Not configured'}</code>
+          <code>
+            {path ||
+              (kind === 'llama' && config.bundledAvailable
+                ? 'Bundled with Mir.cpp'
+                : 'Not configured')}
+          </code>
           <button
-            disabled={busy || !native || (kind === 'llama' && (active || building))}
+            disabled={busy || !native || (kind === 'llama' && active)}
             onClick={() => setFolder(kind as 'llama' | 'models')}
           >
             <Folder size={15} />
@@ -27,7 +32,7 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
         The models folder can be empty. The llama.cpp folder must contain llama-server, in bin or
         build/bin.
       </p>
-      <button onClick={() => setSection('llama')}>Install / update llama.cpp</button>
+      <button onClick={() => setSection('llama')}>Backend details</button>
     </>
   );
 }

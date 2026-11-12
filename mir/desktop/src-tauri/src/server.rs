@@ -1,10 +1,9 @@
-use crate::{workspace, Result, Runtime, Server, Status};
-use serde_json::Value;
+use crate::{workspace::configuration_paths, Result, Runtime, Server, Status};
 use std::{
     collections::VecDeque,
     io::{BufRead, BufReader},
     os::unix::process::CommandExt,
-    process::{Command, Stdio},
+    process::Stdio,
     sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
@@ -13,53 +12,49 @@ use uuid::Uuid;
 
 impl Runtime {
     pub fn start(&self, model: String) -> Result<()> {
-        if self.job_busy()? {
-            return Err(
-                "Wait for the build to finish or cancel it before launching the server.".into(),
-            );
-        }
         let config = self.inspect()?;
-        let mut request = workspace::BridgeRequest::from(&config);
+        let paths = configuration_paths(&config);
         let mut settings = config.settings;
         settings.model = model.clone();
-        request.settings = Some(settings.clone());
+        let settings = settings.validated()?;
+        let (executable, arguments) = self.native.launch(&paths, &settings)?;
         let mut state = self.server.lock().map_err(|e| e.to_string())?;
         refresh_child(&mut state)?;
         if state.child.is_some() || state.phase == "stopping" {
             return Err("Stop the current server before loading another model.".into());
         }
-        let mut child = Command::new(&self.bash)
-            .arg(&self.launcher)
-            .args(["--desktop", "start", &model])
+        if self.native.is_closing() {
+            return Err("Mir.cpp is closing.".into());
+        }
+        let mut child = self
+            .native
+            .store
+            .environment
+            .command(&executable)
+            .args(&arguments)
             .process_group(0)
-            .stdin(Stdio::piped())
+            .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| format!("Cannot start llama.cpp: {e}"))?;
-        if let Some(mut input) = child.stdin.take() {
-            std::io::Write::write_all(
-                &mut input,
-                &serde_json::to_vec(&request).map_err(|e| e.to_string())?,
-            )
-            .map_err(|e| e.to_string())?;
-        }
+            .map_err(|error| format!("Cannot start llama.cpp: {error}"))?;
         let run = Uuid::new_v4();
         let stdout = child.stdout.take().ok_or("Server output is unavailable.")?;
         let stderr = child.stderr.take().ok_or("Server log is unavailable.")?;
+        let url = format!("http://127.0.0.1:{}", settings.port);
         *state = Server {
             child: Some(child),
             settings: Some(settings),
             run,
             phase: "loading".into(),
             model: Some(model),
-            url: None,
+            url: Some(url),
             logs: VecDeque::new(),
             error: None,
             diagnostics: crate::diagnostics::Diagnostics::default(),
         };
-        read_log(self.server.clone(), run, stdout, true);
-        read_log(self.server.clone(), run, stderr, false);
+        read_log(self.server.clone(), run, stdout);
+        read_log(self.server.clone(), run, stderr);
         Ok(())
     }
 
@@ -135,7 +130,7 @@ impl Runtime {
             child
         };
         // An unreaped owned child keeps this PID reserved. Its separate process
-        // group also contains probes running before the bridge execs the server.
+        // group belongs to this supervised server alone.
         let signal = unsafe { libc::kill(-(child.id() as i32), libc::SIGTERM) };
         let signal_error = std::io::Error::last_os_error();
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -178,14 +173,8 @@ fn refresh_child(state: &mut Server) -> Result<()> {
     Ok(())
 }
 
-fn read_log(
-    server: Arc<Mutex<Server>>,
-    run: Uuid,
-    pipe: impl std::io::Read + Send + 'static,
-    metadata: bool,
-) {
+fn read_log(server: Arc<Mutex<Server>>, run: Uuid, pipe: impl std::io::Read + Send + 'static) {
     thread::spawn(move || {
-        let mut first = metadata;
         // read_until bounds retained log lines, including output without newlines.
         let mut reader = BufReader::new(pipe);
         loop {
@@ -201,17 +190,6 @@ fn read_log(
             if state.run != run {
                 break;
             }
-            if first {
-                first = false;
-                if let Ok(value) = serde_json::from_str::<Value>(&line) {
-                    if value["mirDesktop"] == 1 {
-                        if let Some(url) = value["url"].as_str().filter(|url| valid_url(url)) {
-                            state.url = Some(url.into());
-                        }
-                        continue;
-                    }
-                }
-            }
             if state.logs.len() == 300 {
                 state.logs.pop_front();
             }
@@ -219,10 +197,4 @@ fn read_log(
             state.logs.push_back(line);
         }
     });
-}
-
-fn valid_url(url: &str) -> bool {
-    url.strip_prefix("http://127.0.0.1:")
-        .and_then(|port| port.parse::<u16>().ok())
-        .is_some_and(|port| port > 0)
 }

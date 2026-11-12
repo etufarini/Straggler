@@ -25,7 +25,6 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
     active,
     setSelected,
     server,
-    job,
     start,
     requestStop,
   } = controller;
@@ -66,10 +65,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                 <CircleHelp size={19} />
                 <div>
                   <strong>Set up llama.cpp first</strong>
-                  <p>
-                    Open Settings to install llama.cpp or select an existing build and choose your
-                    Models folder.
-                  </p>
+                  <p>Open Settings to select a llama.cpp build and choose your Models folder.</p>
                   <button onClick={() => setPanel('settings')}>Open Settings</button>
                 </div>
               </div>
@@ -123,13 +119,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
               ) : (
                 <button
                   className="primary-button"
-                  disabled={
-                    !native ||
-                    !config?.serverAvailable ||
-                    !selected ||
-                    busy ||
-                    ['running', 'stopping'].includes(job.phase)
-                  }
+                  disabled={!native || !config?.serverAvailable || !selected || busy}
                   onClick={() => void start()}
                 >
                   {busy ? <LoaderCircle size={15} className="spin" /> : <Cpu size={15} />}Load model

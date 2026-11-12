@@ -12,7 +12,6 @@ desktop/src-tauri/icons/32x32.png
 desktop/src-tauri/icons/icon.png
 desktop/src-tauri/icons/icon.svg
 desktop/src-tauri/src/attachments.rs
-desktop/src-tauri/src/builds.rs
 desktop/src-tauri/src/bundled_backend.rs
 desktop/src-tauri/src/chat.rs
 desktop/src-tauri/src/conversation_import.rs
@@ -104,3 +103,11 @@ desktop/src/services/projectFixtures.ts
 desktop/src/style.css
 desktop/tsconfig.json
 desktop/vite.config.ts
+desktop/packaging/llama-runtime.json
+desktop/src-tauri/src/configuration/capabilities.rs
+desktop/src-tauri/src/configuration/defaults.json
+desktop/src-tauri/src/configuration/models.rs
+desktop/src-tauri/src/configuration/native.rs
+desktop/src-tauri/src/platform/linux.rs
+desktop/src-tauri/src/platform/macos.rs
+desktop/src-tauri/src/platform/mod.rs

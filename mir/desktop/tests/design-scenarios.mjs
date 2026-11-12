@@ -123,7 +123,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     'SET-03B': 'occupied',
     'DIALOG-03': 'occupied',
     'DIALOG-04': 'occupied',
-    'BUILD-01': 'build-error',
+    'BUILD-01': 'backend-error',
   };
   await page.goto(
     `${baseUrl}/${screen === 'CHAT-08' ? '' : `?scenario=${scenarios[screen] || 'normal'}`}`,
