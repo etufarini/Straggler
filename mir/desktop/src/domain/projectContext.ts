@@ -4,13 +4,14 @@ import type { Project } from './projects';
 import type { Conversation, Message, Settings } from './types';
 
 export const projectContextThresholds = { close: 0.75, over: 1 } as const;
+export const projectTokenEstimateCharacters = 4;
 
 export function projectConversationReserve(nCtx: number): number {
   return Math.ceil(nCtx * 0.25);
 }
 
 export function estimateProjectTokens(text: string): number {
-  return Math.ceil(Array.from(text).length / 4);
+  return Math.ceil(Array.from(text).length / projectTokenEstimateCharacters);
 }
 
 export interface ProjectContextState {

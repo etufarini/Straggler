@@ -75,6 +75,9 @@ export function createProjectFixture(
       return { project: structuredClone(next), undoToken };
     }
     if (command === 'project_file_add') {
+      const charactersPerToken = Number(args.charactersPerToken);
+      if (!Number.isSafeInteger(charactersPerToken) || charactersPerToken <= 0)
+        throw new Error('The project token estimate requires a positive character count.');
       const project = find(args.projectId);
       assertProjectWritable(project);
       const name = String(args.path).split('/').at(-1)!;
@@ -90,6 +93,8 @@ export function createProjectFixture(
         size: 1234,
         included: true,
         text,
+        tokens: Math.ceil(Array.from(text).length / charactersPerToken),
+        tokenSource: 'approximate',
       });
       timestamp(project);
       persist();

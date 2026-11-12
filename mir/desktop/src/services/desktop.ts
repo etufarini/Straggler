@@ -2,6 +2,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 import type { Attachment, Conversation } from '../domain/types';
+import { projectTokenEstimateCharacters } from '../domain/projectContext';
 import type {
   Project,
   ProjectMutation,
@@ -244,7 +245,11 @@ export const projectService = {
   list: () => invoke<Project[]>('projects_list'),
   save: (project: Project) => invoke<ProjectMutation>('project_save', { project }),
   addFile: (projectId: string, path: string) =>
-    invoke<ProjectMutation>('project_file_add', { projectId, path }),
+    invoke<ProjectMutation>('project_file_add', {
+      projectId,
+      path,
+      charactersPerToken: projectTokenEstimateCharacters,
+    }),
   removeFile: (projectId: string, fileId: string) =>
     invoke<ProjectMutation>('project_file_remove', { projectId, fileId }),
   moveChat: (conversationId: string, projectId: string | null) =>

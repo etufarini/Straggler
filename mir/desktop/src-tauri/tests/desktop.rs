@@ -817,7 +817,7 @@ async fn project_storage_and_generation_use_identity_and_immutable_request_snaps
     fs::write(&source, "A file added during generation").unwrap();
     let added = runtime
         .projects
-        .add_file(&runtime.history, project.id, &source)
+        .add_file(&runtime.history, project.id, &source, 4)
         .unwrap()
         .project
         .unwrap()

@@ -362,6 +362,7 @@ try {
     const addedProjectFile = await invokeNative('project_file_add', {
       projectId,
       path: projectSource,
+      charactersPerToken: 4,
     });
     const projectFile = addedProjectFile.project.files[0];
     assert.equal(projectFile.text, projectSourceText);

@@ -362,14 +362,22 @@ impl Projects {
         history: &History,
         project_id: Uuid,
         path: &Path,
+        characters_per_token: usize,
     ) -> Result<ProjectMutation> {
+        if characters_per_token == 0 {
+            return Err("Token estimates need a positive characters-per-token value.".into());
+        }
         let extracted = attachments::extract(path)?;
         let _guard = self.writer.lock().map_err(|error| error.to_string())?;
         self.prepare(history)?;
         let mut project = self.read(project_id)?;
         ensure_active(&project)?;
         let attachment = extracted.attachment;
-        let approximate_tokens = attachment.text.chars().count().div_ceil(4);
+        let approximate_tokens = attachment
+            .text
+            .chars()
+            .count()
+            .div_ceil(characters_per_token);
         let file = ProjectFile {
             id: attachment.id,
             name: attachment.name,
@@ -1093,6 +1101,27 @@ mod tests {
     }
 
     #[test]
+    fn extraction_uses_supplied_token_ratio_and_rejects_zero_before_reading_or_writing() {
+        let storage = Storage::new();
+        let missing_source = storage.directory.path().join("missing.txt");
+        let invalid = storage
+            .projects
+            .add_file(&storage.history, Uuid::new_v4(), &missing_source, 0)
+            .unwrap_err();
+        assert!(invalid.contains("positive characters-per-token"));
+        assert!(!storage.projects.directory.exists());
+        let project = storage.create("Supplied estimate");
+        let source = storage.directory.path().join("unicode.txt");
+        fs::write(&source, "é☕x").unwrap();
+        let result = storage
+            .projects
+            .add_file(&storage.history, project.id, &source, 2)
+            .unwrap();
+        assert_eq!(result.project.unwrap().project.files[0].tokens, Some(2));
+        assert_eq!(fs::read_to_string(source).unwrap(), "é☕x");
+    }
+
+    #[test]
     fn ipc_contract_contains_text_but_disk_records_contain_only_file_metadata() {
         let storage = Storage::new();
         let project = storage.create("Notes");
@@ -1100,7 +1129,7 @@ mod tests {
         fs::write(&source, "# Unicode ☕").unwrap();
         let result = storage
             .projects
-            .add_file(&storage.history, project.id, &source)
+            .add_file(&storage.history, project.id, &source, 4)
             .unwrap();
         let value = serde_json::to_value(&result).unwrap();
         let file = &value["project"]["files"][0];
@@ -1151,7 +1180,7 @@ mod tests {
         fs::write(&source, "The original is never changed.").unwrap();
         let added = storage
             .projects
-            .add_file(&storage.history, project.id, &source)
+            .add_file(&storage.history, project.id, &source, 4)
             .unwrap()
             .project
             .unwrap()
@@ -1282,7 +1311,7 @@ mod tests {
         fs::write(&source, "Text").unwrap();
         assert!(storage
             .projects
-            .add_file(&storage.history, archived_project.id, &source)
+            .add_file(&storage.history, archived_project.id, &source, 4)
             .is_err());
         let mut invalid_edit = archived_project;
         invalid_edit.instructions = "Forbidden".into();
@@ -1526,7 +1555,7 @@ mod tests {
         .unwrap();
         assert!(storage
             .projects
-            .add_file(&storage.history, project.id, &source)
+            .add_file(&storage.history, project.id, &source, 4)
             .is_err());
         assert_eq!(fs::read(&record).unwrap(), previous);
         assert_eq!(
@@ -1545,7 +1574,7 @@ mod tests {
             fs::write(&path, name).unwrap();
             let added = storage
                 .projects
-                .add_file(&storage.history, project.id, &path)
+                .add_file(&storage.history, project.id, &path, 4)
                 .unwrap()
                 .project
                 .unwrap()
@@ -1585,7 +1614,7 @@ mod tests {
         fs::write(&source, "Keep the original").unwrap();
         let added = storage
             .projects
-            .add_file(&storage.history, project.id, &source)
+            .add_file(&storage.history, project.id, &source, 4)
             .unwrap()
             .project
             .unwrap()
