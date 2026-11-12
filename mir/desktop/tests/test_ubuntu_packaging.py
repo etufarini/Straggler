@@ -79,6 +79,7 @@ class UbuntuPackagingTests(unittest.TestCase):
                                  "libggml-base.so.0", "libggml-cpu-baseline.so"})
         self.assertFalse((prepared / "backend/libllama.so.0").is_symlink())
         config = json.loads((prepared / "tauri.ubuntu.json").read_text())
+        self.assertNotIn("mainBinaryName", config)
         deb = config["bundle"]["linux"]["deb"]
         self.assertEqual(deb["files"]["/usr/lib/mir.cpp/backend"], str(prepared / "backend"))
         self.assertIn("libgomp1", deb["depends"])

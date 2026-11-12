@@ -110,32 +110,28 @@ def store_entitlements(profile, identifier):
     return entitlements
 
 
-def prepare(target, archive_path=None, desktop=False, app_store=False, store_check=False, profile=None):
+def prepare(target, archive_path=None, probe=False, app_store=False, store_check=False, profile=None):
     def populate(source, stage, destination, manifest):
         copy_backend(source, stage, target, manifest)
         desktop_config = json.loads((DESKTOP / "src-tauri/tauri.conf.json").read_text())
-        identifier = desktop_config["identifier"] if desktop else "io.github.etufarini.mir.packaging-check"
-        product = desktop_config["productName"] if desktop else PRODUCT
+        identifier = "io.github.etufarini.mir.packaging-check" if probe else desktop_config["identifier"]
+        product = PRODUCT if probe else desktop_config["productName"]
         if store_check:
             identifier += ".store-check"
             product = "Mir.cpp Store Check"
-        launcher_resources = desktop_config["bundle"]["resources"]
-        # Tauri merges resource maps; null removes the normal launcher's entries.
-        resources = {source: None for source in launcher_resources}
-        resources.update({str(destination / name): name for name in BUNDLE_RESOURCES})
         config = {
             "productName": product,
             "identifier": identifier,
-            "app": {} if desktop else {"windows": []},
+            "app": {"windows": []} if probe else {},
             "bundle": {
                 "targets": ["app"],
-                "resources": resources,
+                "resources": {str(destination / name): name for name in BUNDLE_RESOURCES},
                 "externalBin": [str(destination / "mir-llama-server")],
                 "macOS": {
                     "minimumSystemVersion": "13.5",
                     "frameworks": [str(destination / "libraries" / p.name)
                                    for p in sorted((stage / "libraries").iterdir())],
-                    "entitlements": None if desktop else str(PACKAGING / "app.entitlements.plist"),
+                    "entitlements": str(PACKAGING / "app.entitlements.plist") if probe else None,
                 },
             },
         }
@@ -143,9 +139,9 @@ def prepare(target, archive_path=None, desktop=False, app_store=False, store_che
             entitlements = store_entitlements(profile, identifier)
             (stage / "store.entitlements.plist").write_bytes(plistlib.dumps(entitlements))
             config["bundle"]["macOS"]["entitlements"] = str(destination / "store.entitlements.plist")
-        (stage / "tauri.backend-check.json").write_text(json.dumps(config, indent=2) + "\n")
+        (stage / "tauri.packaging.json").write_text(json.dumps(config, indent=2) + "\n")
     return backend.prepare_backend(PACKAGING, target, archive_path, populate,
-                                   variant="-app-store-check" if store_check else "-app-store" if app_store else "")
+                                   variant="-app-store-check" if store_check else "-app-store" if app_store else "-probe" if probe else "")
 
 
 def run(*arguments, **kwargs):
@@ -185,12 +181,28 @@ def sign_bundle(app, identity, sandbox=True, parent_entitlements=None):
             raise ValueError(f"Unexpected signed entitlements: {binary.name}")
 
 
+def create_disk_image(app, identity):
+    """Package the already signed app without rebuilding or changing its contents."""
+    image = app.with_suffix(".dmg")
+    with tempfile.TemporaryDirectory(prefix=".dmg-", dir=app.parent) as temporary:
+        stage = Path(temporary)
+        run("ditto", str(app), str(stage / app.name))
+        (stage / "Applications").symlink_to("/Applications", target_is_directory=True)
+        run("hdiutil", "create", "-volname", app.stem, "-srcfolder", str(stage),
+            "-format", "UDZO", "-ov", str(image))
+    if identity != "-":
+        run("codesign", "--force", "--sign", identity, str(image))
+        run("codesign", "--verify", str(image))
+    run("hdiutil", "verify", str(image))
+    return image
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("prepare", "bundle"))
     parser.add_argument("--target", choices=tuple(CPU_TYPES), required=True)
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--desktop", action="store_true", help="Build the regular desktop for direct distribution")
+    mode.add_argument("--probe", action="store_true", help="Build the sandboxed backend diagnostic instead of the desktop")
     mode.add_argument("--app-store", action="store_true", help="Build the sandboxed GUI with persistent model-folder permissions")
     parser.add_argument("--store-check", action="store_true", help="Use a separate test app/container for local Store checks")
     parser.add_argument("--debug", action="store_true", help="Store-check only: enable debug WebDriver testing")
@@ -214,7 +226,7 @@ def main():
     profile = None
     if args.provisioning_profile:
         profile = plistlib.loads(subprocess.check_output(["security", "cms", "-D", "-i", str(args.provisioning_profile.resolve())]))
-    prepared = prepare(args.target, args.archive, desktop=args.desktop or args.app_store,
+    prepared = prepare(args.target, args.archive, probe=args.probe,
                        app_store=args.app_store, store_check=args.store_check, profile=profile)
     if args.action == "bundle":
         # Build a complete ICNS (including 512@2x) from the existing vector art;
@@ -223,26 +235,27 @@ def main():
             run("npm", "exec", "--", "tauri", "icon", str(DESKTOP / "src-tauri/icons/icon.svg"),
                 "--output", temporary, cwd=DESKTOP)
             shutil.copyfile(Path(temporary) / "icon.icns", prepared / "icon.icns")
-        config_path = prepared / "tauri.backend-check.json"
+        config_path = prepared / "tauri.packaging.json"
         config = json.loads(config_path.read_text())
         config["bundle"]["icon"] = [str(prepared / "icon.icns")]
         config_path.write_text(json.dumps(config, indent=2) + "\n")
         build = PACKAGING / ("generated/build-app-store-check" if args.store_check else
-                             "generated/build-app-store" if args.app_store else "generated/build")
+                             "generated/build-app-store" if args.app_store else
+                             "generated/build-probe" if args.probe else "generated/build")
         environment = dict(os.environ, CARGO_TARGET_DIR=str(build))
         features = (["--features", "app-store,native-tests" if args.debug else "app-store"] if args.app_store
-                    else [] if args.desktop else ["--features", "packaging-probe"])
+                    else ["--features", "packaging-probe"] if args.probe else [])
         if args.debug:
             features += ["--debug"]
         run("npm", "exec", "--", "tauri", "build", "--target", args.target,
-            *features, "--config", str(prepared / "tauri.backend-check.json"),
+            *features, "--config", str(config_path),
             "--no-sign", cwd=DESKTOP, env=environment)
-        product = json.loads((prepared / "tauri.backend-check.json").read_text())["productName"]
+        product = config["productName"]
         app = build / args.target / ("debug" if args.debug else "release") / "bundle/macos" / (product + ".app")
         verify_bundle_resources(app, prepared)
         if args.provisioning_profile:
             (app / "Contents/embedded.provisionprofile").write_bytes(args.provisioning_profile.read_bytes())
-        sign_bundle(app, args.signing_identity, sandbox=not args.desktop,
+        sign_bundle(app, args.signing_identity, sandbox=args.probe or args.app_store,
                     parent_entitlements=prepared / "store.entitlements.plist" if args.app_store else None)
         if profile:
             details = subprocess.run(["codesign", "--display", "--verbose=4", str(app)], capture_output=True, text=True, check=True)
@@ -259,6 +272,10 @@ def main():
             run("xcrun", "productbuild", "--sign", args.pkg_signing_identity, "--component", str(app), "/Applications", str(package))
             run("pkgutil", "--check-signature", str(package))
             print(f"Built Store package (not uploaded): {package}")
+        if not args.probe and not args.app_store:
+            run(str(app / "Contents/MacOS/mir-desktop"), "--mir-check")
+            image = create_disk_image(app, args.signing_identity)
+            print(f"Built disk image (not notarized or published): {image}")
         print(f"Built application: {app}")
     else:
         print(f"Verified backend prepared at {prepared}")

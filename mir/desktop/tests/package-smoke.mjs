@@ -103,7 +103,7 @@ try {
   if (!store && process.env.MIR_PACKAGE_TEST_DEB) {
     packageRoot = await mkdtemp(path.join(tmpdir(), 'mir-package-layout-'));
     execFileSync('dpkg-deb', ['--extract', process.env.MIR_PACKAGE_TEST_DEB, packageRoot]);
-    const packagedBinary = path.join(packageRoot, 'usr/bin/mir');
+    const packagedBinary = path.join(packageRoot, 'usr/bin/mir-desktop');
     // Production cannot include WebDriver. Only this test substitutes a debug
     // GUI; backend libraries and resources retain their actual package layout.
     await copyFile(binary, packagedBinary);
