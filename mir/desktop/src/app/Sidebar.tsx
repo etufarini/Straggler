@@ -98,7 +98,9 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             title="Create a project"
             data-control-id="button-new-project"
             disabled={!controller.native || !projects.ready || projects.busy}
-            onClick={() => controller.setProjectDialog({ kind: 'create' })}
+            onClick={(event) =>
+              controller.setProjectDialog({ kind: 'create' }, event.currentTarget)
+            }
           >
             <Plus size={13} />
             <span>New</span>

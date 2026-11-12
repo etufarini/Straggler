@@ -50,7 +50,12 @@ export function useWorkspace() {
   const [panel, setPanel] = useState<Panel>(null);
   const [view, setView] = useState<'chat' | 'projects' | 'project'>('chat');
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [projectDialog, setProjectDialog] = useState<ProjectDialog | null>(null);
+  const [projectDialog, updateProjectDialog] = useState<ProjectDialog | null>(null);
+  function setProjectDialog(value: ProjectDialog | null, opener?: HTMLElement) {
+    // WebKit does not focus clicked buttons; make the trigger available for focus restoration.
+    opener?.focus({ preventScroll: true });
+    updateProjectDialog(value);
+  }
   const [reviewFiles, setReviewFiles] = useState(false);
   const [projectDrafts, setProjectDrafts] = useState<Record<string, string>>({});
   const storageQueue = useRef<Promise<void>>(Promise.resolve());

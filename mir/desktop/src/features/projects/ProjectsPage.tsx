@@ -80,7 +80,7 @@ export default function ProjectsPage({ controller }: { controller: WorkspaceCont
             className="primary-button"
             data-control-id="button-new-project-page"
             disabled={!projects.ready}
-            onClick={() => setProjectDialog({ kind: 'create' })}
+            onClick={(event) => setProjectDialog({ kind: 'create' }, event.currentTarget)}
           >
             <Plus size={15} />
             New project
@@ -102,7 +102,7 @@ export default function ProjectsPage({ controller }: { controller: WorkspaceCont
           <button
             className="primary-button"
             data-control-id="button-create-first-project"
-            onClick={() => setProjectDialog({ kind: 'create' })}
+            onClick={(event) => setProjectDialog({ kind: 'create' }, event.currentTarget)}
           >
             <Plus size={15} />
             Create a project
