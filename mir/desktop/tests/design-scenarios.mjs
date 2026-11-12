@@ -93,7 +93,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
           .getByRole('alertdialog')
           .getByRole('button', { name: 'Build llama.cpp', exact: true })
           .click();
-        await expect(button('Cancel build')).toBeVisible();
+        await expect(page.getByText('Build status: ready', { exact: true })).toBeVisible();
       }
     }
     if (screen === 'STATE-02') {
