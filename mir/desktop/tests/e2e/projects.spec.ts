@@ -703,6 +703,36 @@ test('Q1 permits unknown capacity, restores rejected drafts and retries without 
   expect(request.messages[0].content).toContain('Included research notes.');
 });
 
+test('Q1 learns newly available capacity in the same server run and blocks without losing the project draft', async ({
+  page,
+}) => {
+  const values = projects();
+  values[0].instructions = 'x'.repeat(5000);
+  await seed(page, {
+    projects: values,
+    flags: {
+      'mir-fixture-context-unavailable': 'true',
+      'mir-fixture-context-size': '1024',
+    },
+  });
+  await loadModel(page);
+  await openResearch(page);
+  const draft = control(page, 'textarea-start-chat');
+  await draft.fill('Keep this draft when the context size becomes available');
+  await expect(page.getByText('Capacity unavailable', { exact: true })).toBeVisible();
+  await expect(control(page, 'button-start-chat')).toBeEnabled();
+  await expect(control(page, 'meter-project-context')).toHaveCount(0);
+  await page.evaluate(() => localStorage.removeItem('mir-fixture-context-unavailable'));
+  await expect(
+    page.getByText('This project does not fit in the context window', { exact: true }),
+  ).toBeVisible();
+  await expect(control(page, 'button-start-chat')).toBeDisabled();
+  await expect(control(page, 'meter-project-context')).toHaveAttribute('aria-valuemax', '768');
+  await expect(draft).toHaveValue('Keep this draft when the context size becomes available');
+  await expect(page.getByRole('button', { name: 'Server log · Ready', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('mir-fixture-request'))).toBeNull();
+});
+
 test('Q2 preserves the sent prefix while shared edits apply next turn and only lifecycle mutations wait', async ({
   page,
 }) => {

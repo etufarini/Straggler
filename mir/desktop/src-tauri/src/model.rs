@@ -36,7 +36,7 @@ impl Runtime {
             .map_err(|e| e.to_string())?
             .as_ref()
         {
-            if cached.run_id == run && cached.error.is_none() {
+            if cached.run_id == run && cached.error.is_none() && cached.context_size.is_some() {
                 return Ok(cached.clone());
             }
         }

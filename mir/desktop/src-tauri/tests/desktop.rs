@@ -891,12 +891,8 @@ async fn unknown_capacity_rejection_preserves_upstream_type_and_complete_submitt
     .unwrap();
     let runtime = fixture.runtime();
     fixture.ready(&runtime).await;
-    assert!(runtime
-        .server_details()
-        .await
-        .unwrap()
-        .context_size
-        .is_none());
+    let unavailable = runtime.server_details().await.unwrap();
+    assert!(unavailable.context_size.is_none());
     let prefix = format!("Project instructions\n--- BEGIN ATTACHMENT \\\"notes.txt\\\" ---\n{}\n--- END ATTACHMENT \\\"notes.txt\\\" ---", "Full file ☕\n".repeat(3000));
     let user = "The complete user draft\n\ncontext-reject";
     let mut submitted = request(Uuid::new_v4(), user);
@@ -927,6 +923,10 @@ async fn unknown_capacity_rejection_preserves_upstream_type_and_complete_submitt
     assert_eq!(recorded["messages"][0]["content"], prefix);
     assert_eq!(recorded["messages"][1]["content"], user);
     assert_eq!(runtime.status().await.unwrap().phase, "ready");
+    fs::remove_file(format!("{}.context-unavailable", fixture.record.display())).unwrap();
+    let available = runtime.server_details().await.unwrap();
+    assert_eq!(available.context_size, Some(4096));
+    assert_eq!(available.run_id, unavailable.run_id);
     runtime.stop().unwrap();
 }
 
