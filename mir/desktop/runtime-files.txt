@@ -16,6 +16,10 @@ desktop/src-tauri/src/builds.rs
 desktop/src-tauri/src/bundled_backend.rs
 desktop/src-tauri/src/chat.rs
 desktop/src-tauri/src/conversation_import.rs
+desktop/src-tauri/src/configuration/mod.rs
+desktop/src-tauri/src/configuration/environment.rs
+desktop/src-tauri/src/configuration/settings.rs
+desktop/src-tauri/src/configuration/storage.rs
 desktop/src-tauri/src/diagnostics.rs
 desktop/src-tauri/src/files.rs
 desktop/src-tauri/src/history.rs

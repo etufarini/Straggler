@@ -2,6 +2,7 @@ pub mod attachments;
 mod builds;
 pub mod bundled_backend;
 mod chat;
+pub mod configuration;
 pub mod conversation_import;
 pub mod diagnostics;
 pub mod files;
