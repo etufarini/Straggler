@@ -49,7 +49,9 @@ desktop/src/domain/conversationImport.ts
 desktop/src/domain/errors.ts
 desktop/src/domain/messageActions.ts
 desktop/src/domain/presence.ts
+desktop/src/domain/projectContext.ts
 desktop/src/domain/projects.ts
+desktop/src/domain/storageQueue.ts
 desktop/src/domain/types.ts
 desktop/src/features/attachments/AttachmentSection.tsx
 desktop/src/features/attachments/useAttachments.ts

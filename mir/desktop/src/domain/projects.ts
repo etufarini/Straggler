@@ -32,6 +32,14 @@ export interface ProjectConversationMutation {
 export interface ProjectDeletion {
   conversations: Conversation[];
   deletedConversationIds: string[];
+  warning?: string;
+}
+
+export function projectUpdatedAt(project: Project, conversations: Conversation[]): number {
+  return conversations.reduce(
+    (latest, chat) => (chat.projectId === project.id ? Math.max(latest, chat.updatedAt) : latest),
+    project.updatedAt,
+  );
 }
 
 export interface ProjectUndo {
