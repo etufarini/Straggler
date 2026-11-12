@@ -349,9 +349,16 @@ test('history and backend errors use their own context and recovery actions', as
     .getByRole('alertdialog')
     .getByRole('button', { name: 'Use bundled backend', exact: true })
     .click();
-  await expect(page.locator('.settings-content').getByRole('alert')).toContainText(
-    'llama.cpp operation failed',
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation.getByRole('alert')).toContainText('The action could not be completed');
+  await confirmation.getByText('Technical details', { exact: true }).click();
+  await expect(confirmation.getByRole('alert')).toContainText(
+    'The bundled backend could not be selected.',
   );
+  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Use bundled backend', exact: true }),
+  ).toBeEnabled();
   await expect(page.locator('.workspace-feedback')).toHaveCount(0);
 });
 

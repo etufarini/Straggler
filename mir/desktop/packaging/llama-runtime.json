@@ -2,7 +2,7 @@
   "repository": "ggml-org/llama.cpp",
   "tag": "b12248",
   "commit": "3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8",
-  "purpose": "Packaging candidate; not a published Mir.cpp backend",
+  "purpose": "Pinned backend for Mir.cpp development; no desktop release has been published",
   "artifacts": {
     "aarch64-apple-darwin": {
       "name": "llama-b12248-bin-macos-arm64.tar.gz",

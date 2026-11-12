@@ -27,16 +27,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "deb"
-    ],
+    "targets": ["deb"],
     "category": "Utility",
     "shortDescription": "Chat with local GGUF models",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png"
-    ],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png"],
     "resources": []
   }
 }

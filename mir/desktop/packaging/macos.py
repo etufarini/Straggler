@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a pinned upstream backend and build a local macOS packaging check.
+"""Prepare a pinned backend and build the macOS desktop or sandbox diagnostic.
 
 Python is a build tool here. Neither the resulting app nor its helper uses it.
 """
@@ -126,7 +126,7 @@ def copy_backend(archive_path, stage, target, manifest):
         (stage / "LICENSE.llama.cpp").write_bytes(archive.read("LICENSE"))
 
 
-def prepare(target, archive_path=None):
+def prepare(target, archive_path=None, desktop=False):
     manifest = json.loads((PACKAGING / "llama-runtime.json").read_text())
     artifact = manifest["artifacts"][target]
     url = (f"https://github.com/{manifest['repository']}/releases/download/"
@@ -163,9 +163,9 @@ def prepare(target, archive_path=None):
             resources = {source: None for source in launcher_resources}
             resources.update({str(destination / name): name for name in BACKEND_RESOURCES})
             config = {
-                "productName": PRODUCT,
-                "identifier": "io.github.etufarini.mir.packaging-check",
-                "app": {"windows": []},
+                "productName": desktop_config["productName"] if desktop else PRODUCT,
+                "identifier": desktop_config["identifier"] if desktop else "io.github.etufarini.mir.packaging-check",
+                "app": {} if desktop else {"windows": []},
                 "bundle": {
                     "targets": ["app"],
                     "resources": resources,
@@ -174,7 +174,7 @@ def prepare(target, archive_path=None):
                         "minimumSystemVersion": "13.5",
                         "frameworks": [str(destination / "libraries" / p.name)
                                        for p in sorted((stage / "libraries").iterdir())],
-                        "entitlements": str(PACKAGING / "app.entitlements.plist"),
+                        "entitlements": None if desktop else str(PACKAGING / "app.entitlements.plist"),
                     },
                 },
             }
@@ -206,10 +206,10 @@ def verify_bundle_resources(app, prepared):
         if not bundled.is_file() or bundled.read_bytes() != (prepared / name).read_bytes():
             raise ValueError(f"Missing or incorrect bundled backend resource: {name}")
     if (resources / "launcher").exists():
-        raise ValueError("The packaging check must not include launcher resources")
+        raise ValueError("The desktop bundle must not include launcher resources")
 
 
-def sign_bundle(app, identity):
+def sign_bundle(app, identity, sandbox=True):
     contents = app / "Contents"
     # The upstream executables use @loader_path; their libraries live in Frameworks.
     helper = contents / "MacOS/mir-llama-server"
@@ -218,13 +218,15 @@ def sign_bundle(app, identity):
         run("codesign", "--force", "--sign", identity, str(library))
     # Hardened library validation requires a common Team ID, absent from ad hoc signatures.
     helper_options = [] if identity == "-" else ["--options", "runtime"]
-    run("codesign", "--force", "--sign", identity, *helper_options, "--entitlements",
-        str(PACKAGING / "helper.entitlements.plist"), str(helper))
-    run("codesign", "--force", "--sign", identity, "--options", "runtime", "--entitlements",
-        str(PACKAGING / "app.entitlements.plist"), str(app))
+    helper_entitlements = ["--entitlements", str(PACKAGING / "helper.entitlements.plist")] if sandbox else []
+    app_entitlements = ["--entitlements", str(PACKAGING / "app.entitlements.plist")] if sandbox else []
+    run("codesign", "--force", "--sign", identity, *helper_options, *helper_entitlements, str(helper))
+    run("codesign", "--force", "--sign", identity, "--options", "runtime", *app_entitlements, str(app))
     run("codesign", "--verify", "--deep", "--strict", str(app))
     entitlements = subprocess.check_output(["codesign", "--display", "--entitlements", ":-", str(helper)])
-    if plistlib.loads(entitlements) != plistlib.loads((PACKAGING / "helper.entitlements.plist").read_bytes()):
+    actual = plistlib.loads(entitlements) if entitlements.strip() else {}
+    expected = plistlib.loads((PACKAGING / "helper.entitlements.plist").read_bytes()) if sandbox else {}
+    if actual != expected:
         raise ValueError("The signed helper has unexpected sandbox entitlements")
 
 
@@ -232,22 +234,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("prepare", "bundle"))
     parser.add_argument("--target", choices=tuple(CPU_TYPES), required=True)
+    parser.add_argument("--desktop", action="store_true", help="Build the regular desktop for direct distribution; default is the sandbox diagnostic")
     parser.add_argument("--archive", type=Path, help="Use a local archive; still verify the pinned SHA-256")
     parser.add_argument("--signing-identity", default="-", help="Default: local ad hoc signature, not distribution")
     args = parser.parse_args()
     if args.action == "bundle" and platform.system() != "Darwin":
         parser.error("Building and signing the macOS bundle requires a Mac")
-    prepared = prepare(args.target, args.archive)
+    prepared = prepare(args.target, args.archive, desktop=args.desktop)
     if args.action == "bundle":
         build = PACKAGING / "generated/build"
         environment = dict(os.environ, CARGO_TARGET_DIR=str(build))
+        features = [] if args.desktop else ["--features", "packaging-probe"]
         run("npm", "exec", "--", "tauri", "build", "--target", args.target,
-            "--features", "packaging-probe", "--config", str(prepared / "tauri.backend-check.json"),
+            *features, "--config", str(prepared / "tauri.backend-check.json"),
             "--no-sign", cwd=DESKTOP, env=environment)
-        app = build / args.target / "release/bundle/macos" / (PRODUCT + ".app")
+        product = json.loads((DESKTOP / "src-tauri/tauri.conf.json").read_text())["productName"] if args.desktop else PRODUCT
+        app = build / args.target / "release/bundle/macos" / (product + ".app")
         verify_bundle_resources(app, prepared)
-        sign_bundle(app, args.signing_identity)
-        print(f"Local packaging check: {app}")
+        sign_bundle(app, args.signing_identity, sandbox=not args.desktop)
+        print(f"Built application: {app}")
     else:
         print(f"Verified backend prepared at {prepared}")
 

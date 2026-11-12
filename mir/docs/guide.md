@@ -25,7 +25,7 @@ Settings has six sections:
 | Server & port | TCP port, listener details, normal and separately confirmed force shutdown |
 | Saved configurations | Load for review, save to selected, save as new and confirmed deletion |
 | Folders | llama.cpp and recursively searched model directories |
-| llama.cpp | Managed installation, updates, cancellation, rollback and build logs |
+| llama.cpp | Pinned bundled backend details and explicit selection of an external build |
 
 The model selector, server controls and logs remain available from chat. Edited
 settings are distinct from the running configuration. Apply validates a draft;
@@ -219,8 +219,8 @@ can stop at the context limit; an input prompt that already exceeds the window
 is rejected. When context shift is enabled and supported, the server can discard
 part of the earlier context and continue. A `length` finish reason can also mean
 an output-token limit. Mir.cpp does not claim which occurred without evidence.
-See the pinned [server contract](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/README.md)
-and [context implementation](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-context.cpp).
+See the pinned [server contract](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/README.md)
+and [context implementation](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-context.cpp).
 
 ## Devices and memory
 
@@ -388,10 +388,11 @@ uses an existing Homebrew installation and Apple command line tools. Other Linux
 distributions need equivalent dependencies installed manually. Builds run as the
 user. Administrator authorization is restricted to package installation.
 
-Managed llama.cpp updates retain the working build until checkout, compilation
-and executable checks succeed. Source tags and Web UI assets are matched and
-checksummed. Restore previous build selects the previous verified managed build.
-Model settings and conversations are preserved. GPU drivers are external requirements.
+The normal desktop receives its pinned backend with application updates. It does
+not download latest llama.cpp or compile a backend. Existing managed or external
+build folders remain selectable through Folders; changing a backend preserves
+model settings and conversations. GPU drivers remain external requirements.
+The compatibility shell build operations are retained for older source workflows.
 
 Mir.cpp installation uses versioned archives and a managed wrapper. Updating an
 active desktop is rejected. Desktop preparation must succeed before activation;
@@ -442,7 +443,7 @@ For UI work, run `npm run dev` from mir/desktop and open one of these URLs:
 | `?scenario=oom-and-save-error` | Independent server and persistence failures |
 | `?scenario=compute-error` | Unknown compute failure without an OOM diagnosis |
 | `?scenario=history-error` | Unavailable conversation storage |
-| `?scenario=build-error` | Build failure in the llama.cpp settings section |
+| `?scenario=backend-error` | Failed selection of the bundled backend |
 
 These pages clearly identify simulated services. They need neither Tauri nor
 llama.cpp. Fixture transport is removed from production assets. A preview without
@@ -451,10 +452,11 @@ development; `npm run format` applies frontend formatting.
 
 The frontend's desktop service owns Tauri access. Development scenarios replace
 that boundary; browser tests use the same scenarios instead of rewriting Tauri's
-private internals. A contract test compares fixture settings with the real Bash
-bridge and checks older desktop profiles. Rust integration tests use that bridge,
-a local HTTP server and compiler fixtures to verify streaming, persistence,
-configuration, process identity, cancellation, builds and rollback.
+private internals. A contract test compares shared native defaults with the
+compatibility Bash bridge and checks older desktop profiles. Rust integration
+tests use native configuration, fake executables and a local HTTP server to verify
+streaming, persistence, configuration, process identity and cancellation. Shell
+suites retain installation/build rollback checks for source workflows.
 
 Native tests use an embedded W3C WebDriver server on Linux and macOS. Automation
 is enabled only by the explicit `native-tests` feature in debug builds; release
@@ -471,14 +473,15 @@ llama.cpp remains responsible for inference correctness and backend performance.
 
 Frontend code is grouped into app composition, feature components/hooks, shared
 controls, domain types and the desktop service. Native modules separate commands,
-workspace/bridge, server supervision, diagnostics, chat streaming, builds and history.
-The launcher owns setting validation and returns field identifiers through the
-private bridge. The UI uses shared Feedback, FieldError, popover and reasoning controls; each feature
+workspace, native configuration/persistence, platform services, server supervision,
+diagnostics, chat streaming and history. Rust owns desktop validation and returns
+field identifiers through Tauri IPC. Native defaults are shared with development
+fixtures; the compatibility launcher is checked against the same defaults. The UI uses shared Feedback, FieldError, popover and reasoning controls; each feature
 owns the placement and recovery actions for its errors.
 
 ```text
-React features → desktop service → Tauri runtime → mir.sh --desktop
-                                              → local llama-server HTTP API
+React features → desktop service → Tauri runtime → native configuration and OS services
+                                              → supervised llama-server and local HTTP/SSE API
 ```
 
 Assistant presence is a presentation boundary accepting only its seven-state
@@ -515,9 +518,14 @@ Production layouts use explicit React classes instead of `:has()`. Composer widt
 observation also handles webviews without container queries, and the save bar has
 a fallback layout for missing sticky positioning. The design's type floor is 11px.
 
-The private bridge reuses launcher validation, profiles, discovery and native
-argument construction. Platform services own OS operations and build metadata;
-the UI does not select behavior from hardware brands. Keep runtime-files.txt and
+The desktop reads literal profiles and paths directly in Rust, preserves old
+profile defaults and migrations, inspects GGUF metadata without tensors, and
+derives devices/cache/split options from llama-server output. Native OS services
+check ports and attribute listeners; unidentified owners still block launch.
+Linux uses procfs and pidfd signaling, and macOS uses libproc. No inspection utility
+is executed by the desktop. Source preparation and direct GGUF startup remain
+compatible shell entry points; the GUI does not call their private bridge.
+The UI does not select behavior from hardware brands. Keep runtime-files.txt and
 the generated installer aligned when moving bundled source files. Regenerate with
 `bash mir/sh/build-install.sh`; verify with `--check`.
 
@@ -530,12 +538,11 @@ notes before creating a tag or publishing. Never move an existing tag.
 
 ## macOS backend packaging experiment
 
-This branch includes a local packaging experiment, not a distributable desktop
-release. The same Tauri executable can be built in `packaging-probe` mode to check
+This branch includes local packaging procedures, not a published desktop release. The same Tauri executable can be built in `packaging-probe` mode to check
 an included official `llama-server` without starting the Bash/Python bridge or
-loading profiles, conversations or preferences. Normal desktop startup still
-uses the existing launcher. Ubuntu packaging and migration of configuration into
-Rust are subsequent work.
+loading profiles, conversations or preferences. The normal desktop now runs its
+configuration, discovery and process supervision directly in Rust. Ubuntu backend
+bundling and release installers remain subsequent packaging work.
 
 `mir/desktop/packaging/llama-runtime.json` pins candidate upstream release `b12248`,
 its full source commit, and independent SHA-256 digests for macOS ARM64 and Intel.
@@ -567,7 +574,21 @@ npm ci --no-audit --no-fund
 python3 packaging/macos.py bundle --target aarch64-apple-darwin
 ```
 
-Use `x86_64-apple-darwin` on Intel. The command builds an `.app` named
+To build the regular GUI for direct distribution with the same pinned backend:
+
+```bash
+python3 packaging/macos.py bundle --desktop --target aarch64-apple-darwin
+```
+
+That mode builds `Mir.cpp.app` with its normal window and identifier. It does not
+compile `packaging-probe` or enable App Sandbox. The desktop detects the included
+`mir-llama-server` beside its executable and checks its reported source commit.
+It also accepts external build folders; a stopped server is required to switch.
+The base Tauri bundle includes no launcher resources or shell-tool dependencies.
+The direct-distribution GUI still needs its own macOS build and interaction checks;
+the earlier sandbox diagnostic does not validate these later GUI changes.
+
+Use `x86_64-apple-darwin` on Intel. The default diagnostic command builds an `.app` named
 `Mir.cpp Backend Check.app`, includes the pinned server and libraries, adjusts the
 server's library search path, signs nested libraries and the helper before the
 application, then verifies the signatures and the helper's entitlements. The
@@ -580,8 +601,10 @@ The ad hoc helper omits Hardened Runtime because
 [library validation](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.cs.disable-library-validation)
 requires a shared signing Team ID, which ad hoc signatures do not provide. The parent keeps
 Hardened Runtime. Certificate signing enables it for both executables; that path
-still needs validation with a suitable certificate. Both signing modes retain the
-same sandbox entitlements, without a library-validation exception.
+still needs validation with a suitable certificate. Both signing identities retain the
+same sandbox entitlements in diagnostic mode, without a library-validation exception.
+The regular `--desktop` build signs both executables without sandbox entitlements
+for direct distribution.
 
 The parent enables App Sandbox, user-selected read-only files and client/server
 network access. The helper has exactly `app-sandbox` and `inherit`; it obtains
@@ -592,8 +615,7 @@ Python, Node, Rust and command line build tools are developer requirements, not
 dependencies of the resulting diagnostic app.
 
 Resource mappings place the license and provenance directly in `Contents/Resources`.
-The diagnostic configuration removes the launcher's resource mappings during the
-Tauri merge. Before signing, the build checks the bundled resource paths and bytes
+Both bundle modes carry only the backend license and provenance as resources. Before signing, the build checks the bundled resource paths and bytes
 against preparation and rejects bundles that still include the launcher.
 
 Launch the app to check `--version` and `--help`, including whether the backend

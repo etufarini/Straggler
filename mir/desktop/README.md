@@ -2,7 +2,8 @@
 
 Mir.cpp is written for human maintainers. Frontend modules separate app composition,
 chat, settings, server controls, llama.cpp maintenance, shared controls and native
-transport. Rust modules separate the bridge, server, diagnostics, chat, builds and history.
+transport. Rust modules separate native configuration/persistence, OS services, server supervision,
+diagnostics, chat and history. The desktop never invokes the shell bridge.
 
 Normal source startup is `bash mir/mir.sh`; desktop preparation is automatic.
 Developer tools are Bash 4.4+, Python 3, compatible Node/npm and Rust 1.92+ with
@@ -20,7 +21,7 @@ From this directory, `npm run dev` opens the frontend development server.
 Append `?scenario=empty`, `cpu`, `multiple`, `unknown-memory`, `occupied`,
 `save-error`, `model-error`, `interrupted` or `cancel` to exercise simulated services.
 Error scenarios also include `oom`, `oom-startup`, `oom-and-save-error`,
-`compute-error`, `history-error` and `build-error`. Contract scenarios also include
+`compute-error`, `history-error` and `backend-error`. Contract scenarios also include
 `no-metrics`, `no-reasoning`, `effort-levels`, `context-high`, `context-full` and
 `reasoning-stream`.
 The banner identifies simulation; production builds exclude fixture transport.
@@ -32,8 +33,8 @@ use a debug-only embedded WebDriver plugin on both Linux and macOS. Production
 builds reject the native-tests feature. No inspector-specific client is needed.
 The native test includes fatal memory failure while `/health` remains successful,
 partial-response persistence, explicit Stop and a clean server restart.
-Error fixtures follow the pinned upstream [HTTP/SSE contract](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/README.md#api-errors)
-and [fatal Metal backend diagnostic](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/ggml/src/ggml-metal/ggml-metal-context.m).
+Error fixtures follow the pinned upstream [HTTP/SSE contract](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/README.md#api-errors)
+and [fatal Metal backend diagnostic](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/ggml/src/ggml-metal/ggml-metal-context.m).
 Review those contracts when updating the fixtures; other diagnostics remain
 generic unless the server provides enough evidence to classify them.
 
@@ -57,8 +58,8 @@ managers and are not treated as proof of a hidden window.
 
 The test server and Rust checks also pin model properties, template rendering,
 per-request reasoning and final usage-only SSE chunks to the same upstream commit.
-Read the [template capabilities](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/common/jinja/caps.cpp)
-and [stream serialization](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-task.cpp)
+Read the [template capabilities](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/common/jinja/caps.cpp)
+and [stream serialization](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-task.cpp)
 when updating those fixtures.
 
 Keep runtime-files.txt aligned with bundled sources and regenerate the standalone
@@ -70,11 +71,15 @@ with temporary directories, tiny Mach-O fixtures and a fake HTTP server. It does
 not download llama.cpp or require a Mac, model, GPU or inference service. Those
 tests also run through the regular common/desktop suites.
 
-The optional macOS packaging experiment uses the same Tauri executable compiled
+The optional macOS sandbox diagnostic uses the same Tauri executable compiled
 with `packaging-probe`. It bypasses the shell bridge and creates no chat window.
 It checks an upstream backend included in the bundle, writes an isolated native
 report and optionally opens a GGUF through the native picker for a CPU loading
-check. This diagnostic mode is separate from the normal desktop startup path.
+check. This diagnostic mode is separate from the normal desktop startup path. Add
+`--desktop` to the macOS packaging command to build the regular GUI with the same
+pinned backend for direct distribution; that mode uses the normal identifier and
+does not enable App Sandbox. Store-specific persistence and permissions remain
+separate work.
 See [the packaging procedure](../docs/guide.md#macos-backend-packaging-experiment)
 for build, signing, manual checks and current limitations.
 
@@ -83,7 +88,7 @@ settings, contracts, preparation, data paths and release maintenance.
 
 R005 file and context checks use generated tiny Office ZIP packages, temporary
 storage, native file IPC and local `/tokenize` responses. The tokenization fixture
-follows the pinned [server tokenization and template contract](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/README.md#post-tokenize-tokenize-a-given-text).
+follows the pinned [server tokenization and template contract](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/README.md#post-tokenize-tokenize-a-given-text).
 The dialog implementation follows the [Tauri 2 dialog API](https://v2.tauri.app/plugin/dialog/).
 Browser drag fixtures use the native enter/over/drop/leave payload shape, rather
 than HTML5 drop events. The native smoke test exercises actual storage, download,
@@ -107,9 +112,9 @@ Project tests cover legacy history without rewrites, atomic storage/recovery,
 own-prompt restoration, request snapshots during generation, current-prompt
 exports, archived read-only behavior and unknown-capacity server rejections.
 The over-context fixture follows the pinned server's
-[input check](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-context.cpp#L3748-L3766),
-[first-error response](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-context.cpp#L4974-L4986)
-and [error serialization](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-task.cpp#L1453-L1459).
+[input check](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-context.cpp#L3748-L3766),
+[first-error response](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-context.cpp#L4974-L4986)
+and [error serialization](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-task.cpp#L1453-L1459).
 It returns HTTP 400 JSON with `exceed_context_size_error` before SSE output,
 including when the client requested streaming; it never simulates input truncation.
 
@@ -153,3 +158,18 @@ The audit's suggested downgrade to TypeScript ESLint 8.36 also conflicts with
 ESLint 10 and TypeScript 5.9. Recheck the advisory and parent releases before
 updating. Vite 8, plugin-react 6, Lucide 1 and TypeScript 7 are deferred major
 migrations; TypeScript 7 is outside TypeScript ESLint's supported peer range.
+
+Native configuration defaults live in `src-tauri/src/configuration/defaults.json`;
+development fixtures import that record and contract tests compare it with the
+compatibility launcher. Runtime tests supply an explicit captured environment,
+so no test changes process-global HOME or uses personal settings. Native discovery
+uses bounded subprocesses for the selected backend's advertised help/devices and
+reads GGUF metadata with the same bounded fallback as the compatibility launcher.
+Linux process attribution uses procfs and pidfd signaling; macOS uses libproc.
+The additional libproc/bindgen dependency is macOS build tooling; the application
+does not execute Xcode, Homebrew or system inspection utilities.
+
+The native smoke test copies a normal development executable away from the source
+tree and rejects desktop invocations of Bash, Python helpers, curl and OS command
+utilities. Python remains available solely to the test's fake server. Explicit
+`MIR_TEST_NATIVE` bundles retain their directory layout for dynamic libraries.

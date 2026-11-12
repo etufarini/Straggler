@@ -88,6 +88,18 @@ class PackagingTests(unittest.TestCase):
         provenance = json.loads((prepared / "backend-provenance.json").read_text())
         self.assertEqual(provenance["target"], TARGET)
 
+    def test_regular_desktop_bundle_keeps_its_identity_and_native_window(self):
+        archive = self.archive()
+        with patch.object(packaging, "PACKAGING", self.root):
+            prepared = packaging.prepare(TARGET, archive, desktop=True)
+        config = json.loads((prepared / "tauri.backend-check.json").read_text())
+        base = json.loads((packaging.DESKTOP / "src-tauri/tauri.conf.json").read_text())
+        self.assertEqual(config["identifier"], base["identifier"])
+        self.assertEqual(config["productName"], base["productName"])
+        self.assertNotIn("windows", config["app"])
+        self.assertIsNone(config["bundle"]["macOS"]["entitlements"])
+        self.assertTrue(config["bundle"]["externalBin"])
+
     def test_bundle_resources_must_be_at_the_runtime_paths_and_match_preparation(self):
         prepared = self.prepare(self.archive())
         app = self.root / "Backend Check.app"
