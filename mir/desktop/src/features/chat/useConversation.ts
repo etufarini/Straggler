@@ -7,12 +7,11 @@ import {
   chooseConversationImport,
   estimatePromptTokens,
 } from '../../services/desktop';
-import { newConversation } from '../../domain/types';
+import { fileName, newConversation } from '../../domain/types';
 import { inheritedChatOptions, resolveChatOptions } from '../../domain/chat';
 import { replaceMessage, regenerationHistory } from '../../domain/messageActions';
 import { materializeImport } from '../../domain/conversationImport';
 import type { ImportedConversation } from '../../domain/conversationImport';
-import { fileName } from '../../domain/types';
 import { composeRequest } from '../../domain/attachments';
 import { exportFileName, serializeConversation } from '../../domain/conversationExport';
 import { errorDetail } from '../../domain/errors';
@@ -79,6 +78,13 @@ export function useConversation(
     chatRef.current = value;
     setChat(value);
   }
+  function updateConversations(value: Conversation) {
+    setConversations((values) =>
+      [value, ...values.filter((item) => item.id !== value.id)].sort(
+        (a, b) => b.updatedAt - a.updatedAt,
+      ),
+    );
+  }
   const loadHistory = useCallback(async () => {
     try {
       const values = await invoke<Conversation[]>('history_list');
@@ -117,11 +123,7 @@ export function useConversation(
         await invoke(create ? 'history_create' : 'history_save', { conversation: snapshot });
         if (mounted.current) {
           if (historyReady) setStorageError('');
-          setConversations((current) =>
-            [snapshot, ...current.filter((c) => c.id !== snapshot.id)].sort(
-              (a, b) => b.updatedAt - a.updatedAt,
-            ),
-          );
+          updateConversations(snapshot);
         }
       });
     saveQueue.current = pending;
@@ -264,11 +266,7 @@ export function useConversation(
 
   function acceptStoredConversation(value: Conversation) {
     updateChat(value);
-    setConversations((values) =>
-      [value, ...values.filter((item) => item.id !== value.id)].sort(
-        (a, b) => b.updatedAt - a.updatedAt,
-      ),
-    );
+    updateConversations(value);
   }
 
   async function runConversationMutation(operation: () => Promise<void>) {

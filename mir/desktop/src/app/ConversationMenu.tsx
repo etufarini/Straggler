@@ -35,6 +35,11 @@ export default function ConversationMenu({
       left: Math.max(8, Math.min(bounds.right - 225, innerWidth - 233)),
     });
   }
+  function exportChat(includesReasoning: boolean) {
+    if (!onExport || (includesReasoning && !hasReasoning)) return;
+    close(true);
+    onExport(includesReasoning);
+  }
   useEffect(() => {
     if (!position) return;
     const items = menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
@@ -113,12 +118,7 @@ export default function ConversationMenu({
             role="menuitem"
             tabIndex={-1}
             aria-disabled={!onExport}
-            onClick={() => {
-              if (onExport) {
-                close(true);
-                onExport(false);
-              }
-            }}
+            onClick={() => exportChat(false)}
           >
             <Download size={15} />
             Export chat…
@@ -130,12 +130,7 @@ export default function ConversationMenu({
             aria-disabled={!onExport || !hasReasoning}
             title={!hasReasoning ? 'This conversation contains no reasoning.' : undefined}
             aria-describedby={!hasReasoning ? `${id}-reasoning` : undefined}
-            onClick={() => {
-              if (onExport && hasReasoning) {
-                close(true);
-                onExport(true);
-              }
-            }}
+            onClick={() => exportChat(true)}
           >
             <Download size={15} />
             Export with reasoning…

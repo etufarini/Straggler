@@ -2224,9 +2224,6 @@ select:focus-visible {
   border-radius: var(--ui-radius);
   background: var(--ui-raised);
 }
-.file-row.type-txt {
-  --file-color: #aeb9d6;
-}
 .file-row.type-md {
   --file-color: #bba4ff;
 }

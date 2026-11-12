@@ -10,7 +10,7 @@ import type {
   ServerDetails,
 } from '../domain/types';
 import { emptyServer } from '../domain/types';
-import { attachmentTypes } from '../domain/attachments';
+import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 
 export type Scenario =
   | 'normal'
@@ -296,7 +296,7 @@ export function createFixture(scenario: Scenario) {
       case 'tokenize_text':
         if (status.phase !== 'ready' || localStorage.getItem('mir-fixture-tokenize-unavailable'))
           throw new Error('Tokenization unavailable');
-        return Math.ceil(new TextEncoder().encode(String(args.content)).length / 4);
+        return approximateTokens(String(args.content));
       case 'prompt_tokens': {
         if (status.phase !== 'ready' || localStorage.getItem('mir-fixture-tokenize-unavailable'))
           throw new Error('Tokenization unavailable');
@@ -304,10 +304,7 @@ export function createFixture(scenario: Scenario) {
         return {
           tokens:
             Number(localStorage.getItem('mir-fixture-prompt-tokens')) ||
-            Math.ceil(
-              new TextEncoder().encode(messages.map((message) => message.content).join('\n\n'))
-                .length / 4,
-            ),
+            approximatePromptTokens(messages),
           templated: true,
         };
       }

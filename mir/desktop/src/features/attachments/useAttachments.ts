@@ -30,8 +30,7 @@ export function useAttachments(conversation: ConversationController, server: Ser
   const current = useRef(conversation);
   current.current = conversation;
   const onDrop = useRef<(event: DragDropEvent) => void>(() => {});
-  const disabled =
-    !isTauri() || conversation.generating || conversation.editingBusy || conversation.importBusy;
+  const disabled = !isTauri() || conversation.chatOptionsDisabled;
   const stored = conversation.chat.attachments ?? [];
   const textKey = JSON.stringify(stored.map((attachment) => [attachment.id, attachment.text]));
 
@@ -59,18 +58,21 @@ export function useAttachments(conversation: ConversationController, server: Ser
   }
   async function addFiles(paths: string[]) {
     if (!paths.length) return;
-    if (current.current.generating || current.current.editingBusy || current.current.importBusy) {
+    if (current.current.chatOptionsDisabled) {
       setError('Attachments can be changed when the response finishes.');
       return;
     }
     const id = current.current.chatRef.current.id;
-    const rows = paths.map((path): AttachmentRow => ({
-      id: crypto.randomUUID(),
-      name: fileName(path),
-      extension: fileName(path).split('.').at(-1)?.toLowerCase() ?? '',
-      size: null,
-      state: 'reading',
-    }));
+    const rows = paths.map((path): AttachmentRow => {
+      const name = fileName(path);
+      return {
+        id: crypto.randomUUID(),
+        name,
+        extension: name.split('.').at(-1)?.toLowerCase() ?? '',
+        size: null,
+        state: 'reading',
+      };
+    });
     updatePending(id, (values) => [...values, ...rows]);
     setError('');
     try {

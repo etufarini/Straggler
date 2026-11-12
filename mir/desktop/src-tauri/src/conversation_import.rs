@@ -32,8 +32,8 @@ fn optional_string(value: &Value, key: &str) -> Result<Option<String>> {
 pub fn parse(contents: &str) -> Result<ImportedConversation> {
     let root: Value =
         serde_json::from_str(contents).map_err(|e| format!("The file is not valid JSON: {e}"))?;
-    let conversation = if root.is_array() {
-        &root
+    let (conversation, values) = if let Some(messages) = root.as_array() {
+        (&root, messages)
     } else {
         if root.get("format").and_then(Value::as_str) != Some("mir.cpp/conversation") {
             return Err(
@@ -44,16 +44,16 @@ pub fn parse(contents: &str) -> Result<ImportedConversation> {
         if root.get("version").and_then(Value::as_u64) != Some(1) {
             return Err("This conversation version is not supported. Use version 1.".into());
         }
-        root.get("conversation")
+        let conversation = root
+            .get("conversation")
             .filter(|value| value.is_object())
-            .ok_or("The file must contain exactly one conversation object.")?
+            .ok_or("The file must contain exactly one conversation object.")?;
+        let messages = conversation
+            .get("messages")
+            .and_then(Value::as_array)
+            .ok_or("The conversation must contain an array of messages.")?;
+        (conversation, messages)
     };
-    let values = if root.is_array() {
-        root.as_array()
-    } else {
-        conversation.get("messages").and_then(Value::as_array)
-    }
-    .ok_or("The conversation must contain an array of messages.")?;
     let title = optional_string(conversation, "title")?;
     if title.as_ref().is_some_and(|text| text.len() > 1024) {
         return Err("The conversation title exceeds 1024 UTF-8 bytes.".into());

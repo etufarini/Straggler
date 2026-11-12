@@ -53,3 +53,7 @@ export function composeRequest(
 export function approximateTokens(text: string): number {
   return Math.ceil(new TextEncoder().encode(text).length / 4);
 }
+
+export function approximatePromptTokens(messages: { content: string }[]): number {
+  return approximateTokens(messages.map((message) => message.content).join('\n\n'));
+}

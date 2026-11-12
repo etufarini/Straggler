@@ -12,10 +12,9 @@ import { invoke } from '../services/desktop';
 import type { WorkspaceController } from './useWorkspace';
 export default function Sidebar({ controller }: { controller: WorkspaceController }) {
   const {
-    generating,
+    chatOptionsDisabled,
     editingBusy,
     updateChat,
-    setInput,
     setPanel,
     panel,
     conversations,
@@ -59,15 +58,9 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         className="new-chat"
         aria-label="New chat"
         title="New chat"
-        disabled={
-          controller.importBusy ||
-          editingBusy ||
-          generating ||
-          (!!storageError && chat.messages.length > 0)
-        }
+        disabled={chatOptionsDisabled || (!!storageError && chat.messages.length > 0)}
         onClick={() => {
           openConversation(newConversation());
-          setInput('');
           setPanel(null);
         }}
       >
@@ -104,12 +97,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             className={`conversation-row ${chat.id === value.id ? 'selected' : ''}`}
           >
             <button
-              disabled={
-                controller.importBusy ||
-                editingBusy ||
-                generating ||
-                (!!storageError && chat.messages.length > 0)
-              }
+              disabled={chatOptionsDisabled || (!!storageError && chat.messages.length > 0)}
               onClick={() => {
                 openConversation(value);
                 setPanel(null);
@@ -122,7 +110,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             <ConversationMenu
               conversation={value}
               onExport={(includesReasoning) => void controller.exportChat(value, includesReasoning)}
-              disabled={controller.importBusy || editingBusy || generating}
+              disabled={chatOptionsDisabled}
               onDelete={() =>
                 setConfirmation({
                   title: 'Delete conversation?',

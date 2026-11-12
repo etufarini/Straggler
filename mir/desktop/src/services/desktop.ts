@@ -1,6 +1,6 @@
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
-import { approximateTokens, attachmentTypes } from '../domain/attachments';
+import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 import type { Attachment, Conversation } from '../domain/types';
 import { save as nativeSave, open as nativeOpen } from '@tauri-apps/plugin-dialog';
 import {
@@ -220,7 +220,7 @@ export async function estimatePromptTokens(
     return { ...result, source: 'server' };
   } catch {
     return {
-      tokens: approximateTokens(messages.map((message) => message.content).join('\n\n')),
+      tokens: approximatePromptTokens(messages),
       source: 'approximate',
     };
   }

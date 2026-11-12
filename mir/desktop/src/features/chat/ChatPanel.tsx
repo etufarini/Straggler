@@ -152,10 +152,6 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                         value={editor.text}
                         disabled={editingBusy || generating}
                         onChange={(event) => setEditor({ ...editor, text: event.target.value })}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Escape' && !editingBusy && !generating)
-                            setEditor(null);
-                        }}
                       />
                       <div className="message-editor-footer">
                         <p className="message-editor-note" id={`edit-note-${message.id}`}>

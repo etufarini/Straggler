@@ -308,11 +308,9 @@ export function useWorkspace() {
     server.phase === 'ready' &&
     historyReady &&
     !storageError &&
-    !generating &&
+    !chatOptionsDisabled &&
     !busy &&
     !editor &&
-    !editingBusy &&
-    !importBusy &&
     !contextEstimate.overflow;
 
   return {

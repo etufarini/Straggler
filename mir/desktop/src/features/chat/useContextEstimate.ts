@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { approximateTokens, composeRequest } from '../../domain/attachments';
+import { approximatePromptTokens, composeRequest } from '../../domain/attachments';
 import { resolveChatOptions } from '../../domain/chat';
 import { estimatePromptTokens } from '../../services/desktop';
 import type { TokenEstimate } from '../../services/desktop';
@@ -53,7 +53,7 @@ export function useContextEstimate(
     measured?.key === key && measured.run === server.runId && server.phase === 'ready'
       ? measured.estimate
       : {
-          tokens: approximateTokens(messages.map((message) => message.content).join('\n\n')),
+          tokens: approximatePromptTokens(messages),
           source: 'approximate' as const,
         };
   const capacity = details?.runId === server.runId ? details?.contextSize : null;
