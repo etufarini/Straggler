@@ -306,7 +306,7 @@ requests without overwriting another client's preferences.
 
 Preparation uses compatible existing Node and Rust tools when available. Otherwise
 it installs private toolchains, verifies official download checksums and leaves the
-user's login shell unchanged. Node 22 (22.12+), Node 24 or Node 26+ and
+user's login shell unchanged. Node 22 (22.13+), Node 24 or Node 26+ and
 Rust 1.92+ are supported by the current desktop build. Node 24 is the private fallback.
 Network access is required for first preparation and dependency downloads.
 

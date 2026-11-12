@@ -81,3 +81,37 @@ Keyboard traversal tests use Option-Tab in macOS WebKit, matching the platform's
 control traversal behavior without changing user preferences. See the
 [Apple keyboard shortcut guidance](https://support.apple.com/en-lamr/guide/safari/cpsh003/mac)
 and [Playwright's platform behavior discussion](https://github.com/microsoft/playwright/issues/41808).
+
+## Dependency maintenance
+
+Use Node 22.13+, 24 or 26+, matching `package.json` and automatic preparation.
+Node 22.12 does not satisfy ESLint 10's requirements. Keep `@types/node` on
+the Node 24 line used by CI and the private fallback toolchain.
+
+After dependency updates, run `npm ci`, `npm audit`, `npm outdated`, `npm ls --all`
+and `bash mir/tests/run.sh` from the repository root (npm commands run in this
+directory). Every direct dependency is used by the application, configuration,
+development commands or tests. Keep transitive versions within their parents'
+declared ranges; a newer major is not itself an installation error.
+
+`allowScripts` records reviewed, version-pinned install scripts: esbuild prepares
+and validates its platform binary; optional macOS fsevents builds its native
+binding with node-gyp. Review changed scripts before updating these approvals.
+This uses npm's [install-script approval](https://docs.npmjs.com/cli/v11/commands/npm-approve-scripts/)
+mechanism without disabling scripts or warnings.
+
+On 2026-11-12, the full audit still reports 10 moderate dependency entries from
+one advisory, [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+ESLint 10.14.0, its config-array dependency and TypeScript ESLint 8.72.2 require
+minimatch 10.x; the fix starts at 11.0.1. There is no patched 10.x release.
+The affected packages are development dependencies; `npm audit --omit=dev`
+reports no vulnerabilities. The inspected lint paths use the default
+`optimizationLevel: 1`, while this advisory requires level 2 or higher. That
+limits the current exposure but does not resolve the dependency advisory.
+
+Do not force a minimatch 11 override: its matching behavior and public APIs have
+[breaking changes](https://github.com/isaacs/minimatch/blob/v11.0.8/changelog.md).
+The audit's suggested downgrade to TypeScript ESLint 8.36 also conflicts with
+ESLint 10 and TypeScript 5.9. Recheck the advisory and parent releases before
+updating. Vite 8, plugin-react 6, Lucide 1 and TypeScript 7 are deferred major
+migrations; TypeScript 7 is outside TypeScript ESLint's supported peer range.

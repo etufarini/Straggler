@@ -11,7 +11,7 @@ desktop_toolchains() {
     system=$(platform_node_system)
     mkdir -p -- "$tools" || return 1
     if ! command -v node >/dev/null || ! command -v npm >/dev/null ||
-        ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit((a===22&&b>=12)||a===24||a>=26?0:1)' 2>/dev/null; then
+        ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit((a===22&&b>=13)||a===24||a>=26?0:1)' 2>/dev/null; then
         case "$(uname -m)" in x86_64) node_arch=x64 ;; aarch64|arm64) node_arch=arm64 ;; *) fail 'Automatic Node.js preparation supports x86_64 and arm64 Linux/macOS.' ;; esac
         if [[ ! -x "$tools/node/bin/node" ]]; then
             printf 'Preparing Node.js for Mir.cpp...\n' >&2
