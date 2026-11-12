@@ -19,6 +19,7 @@ export function ConfirmationFrame({
   busy?: boolean;
 }) {
   const id = useId();
+  const titleId = project ? `${id}-title` : 'confirm-title';
   return (
     <div className="confirmation-backdrop">
       <section
@@ -26,11 +27,11 @@ export function ConfirmationFrame({
         role={role}
         aria-modal="true"
         aria-busy={busy}
-        aria-labelledby={`${id}-title`}
+        aria-labelledby={titleId}
         aria-describedby={description ? `${id}-body` : undefined}
         data-project-dialog={project || undefined}
       >
-        <h2 id={`${id}-title`}>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         {description && <p id={`${id}-body`}>{description}</p>}
         {children}
       </section>
