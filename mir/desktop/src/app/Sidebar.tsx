@@ -6,29 +6,50 @@ import {
   MessageSquare,
   Settings2,
   Import,
+  Folder,
+  Folders,
 } from 'lucide-react';
+import { controlSlug } from '../components/ActionMenu';
 import { newConversation } from '../domain/types';
-import { invoke } from '../services/desktop';
+import { projectUpdatedAt } from '../domain/projects';
+import type { Conversation } from '../domain/types';
+import { errorDetail } from '../domain/errors';
 import type { WorkspaceController } from './useWorkspace';
+
 export default function Sidebar({ controller }: { controller: WorkspaceController }) {
   const {
     chatOptionsDisabled,
     editingBusy,
-    updateChat,
     setPanel,
     panel,
     conversations,
     chat,
-    openConversation,
-    setConfirmation,
-    saveQueue,
-    setConversations,
-    chatRef,
+    openChat,
     preferences,
     preferencesReady,
     changePreferences,
     storageError,
+    projects,
+    view,
+    projectId,
+    generating,
   } = controller;
+  const starred = projects.projects
+    .filter((project) => project.starred && !project.archived)
+    .sort(
+      (left, right) =>
+        projectUpdatedAt(right, conversations) - projectUpdatedAt(left, conversations),
+    );
+  const conversationNavigationDisabled =
+    chatOptionsDisabled || (!!storageError && chat.messages.length > 0);
+
+  async function removeFromProject(value: Conversation) {
+    try {
+      await controller.moveChat(value, null);
+    } catch (failure) {
+      projects.setError(errorDetail(failure).message);
+    }
+  }
   return (
     <aside id="sidebar" className={`sidebar ${preferences.sidebarCollapsed ? 'is-compact' : ''}`}>
       <div className="brand">
@@ -44,6 +65,9 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
           aria-controls="sidebar"
           aria-label={preferences.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={preferences.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          data-control-id={
+            preferences.sidebarCollapsed ? 'button-expand-sidebar' : 'button-collapse-sidebar'
+          }
           disabled={!preferencesReady}
           onClick={() => changePreferences({ sidebarCollapsed: !preferences.sidebarCollapsed })}
         >
@@ -58,14 +82,68 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         className="new-chat"
         aria-label="New chat"
         title="New chat"
-        disabled={chatOptionsDisabled || (!!storageError && chat.messages.length > 0)}
-        onClick={() => {
-          openConversation(newConversation());
-          setPanel(null);
-        }}
+        data-control-id="button-new-chat"
+        disabled={conversationNavigationDisabled}
+        onClick={() => openChat(newConversation())}
       >
         <Plus size={17} /> <span className="sidebar-label">New chat</span>
       </button>
+      <div className="sidebar-projects">
+        <div className="section-label has-action">
+          <span>PROJECTS</span>
+          <button
+            type="button"
+            className="section-action"
+            aria-label="New project"
+            title="Create a project"
+            data-control-id="button-new-project"
+            disabled={!controller.native || !projects.ready || projects.busy}
+            onClick={() => controller.setProjectDialog({ kind: 'create' })}
+          >
+            <Plus size={13} />
+            <span>New</span>
+          </button>
+        </div>
+        <div className="sidebar-project-list">
+          {starred.map((project) => {
+            const selected = view === 'project' && projectId === project.id && panel !== 'settings';
+            return (
+              <div key={project.id} className={`sidebar-project-row ${selected ? 'selected' : ''}`}>
+                <button
+                  type="button"
+                  title={project.name}
+                  aria-current={selected ? 'page' : undefined}
+                  data-control-id={`button-project-${controlSlug(project.name)}`}
+                  onClick={() => controller.openProject(project.id)}
+                >
+                  <Folder size={15} />
+                  <span>{project.name}</span>
+                </button>
+              </div>
+            );
+          })}
+          {projects.ready && projects.projects.length === 0 && (
+            <p className="project-sidebar-hint">Group chats that share instructions and files.</p>
+          )}
+          {projects.ready && projects.projects.length > 0 && starred.length === 0 && (
+            <p className="project-sidebar-hint">Star a project to pin it here.</p>
+          )}
+          <div
+            className={`sidebar-project-row is-all-projects ${view === 'projects' && panel !== 'settings' ? 'selected' : ''}`}
+          >
+            <button
+              type="button"
+              aria-current={view === 'projects' && panel !== 'settings' ? 'page' : undefined}
+              data-control-id="button-all-projects"
+              aria-label="All projects"
+              onClick={controller.openProjects}
+            >
+              <Folders size={15} />
+              <span className="sidebar-label">All projects</span>
+            </button>
+          </div>
+        </div>
+      </div>
       <div className="section-label has-action">
         <span>CONVERSATIONS</span>
         <button
@@ -73,6 +151,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
           className="section-action"
           aria-label="Import conversation"
           title="Import a conversation from a .json export"
+          data-control-id="button-import-conversation"
           disabled={!controller.native || controller.importBusy || editingBusy}
           onClick={() => {
             setPanel(null);
@@ -91,43 +170,54 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             on this device.
           </p>
         )}
-        {conversations.map((value) => (
-          <div
-            key={value.id}
-            className={`conversation-row ${chat.id === value.id ? 'selected' : ''}`}
-          >
-            <button
-              disabled={chatOptionsDisabled || (!!storageError && chat.messages.length > 0)}
-              onClick={() => {
-                openConversation(value);
-                setPanel(null);
-              }}
-              title={value.title}
-            >
-              <MessageSquare size={15} />
-              <span>{value.title}</span>
-            </button>
-            <ConversationMenu
-              conversation={value}
-              onExport={(includesReasoning) => void controller.exportChat(value, includesReasoning)}
-              disabled={chatOptionsDisabled}
-              onDelete={() =>
-                setConfirmation({
-                  title: 'Delete conversation?',
-                  actionLabel: 'Delete conversation',
-                  destructive: true,
-                  text: `“${value.title}” will be permanently removed from this device.`,
-                  action: async () => {
-                    await saveQueue.current.catch(() => {});
-                    await invoke('history_delete', { id: value.id });
-                    setConversations((values) => values.filter((c) => c.id !== value.id));
-                    if (chatRef.current.id === value.id) updateChat(newConversation());
-                  },
-                })
-              }
-            />
-          </div>
-        ))}
+        {conversations.map((value) => {
+          const project = projects.projects.find((item) => item.id === value.projectId);
+          const selected = view === 'chat' && chat.id === value.id && panel !== 'settings';
+          const mutationReason =
+            generating && chat.id === value.id
+              ? 'Available when the current response finishes or is stopped'
+              : editingBusy && chat.id === value.id
+                ? 'Wait for this chat to finish saving.'
+                : projects.busy
+                  ? 'Wait for the project change to finish.'
+                  : undefined;
+          return (
+            <div key={value.id} className={`conversation-row ${selected ? 'selected' : ''}`}>
+              <button
+                disabled={conversationNavigationDisabled && value.id !== chat.id}
+                onClick={() => openChat(value)}
+                title={value.title}
+                aria-current={selected ? 'page' : undefined}
+                data-control-id={`button-${value.projectId ? 'chat-' : ''}${controlSlug(value.title)}`}
+              >
+                <MessageSquare size={15} />
+                <span className="project-row-text">
+                  <span>{value.title}</span>
+                  {project && (
+                    <span className="project-row-project">
+                      in {project.name}
+                      {project.archived ? ' · archived' : ''}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <ConversationMenu
+                conversation={value}
+                onExport={(includesReasoning) =>
+                  void controller.exportChat(value, includesReasoning)
+                }
+                disabled={!controller.native}
+                readOnly={!!project?.archived}
+                actionBusyReason={mutationReason}
+                onMove={() =>
+                  controller.setProjectDialog({ kind: 'move', conversationId: value.id })
+                }
+                onRemove={() => void removeFromProject(value)}
+                onDelete={() => controller.requestDeleteChat(value)}
+              />
+            </div>
+          );
+        })}
       </div>
       <div className="sidebar-bottom">
         <button
@@ -135,6 +225,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
           aria-label="Settings"
           aria-current={panel === 'settings' ? 'page' : undefined}
           title="Settings"
+          data-control-id="button-settings"
           onClick={() => setPanel('settings')}
         >
           <Settings2 size={17} /> <span className="sidebar-label">Settings</span>

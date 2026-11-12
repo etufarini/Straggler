@@ -449,6 +449,11 @@ export function useConversation(
 
   function setChatOptions(patch: Partial<ChatOptions>) {
     if (requestRef.current || mutation.current) return;
+    if (
+      projects?.current.current.find((project) => project.id === chatRef.current.projectId)
+        ?.archived
+    )
+      return;
     const value = {
       ...chatRef.current,
       options: { ...inheritedChatOptions, ...chatRef.current.options, ...patch },

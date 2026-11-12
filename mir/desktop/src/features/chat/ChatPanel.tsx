@@ -2,7 +2,7 @@ import ReasoningMenu from './ReasoningMenu';
 import SystemPromptMenu from './SystemPromptMenu';
 import ContextCounter from './ContextCounter';
 import Markdown from './Markdown';
-import { ArrowUp, HardDrive, Check, Copy, Square, Pencil, RotateCcw } from 'lucide-react';
+import { ArrowUp, HardDrive, Check, Copy, Square, Pencil, RotateCcw, Folder } from 'lucide-react';
 import { fileName } from '../../domain/types';
 import { messageStatusLabel } from '../../components/statusLabels';
 import Feedback from '../../components/Feedback';
@@ -10,6 +10,8 @@ import StorageFeedback from './StorageFeedback';
 import type { WorkspaceController } from '../../app/useWorkspace';
 import { useEffect, useRef, useState } from 'react';
 import { errorDetail } from '../../domain/errors';
+import { isContextRejection } from '../../domain/errors';
+import { ProjectLimitFeedback } from '../projects/ProjectCapacity';
 export default function ChatPanel({ controller }: { controller: WorkspaceController }) {
   const [copied, setCopied] = useState('');
   const lastEditor = useRef<string | null>(null);
@@ -58,8 +60,23 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
     cancel,
     reviewSettings,
   } = controller;
+  const project = controller.currentProject;
+  const archived = !!project?.archived;
   return (
     <>
+      {project && (
+        <nav className="project-crumb" aria-label="Breadcrumb">
+          <button
+            data-control-id="button-crumb-project"
+            onClick={() => controller.openProject(project.id)}
+          >
+            <Folder size={14} />
+            {project.name}
+          </button>
+          <span aria-hidden="true">›</span>
+          <span aria-current="page">{chat.title}</span>
+        </nav>
+      )}
       <div
         className="messages"
         ref={messageList}
@@ -211,9 +228,28 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                       }
                       details={message.error}
                       actions={
-                        <button className="text-button" onClick={() => reviewSettings('model')}>
-                          Review settings
-                        </button>
+                        project && isContextRejection(message.error) ? (
+                          <>
+                            <button
+                              className="text-button"
+                              data-control-id="button-review-files"
+                              onClick={() => controller.openProject(project.id, true)}
+                            >
+                              Review files
+                            </button>
+                            <button
+                              className="text-button"
+                              data-control-id="button-change-context-size"
+                              onClick={() => reviewSettings('model')}
+                            >
+                              Change context size in Settings
+                            </button>
+                          </>
+                        ) : (
+                          <button className="text-button" onClick={() => reviewSettings('model')}>
+                            Review settings
+                          </button>
+                        )
                       }
                     >
                       {message.content
@@ -252,7 +288,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                           id={`edit-${message.id}`}
                           aria-label={message.role === 'user' ? 'Edit message' : 'Edit response'}
                           title={message.role === 'user' ? 'Edit message' : 'Edit response'}
-                          disabled={generating || editingBusy}
+                          disabled={generating || editingBusy || archived}
                           aria-describedby={generating ? `actions-busy-${message.id}` : undefined}
                           onClick={() => beginEdit(message)}
                         >
@@ -268,7 +304,8 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                               generating ||
                               editingBusy ||
                               server.phase !== 'ready' ||
-                              !!controller.storageError
+                              !!controller.storageError ||
+                              archived
                             }
                             aria-describedby={generating ? `actions-busy-${message.id}` : undefined}
                             onClick={() => void regenerate(message.id).catch(() => {})}
@@ -302,6 +339,53 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
 
       <div className="composer-wrap">
         <StorageFeedback controller={controller} />
+        {chat.projectId && !project && (
+          <Feedback
+            title="Project data is unavailable"
+            actions={
+              <button onClick={() => void controller.projects.load()}>
+                Retry loading projects
+              </button>
+            }
+          >
+            Reload projects before continuing this conversation.
+          </Feedback>
+        )}
+        {project &&
+          (archived ? (
+            <Feedback
+              severity="warning"
+              title="This project is archived"
+              actions={
+                <button
+                  className="text-button"
+                  data-control-id="button-restore-from-chat"
+                  onClick={() =>
+                    void controller.projects
+                      .update(project.id, { archived: false })
+                      .then((result) =>
+                        controller.projects.setNotice({
+                          message: `Restored “${project.name}”.`,
+                          undoToken: result.undoToken,
+                        }),
+                      )
+                      .catch(() => {})
+                  }
+                >
+                  Restore project
+                </button>
+              }
+            >
+              You can read this chat. Restore the project to continue it.
+            </Feedback>
+          ) : (
+            <ProjectLimitFeedback
+              chat
+              context={controller.projects.context(project)}
+              onReviewFiles={() => controller.openProject(project.id, true)}
+              onChangeContext={() => reviewSettings('model')}
+            />
+          ))}
         {(controller.contextEstimate.overflow || controller.contextError) && (
           <p role="alert" className="context-overflow">
             {controller.contextEstimate.overflow
@@ -324,6 +408,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
           <textarea
             ref={textarea}
             aria-label="Message"
+            data-control-id="textarea-message"
             placeholder={
               server.phase === 'ready'
                 ? 'Message your local model…'
@@ -332,7 +417,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   : 'Load a model to start a conversation…'
             }
             value={input}
-            disabled={generating}
+            disabled={generating || archived}
             rows={3}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
@@ -364,6 +449,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   type="submit"
                   className="send-button"
                   aria-label="Send message"
+                  data-control-id="button-send-message"
                   disabled={!canSend || !input.trim()}
                 >
                   <ArrowUp size={19} />

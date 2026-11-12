@@ -399,6 +399,13 @@ export function createFixture(scenario: Scenario) {
         }
         const conversation = structuredClone(args.conversation as Conversation);
         const index = history.findIndex((value) => value.id === conversation.id);
+        const previous = history[index];
+        if (conversation.projectId && projectFixture.find(conversation.projectId).archived)
+          throw new Error('Restore the project before making changes.');
+        if (previous?.projectId && projectFixture.find(previous.projectId).archived)
+          throw new Error('Restore the project before making changes.');
+        if (previous && (previous.projectId ?? null) !== (conversation.projectId ?? null))
+          throw new Error('Move the conversation through the project action before saving.');
         if (command === 'history_create' && index !== -1)
           throw new Error('Conversation already exists');
         if (index === -1) history.push(conversation);

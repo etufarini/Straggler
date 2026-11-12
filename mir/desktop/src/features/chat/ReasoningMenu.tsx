@@ -22,7 +22,7 @@ export default function ReasoningMenu({ controller }: { controller: WorkspaceCon
       label="Reasoning"
       valueLabel={label}
       className={`reasoning-menu ${available && options.reasoning === 'on' ? 'is-on' : ''}`}
-      disabled={chatOptionsDisabled || !available}
+      disabled={chatOptionsDisabled || !available || !!controller.currentProject?.archived}
       trigger={
         <>
           <Lightbulb size={14} />
@@ -34,7 +34,7 @@ export default function ReasoningMenu({ controller }: { controller: WorkspaceCon
     >
       {() => (
         <ReasoningControls
-          disabled={chatOptionsDisabled}
+          disabled={chatOptionsDisabled || !!controller.currentProject?.archived}
           effortPresentation="segments"
           reasoning={options.reasoning}
           effort={options.effort}
