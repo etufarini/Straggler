@@ -6,15 +6,24 @@ import {
   saveConversationExport,
   chooseConversationImport,
   estimatePromptTokens,
+  estimateTextTokens,
 } from '../../services/desktop';
 import { fileName, newConversation } from '../../domain/types';
 import { inheritedChatOptions, resolveChatOptions } from '../../domain/chat';
 import { replaceMessage, regenerationHistory } from '../../domain/messageActions';
 import { materializeImport } from '../../domain/conversationImport';
 import type { ImportedConversation } from '../../domain/conversationImport';
-import { composeRequest } from '../../domain/attachments';
+import {
+  assembleProjectRequest,
+  estimateProjectTokens,
+  projectContextState,
+  projectSystemPrefix,
+} from '../../domain/projectContext';
+import { flushStorage, serializeStorage } from '../../domain/storageQueue';
+import type { StorageQueue } from '../../domain/storageQueue';
+import type { ProjectsController } from '../projects/useProjects';
 import { exportFileName, serializeConversation } from '../../domain/conversationExport';
-import { errorDetail } from '../../domain/errors';
+import { errorDetail, isContextRejection } from '../../domain/errors';
 import type {
   Conversation,
   Delta,
@@ -29,6 +38,8 @@ export function useConversation(
   server: ServerStatus,
   settings?: Settings,
   contextSize?: number | null,
+  projects?: ProjectsController,
+  sharedQueue?: StorageQueue,
 ) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
@@ -58,7 +69,9 @@ export function useConversation(
   const requestRef = useRef<string | null>(null);
   const cancelledRef = useRef<string | null>(null);
   const sendPromise = useRef<Promise<void> | null>(null);
-  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const localQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveQueue = sharedQueue ?? localQueue;
+  const rejectedDraft = useRef<{ chatId: string; userId: string } | null>(null);
   const mounted = useRef(true);
   const messageList = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
@@ -68,11 +81,8 @@ export function useConversation(
   }, [input, chat.attachments, contextSize]);
 
   async function flushSaves() {
-    let pending: Promise<void>;
-    do {
-      pending = saveQueue.current;
-      await pending;
-    } while (pending !== saveQueue.current);
+    await flushStorage(saveQueue);
+    if (projects?.error) throw new Error(projects.error);
   }
   function updateChat(value: Conversation) {
     chatRef.current = value;
@@ -117,16 +127,13 @@ export function useConversation(
   }, [chat, generating]);
   function save(value: Conversation, create = false): Promise<void> {
     const snapshot = structuredClone(value);
-    const pending = saveQueue.current
-      .catch(() => {})
-      .then(async () => {
-        await invoke(create ? 'history_create' : 'history_save', { conversation: snapshot });
-        if (mounted.current) {
-          if (historyReady) setStorageError('');
-          updateConversations(snapshot);
-        }
-      });
-    saveQueue.current = pending;
+    const pending = serializeStorage(saveQueue, async () => {
+      await invoke(create ? 'history_create' : 'history_save', { conversation: snapshot });
+      if (mounted.current) {
+        if (historyReady) setStorageError('');
+        updateConversations(snapshot);
+      }
+    });
     void pending.catch((e) => {
       if (mounted.current && !create) setStorageError(errorDetail(e).message);
     });
@@ -140,10 +147,10 @@ export function useConversation(
     }
   }
 
-  async function send(replacement?: Message[]) {
-    const text = input.trim();
+  async function send(replacement?: Message[], submittedText?: string) {
+    const text = (submittedText ?? input).trim();
     if (
-      (!replacement && (!text || editor)) ||
+      (!replacement && (!text || (editor && submittedText === undefined))) ||
       requestRef.current ||
       mutation.current ||
       server.phase !== 'ready' ||
@@ -151,6 +158,17 @@ export function useConversation(
       storageError
     )
       return;
+    const project = projects?.current.current.find(
+      (value) => value.id === chatRef.current.projectId,
+    );
+    if (chatRef.current.projectId && (!projects?.ready || projects.error || !project)) {
+      setContextError('Project data is unavailable. Retry loading projects before sending.');
+      return;
+    }
+    if (project?.archived) {
+      setContextError('Restore this project to continue the chat.');
+      return;
+    }
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     setGenerating(true);
@@ -177,14 +195,45 @@ export function useConversation(
       updatedAt: Date.now(),
       model: server.model,
       title: chatRef.current.messages.length ? chatRef.current.title : text.slice(0, 80),
-      messages: [...(replacement ?? [...chatRef.current.messages, user]), assistant],
+      messages: [
+        ...(replacement ?? [
+          ...(rejectedDraft.current?.chatId === chatRef.current.id
+            ? chatRef.current.messages.slice(
+                0,
+                chatRef.current.messages.findIndex(
+                  (value) => value.id === rejectedDraft.current?.userId,
+                ),
+              )
+            : chatRef.current.messages),
+          user,
+        ]),
+        assistant,
+      ],
     };
     const options = resolveChatOptions(current.options, settings);
-    const messages = composeRequest(
+    const messages = assembleProjectRequest(
+      current,
       current.messages.slice(0, -1),
-      options.systemPrompt,
-      current.attachments ?? [],
+      settings,
+      project,
     );
+    if (project) {
+      const prefix = projectSystemPrefix(project, settings);
+      const prefixCount = await estimateTextTokens(prefix);
+      const capacity = projectContextState(
+        prefixCount.source === 'server' ? prefixCount.tokens : estimateProjectTokens(prefix),
+        contextSize,
+        prefixCount.source !== 'server',
+      );
+      if (capacity.level === 'over') {
+        setContextError(
+          `This project does not fit in the context window. It needs ${capacity.shortfall.toLocaleString('en-US')} more tokens than are available.`,
+        );
+        requestRef.current = null;
+        setGenerating(false);
+        return;
+      }
+    }
     const estimate = await estimatePromptTokens(messages);
     if (contextSize && estimate.tokens > contextSize) {
       setContextError(
@@ -195,6 +244,7 @@ export function useConversation(
       return;
     }
     setContextError('');
+    rejectedDraft.current = null;
     if (!replacement) {
       setInput('');
       updateChat(current);
@@ -233,6 +283,7 @@ export function useConversation(
           : await invoke<Response>('generate', {
               request: {
                 requestId,
+                conversationId: current.id,
                 messages,
                 options: { reasoning: options.reasoning, effort: options.effort },
               },
@@ -244,9 +295,17 @@ export function useConversation(
       if (response.metrics)
         assistant.metrics = { ...assistant.metrics, ...response.metrics, runId: server.runId };
       if (response.error) assistant.error = response.error;
+      if (response.error && isContextRejection(response.error) && !replacement) {
+        rejectedDraft.current = { chatId: current.id, userId: user.id };
+        setInput(text);
+      }
     } catch (e) {
       assistant.status = 'error';
       if (generationStarted) assistant.error = errorDetail(e).message;
+      if (generationStarted && isContextRejection(errorDetail(e).message) && !replacement) {
+        rejectedDraft.current = { chatId: current.id, userId: user.id };
+        setInput(text);
+      }
     } finally {
       // Ignore any queued IPC deltas once the final snapshot has arrived.
       requestRef.current = null;
@@ -265,7 +324,7 @@ export function useConversation(
   }
 
   function acceptStoredConversation(value: Conversation) {
-    updateChat(value);
+    if (chatRef.current.id === value.id) updateChat(value);
     updateConversations(value);
   }
 
@@ -329,6 +388,7 @@ export function useConversation(
         includesReasoning,
         new Date().toISOString(),
         settings,
+        projects?.current.current.find((project) => project.id === snapshot.projectId),
       );
       if (await saveConversationExport(exportFileName(snapshot.title), contents))
         setFileNotice('Conversation exported.');
@@ -338,7 +398,13 @@ export function useConversation(
   }
 
   function beginEdit(message: Message) {
-    if (requestRef.current || mutation.current) return;
+    if (
+      requestRef.current ||
+      mutation.current ||
+      projects?.current.current.find((project) => project.id === chatRef.current.projectId)
+        ?.archived
+    )
+      return;
     setEditor({ messageId: message.id, text: message.content });
   }
 
@@ -353,6 +419,11 @@ export function useConversation(
 
   async function saveEdit() {
     if (!editor || mutation.current || requestRef.current) return;
+    if (
+      projects?.current.current.find((project) => project.id === chatRef.current.projectId)
+        ?.archived
+    )
+      return;
     const original = chatRef.current;
     const message = original.messages.find((value) => value.id === editor.messageId);
     if (!message) return;
@@ -378,6 +449,9 @@ export function useConversation(
     const value = {
       ...chatRef.current,
       options: { ...inheritedChatOptions, ...chatRef.current.options, ...patch },
+      ...(Object.hasOwn(patch, 'systemPrompt')
+        ? { ownSystemPrompt: patch.systemPrompt ?? null }
+        : {}),
       updatedAt: Date.now(),
     };
     updateChat(value);

@@ -74,6 +74,7 @@ desktop/src/features/presence/renderers/orb-engine.js
 desktop/src/features/server/ServerFeedback.tsx
 desktop/src/features/server/ServerPanel.tsx
 desktop/src/features/server/useServerDetails.ts
+desktop/src/features/projects/useProjects.ts
 desktop/src/features/settings/ChatDefaults.tsx
 desktop/src/features/settings/FolderSettings.tsx
 desktop/src/features/settings/ModelSettings.tsx
