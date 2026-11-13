@@ -1,8 +1,8 @@
-# Mir.cpp development instructions
+# Straggler development instructions
 
 ## Purpose and boundaries
 
-Mir.cpp is a desktop application and llama.cpp supervisor, not an inference engine. Development and required automated checks must run without GPU hardware, model weights, or a working llama.cpp installation. Validate Mir.cpp's interface contracts, user flows, persistence, and process lifecycle. Real inference and backend hardware checks are optional integration diagnostics.
+Straggler is a desktop application and llama.cpp supervisor, not an inference engine. Development and required automated checks must run without GPU hardware, model weights, or a working llama.cpp installation. Validate Straggler's interface contracts, user flows, persistence, and process lifecycle. Real inference and backend hardware checks are optional integration diagnostics.
 
 Target Linux and macOS with Tauri 2, React and TypeScript. Keep device discovery and inference delegated to the selected llama.cpp backend. Derive selectable features from its advertised capabilities; do not hardcode models, device names, hardware vendors or assumed memory capacity. Missing telemetry must not block server controls. Earlier hardware records describe only those configurations, not validation of later GUI changes.
 
@@ -18,7 +18,7 @@ At the end of development, review changed code and its dependencies for redundan
 
 ## Repository structure
 
-Keep the visible root limited to README.md, AGENTS.md, LICENSE and mir/. Keep desktop code in mir/desktop/, the development test runner in mir/tests/run.sh, and documentation in mir/docs/. Use npm --prefix mir/desktop run desktop for local native development. Resolve bundled resources relative to the executable or native resource directory, independently of the working directory.
+Keep the visible root limited to README.md, AGENTS.md, LICENSE and straggler/. Keep desktop code in straggler/desktop/, the development test runner in straggler/tests/run.sh, and documentation in straggler/docs/. Use npm --prefix straggler/desktop run desktop for local native development. Resolve bundled resources relative to the executable or native resource directory, independently of the working directory.
 
 Keep configuration, discovery and process supervision in Rust. Separate platform services into native Linux/macOS modules. Linux must work without macOS files or Homebrew. The app must not invoke shell/Python helpers or install build tools and system packages at runtime. Python packaging utilities and test fixtures are development tools only. The test runner must work with macOS system Bash 3.2 without a replacement shell.
 
@@ -26,9 +26,11 @@ Organize the frontend into app composition, features, shared components, domain 
 
 ## Configuration and compatibility
 
-Use Mir.cpp for the product, mir-desktop for its native executable, and MIR_* for environment controls. Preserve MIR_* precedence over legacy LLAMA_* aliases, including explicit empty MIR_* values; leave native LLAMA_ARG_* variables unchanged. Read configuration and profiles as literal data, never source or eval.
+Use Straggler for the product, straggler-desktop for its native executable, and STRAGGLER_* for environment controls. Preserve STRAGGLER_* precedence over MIR_* and then legacy LLAMA_* aliases, including explicit empty values; leave native LLAMA_ARG_* variables unchanged. Read configuration and profiles as literal data, never source or eval.
 
-Keep paths in ${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/paths.conf and profiles in its profiles/ directory. Preserve release and earlier desktop profile compatibility: validate recognized fields transactionally, ignore removed or unknown keys, and initialize missing fields from documented defaults independently of the current session. Loading returns to configuration review without launching. Compare and save through the same field serialization; confirm overwrite and deletion. Keep migration atomic, preserve originals and never merge over existing settings.
+Keep paths in ${XDG_CONFIG_HOME:-$HOME/.config}/straggler/paths.conf and profiles in its profiles/ directory. Preserve release and earlier desktop profile compatibility: validate recognized fields transactionally, ignore removed or unknown keys, and initialize missing fields from documented defaults independently of the current session. Loading returns to configuration review without launching. Compare and save through the same field serialization; confirm overwrite and deletion. Keep migration atomic, preserve originals and never merge over existing settings.
+
+For each configuration/data root, reuse an existing mir.cpp/ directory when straggler/ is absent. Keep its data and session lock in place; never copy or merge the two directories. Preserve the mir.cpp/conversation version 1 export format and accept legacy mir-build.conf backend metadata.
 
 Folders must be configurable and readable. Accept source builds with build/bin/llama-server and packaged builds with bin/llama-server. Discover GGUF files recursively, allow empty model folders, and report missing server/model files clearly. Browsing, accepting a directory and canceling are separate actions; hidden directories remain accessible.
 
@@ -38,7 +40,7 @@ Preserve release defaults, sampling presets, seed/output independence, cache typ
 
 Keep Settings organized as Model settings, Performance, Server & port, Saved configurations, Folders and llama.cpp. Keep model selection and server controls accessible from chat. Mark Modified relative to saved settings and Restart required relative to the active configuration. Report unavailable native services, unsupported chat requests, interrupted responses and storage errors explicitly.
 
-Store conversations under ${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/desktop/, separate from profiles and browser data. Validate identifiers and write atomically. Preserve partial responses and serialize saves. Do not overwrite browser conversations or preferences.
+Store conversations under ${XDG_DATA_HOME:-$HOME/.local/share}/straggler/desktop/, separate from profiles and browser data. Validate identifiers and write atomically. Preserve partial responses and serialize saves. Do not overwrite browser conversations or preferences.
 
 Start supervised desktop servers on loopback without opening a browser. Check ports before startup and after changes; unidentified listeners still block launch. Show available process details, recheck identity before signaling, request explicit SIGTERM confirmation for unrelated listeners and separate SIGKILL confirmation. Never elevate process-control permissions. Closing the app confirms cancellation, saving and cleanup of its own processes.
 
@@ -50,13 +52,13 @@ Keep macOS GUI packaging the default; sandbox diagnostics and the App Store vari
 
 ## Verification
 
-Use bash mir/tests/run.sh as the development entry point. Keep focused suites available and report skipped checks. Required checks use temporary user directories, fake executables and local HTTP fixtures; they must not install system packages, contact inference services or use personal configuration. Verify test fixtures against native service contracts and pinned upstream examples/documentation to prevent drift.
+Use bash straggler/tests/run.sh as the development entry point. Keep focused suites available and report skipped checks. Required checks use temporary user directories, fake executables and local HTTP fixtures; they must not install system packages, contact inference services or use personal configuration. Verify test fixtures against native service contracts and pinned upstream examples/documentation to prevent drift.
 
 Run Bash syntax checks and ShellCheck for shell changes, frontend type/lint/format checks, relevant unit and integration suites, and Linux/macOS CI. Test native windows, resources and process behavior on CPU runners of each target OS. Exercise storage failures, cancellation, process identity, migration and transactional backend preparation when affected. No GPU, inference workload or hardware inventory is a release gate. Choose representative interactions and boundaries rather than exhaustive combinations or coverage quotas.
 
 ## Documentation and releases
 
-Keep README.md concise and practical: local desktop chat, package availability, requirements, native application startup, first configuration and one link to mir/docs/guide.md. Include the human-maintainer principle. Keep settings, data compatibility, development, packaging and troubleshooting in the guide. Keep the developer README focused on commands and upstream fixture contracts. Remove obsolete installation paths, launcher instructions and duplicated historical records. Use real interface screenshots without fabricated readiness, inference or private paths.
+Keep README.md concise and practical: local desktop chat, package availability, requirements, native application startup, first configuration and one link to straggler/docs/guide.md. Include the human-maintainer principle. Keep settings, data compatibility, development, packaging and troubleshooting in the guide. Keep the developer README focused on commands and upstream fixture contracts. Remove obsolete installation paths, launcher instructions and duplicated historical records. Use real interface screenshots without fabricated readiness, inference or private paths.
 
 main is development, and merging does not publish a release. Do not advertise desktop packages as published before they exist. Never move published tags. Use semantic versions and obtain approval for the exact version, candidate SHA and notes before tagging or publishing. Do not delete remote branches without approval.
 

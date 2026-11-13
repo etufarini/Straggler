@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 40
     defaults:
       run:
-        working-directory: mir/desktop
+        working-directory: straggler/desktop
     steps:
       - uses: actions/checkout@v7
         with:
@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: mir/desktop/package-lock.json
+          cache-dependency-path: straggler/desktop/package-lock.json
       - name: Prepare build tools
         run: |
           rustup toolchain install stable --profile minimal
@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: macos-package-${{ matrix.target }}
-          path: mir/desktop/packaging/generated/build/${{ matrix.target }}/release/bundle/macos/*.dmg
+          path: straggler/desktop/packaging/generated/build/${{ matrix.target }}/release/bundle/macos/*.dmg
           if-no-files-found: error
       - name: Build and sign the sandboxed packaging check
         run: python3 packaging/macos.py bundle --probe --target "${{ matrix.target }}"
@@ -62,12 +62,12 @@ jobs:
           import tempfile
 
           generated = Path('packaging/generated').resolve()
-          app = generated / 'build-probe' / os.environ['CHECK_TARGET'] / 'release/bundle/macos/Mir.cpp Backend Check.app'
-          executable = app / 'Contents/MacOS/mir-desktop'
+          app = generated / 'build-probe' / os.environ['CHECK_TARGET'] / 'release/bundle/macos/Straggler Backend Check.app'
+          executable = app / 'Contents/MacOS/straggler-desktop'
           environment = {key: value for key, value in os.environ.items()
-                         if not key.startswith(('MIR_', 'LLAMA_'))}
+                         if not key.startswith(('STRAGGLER_', 'MIR_', 'LLAMA_'))}
           environment['PATH'] = '/usr/bin:/bin:/usr/sbin:/sbin'
-          with tempfile.TemporaryDirectory(prefix='mir-packaging-run-') as work:
+          with tempfile.TemporaryDirectory(prefix='straggler-packaging-run-') as work:
               result = subprocess.run([str(executable), '--no-dialog', '--allow-force-stop'],
                                       cwd=work, env=environment, capture_output=True, text=True, timeout=150)
           (generated / 'check-stdout.txt').write_text(result.stdout)
@@ -85,20 +85,20 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: backend-check-${{ matrix.target }}
-          path: mir/desktop/packaging/generated/check-*.txt
+          path: straggler/desktop/packaging/generated/check-*.txt
           if-no-files-found: warn
       - name: Build the sandboxed Store GUI check
         run: python3 packaging/macos.py bundle --app-store --store-check --debug --target "${{ matrix.target }}"
       - name: Exercise the actual signed Store GUI without models
         env:
-          MIR_PACKAGE_TEST_BINARY: ${{ github.workspace }}/mir/desktop/packaging/generated/build-app-store-check/${{ matrix.target }}/debug/bundle/macos/Mir.cpp Store Check.app/Contents/MacOS/mir-desktop
+          STRAGGLER_PACKAGE_TEST_BINARY: ${{ github.workspace }}/straggler/desktop/packaging/generated/build-app-store-check/${{ matrix.target }}/debug/bundle/macos/Straggler Store Check.app/Contents/MacOS/straggler-desktop
         run: node tests/package-smoke.mjs
       - name: Retain Store GUI evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: store-gui-${{ matrix.target }}
-          path: mir/desktop/test-results/store-settings.png
+          path: straggler/desktop/test-results/store-settings.png
           if-no-files-found: warn
 
   ubuntu:
@@ -115,7 +115,7 @@ jobs:
     timeout-minutes: 40
     defaults:
       run:
-        working-directory: mir/desktop
+        working-directory: straggler/desktop
     steps:
       - uses: actions/checkout@v7
         with:
@@ -124,7 +124,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: mir/desktop/package-lock.json
+          cache-dependency-path: straggler/desktop/package-lock.json
       - name: Prepare native packaging tools
         run: |
           sudo apt-get update
@@ -143,22 +143,22 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
           WEBKIT_DISABLE_COMPOSITING_MODE: "1"
-          MIR_PACKAGE_TEST_BINARY: ${{ github.workspace }}/mir/desktop/src-tauri/target/debug/mir-desktop
+          STRAGGLER_PACKAGE_TEST_BINARY: ${{ github.workspace }}/straggler/desktop/src-tauri/target/debug/straggler-desktop
         run: |
           packages=("$PWD/packaging/generated/build-ubuntu/${{ matrix.target }}/release/bundle/deb/"*.deb)
-          export MIR_PACKAGE_TEST_DEB="${packages[0]}"
+          export STRAGGLER_PACKAGE_TEST_DEB="${packages[0]}"
           xvfb-run -a dbus-run-session -- node tests/package-smoke.mjs
       - name: Retain the local candidate package
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ubuntu-package-${{ matrix.target }}
-          path: mir/desktop/packaging/generated/build-ubuntu/${{ matrix.target }}/release/bundle/deb/*.deb
+          path: straggler/desktop/packaging/generated/build-ubuntu/${{ matrix.target }}/release/bundle/deb/*.deb
           if-no-files-found: warn
       - name: Retain the package GUI screenshot
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ubuntu-gui-${{ matrix.target }}
-          path: mir/desktop/test-results/ubuntu-settings.png
+          path: straggler/desktop/test-results/ubuntu-settings.png
           if-no-files-found: warn
