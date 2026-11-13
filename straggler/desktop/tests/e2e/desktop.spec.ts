@@ -1,3 +1,4 @@
+import { selectValue } from './select';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -149,11 +150,11 @@ test('settings retain generation and performance values through profile operatio
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('textbox', { name: /^Seed/ }).fill('42');
   await page.getByRole('textbox', { name: /^Longest reply/ }).fill('512');
-  await page.getByRole('combobox', { name: 'Reply style' }).selectOption('focused');
+  await selectValue(page.getByRole('combobox', { name: 'Reply style' }), 'focused');
   await expect(page.getByRole('textbox', { name: /^Seed/ })).toHaveValue('42');
   await expect(page.getByRole('textbox', { name: /^Longest reply/ })).toHaveValue('512');
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
-  await page.getByRole('combobox', { name: /^Device/ }).selectOption('none');
+  await selectValue(page.getByRole('combobox', { name: /^Device/ }), 'none');
   await expect(page.getByRole('textbox', { name: 'Model on the GPU', exact: true })).toBeDisabled();
   await page.getByRole('textbox', { name: /^CPU threads/ }).fill('3');
   await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
@@ -170,7 +171,7 @@ test('settings retain generation and performance values through profile operatio
   await expect(page.locator('.local-badge')).toHaveText('Stopped');
   await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Seed/ })).toHaveValue('42');
-  await expect(page.getByRole('combobox', { name: 'Reply style' })).toHaveValue('focused');
+  await expect(page.getByRole('combobox', { name: 'Reply style' })).toHaveText('Focused');
 });
 
 test('folder selection separates browsing, hidden directories, cancel and confirmation', async ({
@@ -262,9 +263,9 @@ test('fatal OOM stays visible through polling, preserves partial text and suppor
     .click();
   await expect(failure).toContainText('Server stopped after a memory error');
   await failure.getByRole('button', { name: 'Review settings' }).click();
-  await page.getByRole('combobox', { name: 'Context size', exact: true }).selectOption('4096');
+  await selectValue(page.getByRole('combobox', { name: 'Context size', exact: true }), '4096');
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
-  await page.getByRole('combobox', { name: /^Reading your message/ }).selectOption('low-memory');
+  await selectValue(page.getByRole('combobox', { name: /^Reading your message/ }), 'low-memory');
   await page.getByRole('button', { name: 'Launch server', exact: true }).last().click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await expect(failure).toHaveCount(0);

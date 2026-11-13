@@ -1,3 +1,4 @@
+import { selectValue } from './select';
 import { expect, test } from '@playwright/test';
 
 test('sidebar preference persists and server log restores keyboard focus', async ({ page }) => {
@@ -176,7 +177,7 @@ test('reasoning uses advertised efforts and request-time overrides without a res
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('radio', { name: 'On', exact: true }).check();
-  await page.getByRole('combobox', { name: 'Reasoning effort' }).selectOption('minimal');
+  await selectValue(page.getByRole('combobox', { name: 'Reasoning effort' }), 'minimal');
   await page.getByRole('button', { name: 'Apply changes', exact: true }).click();
   await expect(page.locator('.local-badge')).not.toContainText('Restart required');
   await page.goto('/?scenario=no-reasoning');

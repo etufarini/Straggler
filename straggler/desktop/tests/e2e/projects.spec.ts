@@ -1,3 +1,4 @@
+import { selectValue } from './select';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { Project } from '../../src/domain/projects';
@@ -248,7 +249,7 @@ test('CHAT-02 and PROJ-01 support star, description search, sort and arrow-key t
   );
   const cards = page.locator('.project-card-open');
   await expect(cards).toHaveText(['Thesis research', 'Product launch brief', 'Home server setup']);
-  await control(page, 'select-sort-projects').selectOption('name');
+  await selectValue(control(page, 'select-sort-projects'), 'name');
   await expect(cards).toHaveText(['Home server setup', 'Product launch brief', 'Thesis research']);
   await control(page, 'button-star-product-launch-brief').click();
   await expect(control(page, 'button-project-product-launch-brief')).toBeVisible();

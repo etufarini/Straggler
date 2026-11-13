@@ -5,6 +5,7 @@ import ProjectMenu from './ProjectMenu';
 import type { Project } from '../../domain/projects';
 import { projectUpdatedAt } from '../../domain/projects';
 import { controlSlug } from '../../components/ActionMenu';
+import Select from '../../components/Select';
 
 export function projectActions(controller: WorkspaceController, project: Project) {
   const { projects, setProjectDialog } = controller;
@@ -148,14 +149,16 @@ export default function ProjectsPage({ controller }: { controller: WorkspaceCont
             </label>
             <label className="project-sort">
               <span>Sort</span>
-              <select
+              <Select
+                aria-label="Sort"
                 value={sort}
                 data-control-id="select-sort-projects"
-                onChange={(event) => setSort(event.target.value)}
-              >
-                <option value="updated">Recently updated</option>
-                <option value="name">Name</option>
-              </select>
+                onChange={setSort}
+                options={[
+                  { value: 'updated', label: 'Recently updated' },
+                  { value: 'name', label: 'Name' },
+                ]}
+              />
             </label>
           </div>
           <div role="tabpanel" id="projects-tabpanel" aria-labelledby={`projects-tab-${tab}`}>

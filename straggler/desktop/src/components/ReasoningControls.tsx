@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import type { ServerDetails } from '../domain/types';
+import Select from './Select';
 
 export default function ReasoningControls({
   reasoning,
@@ -80,24 +81,22 @@ export default function ReasoningControls({
       ) : (
         <label className="setting-field">
           <span>Reasoning effort</span>
-          <select
+          <Select
             aria-label="Reasoning effort"
             disabled={disabled || !available || reasoning === 'off' || !levels.length}
             value={effort}
-            onChange={(event) => onEffort(event.target.value)}
-          >
-            <option value="auto">Template default</option>
-            {effort !== 'auto' && !levels.includes(effort) && (
-              <option value={effort} disabled>
-                {effort} (not advertised)
-              </option>
-            )}
-            {levels.map((value) => (
-              <option key={value} value={value}>
-                {value.charAt(0).toUpperCase() + value.slice(1)}
-              </option>
-            ))}
-          </select>
+            onChange={onEffort}
+            options={[
+              { value: 'auto', label: 'Template default' },
+              ...(effort !== 'auto' && !levels.includes(effort)
+                ? [{ value: effort, label: `${effort} (not advertised)`, disabled: true }]
+                : []),
+              ...levels.map((value) => ({
+                value,
+                label: value.charAt(0).toUpperCase() + value.slice(1),
+              })),
+            ]}
+          />
           <small>
             {available && !levels.length
               ? 'This template does not advertise effort levels.'

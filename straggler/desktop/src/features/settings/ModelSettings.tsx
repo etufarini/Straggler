@@ -2,6 +2,7 @@ import ChatDefaults from './ChatDefaults';
 import type { SettingsController } from './useSettings';
 import NumberField from '../../components/NumberField';
 import FieldError from '../../components/FieldError';
+import Select from '../../components/Select';
 import { Folder } from 'lucide-react';
 import { fileName, samplingKeys } from '../../domain/types';
 const labels: Record<string, string> = {
@@ -44,23 +45,20 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
       <p className="field-help">What you can use depends on the model and on your memory.</p>
       <label className="setting-field">
         <span>Model</span>
-        <select
+        <Select
           aria-label="Model"
           aria-invalid={fieldError('model') ? true : undefined}
           aria-describedby={fieldError('model') ? 'model-error' : undefined}
           value={draft.model}
-          onChange={(event) => change('model', event.target.value)}
-        >
-          <option value="">Choose a model</option>
-          {draft.model && !config.models.some((model) => model.path === draft.model) && (
-            <option value={draft.model}>{fileName(draft.model)}</option>
-          )}
-          {config.models.map((model) => (
-            <option key={model.path} value={model.path}>
-              {model.label}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => change('model', value)}
+          options={[
+            { value: '', label: 'Choose a model' },
+            ...(draft.model && !config.models.some((model) => model.path === draft.model)
+              ? [{ value: draft.model, label: fileName(draft.model) }]
+              : []),
+            ...config.models.map((model) => ({ value: model.path, label: model.label })),
+          ]}
+        />
         <FieldError id="model-error" message={fieldError('model')} />
       </label>
       {!config.models.length && (
@@ -76,7 +74,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
       <div className="field-grid">
         <label className="setting-field">
           <span>Context size</span>
-          <select
+          <Select
             aria-label="Context size"
             value={
               [
@@ -95,19 +93,17 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
                 ? draft.context
                 : 'custom'
             }
-            onChange={(event) =>
-              change('context', event.target.value === 'custom' ? '2048' : event.target.value)
-            }
-          >
-            <option value="auto">Auto</option>
-            <option value="0">Largest the model supports</option>
-            {[4096, 8192, 16384, 24576, 32768, 49152, 65536, 131072, 262144].map((size) => (
-              <option key={size} value={size}>
-                {size / 1024}K
-              </option>
-            ))}
-            <option value="custom">Custom</option>
-          </select>
+            onChange={(value) => change('context', value === 'custom' ? '2048' : value)}
+            options={[
+              { value: 'auto', label: 'Auto' },
+              { value: '0', label: 'Largest the model supports' },
+              ...[4096, 8192, 16384, 24576, 32768, 49152, 65536, 131072, 262144].map((size) => ({
+                value: size,
+                label: `${size / 1024}K`,
+              })),
+              { value: 'custom', label: 'Custom' },
+            ]}
+          />
         </label>
         <NumberField
           label="Custom size (tokens)"
@@ -136,19 +132,14 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
                 {kind === 'k' ? 'Keys format' : 'Values format'}{' '}
                 <code className="tech-term">{kind.toUpperCase()}</code>
               </span>
-              <select
+              <Select
                 aria-label={kind === 'k' ? 'Keys format' : 'Values format'}
                 aria-invalid={fieldError(key) ? true : undefined}
                 aria-describedby={fieldError(key) ? `${key}-error` : undefined}
                 value={draft[key]}
-                onChange={(event) => change(key, event.target.value)}
-              >
-                {choices.map((value) => (
-                  <option key={value} value={value}>
-                    {value.toUpperCase()}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => change(key, value)}
+                options={choices.map((value) => ({ value, label: value.toUpperCase() }))}
+              />
               <FieldError id={`${key}-error`} message={fieldError(key)} />
               {!advertised.length && (
                 <small>Supported formats unavailable; the current selection is preserved.</small>
@@ -162,31 +153,26 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
         <span>
           Reply style <code className="tech-term">Sampling preset</code>
         </span>
-        <select
+        <Select
           aria-label="Reply style"
           value={preset}
-          onChange={(event) => {
-            const values = config.presets[event.target.value];
-            if (event.target.value === 'custom') setShowSampling(true);
+          onChange={(value) => {
+            const values = config.presets[value];
+            if (value === 'custom') setShowSampling(true);
             if (values)
               setDraft({
                 ...draft,
                 ...Object.fromEntries(samplingKeys.map((key, index) => [key, values[index]])),
               });
           }}
-        >
-          {[
+          options={[
             ['default', 'Default'],
             ['focused', 'Focused'],
             ['exploratory', 'Exploratory'],
             ['min-p', 'Min-P'],
             ['custom', 'Custom'],
-          ].map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+          ].map(([value, label]) => ({ value, label }))}
+        />
         <small>
           Starting points you can fine-tune. They keep your seed, reply length, context and
           performance settings.

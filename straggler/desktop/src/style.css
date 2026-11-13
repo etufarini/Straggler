@@ -71,8 +71,7 @@ textarea {
   font: inherit;
   -webkit-tap-highlight-color: transparent;
 }
-input,
-select {
+input {
   font: inherit;
   color: #f3f6ff;
   background: var(--ui-field);
@@ -82,13 +81,11 @@ select {
   min-width: 0;
   border-color: var(--ui-border);
 }
-input:focus-visible,
-select:focus-visible {
+input:focus-visible {
   outline: 2px solid #7196ff;
   outline-offset: 2px;
 }
-input:disabled,
-select:disabled {
+input:disabled {
   opacity: 0.5;
 }
 .header-controls {
@@ -213,8 +210,7 @@ select:disabled {
 .setting-field > span {
   color: #e1e7fa;
 }
-.setting-field input,
-.setting-field select {
+.setting-field input {
   width: 100%;
 }
 .setting-field small,
@@ -1893,8 +1889,7 @@ button:focus-visible,
 textarea:focus-visible,
 pre:focus-visible,
 summary:focus-visible,
-input:focus-visible,
-select:focus-visible {
+input:focus-visible {
   outline-color: var(--ui-focus);
 }
 .model-switch,
@@ -2422,7 +2417,7 @@ select:focus-visible {
   font-size: 12px;
   color: var(--ui-muted);
 }
-.project-sort select {
+.project-sort .ss-button {
   font-size: 12px;
   padding: 7px 9px;
 }
@@ -3044,4 +3039,135 @@ select:focus-visible {
 .sidebar-bottom .nav-item.selected::before {
   background: linear-gradient(180deg, var(--star-a), var(--ui-cyan) 45%, #4f86ff);
   box-shadow: 0 0 10px #9db4ffcc;
+}
+
+/* Select-only combobox: the popup is portaled beyond scrolling panels. */
+.ss {
+  display: inline-block;
+  min-width: 0;
+}
+.setting-field .ss {
+  width: 100%;
+}
+.ss-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font: inherit;
+  color: #f3f6ff;
+  padding: 9px 12px;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+  background:
+    linear-gradient(180deg, #ffffff0b, #ffffff00 70%),
+    color-mix(in srgb, var(--ui-field) 88%, transparent);
+  box-shadow: inset 0 1px 0 #ffffff12;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.ss-button:hover:not(:disabled) {
+  border-color: #5b74c4;
+}
+.ss-button:focus-visible {
+  outline: none;
+  border-color: #9db4ff;
+  box-shadow:
+    0 0 0 3px #4f86ff47,
+    inset 0 1px 0 #ffffff12;
+}
+.ss-button[aria-expanded='true'] {
+  border-color: transparent;
+  background:
+    linear-gradient(#1c2750, #1c2750) padding-box,
+    var(--ui-holo) border-box;
+}
+.ss-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ss-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ss-chev {
+  width: 14px;
+  height: 14px;
+  color: var(--ui-accent-text);
+  flex-shrink: 0;
+  transition: transform 0.18s;
+}
+.ss-button[aria-expanded='true'] .ss-chev {
+  transform: rotate(180deg);
+}
+.ss-list {
+  position: fixed;
+  z-index: 100;
+  margin: 0;
+  list-style: none;
+  max-height: 288px;
+  overflow: auto;
+  padding: 5px;
+  border-radius: 12px;
+  box-sizing: border-box;
+  border: 1px solid #3a4c8a;
+  background: color-mix(in srgb, #1a2550 93%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 26px 60px -18px #050a1fdd,
+    0 0 0 1px #9db4ff14,
+    inset 0 1px 0 #ffffff14;
+  scrollbar-width: thin;
+  scrollbar-color: #3a4c8a transparent;
+}
+.ss-list.is-up {
+  transform: translateY(-100%);
+}
+.ss-option {
+  display: grid;
+  grid-template-columns: 1fr 16px;
+  align-items: center;
+  gap: 1px 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #dfe6ff;
+  cursor: pointer;
+}
+.ss-option small {
+  grid-column: 1;
+  color: var(--ui-subtle);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.ss-option .ss-check {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: 15px;
+  height: 15px;
+  color: var(--star-a, #cad8ff);
+  opacity: 0;
+}
+.ss-option[aria-selected='true'] {
+  color: #fff;
+  font-weight: 550;
+}
+.ss-option[aria-selected='true'] .ss-check {
+  opacity: 1;
+  filter: drop-shadow(0 0 5px #9db4ffaa);
+}
+.ss-option.is-active {
+  background: #4f86ff2e;
+  box-shadow: inset 0 0 0 1px #9db4ff38;
+  color: #fff;
+}
+.ss-option[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

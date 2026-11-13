@@ -1,6 +1,7 @@
 import type { SettingsController } from './useSettings';
 import NumberField from '../../components/NumberField';
 import FieldError from '../../components/FieldError';
+import Select from '../../components/Select';
 
 export default function PerformanceSettings({ controller }: { controller: SettingsController }) {
   const { config, draft, change, fieldError } = controller;
@@ -12,23 +13,26 @@ export default function PerformanceSettings({ controller }: { controller: Settin
       </p>
       <label className="setting-field">
         <span>Device</span>
-        <select
+        <Select
+          aria-label="Device"
           value={draft.device}
           aria-invalid={fieldError('device') ? true : undefined}
           aria-describedby={fieldError('device') ? 'device-error' : undefined}
-          onChange={(event) => change('device', event.target.value)}
-        >
-          <option value="auto">Auto (llama.cpp chooses)</option>
-          <option value="none">CPU only</option>
-          {!['auto', 'none', ...config.devices.map((device) => device.name)].includes(
-            draft.device,
-          ) && <option value={draft.device}>{draft.device}</option>}
-          {config.devices.map((device) => (
-            <option key={device.name} value={device.name}>
-              {device.name}: {device.label}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => change('device', value)}
+          options={[
+            { value: 'auto', label: 'Auto (llama.cpp chooses)' },
+            { value: 'none', label: 'CPU only' },
+            ...(!['auto', 'none', ...config.devices.map((device) => device.name)].includes(
+              draft.device,
+            )
+              ? [{ value: draft.device, label: draft.device }]
+              : []),
+            ...config.devices.map((device) => ({
+              value: device.name,
+              label: `${device.name}: ${device.label}`,
+            })),
+          ]}
+        />
         <FieldError id="device-error" message={fieldError('device')} />
       </label>
       <div className="field-grid">
@@ -57,17 +61,18 @@ export default function PerformanceSettings({ controller }: { controller: Settin
         <span>
           Reading your message <code className="tech-term">Prompt processing</code>
         </span>
-        <select
+        <Select
           aria-label="Reading your message"
           value={draft.prompt_processing}
           aria-invalid={fieldError('prompt_processing') ? true : undefined}
           aria-describedby={fieldError('prompt_processing') ? 'prompt-processing-error' : undefined}
-          onChange={(event) => change('prompt_processing', event.target.value)}
-        >
-          <option value="auto">Default</option>
-          <option value="low-memory">Low memory</option>
-          <option value="large-batch">Large batch</option>
-        </select>
+          onChange={(value) => change('prompt_processing', value)}
+          options={[
+            { value: 'auto', label: 'Default' },
+            { value: 'low-memory', label: 'Low memory' },
+            { value: 'large-batch', label: 'Large batch' },
+          ]}
+        />
         <FieldError id="prompt-processing-error" message={fieldError('prompt_processing')} />
         <small>
           Large batch reads long messages faster but uses more memory. It does not speed up replies.
@@ -104,21 +109,19 @@ export default function PerformanceSettings({ controller }: { controller: Settin
             <span>
               How to split the model <code className="tech-term">Split mode</code>
             </span>
-            <select
+            <Select
               aria-label="How to split the model"
               value={draft.split_mode}
               aria-invalid={fieldError('split_mode') ? true : undefined}
               aria-describedby={fieldError('split_mode') ? 'split-mode-error' : undefined}
-              onChange={(event) => change('split_mode', event.target.value)}
-            >
-              {[...new Set(['auto', draft.split_mode, ...config.capabilities.splitModes])].map(
-                (mode) => (
-                  <option key={mode} value={mode}>
-                    {mode === 'tensor' ? 'tensor (experimental)' : mode}
-                  </option>
-                ),
-              )}
-            </select>
+              onChange={(value) => change('split_mode', value)}
+              options={[
+                ...new Set(['auto', draft.split_mode, ...config.capabilities.splitModes]),
+              ].map((mode) => ({
+                value: mode,
+                label: mode === 'tensor' ? 'tensor (experimental)' : mode,
+              }))}
+            />
             <FieldError id="split-mode-error" message={fieldError('split_mode')} />
           </label>
           <NumberField

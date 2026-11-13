@@ -1,4 +1,5 @@
 import type { SettingsController } from './useSettings';
+import Select from '../../components/Select';
 
 export default function SavedConfigurations({ controller }: { controller: SettingsController }) {
   const {
@@ -29,14 +30,15 @@ export default function SavedConfigurations({ controller }: { controller: Settin
       </p>
       <label className="setting-field">
         <span>Configuration</span>
-        <select value={profile} onChange={(event) => setProfile(event.target.value)}>
-          <option value="">Choose a configuration</option>
-          {config.profiles.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
+        <Select
+          aria-label="Configuration"
+          value={profile}
+          onChange={setProfile}
+          options={[
+            { value: '', label: 'Choose a configuration' },
+            ...config.profiles.map((value) => ({ value, label: value })),
+          ]}
+        />
       </label>
       <div className="profile-actions">
         <button
