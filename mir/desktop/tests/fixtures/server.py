@@ -39,6 +39,8 @@ class Handler(BaseHTTPRequestHandler):
             data = {'default_generation_settings': {'n_ctx': 4096},
                     'chat_template_caps': {'supports_system_role': True, 'supports_reasoning_effort': True,
                                            'reasoning_effort_levels': ['low', 'high']}}
+            if os.path.exists(os.environ['TEST_REQUEST'] + '.context-unavailable'):
+                data['default_generation_settings'] = {}
         body = json.dumps(data).encode()
         self.send_response(200)
         self.send_header('Content-Length', str(len(body)))
@@ -73,6 +75,21 @@ class Handler(BaseHTTPRequestHandler):
         # Failed assistant turns are omitted, so consecutive user turns can be
         # merged. Fixture control words belong to the final user paragraph.
         prompt = request['messages'][-1]['content'].split('\n\n')[-1]
+        if prompt == 'context-reject':
+            # Pinned server-context.cpp rejects oversized input before the first
+            # SSE event, including stream:true requests. Never simulate truncation.
+            body = json.dumps({'error': {
+                'code': 400,
+                'type': 'exceed_context_size_error',
+                'message': 'request (5000 tokens) exceeds the available context size (4096 tokens), try increasing it',
+                'n_prompt_tokens': 5000,
+                'n_ctx': 4096,
+            }}).encode()
+            self.send_response(400)
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if prompt in ('oom', 'compute-error'):
             if prompt == 'oom':
                 report_memory_failure()

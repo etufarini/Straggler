@@ -117,6 +117,8 @@ export interface Conversation {
   messages: Message[];
   options?: ChatOptions;
   attachments?: Attachment[];
+  projectId?: string | null;
+  ownSystemPrompt?: string | null;
 }
 export interface Delta {
   metrics?: GenerationMetrics;

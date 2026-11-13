@@ -1,36 +1,65 @@
 import type { WorkspaceController } from './useWorkspace';
 import Feedback from '../components/Feedback';
+import { useId } from 'react';
+import type { ReactNode } from 'react';
+
+export function ConfirmationFrame({
+  title,
+  description,
+  children,
+  project = false,
+  role = 'alertdialog',
+  busy = false,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  project?: boolean;
+  role?: 'dialog' | 'alertdialog';
+  busy?: boolean;
+}) {
+  const id = useId();
+  const titleId = project ? `${id}-title` : 'confirm-title';
+  return (
+    <div className="confirmation-backdrop">
+      <section
+        className={`confirmation${project ? ' project-dialog' : ''}`}
+        role={role}
+        aria-modal="true"
+        aria-busy={busy}
+        aria-labelledby={titleId}
+        aria-describedby={description ? `${id}-body` : undefined}
+        data-project-dialog={project || undefined}
+      >
+        <h2 id={titleId}>{title}</h2>
+        {description && <p id={`${id}-body`}>{description}</p>}
+        {children}
+      </section>
+    </div>
+  );
+}
 export default function ConfirmationDialog({ controller }: { controller: WorkspaceController }) {
   const { confirmation, confirmError, confirmBusy, setConfirmation, confirm } = controller;
   if (!confirmation) return null;
   return (
-    <div className="confirmation-backdrop">
-      <section
-        className="confirmation"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-title"
-      >
-        <h2 id="confirm-title">{confirmation.title}</h2>
-        <p>{confirmation.text}</p>
-        {confirmError && (
-          <Feedback title="The action could not be completed" details={confirmError}>
-            Review the details before trying again. This window remains open.
-          </Feedback>
-        )}
-        <div className="panel-actions">
-          <button disabled={confirmBusy} onClick={() => setConfirmation(null)}>
-            Cancel
-          </button>
-          <button
-            className={confirmation.destructive ? 'danger-button' : 'primary-button'}
-            disabled={confirmBusy}
-            onClick={() => void confirm()}
-          >
-            {confirmBusy ? 'Working…' : confirmation.actionLabel}
-          </button>
-        </div>
-      </section>
-    </div>
+    <ConfirmationFrame title={confirmation.title} description={confirmation.text}>
+      {confirmError && (
+        <Feedback title="The action could not be completed" details={confirmError}>
+          Review the details before trying again. This window remains open.
+        </Feedback>
+      )}
+      <div className="panel-actions">
+        <button disabled={confirmBusy} onClick={() => setConfirmation(null)}>
+          Cancel
+        </button>
+        <button
+          className={confirmation.destructive ? 'danger-button' : 'primary-button'}
+          disabled={confirmBusy}
+          onClick={() => void confirm()}
+        >
+          {confirmBusy ? 'Working…' : confirmation.actionLabel}
+        </button>
+      </div>
+    </ConfirmationFrame>
   );
 }

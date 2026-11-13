@@ -9,14 +9,23 @@ import {
   isTauri,
 } from '../../services/desktop';
 import type { DragDropEvent, TokenEstimate } from '../../services/desktop';
-import { approximateTokens, sortAttachmentRows } from '../../domain/attachments';
+import {
+  approximateTokens,
+  pendingAttachmentRow,
+  sortAttachmentRows,
+} from '../../domain/attachments';
 import type { AttachmentRow } from '../../domain/attachments';
 import { errorDetail } from '../../domain/errors';
 import { fileName } from '../../domain/types';
 import type { Attachment, ServerStatus } from '../../domain/types';
 import type { ConversationController } from '../chat/useConversation';
 
-export function useAttachments(conversation: ConversationController, server: ServerStatus) {
+export function useAttachments(
+  conversation: ConversationController,
+  server: ServerStatus,
+  visible = true,
+  readOnly = false,
+) {
   const [pending, setPending] = useState<Record<string, AttachmentRow[]>>({});
   const [dragged, setDragged] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -30,7 +39,7 @@ export function useAttachments(conversation: ConversationController, server: Ser
   const current = useRef(conversation);
   current.current = conversation;
   const onDrop = useRef<(event: DragDropEvent) => void>(() => {});
-  const disabled = !isTauri() || conversation.chatOptionsDisabled;
+  const disabled = !isTauri() || conversation.chatOptionsDisabled || readOnly;
   const stored = conversation.chat.attachments ?? [];
   const textKey = JSON.stringify(stored.map((attachment) => [attachment.id, attachment.text]));
 
@@ -58,21 +67,12 @@ export function useAttachments(conversation: ConversationController, server: Ser
   }
   async function addFiles(paths: string[]) {
     if (!paths.length) return;
-    if (current.current.chatOptionsDisabled) {
+    if (current.current.chatOptionsDisabled || readOnly) {
       setError('Attachments can be changed when the response finishes.');
       return;
     }
     const id = current.current.chatRef.current.id;
-    const rows = paths.map((path): AttachmentRow => {
-      const name = fileName(path);
-      return {
-        id: crypto.randomUUID(),
-        name,
-        extension: name.split('.').at(-1)?.toLowerCase() ?? '',
-        size: null,
-        state: 'reading',
-      };
-    });
+    const rows = paths.map(pendingAttachmentRow);
     updatePending(id, (values) => [...values, ...rows]);
     setError('');
     try {
@@ -138,6 +138,7 @@ export function useAttachments(conversation: ConversationController, server: Ser
     }
   }
   onDrop.current = (event) => {
+    if (!visible || readOnly) return;
     if (event.type === 'leave') {
       setDragged([]);
       return;

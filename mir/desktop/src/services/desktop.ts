@@ -2,6 +2,14 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 import type { Attachment, Conversation } from '../domain/types';
+import { projectTokenEstimateCharacters } from '../domain/projectContext';
+import type {
+  Project,
+  ProjectMutation,
+  ProjectConversationMutation,
+  ProjectDeletion,
+  ProjectUndo,
+} from '../domain/projects';
 import { save as nativeSave, open as nativeOpen } from '@tauri-apps/plugin-dialog';
 import {
   Channel as NativeChannel,
@@ -50,7 +58,14 @@ export type DesktopCommand =
   | 'write_export'
   | 'history_list'
   | 'history_save'
-  | 'history_delete';
+  | 'history_delete'
+  | 'projects_list'
+  | 'project_save'
+  | 'project_file_add'
+  | 'project_file_remove'
+  | 'project_move_chat'
+  | 'project_delete'
+  | 'project_undo';
 
 export async function invoke<T = void>(
   command: DesktopCommand,
@@ -225,3 +240,21 @@ export async function estimatePromptTokens(
     };
   }
 }
+
+export const projectService = {
+  list: () => invoke<Project[]>('projects_list'),
+  save: (project: Project) => invoke<ProjectMutation>('project_save', { project }),
+  addFile: (projectId: string, path: string) =>
+    invoke<ProjectMutation>('project_file_add', {
+      projectId,
+      path,
+      charactersPerToken: projectTokenEstimateCharacters,
+    }),
+  removeFile: (projectId: string, fileId: string) =>
+    invoke<ProjectMutation>('project_file_remove', { projectId, fileId }),
+  moveChat: (conversationId: string, projectId: string | null) =>
+    invoke<ProjectConversationMutation>('project_move_chat', { conversationId, projectId }),
+  delete: (projectId: string, deleteChats: boolean) =>
+    invoke<ProjectDeletion>('project_delete', { projectId, deleteChats }),
+  undo: (token: string) => invoke<ProjectUndo>('project_undo', { token }),
+};

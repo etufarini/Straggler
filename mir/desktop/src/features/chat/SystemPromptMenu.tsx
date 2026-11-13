@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { ChevronDown, FileText } from 'lucide-react';
 import Popover from '../../components/Popover';
 import type { WorkspaceController } from '../../app/useWorkspace';
+import { ownSystemPrompt } from '../../domain/projects';
+import { estimateProjectTokens } from '../../domain/projectContext';
+import Feedback from '../../components/Feedback';
+import { errorDetail } from '../../domain/errors';
 
 function SystemPromptEditor({
   controller,
@@ -11,13 +15,9 @@ function SystemPromptEditor({
   close: () => void;
 }) {
   const { chat, config, setChatOptions, reviewSettings } = controller;
-  const [source, setSource] = useState(
-    chat.options?.systemPrompt === undefined || chat.options?.systemPrompt === null
-      ? 'default'
-      : 'chat',
-  );
+  const [source, setSource] = useState(ownSystemPrompt(chat) === null ? 'default' : 'chat');
   const [text, setText] = useState(
-    chat.options?.systemPrompt ?? config?.settings.chat_system_prompt ?? '',
+    ownSystemPrompt(chat) ?? config?.settings.chat_system_prompt ?? '',
   );
   const tooLong = new TextEncoder().encode(text).length > 65536 || text.includes('\0');
   return (
@@ -94,28 +94,135 @@ function SystemPromptEditor({
 }
 
 export default function SystemPromptMenu({ controller }: { controller: WorkspaceController }) {
+  const project = controller.currentProject;
   return (
     <Popover
-      label="System prompt"
+      label={project ? 'System prompt: Project instructions' : 'System prompt'}
+      heading={project ? 'Project instructions' : undefined}
+      controlId="button-system-prompt"
+      closeControlId={project ? 'button-close-project-instructions' : undefined}
+      containFocus={!!project}
+      popoverClassName={project ? 'is-project' : ''}
       valueLabel={
-        controller.chat.options?.systemPrompt == null
-          ? 'From Settings'
-          : 'Custom instructions for this chat'
+        project
+          ? `From project ${project.name}`
+          : ownSystemPrompt(controller.chat) === null
+            ? 'From Settings'
+            : 'Custom instructions for this chat'
       }
-      disabled={controller.chatOptionsDisabled}
-      className="system-menu"
+      disabled={project ? !controller.projects.ready : controller.chatOptionsDisabled}
+      className={`system-menu${project ? ' is-project' : ''}`}
       trigger={
         <>
           <FileText size={14} />
           <span>System prompt</span>
           <span className="chip-value">
-            {controller.chat.options?.systemPrompt == null ? 'Default' : 'This chat'}
+            {project
+              ? 'Project instructions'
+              : ownSystemPrompt(controller.chat) === null
+                ? 'Default'
+                : 'This chat'}
           </span>
           <ChevronDown size={12} />
         </>
       }
     >
-      {(close) => <SystemPromptEditor controller={controller} close={close} />}
+      {(close) =>
+        project ? (
+          <ProjectInstructionsEditor controller={controller} close={close} />
+        ) : (
+          <SystemPromptEditor controller={controller} close={close} />
+        )
+      }
     </Popover>
+  );
+}
+
+function ProjectInstructionsEditor({
+  controller,
+  close,
+}: {
+  controller: WorkspaceController;
+  close: () => void;
+}) {
+  const project = controller.currentProject!;
+  const count = controller.conversations.filter((chat) => chat.projectId === project.id).length;
+  const [text, setText] = useState(project.instructions);
+  const [failure, setFailure] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function saveInstructions() {
+    setBusy(true);
+    try {
+      await controller.projects.update(project.id, { instructions: text });
+      controller.projects.setNotice({
+        message: text.trim()
+          ? `Saved the project instructions for ${count} chats.`
+          : 'Cleared the project instructions. This project uses the system prompt from Settings.',
+      });
+      close();
+    } catch (error) {
+      setFailure(errorDetail(error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <p className="popover-note">
+        From <strong>{project.name}</strong>.{' '}
+        {project.archived
+          ? 'The project is archived, so its instructions are read-only.'
+          : `Changes apply to all ${count} chats in this project and replace the system prompt from Settings.`}
+      </p>
+      {ownSystemPrompt(controller.chat) !== null && (
+        <p className="popover-note">
+          This chat’s own prompt is kept and returns if the chat leaves the project.
+        </p>
+      )}
+      <textarea
+        className="instructions-input"
+        data-initial-focus
+        data-control-id="textarea-project-instructions"
+        aria-label="Project instructions"
+        rows={6}
+        value={text}
+        readOnly={project.archived}
+        aria-describedby="project-prompt-count"
+        onChange={(event) => setText(event.target.value)}
+      />
+      <p className="popover-note project-count" id="project-prompt-count">
+        ≈ {estimateProjectTokens(text).toLocaleString('en-US')} tokens · estimate while editing
+      </p>
+      {controller.generating && (
+        <p className="popover-note">Changes apply from the next message.</p>
+      )}
+      {failure && (
+        <Feedback title="Project instructions could not be saved" details={failure}>
+          Your edits remain available. Try saving again.
+        </Feedback>
+      )}
+      <div className="popover-actions">
+        <button
+          className="text-button"
+          data-control-id="button-open-project-from-prompt"
+          onClick={() => {
+            close();
+            controller.openProject(project.id);
+          }}
+        >
+          Open project
+        </button>
+        {!project.archived && (
+          <button
+            className="primary-button"
+            data-control-id="button-save-instructions-for-chats"
+            disabled={busy}
+            onClick={() => void saveInstructions()}
+          >
+            Save for {count} {count === 1 ? 'chat' : 'chats'}
+          </button>
+        )}
+      </div>
+    </>
   );
 }

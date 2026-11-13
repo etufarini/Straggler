@@ -3,6 +3,11 @@ import { useUiPreferences } from './useUiPreferences';
 import { useAttachments } from '../features/attachments/useAttachments';
 import { useContextEstimate } from '../features/chat/useContextEstimate';
 import { useConversation } from '../features/chat/useConversation';
+import { useProjects } from '../features/projects/useProjects';
+import type { Conversation } from '../domain/types';
+import { newConversation } from '../domain/types';
+import { ownSystemPrompt } from '../domain/projects';
+import { serializeStorage } from '../domain/storageQueue';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
 import { equalSettings, emptyServer, serverActive } from '../domain/types';
@@ -18,6 +23,13 @@ import type {
   Confirmation,
 } from '../domain/types';
 type Panel = 'models' | 'settings' | 'logs' | null;
+
+export interface ProjectDialog {
+  kind: 'create' | 'edit' | 'move' | 'instructions' | 'archive' | 'delete';
+  id?: string;
+  conversationId?: string;
+}
+
 export function useWorkspace() {
   const [config, setConfig] = useState<Configuration | null>(null);
   const [server, setServer] = useState<ServerStatus>(emptyServer);
@@ -36,6 +48,17 @@ export function useWorkspace() {
     setDraft(value.settings);
   }
   const [panel, setPanel] = useState<Panel>(null);
+  const [view, setView] = useState<'chat' | 'projects' | 'project'>('chat');
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectDialog, updateProjectDialog] = useState<ProjectDialog | null>(null);
+  function setProjectDialog(value: ProjectDialog | null, opener?: HTMLElement) {
+    // WebKit does not focus clicked buttons; make the trigger available for focus restoration.
+    opener?.focus({ preventScroll: true });
+    updateProjectDialog(value);
+  }
+  const [reviewFiles, setReviewFiles] = useState(false);
+  const [projectDrafts, setProjectDrafts] = useState<Record<string, string>>({});
+  const storageQueue = useRef<Promise<void>>(Promise.resolve());
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -48,20 +71,38 @@ export function useWorkspace() {
   const native = isTauri();
   const ui = useUiPreferences();
   const serverDetails = useServerDetails(server);
-  const conversation = useConversation(server, config?.settings, serverDetails?.contextSize);
-  const attachments = useAttachments(conversation, server);
+  const projects = useProjects(storageQueue, server, config?.settings, serverDetails);
+  const projectBusy = useRef(projects.busy);
+  projectBusy.current = projects.busy;
+  const conversation = useConversation(
+    server,
+    config?.settings,
+    serverDetails?.runId === server.runId ? serverDetails?.contextSize : null,
+    projects,
+    storageQueue,
+  );
+  const currentProject = projects.projects.find(
+    (project) => project.id === conversation.chat.projectId,
+  );
+  const attachments = useAttachments(
+    conversation,
+    server,
+    view === 'chat' && panel !== 'settings',
+    !!currentProject?.archived,
+  );
   const contextEstimate = useContextEstimate(
     conversation.chat,
     conversation.input,
     config?.settings,
     server,
     serverDetails,
+    currentProject,
   );
   const {
     chatOptionsDisabled,
     flushSaves,
     contextError,
-    importChat,
+    importChat: performImport,
     importBusy,
     importError,
     setImportError,
@@ -98,6 +139,82 @@ export function useWorkspace() {
     send,
     openConversation,
   } = conversation;
+
+  async function importChat() {
+    const value = await performImport();
+    if (value) {
+      setView('chat');
+      setPanel(null);
+    }
+  }
+
+  function openProject(id: string, files = false) {
+    setProjectId(id);
+    setView('project');
+    setPanel(null);
+    setReviewFiles(files);
+  }
+  function openProjects() {
+    setView('projects');
+    setPanel(null);
+  }
+  function openChat(value: Conversation) {
+    if (value.id === conversation.chatRef.current.id) {
+      setView('chat');
+      setPanel(null);
+      return;
+    }
+    openConversation(value);
+    if (!generating && !editingBusy) {
+      setView('chat');
+      setPanel(null);
+    }
+  }
+  function startProjectChat(id: string, text: string) {
+    if (generating || editingBusy || storageError || server.phase !== 'ready') return;
+    const project = projects.current.current.find((value) => value.id === id);
+    if (!project || project.archived || projects.context(project).level === 'over') return;
+    const value = { ...newConversation(), projectId: id, ownSystemPrompt: null };
+    openChat(value);
+    setInput(text);
+    const pending = send(undefined, text);
+    setProjectDrafts((values) => ({ ...values, [id]: '' }));
+    sendPromise.current = pending;
+    void pending;
+  }
+  async function moveChat(value: Conversation, target: string | null) {
+    if (value.id === chatRef.current.id) await save(chatRef.current);
+    const previous = projects.current.current.find((project) => project.id === value.projectId);
+    const result = await projects.moveChat(value.id, target);
+    conversation.acceptStoredConversation(result.conversation);
+    const destination = projects.current.current.find((project) => project.id === target);
+    projects.setNotice({
+      message: destination
+        ? `Moved “${value.title}” to ${destination.name}.${ownSystemPrompt(value) !== null ? ' Its own system prompt is kept for later.' : ''}`
+        : `Removed from ${previous?.name ?? 'project'}. ${ownSystemPrompt(value) !== null ? 'Its own system prompt is active again.' : 'It uses the system prompt from Settings.'}`,
+      undoToken: result.undoToken,
+    });
+  }
+  async function undoProjectAction(token: string) {
+    const result = await projects.undo(token);
+    if (result.conversation) conversation.acceptStoredConversation(result.conversation);
+    projects.setNotice({ message: 'Undone.' });
+  }
+  function requestDeleteChat(value: Conversation) {
+    setConfirmation({
+      title: 'Delete conversation?',
+      actionLabel: 'Delete conversation',
+      destructive: true,
+      text: `“${value.title}” will be permanently removed from this device.`,
+      action: async () => {
+        await serializeStorage(storageQueue, async () => {
+          await invoke('history_delete', { id: value.id });
+          setConversations((values) => values.filter((item) => item.id !== value.id));
+          if (chatRef.current.id === value.id) updateChat(newConversation());
+        });
+      },
+    });
+  }
 
   function reviewSettings(section: Section) {
     setSettingsSection(section);
@@ -182,20 +299,33 @@ export function useWorkspace() {
   }, [loadConfiguration, native]);
 
   useEffect(() => {
-    if ((!panel || panel === 'settings') && !confirmation) return;
+    if ((!panel || panel === 'settings') && !confirmation && !projectDialog) return;
     const previous = document.activeElement as HTMLElement | null;
     const dialog = document.querySelector<HTMLElement>(
-      confirmation ? '[role="alertdialog"]' : '[role="dialog"]',
+      confirmation
+        ? '.confirmation-backdrop [role="alertdialog"]'
+        : projectDialog
+          ? '[data-project-dialog]'
+          : '[role="dialog"]',
     );
-    dialog?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+    (
+      dialog?.querySelector<HTMLElement>('[data-initial-focus]') ??
+      dialog?.querySelector<HTMLElement>('button:not(:disabled)')
+    )?.focus();
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape' && !confirmBusy) {
         if (confirmation) setConfirmation(null);
+        else if (
+          projectDialog &&
+          !projectBusy.current &&
+          dialog?.getAttribute('aria-busy') !== 'true'
+        )
+          setProjectDialog(null);
         else setPanel(null);
       }
       if (event.key !== 'Tab') return;
       const nodes = dialog?.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
       );
       if (!nodes?.length) return;
       const first = nodes[0],
@@ -213,7 +343,7 @@ export function useWorkspace() {
       document.removeEventListener('keydown', onKey);
       previous?.focus();
     };
-  }, [panel, confirmation, confirmBusy]);
+  }, [panel, confirmation, confirmBusy, projectDialog]);
 
   useEffect(() => {
     setConfirmError('');
@@ -311,9 +441,34 @@ export function useWorkspace() {
     !chatOptionsDisabled &&
     !busy &&
     !editor &&
-    !contextEstimate.overflow;
+    !contextEstimate.overflow &&
+    !currentProject?.archived &&
+    (!chat.projectId ||
+      (projects.ready &&
+        !projects.error &&
+        !!currentProject &&
+        projects.context(currentProject).level !== 'over'));
 
   return {
+    projects,
+    projectDrafts,
+    setProjectDrafts,
+    currentProject,
+    view,
+    setView,
+    projectId,
+    projectDialog,
+    setProjectDialog,
+    acceptStoredConversation: conversation.acceptStoredConversation,
+    reviewFiles,
+    setReviewFiles,
+    openProject,
+    openProjects,
+    openChat,
+    moveChat,
+    undoProjectAction,
+    requestDeleteChat,
+    startProjectChat,
     ...ui,
     chatOptionsDisabled,
     attachments,

@@ -48,6 +48,72 @@ source-build layout takes precedence when both exist.
 
 ## Context, cache and generation
 
+### Projects
+
+Use **Projects → New** or **All projects → New project** to group related chats.
+Names are required, unique without regard to case, and at most 80 characters.
+Descriptions are optional and accept up to 200 characters. Star a project to pin
+it in the sidebar. All projects supports search, recent/name sorting and Active
+and Archived tabs. The sidebar's **New chat** always starts outside projects;
+start a project chat from its page instead.
+
+Inside a project, its instructions replace the system prompt. Empty instructions
+fall back to the applied Settings prompt. The chat's **System prompt** chip shows
+**Project instructions** and saves changes for every member chat. A chat's own
+prompt is kept and becomes active again when the chat leaves the project.
+Conversation options offer **Move to project…** and **Remove from project**;
+moving a chat with an own prompt explains the change before confirmation.
+
+Project files accept the same text/document formats and 10 MiB limit as chat
+attachments. Mir.cpp keeps extracted text copies without changing original files.
+Included files enter every request in full, in a stable system-message prefix
+after the instructions. Include switches exclude a file without removing it.
+There is no retrieval, embedding index, sharing or project memory.
+
+The project meter compares that prefix with the running server's `n_ctx` minus
+25% reserved for conversation and replies. It reports **close to the limit** from
+75% of the available space and **over the limit** above 100%. Exact counts use
+the running server's tokenizer; `≈` marks a fallback of about four characters per
+token. These defaults are defined once in `src/domain/projectContext.ts`.
+An over-limit project cannot start chats or send; **Review files** and
+**Change context size in Settings** provide recovery without truncating content.
+Changing an edited context size still requires applying/restarting as usual.
+
+When the server has not reported `n_ctx`, the meter says **Capacity unavailable**
+with the reason and permits sending. It invents no capacity or percentage.
+Server context rejections remain in the chat's error region with the draft and
+the same recovery actions. As soon as capacity is known, normal blocking applies.
+No project instructions or files are silently dropped to fit a request.
+
+During generation, project content, Include switches, name, description and star
+can change for the next message. The request already sent keeps its snapshot.
+Moving/removing the generating chat or archiving/deleting its project waits until
+the response finishes or is stopped; the disabled action explains why. Other
+member chats can still be moved, removed or deleted. All writes use the same
+serialized-save mechanism as conversation history.
+
+Archived projects and their chats remain readable. Restore the project to send,
+start chats or change content; deletion also requires Restore. Deletion confirms
+whether to delete chats too: by default they remain in Conversations with their
+own prompt restored. Originals on disk are untouched. Move/remove, file removal,
+archive and restore offer a brief Undo that reverses only that action. Confirmed
+project deletion is permanent.
+
+Chat exports retain the existing format. Both export actions include the prompt
+effective **at export time**: current project instructions or Settings fallback
+inside a project, the chat's own/inherited prompt outside it. Earlier prompt
+versions, project metadata and project files are excluded, just like attachments.
+Import continues to create an outside-project chat.
+
+Project metadata is stored as `desktop/projects/<UUID>/project.json` beneath the
+XDG data directory, and extracted text as `files/<UUID>.txt` beside it. IDs are
+validated and writes are atomic. Conversation records keep their existing paths
+and gain optional membership/own-prompt fields; loading older records does not
+rewrite them. Recoverable deletion coordinates project/history changes and keeps
+errors explicit, including cleanup failures after a successful deletion.
+
+### Context and generation controls
+
 Auto leaves context to llama.cpp. Zero requests the full model context; a positive
 count is explicit. Context includes input and output. A supported GGUF can still
 exceed memory or use a chat template unsupported by the server.

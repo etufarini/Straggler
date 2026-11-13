@@ -38,8 +38,8 @@ Review those contracts when updating the fixtures; other diagnostics remain
 generic unless the server provides enough evidence to classify them.
 
 With `npm run dev` running in a separate terminal, run
-`node tests/design-review.mjs final` from this directory to capture all 26 approved
-screens at 1200×820 and 960×720 in Chromium and WebKit. The generated
+`node tests/design-review.mjs final` from this directory to capture the legacy review
+screens and all R001 screens at 1200×820 and 960×720 in Chromium and WebKit. The generated
 `test-results/design/final/comparison.html` pairs actual React fixture views with
 proposal templates, and checks console errors and the visible 11px type floor.
 Fixtures are labeled simulation; they are not evidence of model inference.
@@ -81,6 +81,31 @@ Keyboard traversal tests use Option-Tab in macOS WebKit, matching the platform's
 control traversal behavior without changing user preferences. See the
 [Apple keyboard shortcut guidance](https://support.apple.com/en-lamr/guide/safari/cpsh003/mac)
 and [Playwright's platform behavior discussion](https://github.com/microsoft/playwright/issues/41808).
+
+## Projects development checks
+
+Projects reuse native attachment extraction and history serialization. The shared
+`src/domain/projectContext.ts` owns request assembly, a 25% conversation reserve,
+the 75%/over-100% project thresholds and the four-characters-per-token fallback.
+The regular chat context counter retains its existing policy. All IPC remains in
+`src/services/desktop.ts`; project data stays in the native XDG desktop data root.
+
+Project tests cover legacy history without rewrites, atomic storage/recovery,
+own-prompt restoration, request snapshots during generation, current-prompt
+exports, archived read-only behavior and unknown-capacity server rejections.
+The over-context fixture follows the pinned server's
+[input check](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-context.cpp#L3748-L3766),
+[first-error response](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-context.cpp#L4974-L4986)
+and [error serialization](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-task.cpp#L1453-L1459).
+It returns HTTP 400 JSON with `exceed_context_size_error` before SSE output,
+including when the client requested streaming; it never simulates input truncation.
+
+With `npm run dev` running, `node tests/design-review.mjs r001` captures every R001
+React screen and its actual dossier Proposal rendering in Chromium and WebKit at
+1200×820, 760×560, 960×720 and 1440×900. Output is under `test-results/design/r001/`.
+The fixtures are explicitly simulated. The fixture helper reads only requested
+proposal template ranges; references use the dossier viewer without changing its evidence.
+Run `node tests/r001-reference.mjs` for reference-only captures.
 
 ## Dependency maintenance
 

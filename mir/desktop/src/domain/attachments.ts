@@ -1,4 +1,4 @@
-import { requestMessages } from './types';
+import { fileName, requestMessages } from './types';
 import type { Attachment, Message } from './types';
 
 export const attachmentTypes = ['txt', 'md', 'docx', 'xlsx', 'pptx', 'pdf'] as const;
@@ -11,6 +11,17 @@ export type AttachmentRow = {
   error?: string;
   attachment?: Attachment;
 };
+
+export function pendingAttachmentRow(path: string): AttachmentRow {
+  const name = fileName(path);
+  return {
+    id: crypto.randomUUID(),
+    name,
+    extension: name.split('.').at(-1)?.toLowerCase() ?? '',
+    size: null,
+    state: 'reading',
+  };
+}
 
 export function sortAttachmentRows(rows: AttachmentRow[]): AttachmentRow[] {
   return [...rows].sort((a, b) => {

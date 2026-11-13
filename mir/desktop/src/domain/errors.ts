@@ -1,5 +1,9 @@
 import type { Settings } from './types';
 
+export function isContextRejection(message: string): boolean {
+  return message.includes('exceed_context_size_error');
+}
+
 export interface SettingsFailure {
   message: string;
   field?: keyof Settings;

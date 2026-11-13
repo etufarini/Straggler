@@ -146,6 +146,7 @@ async fn wait_build(runtime: &Runtime, expected: &str) {
 
 fn request(id: Uuid, content: &str) -> ChatRequest {
     ChatRequest {
+        conversation_id: None,
         options: Default::default(),
         request_id: id,
         messages: vec![ChatMessage {
@@ -718,4 +719,265 @@ async fn tokenization_counts_text_and_rendered_prompts_without_generation() {
     assert!(!fixture.record.exists());
     runtime.stop().unwrap();
     assert!(runtime.tokenize_text("offline").await.is_err());
+}
+
+fn project_record(name: &str) -> mir_desktop::projects::Project {
+    serde_json::from_value(serde_json::json!({
+        "id": Uuid::new_v4(), "name": name, "description": "", "instructions": "Original instructions",
+        "starred": false, "archived": false, "createdAt": 1, "updatedAt": 1, "files": []
+    })).unwrap()
+}
+
+fn stored_chat(runtime: &Runtime) -> mir_desktop::history::Conversation {
+    let chat = serde_json::from_value(serde_json::json!({
+        "id": Uuid::new_v4(), "title": "Project chat", "createdAt": 1, "updatedAt": 2,
+        "model": null, "messages": [], "options": {"systemPrompt": "Own prompt", "reasoning": null, "effort": null}
+    })).unwrap();
+    runtime.history.create(&chat).unwrap();
+    chat
+}
+
+#[tokio::test]
+async fn project_storage_and_generation_use_identity_and_immutable_request_snapshots() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    let mut project = runtime
+        .save_project(project_record("Native project"))
+        .unwrap()
+        .project
+        .unwrap()
+        .project;
+    let active = stored_chat(&runtime);
+    let other = stored_chat(&runtime);
+    runtime
+        .move_project_chat(active.id, Some(project.id))
+        .unwrap();
+    runtime
+        .move_project_chat(other.id, Some(project.id))
+        .unwrap();
+    project.archived = true;
+    project = runtime
+        .save_project(project)
+        .unwrap()
+        .project
+        .unwrap()
+        .project;
+    fixture.ready(&runtime).await;
+    let mut archived = request(Uuid::new_v4(), "hello");
+    archived.conversation_id = Some(active.id);
+    assert!(runtime
+        .generate(archived, |_| Ok(()))
+        .await
+        .unwrap_err()
+        .contains("Restore"));
+    assert!(!fixture.record.exists());
+    project.archived = false;
+    project = runtime
+        .save_project(project)
+        .unwrap()
+        .project
+        .unwrap()
+        .project;
+    let id = Uuid::new_v4();
+    let task_runtime = runtime.clone();
+    let (sent, received) = tokio::sync::oneshot::channel();
+    let snapshot = project.instructions.clone();
+    let mut submitted = request(id, "wait");
+    submitted.conversation_id = Some(active.id);
+    submitted.messages.insert(
+        0,
+        ChatMessage {
+            role: "system".into(),
+            content: snapshot.clone(),
+        },
+    );
+    let task = tokio::spawn(async move {
+        let mut sent = Some(sent);
+        task_runtime
+            .generate(submitted, |_| {
+                if let Some(sent) = sent.take() {
+                    let _ = sent.send(());
+                }
+                Ok(())
+            })
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(3), received)
+        .await
+        .unwrap()
+        .unwrap();
+    project.instructions = "Changes apply from the next message.".into();
+    project = runtime
+        .save_project(project)
+        .unwrap()
+        .project
+        .unwrap()
+        .project;
+    let source = fixture._directory.path().join("project.txt");
+    fs::write(&source, "A file added during generation").unwrap();
+    let added = runtime
+        .projects
+        .add_file(&runtime.history, project.id, &source, 4)
+        .unwrap()
+        .project
+        .unwrap()
+        .project;
+    runtime
+        .projects
+        .remove_file(&runtime.history, project.id, added.files[0].id)
+        .unwrap();
+    assert!(runtime
+        .move_project_chat(active.id, None)
+        .unwrap_err()
+        .contains("current response"));
+    assert!(runtime
+        .delete_conversation(active.id)
+        .unwrap_err()
+        .contains("current response"));
+    assert!(runtime
+        .delete_project(project.id, false)
+        .unwrap_err()
+        .contains("current response"));
+    project = runtime
+        .projects
+        .list(&runtime.history)
+        .unwrap()
+        .remove(0)
+        .project;
+    project.archived = true;
+    assert!(runtime
+        .save_project(project)
+        .unwrap_err()
+        .contains("current response"));
+    runtime.move_project_chat(other.id, None).unwrap();
+    let recorded: serde_json::Value =
+        serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
+    assert_eq!(recorded["messages"][0]["content"], snapshot);
+    runtime.cancel(id).unwrap();
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(2), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        "stopped"
+    );
+    runtime.move_project_chat(active.id, None).unwrap();
+    assert_eq!(
+        runtime
+            .history
+            .list()
+            .unwrap()
+            .iter()
+            .find(|chat| chat.id == active.id)
+            .unwrap()
+            .options
+            .as_ref()
+            .unwrap()
+            .system_prompt
+            .as_deref(),
+        Some("Own prompt")
+    );
+    runtime.stop().unwrap();
+}
+
+#[tokio::test]
+async fn unknown_capacity_rejection_preserves_upstream_type_and_complete_submitted_content() {
+    let fixture = Fixture::new();
+    fs::write(
+        format!("{}.context-unavailable", fixture.record.display()),
+        "",
+    )
+    .unwrap();
+    let runtime = fixture.runtime();
+    fixture.ready(&runtime).await;
+    let unavailable = runtime.server_details().await.unwrap();
+    assert!(unavailable.context_size.is_none());
+    let prefix = format!("Project instructions\n--- BEGIN ATTACHMENT \\\"notes.txt\\\" ---\n{}\n--- END ATTACHMENT \\\"notes.txt\\\" ---", "Full file ☕\n".repeat(3000));
+    let user = "The complete user draft\n\ncontext-reject";
+    let mut submitted = request(Uuid::new_v4(), user);
+    submitted.messages.insert(
+        0,
+        ChatMessage {
+            role: "system".into(),
+            content: prefix.clone(),
+        },
+    );
+    let mut deltas = 0;
+    let error = runtime
+        .generate(submitted, |_| {
+            deltas += 1;
+            Ok(())
+        })
+        .await
+        .unwrap_err();
+    assert!(error.contains("exceed_context_size_error:"), "{error}");
+    assert!(
+        error.contains("request (5000 tokens) exceeds the available context size (4096 tokens)"),
+        "{error}"
+    );
+    assert_eq!(deltas, 0);
+    let recorded: serde_json::Value =
+        serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
+    assert_eq!(recorded["stream"], true);
+    assert_eq!(recorded["messages"][0]["content"], prefix);
+    assert_eq!(recorded["messages"][1]["content"], user);
+    assert_eq!(runtime.status().await.unwrap().phase, "ready");
+    fs::remove_file(format!("{}.context-unavailable", fixture.record.display())).unwrap();
+    let available = runtime.server_details().await.unwrap();
+    assert_eq!(available.context_size, Some(4096));
+    assert_eq!(available.run_id, unavailable.run_id);
+    runtime.stop().unwrap();
+}
+
+#[tokio::test]
+async fn corrupt_projects_report_storage_errors_without_disabling_server_controls() {
+    let fixture = Fixture::new();
+    let project_id = Uuid::new_v4();
+    let directory = fixture.data.join("projects").join(project_id.to_string());
+    fs::create_dir_all(&directory).unwrap();
+    let record = directory.join("project.json");
+    fs::write(&record, "broken project JSON").unwrap();
+    let runtime = fixture.runtime();
+    let chat = stored_chat(&runtime);
+    let chat_path = fixture
+        .data
+        .join("conversations")
+        .join(format!("{}.json", chat.id));
+    let original_chat = fs::read(&chat_path).unwrap();
+    assert!(runtime.inspect().is_ok());
+    assert!(runtime
+        .projects
+        .list(&runtime.history)
+        .unwrap_err()
+        .contains("data was kept"));
+    assert_eq!(runtime.history.list().unwrap().len(), 1);
+    fixture.ready(&runtime).await;
+    assert_eq!(runtime.status().await.unwrap().phase, "ready");
+    runtime.stop().unwrap();
+    assert_eq!(fs::read_to_string(record).unwrap(), "broken project JSON");
+    assert_eq!(fs::read(chat_path).unwrap(), original_chat);
+}
+
+#[test]
+fn unavailable_project_storage_and_failed_recovery_stay_at_storage_boundaries() {
+    for recovery_error in [false, true] {
+        let fixture = Fixture::new();
+        fs::create_dir_all(&fixture.data).unwrap();
+        if recovery_error {
+            let stage = fixture
+                .data
+                .join("projects/.transactions")
+                .join(Uuid::new_v4().to_string());
+            fs::create_dir_all(&stage).unwrap();
+            fs::write(stage.join("operation.json"), "invalid recovery record").unwrap();
+        } else {
+            fs::write(fixture.data.join("projects"), "Unavailable directory").unwrap();
+        }
+        let runtime = fixture.runtime();
+        assert!(runtime.inspect().is_ok());
+        assert!(runtime.projects.list(&runtime.history).is_err());
+        assert!(runtime.history.list().is_err());
+        assert!(runtime.stop().is_ok());
+    }
 }

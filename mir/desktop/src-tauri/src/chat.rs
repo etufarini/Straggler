@@ -40,6 +40,18 @@ impl Runtime {
             if active.current.is_some() {
                 return Err("A response is already being generated.".into());
             }
+            if let Some(id) = request.conversation_id {
+                let _guard = self
+                    .history
+                    .writer
+                    .lock()
+                    .map_err(|error| error.to_string())?;
+                self.history.recover()?;
+                let conversation = self.history.read_one(id)?;
+                if let Some(project) = conversation.project_id {
+                    crate::projects::ensure_active_at(&self.history.project_directory()?, project)?;
+                }
+            }
             let state = self.server.lock().map_err(|e| e.to_string())?;
             if state.diagnostics.issue.is_some() {
                 return Err(
@@ -54,6 +66,7 @@ impl Runtime {
                 .clone()
                 .ok_or("The server address is unavailable.")?;
             active.current = Some((request.request_id, token.clone()));
+            active.conversation_id = request.conversation_id;
             (url, state.run, state.diagnostics.failed.clone())
         };
         let result = tokio::select! {
@@ -73,7 +86,9 @@ impl Runtime {
             }
         }
         drop(state);
-        self.active.lock().map_err(|e| e.to_string())?.current = None;
+        let mut active = self.active.lock().map_err(|e| e.to_string())?;
+        active.current = None;
+        active.conversation_id = None;
         result
     }
 
@@ -145,7 +160,15 @@ impl Runtime {
             let text = String::from_utf8_lossy(&body);
             let detail = serde_json::from_slice::<Value>(&body)
                 .ok()
-                .and_then(|v| v["error"]["message"].as_str().map(str::to_owned))
+                .and_then(|value| {
+                    value["error"]["message"].as_str().map(|message| {
+                        if value["error"]["type"] == "exceed_context_size_error" {
+                            format!("exceed_context_size_error: {message}")
+                        } else {
+                            message.to_owned()
+                        }
+                    })
+                })
                 .unwrap_or_else(|| text.into_owned());
             return Err(format!("Model request failed ({status}): {detail}"));
         }

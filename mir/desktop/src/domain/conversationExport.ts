@@ -1,4 +1,5 @@
-import { resolveChatOptions } from './chat';
+import { resolveProjectSystemPrompt } from './projectContext';
+import type { Project } from './projects';
 import type { Conversation, Settings } from './types';
 
 export function exportFileName(title: string): string {
@@ -24,8 +25,9 @@ export function serializeConversation(
   includesReasoning: boolean,
   exportedAt: string,
   settings?: Settings,
+  project?: Project,
 ): string {
-  const systemPrompt = resolveChatOptions(conversation.options, settings).systemPrompt;
+  const systemPrompt = resolveProjectSystemPrompt(conversation, settings, project);
   const messages: { role: string; content: string; model?: string; reasoning_content?: string }[] =
     [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });

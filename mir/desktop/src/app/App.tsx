@@ -13,6 +13,9 @@ import ServerFeedback from '../features/server/ServerFeedback';
 import StorageFeedback from '../features/chat/StorageFeedback';
 import Feedback from '../components/Feedback';
 import { useWorkspace } from './useWorkspace';
+import ProjectsPage from '../features/projects/ProjectsPage';
+import ProjectDetail from '../features/projects/ProjectDetail';
+import ProjectDialogs from '../features/projects/ProjectDialogs';
 export default function App() {
   const controller = useWorkspace();
   const {
@@ -167,8 +170,27 @@ export default function App() {
             </Feedback>
           </div>
         )}
-        {(storageError || controller.fileError || controller.fileNotice) &&
-          panel === 'settings' && (
+        {controller.projects.error && (
+          <div className="workspace-feedback">
+            <Feedback
+              title="Project data could not be saved or loaded"
+              details={controller.projects.error}
+              actions={
+                <button className="text-button" onClick={() => void controller.projects.load()}>
+                  Retry loading projects
+                </button>
+              }
+            >
+              Project changes remain available for review. Retry the action or reload the saved
+              projects.
+            </Feedback>
+          </div>
+        )}
+        {(storageError ||
+          controller.fileError ||
+          controller.fileNotice ||
+          controller.importError) &&
+          (panel === 'settings' || controller.view !== 'chat') && (
             <div className="workspace-feedback">
               <StorageFeedback controller={controller} />
             </div>
@@ -192,6 +214,26 @@ export default function App() {
             onBack={() => setPanel(null)}
             onJob={setJob}
           />
+        ) : controller.view === 'projects' ? (
+          <ProjectsPage controller={controller} />
+        ) : controller.view === 'project' ? (
+          (() => {
+            const project = controller.projects.projects.find(
+              (value) => value.id === controller.projectId,
+            );
+            return project ? (
+              <ProjectDetail key={project.id} controller={controller} project={project} />
+            ) : (
+              <div className="workspace-feedback">
+                <Feedback
+                  title="Project unavailable"
+                  actions={<button onClick={controller.openProjects}>All projects</button>}
+                >
+                  Reload projects to continue.
+                </Feedback>
+              </div>
+            );
+          })()
         ) : (
           <div className="chat-body">
             <div className="chat-main">
@@ -210,6 +252,33 @@ export default function App() {
       </main>
 
       {panel && panel !== 'settings' && <ServerPanel controller={controller} />}
+
+      <ProjectDialogs controller={controller} />
+
+      {controller.projects.notice && (
+        <div className="project-toast" role="status">
+          <span>{controller.projects.notice.message}</span>
+          {controller.projects.notice.undoToken && (
+            <button
+              data-control-id="button-undo"
+              onClick={() =>
+                void controller
+                  .undoProjectAction(controller.projects.notice!.undoToken!)
+                  .catch(() => {})
+              }
+            >
+              Undo
+            </button>
+          )}
+          <button
+            data-control-id="button-dismiss-message"
+            aria-label="Dismiss message"
+            onClick={() => controller.projects.setNotice(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {confirmation && <ConfirmationDialog controller={controller} />}
     </div>

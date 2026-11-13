@@ -1,27 +1,11 @@
-import {
-  Download,
-  FileText,
-  FileType,
-  FileSpreadsheet,
-  FileChartColumn,
-  FileCode,
-  FileUp,
-  X,
-} from 'lucide-react';
+import { Download, FileUp, X } from 'lucide-react';
 import { useId } from 'react';
+import AttachmentRow from './AttachmentRow';
 import Feedback from '../../components/Feedback';
 import { attachmentTypes } from '../../domain/attachments';
 import { fileName } from '../../domain/types';
 import type { AttachmentController } from './useAttachments';
 
-const icons = {
-  txt: FileText,
-  md: FileCode,
-  docx: FileType,
-  xlsx: FileSpreadsheet,
-  pptx: FileChartColumn,
-  pdf: FileText,
-};
 export default function AttachmentSection({ controller }: { controller: AttachmentController }) {
   const id = useId();
   const ready = controller.rows.filter((row) => row.state === 'ready').length;
@@ -38,61 +22,32 @@ export default function AttachmentSection({ controller }: { controller: Attachme
       {!!controller.rows.length && (
         <ul className="file-list">
           {controller.rows.map((row) => {
-            const Icon = icons[row.extension as keyof typeof icons] ?? FileText;
             const tokens = row.attachment ? controller.estimate(row.attachment) : null;
             return (
-              <li key={row.id} className={`file-row type-${row.extension} is-${row.state}`}>
-                <span className="file-tile">
-                  <Icon size={17} aria-hidden="true" />
-                </span>
-                <div className="file-text">
-                  <span
-                    className="file-name"
-                    title={`${row.name} · ${row.size === null ? 'Size unavailable' : `${row.size.toLocaleString('en-US')} bytes`}`}
-                  >
-                    {row.name}
-                  </span>
-                  <div className="file-meta">
-                    <span className="file-ext">.{row.extension}</span>
-                    {row.state === 'reading' ? (
-                      <span role="status">Reading text…</span>
-                    ) : row.state === 'error' ? (
-                      <span className="file-error" role="alert">
-                        {row.error}
-                      </span>
-                    ) : (
-                      <span>
-                        {tokens?.source === 'approximate' ? '~' : ''}
-                        {tokens?.tokens.toLocaleString('en-US')} tokens
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="file-actions">
-                  {row.state !== 'error' && (
-                    <button
-                      type="button"
-                      className="file-action"
-                      aria-label={`Download ${row.name}`}
-                      title={`Download ${row.name}`}
-                      disabled={row.state === 'reading'}
-                      onClick={() => row.attachment && void controller.downloadFile(row.attachment)}
-                    >
-                      <Download size={14} />
-                    </button>
-                  )}
+              <AttachmentRow key={row.id} row={row} estimate={tokens}>
+                {row.state !== 'error' && (
                   <button
                     type="button"
                     className="file-action"
-                    aria-label={`Remove ${row.name}`}
-                    title={`Remove ${row.name}`}
-                    disabled={controller.disabled}
-                    onClick={() => void controller.removeFile(row)}
+                    aria-label={`Download ${row.name}`}
+                    title={`Download ${row.name}`}
+                    disabled={row.state === 'reading'}
+                    onClick={() => row.attachment && void controller.downloadFile(row.attachment)}
                   >
-                    <X size={14} />
+                    <Download size={14} />
                   </button>
-                </div>
-              </li>
+                )}
+                <button
+                  type="button"
+                  className="file-action"
+                  aria-label={`Remove ${row.name}`}
+                  title={`Remove ${row.name}`}
+                  disabled={controller.disabled}
+                  onClick={() => void controller.removeFile(row)}
+                >
+                  <X size={14} />
+                </button>
+              </AttachmentRow>
             );
           })}
         </ul>

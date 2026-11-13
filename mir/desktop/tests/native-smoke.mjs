@@ -275,6 +275,7 @@ try {
       updatedAt: Date.now(),
       model: null,
       messages: [],
+      options: { systemPrompt: 'Native chat own prompt', reasoning: null, effort: null },
     };
     const invokeNative = (command, args) =>
       evaluate(
@@ -324,6 +325,244 @@ try {
         ),
       'native PDF attachment rail',
     );
+    // Set up native project files through the public IPC contract, then exercise
+    // membership, shared instructions and lifecycle through production controls.
+    async function clickControl(controlId) {
+      const selector = JSON.stringify(`[data-control-id="${controlId}"]`);
+      await until(
+        () =>
+          evaluate(`(() => {
+            const control = document.querySelector(${selector});
+            return !!control && !control.disabled && control.getAttribute('aria-disabled') !== 'true';
+          })()`),
+        `native control ${controlId}`,
+      );
+      await evaluate(`document.querySelector(${selector}).click()`);
+    }
+    const projectId = crypto.randomUUID();
+    const projectName = 'Native project';
+    const projectInstructions = 'Use these native project instructions for every member chat.';
+    const projectSourceText = 'Project source text stays on the device. ☕';
+    const projectSource = path.join(stage, 'source.txt');
+    await writeFile(projectSource, projectSourceText);
+    const createdProject = await invokeNative('project_save', {
+      project: {
+        id: projectId,
+        name: projectName,
+        description: 'Native persistence and window contract',
+        instructions: projectInstructions,
+        starred: true,
+        archived: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        files: [],
+      },
+    });
+    assert.equal(createdProject.project.id, projectId);
+    const addedProjectFile = await invokeNative('project_file_add', {
+      projectId,
+      path: projectSource,
+      charactersPerToken: 4,
+    });
+    const projectFile = addedProjectFile.project.files[0];
+    assert.equal(projectFile.text, projectSourceText);
+    assert.equal(projectFile.included, true);
+    const projectsRoot = path.join(stage, 'data/mir.cpp/desktop/projects');
+    const projectRecordPath = path.join(projectsRoot, projectId, 'project.json');
+    const projectTextPath = path.join(projectsRoot, projectId, 'files', `${projectFile.id}.txt`);
+    const projectRecord = JSON.parse(await readFile(projectRecordPath, 'utf8'));
+    assert.equal(projectRecord.files[0].id, projectFile.id);
+    assert.equal(Object.hasOwn(projectRecord.files[0], 'text'), false);
+    assert.equal(await readFile(projectTextPath, 'utf8'), projectSourceText);
+    await evaluate('location.reload()');
+    await until(
+      () =>
+        evaluate(`!!document.querySelector('[data-control-id="button-project-native-project"]')`),
+      'project sidebar loaded from native storage',
+    );
+    await evaluate(`document.querySelector('[title="Attachment contract"]').click()`);
+    await clickControl('button-options-for-attachment-contract');
+    await clickControl('button-move-to-project');
+    await clickControl('option-project-native-project');
+    assert.match(
+      await evaluate('document.querySelector(".confirmation").textContent'),
+      /This chat has its own system prompt/,
+    );
+    await clickControl('button-confirm-move');
+    const attachmentRecordPath = path.join(history, `${attachmentChatId}.json`);
+    await until(async () => {
+      const member = JSON.parse(await readFile(attachmentRecordPath, 'utf8'));
+      return member.projectId === projectId && member.ownSystemPrompt === 'Native chat own prompt';
+    }, 'native move preserves the own prompt');
+    await clickControl('button-all-projects');
+    await clickControl('button-open-project-native-project');
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".project-instructions-preview")?.textContent === ' +
+            JSON.stringify(projectInstructions),
+        ),
+      'persisted project instructions',
+    );
+    assert.equal(
+      await evaluate(
+        `document.querySelector('[aria-label="Project files"] .file-name')?.textContent`,
+      ),
+      'source.txt',
+    );
+    await clickControl('switch-include-source-txt');
+    await until(async () => {
+      const stored = JSON.parse(await readFile(projectRecordPath, 'utf8'));
+      return stored.files[0].included === false;
+    }, 'native file exclusion persisted');
+    await clickControl('switch-include-source-txt');
+    await until(async () => {
+      const stored = JSON.parse(await readFile(projectRecordPath, 'utf8'));
+      return stored.files[0].included === true;
+    }, 'native file inclusion persisted');
+    await clickControl('button-open-attachment-contract');
+    await until(
+      () =>
+        evaluate(
+          `document.querySelector('[data-control-id="button-crumb-project"]')?.textContent === "Native project"`,
+        ),
+      'native member chat breadcrumb',
+    );
+    assert.match(
+      await evaluate(
+        `document.querySelector('[data-control-id="button-system-prompt"]').textContent`,
+      ),
+      /Project instructions/,
+    );
+    await clickControl('button-options-for-attachment-contract');
+    assert.equal(
+      await evaluate(
+        `document.querySelector('[data-control-id="button-move-to-project"]').textContent.trim()`,
+      ),
+      'Move to another project…',
+    );
+    assert.equal(
+      await evaluate(
+        `document.querySelector('[data-control-id="button-remove-from-project"]').getAttribute("aria-disabled")`,
+      ),
+      null,
+    );
+    await clickControl('button-options-for-attachment-contract');
+    await clickControl('button-system-prompt');
+    assert.equal(
+      await evaluate(
+        `document.querySelector('[data-control-id="textarea-project-instructions"]').value`,
+      ),
+      projectInstructions,
+    );
+    const editedProjectInstructions = 'Updated native project instructions for every chat.';
+    await fillField('[data-control-id="textarea-project-instructions"]', editedProjectInstructions);
+    await clickControl('button-save-instructions-for-chats');
+    await until(async () => {
+      const stored = JSON.parse(await readFile(projectRecordPath, 'utf8'));
+      return stored.instructions === editedProjectInstructions;
+    }, 'shared instructions saved through the native chip');
+    await clickControl('button-crumb-project');
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".project-instructions-preview")?.textContent === ' +
+            JSON.stringify(editedProjectInstructions),
+        ),
+      'project detail reflects the shared prompt edit',
+    );
+    await writeFile(
+      path.join(desktop, 'test-results/native-project.png'),
+      Buffer.from(await screenshot(), 'base64'),
+    );
+    await clickControl('button-options-for-current-project');
+    await clickControl('button-archive-project-menu');
+    await clickControl('button-archive-project');
+    await until(
+      () => evaluate(`!!document.querySelector('[data-control-id="button-restore-project"]')`),
+      'archived native project detail',
+    );
+    assert.equal(
+      await evaluate(`document.querySelector('[data-control-id="textarea-start-chat"]').disabled`),
+      true,
+    );
+    assert.equal(
+      await evaluate(
+        `document.querySelector('[data-control-id="switch-include-source-txt"]').disabled`,
+      ),
+      true,
+    );
+    await clickControl('button-open-attachment-contract');
+    await until(
+      () => evaluate(`!!document.querySelector('[data-control-id="button-restore-from-chat"]')`),
+      'archived native member chat',
+    );
+    assert.equal(await evaluate('document.querySelector(".composer textarea").disabled'), true);
+    await clickControl('button-options-for-attachment-contract');
+    for (const controlId of ['button-move-to-project', 'button-remove-from-project']) {
+      assert.equal(
+        await evaluate(
+          `document.querySelector('[data-control-id="${controlId}"]').getAttribute('aria-disabled')`,
+        ),
+        'true',
+      );
+    }
+    await clickControl('button-options-for-attachment-contract');
+    await clickControl('button-restore-from-chat');
+    await until(
+      () => evaluate('!document.querySelector(".composer textarea").disabled'),
+      'restored native member chat',
+    );
+    await clickControl('button-crumb-project');
+    await clickControl('button-options-for-current-project');
+    await clickControl('button-delete-project-menu');
+    await until(
+      () => evaluate(`!!document.querySelector('[data-control-id="checkbox-also-delete-chats"]')`),
+      'native project deletion confirmation',
+    );
+    assert.equal(
+      await evaluate(
+        `document.querySelector('[data-control-id="checkbox-also-delete-chats"]').checked`,
+      ),
+      false,
+    );
+    await clickControl('button-delete-project');
+    await until(
+      async () => !(await readdir(projectsRoot)).includes(projectId),
+      'native project deleted',
+    );
+    const detached = JSON.parse(await readFile(attachmentRecordPath, 'utf8'));
+    assert.equal(detached.projectId, undefined);
+    assert.equal(detached.ownSystemPrompt, 'Native chat own prompt');
+    assert.equal(detached.options.systemPrompt, 'Native chat own prompt');
+    assert.equal(detached.attachments.length, 2);
+    assert.equal(await readFile(projectSource, 'utf8'), projectSourceText);
+    assert.ok(!(await readdir(projectsRoot)).includes(projectId));
+    for (const attachment of detached.attachments) {
+      assert.ok(
+        (
+          await readFile(
+            path.join(
+              history,
+              attachmentChatId,
+              'attachments',
+              `${attachment.id}.${attachment.extension}`,
+            ),
+          )
+        ).length,
+      );
+    }
+    await until(
+      () => evaluate('!document.querySelector(".confirmation")'),
+      'native project deletion dialog closed',
+    );
+    await evaluate(`document.querySelector('[title="Attachment contract"]').click()`);
+    await clickControl('button-system-prompt');
+    assert.equal(
+      await evaluate(`document.querySelector('[aria-label="System prompt instructions"]').value`),
+      'Native chat own prompt',
+    );
+    await clickControl('button-system-prompt');
     await evaluate(
       `document.querySelector('[aria-label="Options for Attachment contract"]').click()`,
     );
@@ -442,7 +681,9 @@ try {
     console.log(
       `PASS: real Tauri/WebKit window, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.MIR_TEST_SHUTDOWN === 'signal' || process.env.MIR_MEASURE_ORB === '1' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
     );
-    console.log('Screenshot: test-results/native-chat.png (test server; no model inference)');
+    console.log(
+      'Screenshots: test-results/native-chat.png and test-results/native-project.png (test server; no model inference)',
+    );
   }
 } catch (error) {
   if (inspectPage) {

@@ -8,6 +8,7 @@ export default function Feedback({
   details,
   severity = 'error',
   onDismiss,
+  announce = true,
 }: {
   title: string;
   children: ReactNode;
@@ -15,9 +16,13 @@ export default function Feedback({
   details?: string;
   severity?: 'error' | 'warning';
   onDismiss?: () => void;
+  announce?: boolean;
 }) {
   return (
-    <div className={`feedback ${severity}`} role={severity === 'error' ? 'alert' : 'status'}>
+    <div
+      className={`feedback ${severity}`}
+      role={announce ? (severity === 'error' ? 'alert' : 'status') : undefined}
+    >
       <CircleAlert size={18} className="feedback-icon" aria-hidden="true" />
       <div className="feedback-content">
         <strong>{title}</strong>
