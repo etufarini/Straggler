@@ -34,11 +34,12 @@ emit_installer() {
             emit_functions "$ROOT/lib/platform/macos.sh" 'platform_required_tools platform_browser_command platform_move platform_dependency_hint platform_ensure_dependencies'
             printf '            ;;\n    esac\n'
         else printf '%s\n' "$line"; fi
-    done < <(sed '1d' "$ROOT/lib/platform.sh")
-    printf 'runtime_files() {\n    printf '\''%%s\\n'\'' mir.sh dialogrc sh/uninstall.sh lib/gguf.py'
-    for file in "$ROOT"/lib/*.sh "$ROOT"/lib/tui/*.sh; do
+    done < <(sed '1d; /^# Shared helpers used/,$d' "$ROOT/lib/platform.sh")
+    printf 'runtime_files() {\n    printf '\''%%s\\n'\'' mir.sh sh/uninstall.sh lib/gguf.py lib/desktop.py desktop/runtime-files.txt'
+    for file in "$ROOT"/lib/*.sh; do
         printf ' %q' "${file#"$ROOT"/}"
     done
+    while IFS= read -r file; do printf ' %q' "$file"; done < "$ROOT/desktop/runtime-files.txt"
     printf '\n'
     # shellcheck disable=SC2016 # Bundle only files for the selected target OS.
     printf '    case "$PLATFORM_ID" in\n        linux) printf '\''%%s\\n'\'' lib/platform/linux.sh ;;\n        macos) printf '\''%%s\\n'\'' lib/platform/macos.sh lib/platform/macos-bootstrap.sh ;;\n    esac\n}\n'

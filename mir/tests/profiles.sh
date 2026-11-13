@@ -20,7 +20,7 @@ set_generation_preset min-p
 build_model_args
 [[ $(printf '%s\n' "${MODEL_ARGS[@]}") == "$model_args" ]]
 write_profile "$PROFILES_DIR/Generation.conf"
-(( $(wc -l < "$PROFILES_DIR/Generation.conf") == 21 ))
+(( $(wc -l < "$PROFILES_DIR/Generation.conf") == 24 ))
 saved=$(profile_data)
 GENERATION[temperature]=0.8
 [[ $(generation_preset) == custom && $(profile_status) == 'Generation (Modified)' ]]
@@ -39,18 +39,8 @@ for value in 'temperature=nan' 'top_p=2' 'seed=4294967296' 'max_tokens=-2'; do
     if load_profile "$PROFILES_DIR/Invalid.conf"; then exit 1; fi
     [[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
 done
-# Invalid or canceled edits preserve all saved values and tracking.
-message() { :; }
-ui() { printf 'bad'; }
-before=$(profile_data)
-edit_generation_value temperature
-[[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
-ui() { return 255; }
-edit_generation_value seed
-generation_menu
-[[ $(profile_data) == "$before" && $(profile_status) == Generation ]]
 rm "$PROFILES_DIR/Generation.conf" "$PROFILES_DIR/Invalid.conf"
-printf 'PASS: generation profile round trips, invalid/canceled edits and sampling isolation\n'
+printf 'PASS: generation profile round trips, transactional rejection and sampling isolation\n'
 
 export MIR_PORT=11000 MIR_CACHE_TYPE_K=f32 MIR_CACHE_TYPE_V=q8_0
 export MIR_GENERATION_PRESET=exploratory LLAMA_ARG_CACHE_TYPE_V=f16
@@ -63,7 +53,7 @@ set_generation_preset focused
 GENERATION[seed]=42 GENERATION[max_tokens]=1024
 write_profile "$PROFILES_DIR/Complete.conf"
 complete=$(profile_data)
-for field in model context port device threads gpu_layers prompt_processing cache_type_k cache_type_v split_mode tensor_split fit_target "${GENERATION_KEYS[@]}"; do
+for field in model context port device threads gpu_layers prompt_processing cache_type_k cache_type_v split_mode tensor_split fit_target chat_system_prompt chat_reasoning chat_reasoning_effort "${GENERATION_KEYS[@]}"; do
     load_profile "$PROFILES_DIR/Complete.conf"
     before=$(profile_data)
     tracking=$SAVED_PROFILE
@@ -74,7 +64,7 @@ for field in model context port device threads gpu_layers prompt_processing cach
         if load_profile "$PROFILES_DIR/Partial.conf"; then exit 1; fi
         [[ $(profile_data) == "$before" && $SAVED_PROFILE == "$tracking" && $(profile_status) == Complete ]]
     else
-        case "$field" in port) default=9931 ;; cache_type_k|cache_type_v) default=q4_0 ;; *) default=auto ;; esac
+        case "$field" in chat_system_prompt) default='""' ;; port) default=9931 ;; cache_type_k|cache_type_v) default=q4_0 ;; *) default=auto ;; esac
         expected=$(printf '%s\n' "$complete" | sed "s/^$field=.*/$field=$default/")
         load_profile "$PROFILES_DIR/Partial.conf"
         [[ $(profile_data) == "$expected" && $(profile_status) == Partial ]]
@@ -106,7 +96,7 @@ load_profile "$PROFILES_DIR/Compatible.conf"
 write_profile "$PROFILES_DIR/Resaved.conf"
 [[ $(cat "$CURRENT_PROFILE") == "$complete" ]]
 # Reject malformed input and invalid recognized fields without changing state.
-for value in 'malformed line without separator' 'model=' "model=$model.missing.gguf" 'context=' 'port=' 'device=' 'threads=' 'gpu_layers=' 'prompt_processing=' 'cache_type_k=' 'cache_type_v=' 'split_mode=' 'tensor_split=' 'fit_target=' "temperature=\$(touch executed)"; do
+for value in 'malformed line without separator' 'model=' "model=$model.missing.gguf" 'context=' 'port=' 'device=' 'threads=' 'gpu_layers=' 'prompt_processing=' 'cache_type_k=' 'cache_type_v=' 'split_mode=' 'tensor_split=' 'fit_target=' 'chat_system_prompt={}' 'chat_reasoning=maybe' 'chat_reasoning_effort=NOT_VALID' "temperature=\$(touch executed)"; do
     field=${value%%=*}
     while IFS= read -r line; do
         [[ "$line" == "$field="* ]] || printf '%s\n' "$line"

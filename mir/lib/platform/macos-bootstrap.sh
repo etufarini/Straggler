@@ -16,7 +16,7 @@ bootstrap_macos() {
 }
 
 macos_dependency_hint() {
-    printf 'On macOS, install the launcher dependencies and retry:\n  brew install bash coreutils findutils dialog flock\n'
+    printf 'On macOS, install the launcher dependencies and retry:\n  brew install bash coreutils findutils flock\n'
 }
 
 # Shared by the Bash 3.2 installer bootstrap and the modern build menus.

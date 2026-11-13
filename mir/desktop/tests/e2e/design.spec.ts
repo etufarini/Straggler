@@ -1,0 +1,331 @@
+import { expect, test } from '@playwright/test';
+
+test('sidebar preference persists and server log restores keyboard focus', async ({ page }) => {
+  await page.goto('/?scenario=normal');
+  const collapse = page.getByRole('button', { name: 'Collapse sidebar' });
+  await collapse.click();
+  await expect(page.locator('.sidebar')).toHaveCSS('width', '68px');
+  await expect(page.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
+  await expect(page.locator('.sidebar .server-card, .sidebar nav')).toHaveCount(0);
+  const badge = page.getByRole('button', { name: /Server log/ });
+  await badge.focus();
+  await badge.press('Enter');
+  await expect(badge).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('dialog', { name: 'Server log' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(badge).toBeFocused();
+  await expect(badge).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('restart indication remains accessible after returning to chat', async ({ page }) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  await expect(page.locator('.local-badge')).toContainText('Ready');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }).fill('8192');
+  await page.getByRole('button', { name: 'Back to chat' }).click();
+  await expect(page.locator('.local-badge')).toContainText('Restart required');
+  await expect(page.locator('.configuration-strip, .settings-launch')).toHaveCount(0);
+});
+
+test('settings keep their save action visible and folders and builds have their own actions', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByText('Fine-tune reply style', { exact: true }).click();
+  await page.locator('.settings-page').evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Model settings', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await page.getByRole('button', { name: 'Folders', exact: true }).click();
+  await expect(page.getByText('Saved automatically once a folder is validated.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Install or change build' }).click();
+  await expect(
+    page.getByRole('alertdialog').getByRole('button', { name: 'Build llama.cpp' }),
+  ).toBeVisible();
+});
+
+test('chat defaults save with profiles and only server fields require restart', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Default system prompt', exact: true })
+    .fill('Default instructions\nLiteral $(touch unsafe)');
+  await expect(page.locator('.local-badge')).not.toContainText('Restart required');
+  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'New configuration name', exact: true })
+    .fill('Chat defaults');
+  await page.getByRole('button', { name: 'Save as new configuration' }).click();
+  await expect(page.getByText('Configuration saved.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Default system prompt', exact: true }).fill('Changed');
+  await expect(page.getByText('Modified', { exact: true })).toBeVisible();
+  await expect(page.locator('.local-badge')).not.toContainText('Restart required');
+  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await page.getByRole('button', { name: 'Load configuration' }).click();
+  await expect(
+    page.getByRole('textbox', { name: 'Default system prompt', exact: true }),
+  ).toHaveValue('Default instructions\nLiteral $(touch unsafe)');
+});
+
+test('system prompt popover restores focus, dismisses outside, and persists a chat override', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  const prompt = page.getByRole('button', { name: 'System prompt', exact: true });
+  await prompt.click();
+  await expect(prompt).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Escape');
+  await expect(prompt).toBeFocused();
+  await expect(prompt).toHaveAttribute('aria-expanded', 'false');
+  await prompt.click();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).click();
+  await expect(prompt).toHaveAttribute('aria-expanded', 'false');
+  await prompt.click();
+  await page.getByRole('radio', { name: 'This chat Custom text' }).check();
+  await page
+    .getByRole('textbox', { name: 'System prompt instructions' })
+    .fill('Literal instructions\nUnicode: caffè ☕');
+  await page.getByRole('button', { name: 'Apply to this chat' }).click();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A question');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('mir-fixture-request')!).messages[0]),
+  ).toEqual({ role: 'system', content: 'Literal instructions\nUnicode: caffè ☕' });
+  await page.reload();
+  await page.getByRole('button', { name: 'A question', exact: true }).click();
+  await prompt.click();
+  await expect(page.getByRole('textbox', { name: 'System prompt instructions' })).toHaveValue(
+    'Literal instructions\nUnicode: caffè ☕',
+  );
+});
+
+test('context thresholds use response data and missing metrics remain unavailable', async ({
+  page,
+}) => {
+  for (const [scenario, level, percent] of [
+    ['normal', 'normal', '5%'],
+    ['context-high', 'high', '82%'],
+    ['context-full', 'full', '96%'],
+    ['no-metrics', 'unknown', '—'],
+  ]) {
+    await page.goto(`/?scenario=${scenario}`);
+    await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Measure this response');
+    await page.getByRole('button', { name: 'Send message' }).click();
+    await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
+    const counter = page.locator(`.context-menu.ctx-${level}`);
+    await expect(counter).toContainText(percent);
+    await counter.getByRole('button', { name: 'Context', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Context' })).toContainText(
+      scenario === 'no-metrics' ? 'Usage is unavailable' : '4,096 tokens',
+    );
+    await page.keyboard.press('Escape');
+  }
+});
+
+test('reasoning uses advertised efforts and request-time overrides without a restart', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=effort-levels');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  const reasoning = page.getByRole('button', { name: 'Reasoning', exact: true });
+  await expect(reasoning).toBeEnabled();
+  await reasoning.click();
+  await page.getByRole('radio', { name: 'On', exact: true }).check();
+  const effort = page.getByRole('group', { name: 'Reasoning effort' });
+  await expect(effort.getByRole('radio')).toHaveCount(2);
+  await expect(effort.getByRole('radio', { name: 'Minimal', exact: true })).toBeVisible();
+  await expect(effort.getByRole('radio', { name: 'Xhigh', exact: true })).toBeVisible();
+  await effort.getByRole('radio', { name: 'Xhigh', exact: true }).check();
+  await page.keyboard.press('Escape');
+  await expect(reasoning).toBeFocused();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Use reasoning');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('mir-fixture-request')!).options),
+  ).toEqual({ reasoning: 'on', effort: 'xhigh' });
+  await expect(page.locator('.local-badge')).not.toContainText('Restart required');
+  await reasoning.click();
+  await page.getByRole('radio', { name: 'Off', exact: true }).check();
+  await expect(effort.getByRole('radio').first()).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('radio', { name: 'On', exact: true }).check();
+  await page.getByRole('combobox', { name: 'Reasoning effort' }).selectOption('minimal');
+  await page.getByRole('button', { name: 'Apply changes', exact: true }).click();
+  await expect(page.locator('.local-badge')).not.toContainText('Restart required');
+  await page.goto('/?scenario=no-reasoning');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  await expect(reasoning).toBeDisabled();
+  await expect(reasoning).toContainText('Unavailable');
+});
+
+test('presence rail overlays narrow chat, remembers preference and keeps status text', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 960, height: 720 });
+  await page.goto('/?scenario=normal');
+  const expand = page.getByRole('button', { name: 'Expand assistant panel' });
+  await expect(expand).toBeVisible();
+  await expect(page.locator('.presence')).toHaveCSS('width', '60px');
+  await expect(page.locator('.presence-rail-status')).toHaveText('Offline');
+  const composerWidth = await page
+    .locator('.composer')
+    .evaluate((element) => element.getBoundingClientRect().width);
+  await expand.click();
+  await expect(page.getByRole('button', { name: 'Collapse assistant panel' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect(page.locator('.presence')).toHaveCSS('position', 'absolute');
+  expect(
+    await page.locator('.composer').evaluate((element) => element.getBoundingClientRect().width),
+  ).toBe(composerWidth);
+  await page.keyboard.press('Escape');
+  await expect(expand).toBeFocused();
+  await page.reload();
+  await expect(expand).toBeVisible();
+  await page.setViewportSize({ width: 1200, height: 820 });
+  await expect(expand).toBeVisible();
+  await expand.click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Collapse assistant panel' })).toBeVisible();
+  await expect(page.locator('.presence-stage')).toHaveAttribute('aria-hidden', 'true');
+});
+
+test('reduced-motion presence draws a still and destroys the renderer in Settings', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?scenario=cancel');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep generating');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'generating');
+  await page.evaluate(() => {
+    const original = CanvasRenderingContext2D.prototype.clearRect;
+    (window as unknown as { orbTestFrames: number }).orbTestFrames = 0;
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (this.canvas.closest('.presence-stage'))
+        (window as unknown as { orbTestFrames: number }).orbTestFrames++;
+      return original.apply(this, args);
+    };
+  });
+  await page.waitForTimeout(1100);
+  expect(
+    await page.evaluate(() => (window as unknown as { orbTestFrames: number }).orbTestFrames),
+  ).toBe(0);
+  await page.getByRole('button', { name: 'Stop response' }).click();
+  await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'stopped');
+  await expect(page.locator('.presence-caption')).toContainText('Stopped by you');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.locator('.presence-stage canvas')).toHaveCount(0);
+  const frames = await page.evaluate(
+    () => (window as unknown as { orbTestFrames: number }).orbTestFrames,
+  );
+  await page.waitForTimeout(1100);
+  expect(
+    await page.evaluate(() => (window as unknown as { orbTestFrames: number }).orbTestFrames),
+  ).toBe(frames);
+});
+
+test('presence follows reasoning deltas and the ready renderer comes to rest', async ({ page }) => {
+  test.setTimeout(35000);
+  await page.goto('/?scenario=reasoning-stream');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Think, then answer');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'reasoning');
+  await expect(page.locator('.presence-caption')).toContainText('Thinking…');
+  await expect(page.locator('.typing-indicator')).toHaveText('Thinking');
+  await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'generating');
+  await expect(page.locator('.typing-indicator')).toHaveText('Generating');
+  await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'ready');
+  await expect(page.locator('.typing-indicator')).toHaveCount(0);
+  await page.waitForTimeout(17000);
+  await page.evaluate(() => {
+    const original = CanvasRenderingContext2D.prototype.clearRect;
+    (window as unknown as { orbRestFrames: number }).orbRestFrames = 0;
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (this.canvas.closest('.presence-stage'))
+        (window as unknown as { orbRestFrames: number }).orbRestFrames++;
+      return original.apply(this, args);
+    };
+  });
+  await page.waitForTimeout(1100);
+  expect(
+    await page.evaluate(() => (window as unknown as { orbRestFrames: number }).orbRestFrames),
+  ).toBe(0);
+});
+
+test('renderer holds state and size changes while native visibility reports a pause', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const modulePath = '/src/features/presence/renderers/OrbRenderer.ts';
+    const { OrbRenderer } = await import(modulePath);
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;width:224px;height:224px;left:0;top:0';
+    document.body.append(host);
+    let frames = 0;
+    const original = CanvasRenderingContext2D.prototype.clearRect;
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (this.canvas.parentElement === host) frames++;
+      return original.apply(this, args);
+    };
+    const pause = (milliseconds: number) =>
+      new Promise((resolve) => setTimeout(resolve, milliseconds));
+    const renderer = new OrbRenderer();
+    try {
+      renderer.mount(host);
+      renderer.setState('generating');
+      await pause(200);
+      renderer.setPaused(true);
+      await pause(100);
+      const before = frames;
+      for (let i = 0; i < 3; i++) {
+        renderer.setPaused(true);
+        renderer.setState(i % 2 ? 'reasoning' : 'generating');
+        renderer.resize(200 + i);
+        await pause(100);
+      }
+      const paused = frames;
+      renderer.setPaused(false);
+      await pause(200);
+      const resumed = frames;
+      renderer.destroy();
+      await pause(100);
+      return { before, paused, resumed, destroyed: frames };
+    } finally {
+      renderer.destroy();
+      host.remove();
+      CanvasRenderingContext2D.prototype.clearRect = original;
+    }
+  });
+  expect(result.before).toBeGreaterThan(0);
+  expect(result.paused).toBe(result.before);
+  expect(result.resumed).toBeGreaterThan(result.paused);
+  expect(result.destroyed).toBe(result.resumed);
+});

@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Server capabilities, device menus and native argument compatibility; no inference.
+# Server capabilities, device discovery and native argument compatibility; no inference.
 set -euo pipefail
 TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 python3 -I - "$TEST_ROOT" <<'PY'
 import json
 import os
 from pathlib import Path
-import pty
 import signal
 import shutil
 import subprocess
@@ -77,16 +76,6 @@ fi
     executable(commands / 'curl', '#!/usr/bin/env bash\nprintf "%s\\0" "$@" > "$TEST_CURL"\n')
     executable(commands / 'xdg-open', '#!/usr/bin/env bash\nprintf "%s" "$1" > "$TEST_BROWSER"\n')
     executable(commands / 'sleep', '#!/usr/bin/env bash\n/bin/sleep 0.01\n')
-    executable(commands / 'dialog', '''#!/usr/bin/env python3
-import json, os, sys
-from pathlib import Path
-path = Path(os.environ['TEST_QUEUE'])
-queue = json.loads(path.read_text())
-status, value = queue.pop(0)
-path.write_text(json.dumps(queue))
-sys.stdout.write(value)
-sys.exit(status)
-''')
     env = {k:v for k,v in os.environ.items() if not k.startswith(('LLAMA_', 'MIR_', 'XDG_'))}
     (work / 'home').mkdir()
     env.update(HOME=str(work / 'home'), XDG_DATA_HOME=str(work / 'data'), PATH=str(commands) + ':' + env['PATH'], XDG_CONFIG_HOME=str(work / 'config'),
@@ -122,12 +111,7 @@ sys.exit(status)
     assert result.returncode == 0 and '--ctx-size' not in args
     result, args = launch({'MIR_CTX_SIZE':'1+1'})
     assert result.returncode != 0 and not args
-    (work / 'queue').write_text(json.dumps([[0,'context'], [0,'custom'], [0,'1024'], [0,'back']]))
-    check('initialize_config "$2"; model_menu; [[ $CTX_SIZE == 1024 ]]')
-    (work / 'queue').write_text(json.dumps([[0,'context'], [0,'custom'], [255,''], [0,'back']]))
-    check('initialize_config "$2"; model_menu; [[ $CTX_SIZE == auto ]]')
-    print('PASS: automatic/custom context, native environment, bounded validation, canceled edits')
-
+    print('PASS: automatic/custom context, native environment and bounded validation')
 
     # GPU controls must stay optional, literal and independent of CPU fallback.
     result, args = launch()
@@ -187,92 +171,6 @@ prepare_server ''' + ' '.join(arguments) + '''
     assert result.returncode != 0 and 'not advertised' in result.stderr
     print('PASS: optional GPU flags, literal ratio/margin validation, native/MIR/CLI priority, CPU fallback and unsupported builds')
 
-    (work / 'queue').write_text(json.dumps([[0,'multiple'],[0,'Vulkan0\nVulkan1']]))
-    check('initialize_config "$2"; select_device; [[ $DEVICE == Vulkan0,Vulkan1 ]]')
-    for status, value in [(255,''),(0,'')]:
-        queue = [[0,'multiple'],[status,value]] + ([[0,'']] if status == 0 else [])
-        (work / 'queue').write_text(json.dumps(queue))
-        check('initialize_config "$2"; DEVICE=Vulkan1,Vulkan0; select_device; [[ $DEVICE == Vulkan1,Vulkan0 ]]')
-    check('''initialize_config "$2"
-DEVICE=Vulkan1,Vulkan0
-server_devices
-ui() { printf '%s\\n' "$@" > "$TEST_ARGS"; printf 'Vulkan1\\nVulkan0'; }
-select_multiple_devices
-[[ $DEVICE == Vulkan1,Vulkan0 ]]
-mapfile -t options < "$TEST_ARGS"
-[[ " ${options[*]} " == *' Vulkan1 Vulkan1: Second GPU '*' on Vulkan0 Vulkan0: First GPU '*' on '* ]]
-''')
-    (work / 'queue').write_text(json.dumps([[0,'mode'],[0,'row'],[0,'proportions'],[0,'2,1'],[0,'margin'],[0,'2048,1024'],[0,'back']]))
-    check('''initialize_config "$2"
-DEVICE=Vulkan0,Vulkan1
-gpu_memory_menu
-[[ $SPLIT_MODE == row && $TENSOR_SPLIT == 2,1 && $FIT_TARGET == 2048,1024 ]]
-''')
-    (work / 'queue').write_text(json.dumps([[0,'mode'],[255,''],[0,'proportions'],[255,''],[0,'margin'],[255,''],[0,'back']]))
-    check('initialize_config "$2"; DEVICE=Vulkan0,Vulkan1; gpu_memory_menu; [[ $SPLIT_MODE == auto && $TENSOR_SPLIT == auto && $FIT_TARGET == auto ]]')
-    (work / 'queue').write_text(json.dumps([[0,'mode'],[0,'auto'],[0,'proportions'],[0,'auto'],[0,'margin'],[0,'auto'],[0,'back']]))
-    check('''initialize_config "$2"
-DEVICE=Vulkan0,Vulkan1 SPLIT_MODE=row TENSOR_SPLIT=2,1 FIT_TARGET=2048
-gpu_memory_menu
-[[ $SPLIT_MODE == auto && $TENSOR_SPLIT == auto && $FIT_TARGET == auto ]]
-''', {'TEST_HELP':'--model FNAME\n--port PORT'})
-    check('''initialize_config "$2"
-DEVICE=Vulkan0
-ui() { return 99; }
-gpu_memory_menu
-[[ $GPU_SETTINGS_ACTIVE == false ]]
-''')
-    print('PASS: multi-GPU checklist order/cancellation, advanced menus, single-device visibility')
-
-
-    # Visibility follows platform capability and usable native memory reports.
-    for devices, expected in [
-        ('Available devices:\n  (none)', 'false'),
-        ('Available devices:\n  GPU0: One GPU (8192 MiB, 4096 MiB free)', 'false'),
-        ('Available devices:\n  GPU0: One GPU (8192 MiB, 4096 MiB free)\n  BLAS: CPU accelerator (0 MiB, 0 MiB free)', 'false'),
-        ('Available devices:\n  GPU0: One GPU (8192 MiB, 4096 MiB free)\n  GPU1: Unknown memory', 'false'),
-        ('Available devices:\n  GPU0: One GPU (8192 MiB, 4096 MiB free)\n  GPU0: Duplicate (8192 MiB, 4096 MiB free)', 'false'),
-        ('Available devices:\n  GPU0: One GPU (8192 MiB, 4096 MiB free)\n  GPU1: Second GPU (8192 MiB, 4096 MiB free)', 'true')]:
-        check('''initialize_config "$2"
-TUI=true SPLIT_MODE=layer TENSOR_SPLIT=2,1 FIT_TARGET=2048
-before=$(profile_data)
-ui() { printf '%s\\n' "$@" > "$TEST_ARGS"; return 255; }
-performance_menu
-[[ $GPU_SETTINGS_ACTIVE == "$TEST_EXPECT" ]]
-options=$(cat "$TEST_ARGS")
-if "$TEST_EXPECT"; then [[ $options == *'GPU memory'* ]]; else [[ $options != *'GPU memory'* ]]; fi
-select_device
-options=$(cat "$TEST_ARGS")
-if "$TEST_EXPECT"; then [[ $options == *'Select multiple devices'* ]]; else [[ $options != *'Select multiple devices'* ]]; fi
-prepare_server
-if "$TEST_EXPECT"; then
-    [[ " ${ARGS[*]} " == *' --split-mode layer '* ]]
-else
-    [[ " ${ARGS[*]} " != *' --split-mode '* && " ${ARGS[*]} " != *' --tensor-split '* && " ${ARGS[*]} " != *' --fit-target '* ]]
-fi
-[[ $(profile_data) == "$before" ]]
-''', {'TEST_DEVICES':devices, 'TEST_EXPECT':expected})
-    check('''initialize_config "$2"
-TUI=true DEVICE=Vulkan0 SPLIT_MODE=layer TENSOR_SPLIT=2,1 FIT_TARGET=2048
-prepare_server
-[[ $GPU_SETTINGS_ACTIVE == false && " ${ARGS[*]} " != *' --split-mode '* ]]
-DEVICE=Vulkan0,Vulkan0
-refresh_gpu_settings
-[[ $GPU_SETTINGS_ACTIVE == false ]]
-DEVICE=none
-refresh_gpu_settings
-[[ $GPU_SETTINGS_ACTIVE == false ]]
-''')
-    check('''initialize_config "$2"
-TUI=true
-ui() { printf '%s\\n' "$@" > "$TEST_ARGS"; return 255; }
-performance_menu
-[[ $GPU_SETTINGS_ACTIVE == false ]]
-options=$(cat "$TEST_ARGS")
-[[ $options != *'GPU memory'* ]]
-''', {'TEST_DEVICE_EXIT':'1'})
-    print('PASS: zero/one/two devices, CPU accelerators, unknown/duplicate reports, discovery failure and inactive TUI profile values')
-
     # The installed build's help is the authority; never reuse draft-cache lists.
     check(r'''initialize_config "$2"
 server_capabilities
@@ -311,21 +209,6 @@ help=$'--cache-type-k TYPE\n  allowed values: f16, q4_0,\n                  cust
     result, args = launch({'TEST_HELP':'--model FNAME\n--port PORT'})
     assert result.returncode != 0 and 'does not advertise --cache-type-k' in result.stderr
     print('PASS: all advertised cache types, wrapped/draft help isolation, defaults, native/MIR/CLI priority and unsupported controls')
-
-    (work / 'queue').write_text(json.dumps([[0,'k'],[0,'q8_0'],[0,'v'],[0,'other'],[0,'q5_1'],[0,'back']]))
-    check('initialize_config "$2"; cache_menu; [[ $CACHE_TYPE_K == q8_0 && $CACHE_TYPE_V == q5_1 ]]')
-    (work / 'queue').write_text(json.dumps([[0,'k'],[255,''],[0,'v'],[0,'other'],[0,'back'],[0,'back']]))
-    check('initialize_config "$2"; cache_menu; [[ $CACHE_TYPE_K == q4_0 && $CACHE_TYPE_V == q4_0 ]]')
-    check(r'''initialize_config "$2"
-CACHE_TYPE_K=q8_0 CACHE_TYPE_V=q5_1
-saved=$(profile_data)
-message() { :; }
-platform_timeout() { return 1; }
-CAPABILITIES_SERVER=''
-select_cache_type K "$CACHE_TYPE_K"
-[[ $(profile_data) == "$saved" ]]
-''')
-    print('PASS: primary/other cache menus, separate K/V edits, cancellation, probe failure and unchanged selections')
 
     for host, address in [('::1','[::1]'), ('::','[::1]'), ('0.0.0.0','127.0.0.1'),
                           ('127.0.0.2','127.0.0.2'), ('::1,127.0.0.1','[::1]')]:
@@ -377,10 +260,7 @@ load_profile "$PROFILES_DIR/OtherComputer.conf"
 if prepare_server; then exit 1; fi
 [[ $DEVICE == Vulkan9 && $(profile_status) == OtherComputer && $LAUNCH_ERROR == *unavailable* ]]
 platform_timeout() { return 1; }
-message() { :; }
-ui() { printf none; }
-select_device
-[[ $DEVICE == none ]]
+DEVICE=none
 GPU_LAYERS=all
 prepare_server
 [[ ${ARGS[*]} == *'--device none --gpu-layers 0'* ]]
@@ -416,27 +296,4 @@ prepare_server
     assert process.returncode == 143
     print('PASS: running health check, browser address and shutdown with an overridden IPv6 endpoint')
 
-    (work / 'args').unlink(missing_ok=True)
-    # A rejected setting must return to the TUI so it can be corrected there.
-    (work / 'queue').write_text(json.dumps([[0,'launch'], [0,''], [0,'performance'],
-                                           [0,'threads'], [0,'auto'], [0,'back'],
-                                           [0,'launch'], [0,'']]))
-    master, slave = pty.openpty()
-    process = subprocess.Popen(['bash', str(root / 'mir.sh')],
-                               env=env | {'TEST_LIVE':'1', 'MIR_THREADS':'4',
-                                          'TEST_HELP':minimal_help},
-                               stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
-    os.close(slave)
-    try:
-        process.wait(timeout=8)
-        assert process.returncode == 0
-        assert json.loads((work / 'queue').read_text()) == []
-        args = (work / 'args').read_bytes().split(b'\0')
-        assert b'--model' in args and b'--threads' not in args
-    finally:
-        if process.poll() is None:
-            os.killpg(process.pid, signal.SIGKILL)
-            process.wait(timeout=3)
-        os.close(master)
-    print('PASS: unsupported settings return to the TUI for correction before successful launch')
 PY

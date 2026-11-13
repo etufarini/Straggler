@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix='mir-download-') as temporary:
         assert active != previous
         assert len(list((install_dir / 'releases').glob('install.*'))) == 1
         assert previous is None or not previous.exists()
-        for name in ('mir.sh', 'dialogrc', 'lib/config.sh', 'lib/tui/main.sh', 'mir/docs/guide.md'):
+        for name in ('mir.sh', 'lib/config.sh', 'lib/desktop.sh', 'mir/docs/guide.md'):
             assert (active / name).is_file(), name
         assert (config / 'paths.conf').read_text() == 'personal paths\n'
         assert (config / 'profiles/Personal.conf').read_text() == 'personal profile\n'

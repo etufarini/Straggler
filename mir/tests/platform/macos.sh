@@ -78,34 +78,15 @@ server_devices
 size=$(wc -c < "$TEST_DEVICE_PROBES")
 memory_available
 [[ $RAM_AVAILABLE == 12288 && ${#DEVICE_FREE[@]} == 0 ]]
-[[ $(memory_line) == 'Free GiB: RAM ~12.0' ]]
-memory_controls
-[[ ${#MEMORY_BUTTONS[@]} == 0 ]]
-for width in 16 24 40 72; do
-    line=$(memory_line "$width")
-    (( ${#line} <= width ))
-    [[ $line == *'RAM ~12.0' ]]
-done
 DEVICE=none
 memory_available
 (( $(wc -c < "$TEST_DEVICE_PROBES") == size ))
-[[ $(platform_memory_style) == system ]]
-if platform_multi_gpu_ui; then exit 1; fi
-# Linux multi-GPU controls stay disabled even with a saved multi-device selection.
-TUI=true DEVICE=MTL0,MTL1 SPLIT_MODE=tensor TENSOR_SPLIT=2,1 FIT_TARGET=2048
-refresh_gpu_settings
-[[ $GPU_SETTINGS_ACTIVE == false ]]
+DEVICE=MTL0,MTL1 SPLIT_MODE=tensor TENSOR_SPLIT=2,1 FIT_TARGET=2048
 build_model_args
-[[ " ${MODEL_ARGS[*]} " != *' --split-mode '* && " ${MODEL_ARGS[*]} " != *' --tensor-split '* && " ${MODEL_ARGS[*]} " != *' --fit-target '* ]]
+[[ " ${MODEL_ARGS[*]} " == *' --split-mode tensor '* ]]
 [[ $SPLIT_MODE == tensor && $TENSOR_SPLIT == 2,1 && $FIT_TARGET == 2048 ]]
-ui() { printf '%s\\n' "$@" > "$TEST_ARGS"; return 255; }
-performance_menu
-if grep -q 'GPU memory' "$TEST_ARGS"; then exit 1; fi
-select_device
-if grep -q 'Select multiple devices' "$TEST_ARGS"; then exit 1; fi
-[[ $(platform_gpu_build_note) == *'included in macOS'* ]]
 ''', {'TEST_DEVICE_DELAY':'0.1'})
-    print('PASS: Darwin live RAM, compact widths, no telemetry GPU probes and hidden/inactive multi-GPU controls')
+    print('PASS: Darwin memory data, no telemetry GPU probes and preserved explicit settings')
     for bad in ('', snapshot.replace('Pages inactive: 655360.\n', ''),
                 snapshot + 'Pages free: 1.\n', snapshot.replace('16384', '0'),
                 snapshot.replace('16384', '12345'), snapshot.replace('16384', '99999999'),
@@ -117,7 +98,7 @@ if grep -q 'Select multiple devices' "$TEST_ARGS"; then exit 1; fi
     check('platform_memory_snapshot; [[ -z "$RAM_AVAILABLE" ]]', {'TEST_VM_STAT_EXIT':'1'})
     check('''initialize_config "$2"
 memory_available
-[[ $RAM_AVAILABLE == 0 && $(memory_line) == 'Free GiB: RAM ~0.0' ]]
+[[ $RAM_AVAILABLE == 0 ]]
 ''', {'TEST_VM_STAT':snapshot.replace('655360.', '0.').replace('65536.', '0.')})
     check('platform_memory_snapshot; [[ $RAM_AVAILABLE == 3072 ]]',
           {'TEST_VM_STAT':snapshot.replace('16384', '4096')})

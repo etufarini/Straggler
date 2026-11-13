@@ -10,9 +10,21 @@ load_platform "$PLATFORM_ID"
 source "$MIR_ROOT/lib/launcher.sh"
 load_launcher_modules
 
+if [[ ${1:-} == --desktop ]]; then
+    shift
+    source "$MIR_ROOT/lib/desktop.sh"
+    desktop_command "$@"
+    exit
+fi
+if (( $# == 0 )) || [[ ${1:-} == --prepare-desktop ]]; then
+    source "$MIR_ROOT/lib/bootstrap.sh"
+    prepare_desktop || fail 'Desktop preparation failed. Existing builds and user data were kept.'
+    if (( $# > 0 )); then exit 0; fi
+    exec env MIR_ROOT="$MIR_ROOT" MIR_DESKTOP_BASH="$BASH" "$GUI_BINARY"
+fi
+[[ ${1:-} != --tui ]] || fail 'The terminal interface has been removed. Run mir to open the desktop.'
 initialize_config "$@"
-if (( $# > 0 )); then shift; fi
+shift
 validate_config
-if "$TUI"; then configure_tui;
-else prepare_server "$@" || fail "$LAUNCH_ERROR"; fi
+prepare_server "$@" || fail "$LAUNCH_ERROR"
 run_server

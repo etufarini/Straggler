@@ -37,10 +37,11 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
     bin_dir = work / 'mock-bin'
     bin_dir.mkdir()
     archive = work / 'source.tar.gz'
-    files = ['mir.sh', 'dialogrc', 'sh/uninstall.sh'] + [
+    files = ['mir.sh', 'sh/uninstall.sh', 'desktop/runtime-files.txt'] + (root / 'desktop/runtime-files.txt').read_text().splitlines() + [
         str(p.relative_to(root)) for p in sorted((root / 'lib').rglob('*')) if p.suffix in ('.sh', '.py')]
-    documents = ['README.md'] + [
-        'mir/' + str(p.relative_to(root)) for p in sorted((root / 'docs').rglob('*')) if p.is_file()]
+    documents = ['README.md', 'mir/docs/guide.md', 'mir/docs/images/logo.png',
+                 'mir/docs/screenshots/desktop-chat.png', 'mir/docs/screenshots/desktop-settings.png',
+                 'mir/docs/screenshots/llama-setup.png']
     files += documents
     def source_path(name):
         return (root.parent if name in documents else root) / name
@@ -62,6 +63,20 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
         path.chmod(0o755)
+    executable(bin_dir / 'setsid', '#!/usr/bin/env python3\nimport os, sys\nos.setsid()\nos.execvp(sys.argv[1], sys.argv[1:])\n')
+    executable(bin_dir / 'node', '#!/bin/sh\nexit 0\n')
+    executable(bin_dir / 'npm', '#!/bin/sh\nexit "${TEST_GUI_BUILD:-0}"\n')
+    executable(bin_dir / 'rustc', '#!/bin/sh\nprintf "rustc 1.96.1\\n"\n')
+    executable(bin_dir / 'pkg-config', '#!/bin/sh\nexit 0\n')
+    executable(bin_dir / 'dpkg-query', '#!/bin/sh\nprintf "install ok installed"\n')
+    executable(bin_dir / 'pkexec', '#!/bin/sh\nexit 99\n')
+    executable(bin_dir / 'cargo', '''#!/usr/bin/env bash
+mkdir -p "$CARGO_TARGET_DIR/release/bundle/macos/Mir.cpp.app/Contents/MacOS"
+printf '#!/bin/sh\\nexit 0\\n' > "$CARGO_TARGET_DIR/release/mir-desktop"
+chmod +x "$CARGO_TARGET_DIR/release/mir-desktop"
+cp "$CARGO_TARGET_DIR/release/mir-desktop" "$CARGO_TARGET_DIR/release/bundle/macos/Mir.cpp.app/Contents/MacOS/mir-desktop"
+''')
+
     executable(bin_dir / 'curl', '''#!/usr/bin/env bash
 printf '%s\\0' "$@" > "$TEST_DOWNLOAD_ARGS"
 if [[ -n ${TEST_PAUSE_FLAG:-} ]]; then
@@ -103,7 +118,7 @@ exec /bin/rm "$@"
     env = {k: v for k, v in os.environ.items() if not k.startswith(('LLAMA_', 'MIR_', 'XDG_'))}
     env.update(HOME=str(home), PATH=str(bin_dir) + ':' + os.environ['PATH'],
                TEST_ARCHIVE=str(archive), TEST_DOWNLOAD_ARGS=str(work / 'download-args'),
-               XDG_CONFIG_HOME=str(home / 'config'))
+               XDG_CONFIG_HOME=str(home / 'config'), XDG_CACHE_HOME=str(work / 'cache'))
     install_dir = home / '.local/share/mir.cpp'
     command = home / '.local/bin/mir'
     def install(overrides=None, success=True):
@@ -148,7 +163,7 @@ exec /bin/rm "$@"
         if name.startswith('lib/platform/') and name not in selected_adapters:
             assert not (target / name).exists()
         elif name != 'mir.sh':
-            assert (target / name).read_bytes() == source_path(name).read_bytes()
+            assert (target / name).read_bytes() == source_path(name).read_bytes(), name
     assert (config / 'paths.conf').read_text() == 'existing paths\n'
     assert (config / 'profiles/Personal.conf').read_text() == 'existing profile\n'
     # Launch outside the checkout to verify module lookup and literal arguments.
@@ -165,6 +180,13 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     assert result.returncode == 0, result.stderr
     assert (work / 'args').read_bytes().endswith(b'--alias\x00two words\x00')
     print('PASS: piped installer, complete runtime, paths with spaces, wrapper and personal configuration')
+
+    package(marker='failed-desktop')
+    result = install({'TEST_GUI_BUILD':'1'}, success=False)
+    assert b'Desktop preparation failed' in result.stderr
+    assert (install_dir / 'current').resolve() == target and command.is_file()
+    assert (config / 'profiles/Personal.conf').read_text() == 'existing profile\n'
+    print('PASS: failed desktop compilation preserves the active installation and settings')
 
     package(marker='second')
     install()
@@ -187,7 +209,7 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     assert (install_dir / 'current').resolve() == updated
     assert command.read_bytes() == snapshot
     assert set((install_dir / 'releases').iterdir()) == releases
-    for omitted in [*selected_adapters, 'lib/runtime.sh', 'lib/tui/main.sh', 'lib/memory.sh', 'lib/gguf.py', 'dialogrc', 'sh/uninstall.sh', *documents]:
+    for omitted in [*selected_adapters, 'lib/runtime.sh', 'lib/memory.sh', 'lib/desktop.sh', 'desktop/src/app/App.tsx', 'lib/gguf.py', 'sh/uninstall.sh', *documents]:
         package(omit=omitted)
         install(success=False)
         assert (install_dir / 'current').resolve() == updated
@@ -268,7 +290,8 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     # Control PATH completely so missing-command checks do not depend on the host.
     restricted = work / 'restricted-bin'
     restricted.mkdir()
-    tools = 'uname brew bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ps find sort grep dirname sleep cp'.split()
+    tools = 'uname brew bash curl tar gzip mktemp chmod mkdir mv ln rm flock ps find sort grep dirname sleep cp'.split()
+    tools += ['python3', 'node', 'npm', 'cargo', 'rustc', 'cc', 'c++', 'make', 'pkg-config', 'pkexec', 'setsid', 'awk', 'head', 'tr', 'cat', 'tee']
     tools += ['gfind', 'gmv', 'lsof', 'netstat'] if target_os == 'Darwin' else ['ss']
     for tool in tools:
         source = bin_dir / tool
@@ -276,18 +299,16 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
             (restricted / tool).symlink_to(source)
         elif shutil.which(tool):
             (restricted / tool).symlink_to(shutil.which(tool))
-        elif tool == 'dialog':
-            executable(restricted / tool, '#!/bin/sh\nexit 0\n')
+        elif tool == 'setsid':
+            executable(restricted / tool, '#!/bin/sh\nexec \"$@\"\n')
     fake_prefix = work / 'isolated brew'
     (fake_prefix / 'bin').mkdir(parents=True)
     (restricted / 'brew').unlink(missing_ok=True)
     executable(restricted / 'brew', "#!/bin/sh\nprintf '%s\\n' " + shlex.quote(str(fake_prefix)) + "\n")
     (restricted / 'gzip').unlink()
-    (restricted / 'dialog').unlink()
     installed = (install_dir / 'current').resolve()
     result = install({'PATH':str(restricted)}, success=False)
     if target_os == 'Darwin':
-        assert b'brew install dialog' in result.stderr
         assert b'brew install' in result.stderr
     else:
         assert b'Missing tools for launcher' in result.stderr or b'A terminal is required' in result.stderr
@@ -295,12 +316,9 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     assert (install_dir / 'current').resolve() == installed
     assert b'Downloading Mir.cpp' not in result.stdout
     (restricted / 'gzip').symlink_to(shutil.which('gzip'))
-    executable(restricted / 'dialog', '#!/bin/sh\nexit 0\n')
     result = install({'PATH':str(restricted)})
     assert not (restricted / 'cut').exists()
-    assert ('WARNING: ' + ('open' if target_os == 'Darwin' else 'xdg-open') + ' is missing').encode() in result.stderr
-    assert b'Open the server address manually' in result.stderr
-    print('PASS: aggregated required dependencies before changes and optional browser warning')
+    print('PASS: aggregated required dependencies before changes without terminal UI dependencies')
 
     other_home = work / 'other home'
     other_home.mkdir()

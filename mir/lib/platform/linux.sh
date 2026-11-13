@@ -19,7 +19,6 @@ platform_timeout() {
     timeout --kill-after=1 "$@" 2>/dev/null
 }
 platform_memory_style() { printf margins; }
-platform_multi_gpu_ui() { return 0; }
 platform_gpu_build_note() { printf 'GPU builds require working drivers, configured separately.'; }
 # shellcheck disable=SC2034 # RAM_AVAILABLE is an output consumed by shared memory code.
 platform_memory_snapshot() {
@@ -49,7 +48,7 @@ platform_dependency_hint() {
     local -A hint_packages=()
     for tool in "$@"; do
         case "$tool" in
-            bash|curl|tar|gzip|dialog|grep) package="$tool" ;;
+            bash|curl|tar|gzip|grep) package="$tool" ;;
             flock) package=util-linux ;;
             ss) package=iproute2 ;;
             ps) package=procps ;;
@@ -79,9 +78,14 @@ platform_ensure_dependencies() {
     local group=$1 tool package
     local -a tools packages missing=()
     case "$group" in
+        cpu) return 0 ;;
         launcher)
-            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock dialog ss ps find sort grep dirname sleep cp)
-            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux dialog iproute2 procps findutils coreutils grep coreutils coreutils coreutils) ;;
+            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock ss ps find sort grep dirname sleep cp)
+            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux iproute2 procps findutils coreutils grep coreutils coreutils coreutils) ;;
+        desktop-runtime) tools=(python3); packages=(python3) ;;
+        desktop)
+            tools=(python3 cc c++ make pkg-config pkexec setsid)
+            packages=(python3 build-essential build-essential build-essential pkg-config policykit-1 util-linux) ;;
         build)
             tools=(git cmake make cc c++ python3 setsid timeout)
             packages=(git cmake build-essential build-essential build-essential python3 util-linux coreutils) ;;
@@ -99,6 +103,9 @@ platform_ensure_dependencies() {
         case "$group" in
             launcher) packages=(ca-certificates) ;;
             build) packages=(libssl-dev libcurl4-openssl-dev) ;;
+            # WebKitGTK depends on the distribution's GTK runtime (including t64 variants).
+            desktop-runtime) packages=(libwebkit2gtk-4.1-0) ;;
+            desktop) packages=(libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev) ;;
             vulkan) packages=(libvulkan-dev spirv-headers mesa-vulkan-drivers) ;;
             *) packages=() ;;
         esac
@@ -141,10 +148,32 @@ install_dependency_packages() {
     }
 }
 
-platform_build_backends() { printf '%s\n' cpu CPU vulkan Vulkan cuda 'CUDA (NVIDIA; hardware validation pending)'; }
+platform_build_backends() { printf '%s\n' cpu CPU vulkan Vulkan cuda CUDA; }
 platform_build_flags() {
     BUILD_FLAGS=(-DGGML_METAL=OFF)
     case "$1" in cpu) ;; vulkan) BUILD_FLAGS+=(-DGGML_VULKAN=ON) ;; cuda) BUILD_FLAGS+=(-DGGML_CUDA=ON) ;; *) return 1 ;; esac
 }
 platform_start_worker() { exec setsid "$@"; }
 platform_build_probe() { timeout --foreground --kill-after=2 30 "$@"; }
+
+platform_node_system() { printf linux; }
+platform_install_desktop_packages() {
+    if (( EUID == 0 )); then apt-get update && apt-get install --no-remove --no-install-recommends -y "$@";
+    else return 1; fi
+}
+
+platform_authorize_build_packages() {
+    pkexec "$BASH" "$MIR_ROOT/mir.sh" --desktop install-dependencies "$@"
+}
+
+platform_desktop_package_allowed() {
+    local backend=$1 package=$2 allowed=' git cmake build-essential python3 util-linux coreutils libssl-dev libcurl4-openssl-dev '
+    [[ "$package" =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || return 1
+    case "$backend" in
+        cpu) ;;
+        vulkan) allowed+='glslc vulkan-tools libvulkan-dev spirv-headers mesa-vulkan-drivers ' ;;
+        cuda) allowed+='nvidia-cuda-toolkit cuda-toolkit ' ;;
+        *) return 1 ;;
+    esac
+    [[ "$allowed" == *" $package "* ]]
+}

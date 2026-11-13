@@ -1,185 +1,65 @@
 # Mir.cpp development instructions
 
-## Scope and purpose
+## Purpose and boundaries
 
-These instructions apply to `mir/mir.sh`, `README.md`, these instructions and files created specifically to support the launcher.
+Mir.cpp is a GUI and launcher wrapper, not an inference engine. Development and required automated checks must run without GPU hardware, model weights, or a working llama.cpp installation. Validate Mir.cpp's interface contracts, user flows, persistence, and process lifecycle. Real inference and backend hardware checks are optional integration diagnostics.
 
-Keep the visible repository root limited to `README.md`, `AGENTS.md`, `LICENSE` and the `mir/` software folder. Keep the source entry point and `dialogrc` together inside `mir/`, modules in `mir/lib/`, tests in `mir/tests/`, the installer in `mir/sh/install.sh`, and the user guide and screenshots in `mir/docs/`. Resolve runtime paths from `MIR_ROOT`, independently of the working directory. Keep the installed `mir` command and existing installation layout compatible when reorganizing source files.
+Target Linux and macOS with Tauri 2, React and TypeScript. Keep device discovery and inference delegated to the installed llama.cpp. Derive selectable features from its advertised capabilities; do not hardcode models, device names, hardware vendors or assumed memory capacity. Missing telemetry must not block server controls. Earlier hardware records describe only those configurations, not validation of later GUI changes.
 
-Mir.cpp is a Bash launcher for the local llama.cpp server and its browser-based Web UI. It can install, update and restore managed llama.cpp builds or use an existing build. Its `dialog` terminal interface discovers GGUF files under a user-selected models directory and lets the user select a model, configure context size, generation, port and performance settings, and save configurations before starting the server on CPU or a backend supported by the installed build. While running, it shows server status and offers log viewing and server shutdown. A model path and environment variables allow direct startup without the TUI. All script comments, menus, messages and project documentation must be in English.
+The desktop is the normal interface. Preserve direct startup with a GGUF path, native argument pass-through, existing settings and installation layout. Remove the compatibility TUI; do not introduce a second interactive interface. All code comments, UI messages and project documentation must be in English.
 
-Aim for general compatibility with GGUF models supported by the installed llama.cpp version and available hardware, without launcher-specific restrictions. This is a design goal, not a claim that every combination has been tested. Do not hardcode behavior for a model, family, filename or directory layout. Respect differences in architecture, context limits, chat templates and memory requirements, and report unsupported configurations clearly. Preserve settings so other models work without script edits; the launcher cannot overcome insufficient resources or missing llama.cpp support.
+## Human-readable code
 
-## Platform boundaries
+Write code for human maintainers, not for LLMs. Prefer explicit control flow, descriptive names, focused modules, and readable formatting. Optimize for understanding and safe changes.
 
-Keep shared launcher behavior in `mir/lib/` and system operations in `mir/lib/platform/linux.sh` and `macos.sh`. Detect the OS in `runtime.sh`, then load only the selected adapter through `platform.sh`. Keep Homebrew discovery and the pre-4.4 Bash bootstrap in `platform/macos-bootstrap.sh`; Linux startup must work without any macOS files or Homebrew commands. Shared configuration, profiles, model/device arguments, TUI, port status formatting, shutdown confirmations and PID identity checks must not branch on the OS. Use the platform contract for listeners, browser opening, bounded commands, model discovery, atomic activation, memory presentation style and native memory snapshots. Adapters define functions without effects on import; unsupported OS values and attempts to mix adapters must fail clearly.
+Group code by responsibility. Keep JSX multiline, asynchronous operations named, errors explicit and comments focused on reasons and constraints. Share rules at their owning boundary instead of copying them into UI components or test doubles. Introduce abstractions only when they remove concrete duplication or clarify ownership; avoid arbitrary file-size targets.
 
-Use explicit module loading through `lib/launcher.sh` in the entry point and isolated test helpers; never recursively source all shell files. Core tests use `tests/helpers/fake.sh`; platform contract tests live in `tests/platform/` and real OS tests in `tests/native/`. Keep `bash mir/tests/run.sh common` and `linux` usable on Linux without macOS dependencies; `all` additionally runs cross-platform fixtures and any native tests available on the current host. Keep Ubuntu and macOS CI checks independent and report skipped native checks honestly.
+At the end of development, review changed code and its dependencies for redundant, unused or unnecessary content. Remove it within the approved scope, preserving validation, compatibility and useful diagnostics. Report the cleanup or state that none was found. Documentation-only tasks need no code cleanup.
 
-Treat `mir/sh/install.sh` as a generated standalone artifact. Edit `install-core.sh`, the canonical bootstrap or adapters, regenerate with `bash mir/sh/build-install.sh`, and verify with `--check`. The bundle must include only installer-required adapter functions, keep the versioned raw GitHub curl URL format and installation layout, and retain Bash 3.2 bootstrap compatibility. Do not hand-edit generated copies of platform logic.
+## Repository structure
 
-## Release scope
+Keep the visible root limited to README.md, AGENTS.md, LICENSE and mir/. The only shell launcher entry point is mir/mir.sh; installed startup remains mir. Resolve resources from MIR_ROOT independently of the working directory, including bundled desktop resources.
 
-The launcher targets Linux with CPU, Vulkan and CUDA builds of llama.cpp, and macOS with CPU and Metal builds. CUDA smoke tests cover one llama.cpp build and model; keep claims within the [recorded hardware checks](mir/docs/guide.md#recorded-hardware-checks). macOS support requires Bash 4.4 or newer and the documented Homebrew launcher dependencies. Bootstrap with syntax accepted by macOS Bash 3.2, automatically finding compatible Homebrew Bash and tools for source, piped installer and installed-command startup. Never require users to change their login shell or shell configuration; dependency PATH additions must stay within the program process and preserve existing command precedence. Keep device discovery delegated to the installed llama.cpp; the documented release scope must not introduce hardcoded backend names or restrict otherwise valid model and device arguments. Follow the verification policy below when describing test coverage.
+Keep shared launcher behavior in mir/lib/, platform adapters in mir/lib/platform/, shell tests in mir/tests/, the installer in mir/sh/, desktop code in mir/desktop/, and documentation in mir/docs/. Use explicit module imports. Adapters define functions without effects on import; shared features call platform services rather than branching on the OS. Linux must work without macOS files or Homebrew. Keep bootstrap syntax compatible with macOS Bash 3.2, then select and reuse Bash 4.4+ without changing the user's shell.
 
-## Release and verification policy
+Organize the frontend into app composition, features, shared components, domain data and a typed desktop service. Keep Tauri IPC access in that service. Separate edited settings, saved settings and the active server configuration. Keep native commands thin and separate bridge operations, process supervision, builds, streaming and history.
 
-Mir.cpp is a non-critical local application. Prefer small, frequent releases and verification proportional to the impact of each change. Do not require exhaustive combinations of operating systems, hardware, drivers, llama.cpp versions, models and settings, or mandatory coverage percentages. Use representative cases, boundary values and relevant setting interactions; combinatorial testing can help when interactions matter.
+## Configuration and compatibility
 
-Choose checks from the changed behavior and its direct and indirect dependencies:
+Use Mir.cpp, mir.sh, mir, MIR_ROOT and MIR_* consistently. Preserve MIR_* precedence over legacy LLAMA_* aliases, including explicit empty MIR_* values; leave native LLAMA_ARG_* variables unchanged. Read configuration and profiles as literal data, never source or eval.
 
-| Change | Verification |
-| --- | --- |
-| Documentation or comments only | Check accuracy, links and consistency; confirm comment edits do not change executable content. No new hardware tests are required. |
-| TUI | Run affected tests and visually inspect changed screens, including navigation and 80×24 readability. |
-| Configuration or server arguments | Test validation, precedence and compatibility; perform a real smoke test when startup behavior changes. |
-| Platform adapters or GPU settings | Run affected adapter tests and, when available, test the affected backend on real hardware. Disclose unavailable validation. |
-| Installation, migration, deletion or process management | Check isolation, preservation of user data, process identity where relevant, and failure paths in addition to normal operation. |
+Keep paths in ${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/paths.conf and profiles in its profiles/ directory. Preserve release and earlier desktop profile compatibility: validate recognized fields transactionally, ignore removed or unknown keys, and initialize missing fields from documented defaults independently of the current session. Loading returns to configuration review without launching. Compare and save through the same field serialization; confirm overwrite and deletion. Keep migration atomic, preserve originals and never merge over existing settings.
 
-Keep Linux and macOS CI checks. For releases that change runtime behavior, require successful CI on the candidate commit, relevant regression checks and a brief real smoke test of affected flows on available machines. For server startup changes, exercise startup, a small inference request, browser access and shutdown with a supported model. Reuse earlier hardware results only when the changes do not invalidate them; identify them as earlier results rather than new tests. Local checks need not repeat successful CI or unrelated hardware tests without a concrete reason.
+Folders must be configurable and readable. Accept source builds with build/bin/llama-server and packaged builds with bin/llama-server. Discover GGUF files recursively, allow empty model folders, and report missing server/model files clearly. Browsing, accepting a directory and canceling are separate actions; hidden directories remain accessible.
 
-Unavailable hardware does not automatically block a release. Distinguish tested configurations, expected compatibility and known problems. Record checks performed and limitations briefly in release notes; for inference tests, identify the OS, backend, relevant memory capacity, llama.cpp version and model without naming specific hardware models. A discovery probe or fixture is not an inference test. Known defects that can lose user data or signal an unintended process block release until fixed.
+Preserve release defaults, sampling presets, seed/output independence, cache types and advanced GPU settings. Discover supported cache types and split modes through native help. Auto omits the corresponding arguments; CPU only disables GPU layers. Explicit trailing arguments retain precedence. Do not infer model support from filenames or hardware identity from backend labels.
 
-Use an optional GitHub prerelease for broad or uncertain changes when user feedback would help; do not require a beta for every fix or ordinary release. Keep unverified claims explicit rather than treating a beta label as evidence of correctness.
+## Desktop behavior and data
 
-## Versioned releases
+Keep Settings organized as Model settings, Performance, Server & port, Saved configurations, Folders and llama.cpp. Keep model selection and server controls accessible from chat. Mark Modified relative to saved settings and Restart required relative to the active configuration. Report unavailable native services, unsupported chat requests, interrupted responses and storage errors explicitly.
 
-`main` is the development branch and may contain changes newer than the
-latest stable release. Merging a pull request does not publish a release.
+Store conversations under ${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/desktop/, separate from profiles and browser data. Validate identifiers and write atomically. Preserve partial responses and serialize saves. Do not overwrite browser conversations or preferences.
 
-The stable version is the latest published versioned GitHub Release that
-is not marked as a prerelease. Mark it as Latest on GitHub. A newer tag,
-draft or prerelease does not replace the stable version.
+Start supervised desktop servers on loopback without opening a browser. Check ports before startup and after changes; unidentified listeners still block launch. Show available process details, recheck identity before signaling, request explicit SIGTERM confirmation for unrelated listeners and separate SIGKILL confirmation. Never elevate process-control permissions. Closing the app confirms cancellation, saving and cleanup of its own processes.
 
-Use tags named `vMAJOR.MINOR.PATCH`: increment PATCH for compatible fixes,
-MINOR for compatible features and MAJOR for incompatible changes to
-documented commands, configuration or behavior. Use `v1.0.0` for the first
-stable release.
+## Preparation and installation
 
-Keep releases manual and simple; no separate stable branch, version file,
-release workflow or custom source archive is required.
+Source and installed startup prepare the same embedded desktop automatically. Reuse compatible Node/Rust tools or checksum-verified private toolchains. Cache verified builds by source content, supervise cancellation and run compilation as the user. Internal bridge calls bypass GUI preparation. System package installation requires consent and is limited to supported Ubuntu/Debian or existing Homebrew setups; model files and GPU drivers remain external requirements.
 
-The README quick-install curl URL must point directly to the latest stable
-tag, for example `https://raw.githubusercontent.com/etufarini/Mir.cpp/v1.0.0/mir/sh/install.sh`.
-The installer must download that same tag, never `main`. Keep its version
-in the single `release_tag` value in `mir/sh/install-core.sh`; derive the
-download URL, archive paths and download message from it. Regenerate the
-standalone installer after changing it. No separate installer asset or
-automatic latest-version lookup is needed. An older curl command reinstalls
-its original version; updates use the command in the current README.
+Keep mir/sh/install.sh generated from install-core.sh and canonical adapters using build-install.sh; verify with --check. Update extraction manifests when moving runtime files. Activate an installed update only after desktop preparation succeeds, preserve the working installation on failure, and reject updates during an active desktop session.
 
-Release procedure:
+## Verification
 
-1. Prepare the release by setting the installer tag and README curl URL to
-   the intended version, updating the documented stable version and
-   regenerating the installer. Integrate the changes on `main`, then select
-   the exact candidate commit and record its full commit SHA. For prereleases,
-   keep the README quick install on the existing stable version and document
-   the prerelease command separately.
-2. Complete the applicable release and verification checks above on that
-   commit. If the candidate changes, reassess the affected checks.
-3. Prepare brief English release notes with changes, the full commit SHA,
-   checks performed and known limitations. Identify reused hardware checks
-   as earlier results.
-4. Obtain explicit user approval for the version, candidate commit and
-   release notes before creating the tag or publishing the release.
-5. Create an annotated version tag at the approved SHA and push that tag.
-   Publish its GitHub Release with `gh release create --verify-tag`, using
-   `--latest` for a stable release or `--prerelease --latest=false` for a
-   prerelease. Use the reviewed notes; GitHub-generated archives suffice.
-6. Verify that the published tag resolves to the approved SHA and that
-   the release notes and Latest status are correct. Test the published curl
-   command in an isolated HOME, including reinstall and preserved settings.
+Use bash mir/tests/run.sh as the development entry point. Keep focused suites available and report skipped checks. Required checks use temporary user directories, fake executables and local HTTP fixtures; they must not install system packages, contact inference services or use personal configuration. Verify test fixtures against real bridge contracts and pinned upstream examples/documentation to prevent drift.
 
-Never move or reuse a published version tag. Publish corrections under a
-new version. GitHub-generated source archives are sufficient.
+Run Bash syntax checks and ShellCheck for shell changes, frontend type/lint/format checks, relevant unit and integration suites, and Linux/macOS CI. Test native windows, resources and process behavior on CPU runners of each target OS. Exercise storage failures, cancellation, process identity, migration and installation rollback when affected. No GPU, inference workload or hardware inventory is a release gate. Choose representative interactions and boundaries rather than exhaustive combinations or coverage quotas.
 
-Delete remote development branches only after confirming their work was
-merged and obtaining approval for the named branches. Preserve `main`
-and release tags.
+## Documentation and releases
 
-## TUI organization
+Keep README.md concise and practical: local desktop chat, requirements, stable curl installation, mir startup, first configuration and one link to mir/docs/guide.md. Include the human-maintainer principle. Keep detailed settings, direct startup, development commands, architecture, preparation, troubleshooting and earlier hardware records in the guide. Use real interface screenshots without fabricated readiness, inference or private paths.
 
-Keep the main menu in this order: Launch server, Model settings, Performance, Server & port, Saved configurations, Folders and Quit. Initially select Launch server, preserving all launch validation. Show the current configuration, model, compact context, device and port status above these entries. Hide internal menu tags and display readable values while preserving stored values and command-line arguments. Keep menus readable at 80×24 characters. Group model selection, context, KV Cache and Generation under Model settings; group port editing, status refresh and stopping an occupying process under Server & port. Keep complete process details available there and in shutdown confirmations. Order saved configuration actions as Load configuration, Update current, Save as new configuration, Delete configuration and Back, keeping deletion after the other operations.
+Preserve versioned stable installation: README curl and installer download refer to the same published stable tag. main is development, and merging does not publish a release. Keep the installer version in its single release_tag value and regenerate the standalone artifact. Never move published tags. Use semantic versions and obtain approval for the exact version, candidate SHA and notes before tagging or publishing. Do not delete remote branches without approval.
 
-Use descriptive screen titles, Back controls in submenus and current-value selection where available. Remember the selected entry when returning from a setting or submenu. Loading a profile must still return to the main screen for review. Keep the running server screen's status, address, log access and Stop server control.
+## Approval
 
-## Visual style
-
-Keep the theme in `dialogrc` beside the script and apply it only to dialog invocations through `DIALOGRC`, never to the user's global configuration. Reflect the logo with standard terminal colors: a black background, light body text, white-on-blue titles, indicators, selected items and active buttons, and light thin borders. Use bold white for inactive button shortcuts. Blue identifies branding and focus; errors and status must remain explicit in text. Use the compact `MIR.CPP / STATION CONTROL` backtitle throughout, with readable descriptive screen titles and no decorative art. Keep body text in normal case, reserve uppercase for branding and existing status labels, and leave font selection to the terminal. Use flat borders without shadows, padded titles and consistent label/value alignment. Preserve spacing centrally with `--no-collapse`; keep the same style for menus, inputs, confirmations and the running server screen. Status must remain explicit in text, including FREE, IN USE, Modified, Loading and Ready; never rely on color alone. Use the existing shared color definitions rather than duplicating them. Exact shades follow the terminal palette; do not redefine that palette to reproduce the logo's RGB values. Preserve 80×24 readability and all existing navigation and safety controls. Do not add runtime dependencies beyond the documented platform requirements.
-
-## Configurable paths
-
-Keep llama.cpp and models paths configurable through the Folders menu, without fixed project-relative paths. Use a menu-based folder browser: Up/Down selects, Enter opens a directory, Parent folder goes up, Enter path accepts a typed or pasted path, and Use this folder separately confirms the current directory. Display the current path and brief instructions. Sort directories alphabetically, hide dot-prefixed directories initially and provide a Show/Hide hidden folders action. Back/Esc cancels without saving; manual paths must still allow hidden directories. Validate readable directories; the llama.cpp folder must contain executable `build/bin/llama-server` or `bin/llama-server`, preferring the source-build layout when both exist. Save accepted changes atomically in `${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/paths.conf`, separately from model profiles. Read this file as data, never source or eval. If saving fails, keep previous settings.
-
-Allow first-time configuration and correction of missing or invalid paths from the TUI. Empty model folders must show a clear message without exiting. Refresh recursive GGUF discovery when the folder changes and retain the selected model if still listed. Block launch with a clear message when the server or model is unavailable. Direct startup uses saved paths, with `MIR_LLAMA_CPP_DIR` and `MIR_MODELS_DIR` overrides supported.
-
-## Port and process management
-
-Check whether the selected TCP port is occupied when showing the configuration menu, after changing the port and immediately before startup. Show process IDs, names and owners when available. Unidentified listeners still block startup. Direct startup must report an occupied port and exit.
-
-Never automatically terminate an existing process. Before stopping listeners, show the affected processes and request explicit confirmation. Attempt normal shutdown with SIGTERM first; SIGKILL requires a separate confirmation. Check process identity before signalling to reduce the risk of acting on a reused PID. Report permission failures clearly and do not automatically elevate privileges. Preserve the running session's Stop server control and cleanup of its own server process.
-
-## Memory presentation
-
-Show compact free-memory telemetry only while the server is running, using Free GiB on Linux and macOS behind adapter services. Do not estimate memory before launch or build/invoke an external memory planner. On macOS, show approximate available system RAM with a ~ marker, using native vm_stat free, inactive and speculative pages and the reported page size. Never present process-local GPU allocation margins as available system RAM. Do not show RSS, pressure, swap, total RAM or device budgets in the compact telemetry. Missing, unsupported or malformed measurements show N/A and never block server controls. Preserve Linux's device-pool pagination in stable discovery order, 80×24 readability and the Linux/macOS architecture boundary. Keep the Linux screenshots current; do not add macOS screenshots. Preserve llama.cpp's native automatic memory fitting.
-
-## Portable performance settings
-
-Keep the Performance submenu limited to device selection, CPU threads, GPU layers, prompt processing and an advanced GPU memory submenu. Use llama.cpp's automatic choices by default: do not hardcode a GPU name, CPU thread count or a hardware-specific profile. Discover selectable devices through the installed server's `--list-devices`; keep Auto and CPU only available even when no accelerator is detected. Offer explicit multiple-device selection only through the Linux adapter capability and at least two distinct native device names with positive capacity and valid free memory. Missing/zero-memory entries and failed probes must not enable it. Use a checklist preserving existing selection order for per-device values; do not infer physical GPU identity from backend names. CPU only must disable GPU layers, regardless of the selected layer count.
-
-Preserve the same controls for direct startup through `MIR_DEVICE`, `MIR_THREADS`, `MIR_GPU_LAYERS` and `MIR_PROMPT_PROCESSING`. Validate thread and layer counts before launching. Automatic controls omit their corresponding arguments and allow native llama.cpp configuration to apply; explicit pass-through arguments remain supported.
-
-Keep GPU memory settings automatic by default. Support `MIR_SPLIT_MODE`, `MIR_TENSOR_SPLIT` and `MIR_FIT_TARGET` over the respective native `LLAMA_ARG_*` variables, preserving explicit trailing arguments and literal validation. Show the GPU memory panel only on Linux with multiple eligible devices active, deriving mode choices from installed server help; label tensor parallelism experimental. Explain proportions as relative values in device order and margins as fitting targets in MiB, not process memory limits or allocation guarantees. Preserve saved values but omit these launcher arguments in the TUI whenever the panel is inactive. Direct startup and explicit native arguments remain supported. Keep simultaneous requests and Flash Attention under native control. Keep device, CPU threads, GPU layers and prompt processing available on macOS; describe Metal as using built-in macOS GPU support rather than separately installed drivers.
-
-Prompt processing choices are Default (no batch overrides), Low memory (`--batch-size 512 --ubatch-size 128`) and Large batch (`--batch-size 2048 --ubatch-size 1024`). Explain the memory tradeoff and distinguish input processing from answer generation. Leave Flash Attention automatic and do not introduce model-specific tuning as defaults. Never promise a universal speed improvement; compare equivalent workloads before making performance claims.
-
-## KV Cache settings
-
-Keep separate K and V type selectors under Model settings → KV Cache, defaulting both to Q4_0. Offer Q4_0, Q8_0 and F16 as primary choices when advertised by the selected server; group its remaining advertised types under Other formats. Derive available types from the respective native help sections, excluding draft-cache options. Missing capability information must preserve the selection; do not invent supported types or silently replace a requested type.
-
-Pass both choices through `--cache-type-k` and `--cache-type-v` to the server. Preserve native Flash Attention controls and explain quantized V requirements and possible model/backend restrictions on mixed types. Let llama.cpp report runtime compatibility errors without model-specific launcher rules. Support `MIR_CACHE_TYPE_K` and `MIR_CACHE_TYPE_V` over native `LLAMA_ARG_CACHE_TYPE_K` and `LLAMA_ARG_CACHE_TYPE_V`, then q4_0 when unset; preserve explicit trailing argument precedence and literal validation. Persist both fields in profiles and keep sampling presets independent of them.
-
-## Generation settings
-
-Keep Default, Focused, Exploratory, Min-P and Custom sampling choices under Model settings → Generation. Default omits sampling arguments. Focused uses temperature 0.6, Top-P 0.95, Top-K 20 and Min-P 0; Exploratory changes temperature to 1; Min-P uses temperature 1, Top-P 1, Top-K 0 and Min-P 0.05. All three explicit presets set repeat penalty to 1 and presence/frequency penalties to 0. Treat presets as manual starting points, never universal quality guarantees or automatic model-family rules. Preserve context, device and performance settings when selecting a preset.
-
-Allow custom sampling values and separate seed and maximum output token controls. Applying a sampling preset preserves seed and output length. Derive the preset label from actual sampling values; persist values rather than a potentially stale label. Validate numeric inputs without evaluating them as code. Keep automatic values unset on the server command line. Support direct startup through MIR_GENERATION_PRESET and individual MIR_* generation controls, with legacy LLAMA_* aliases and explicit trailing arguments preserved. Explain that browser chat overrides can replace server defaults; never overwrite browser preferences or conversations.
-
-## Saved configurations
-
-Keep named profiles in `${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/profiles/`, one plain `key=value` file per profile. Read profiles as data; never use source or eval. Save the model path, context, port, device, threads, GPU layers, prompt processing, K/V cache types, GPU split mode, proportions, memory margin, temperature, Top-P, Top-K, Min-P, repeat penalty, presence penalty, frequency penalty, seed and maximum output tokens. Require only the model path when loading; ignore unknown or removed keys. Missing settings use documented launcher defaults independently of current settings or environment overrides: port 9931, q4_0 for both cache types and auto for all other controls. Reject malformed lines and invalid or duplicate recognized fields before applying anything. Loading must not rewrite profiles; saving writes only current fields. Do not persist conversations, arbitrary trailing arguments or unrelated environment settings.
-
-Validate every recognized field and the model file before applying any loaded settings; failures must preserve all current settings. Loading returns to the main menu without launching, and existing port checks still apply. Confirm replacement and deletion. Use safe profile names and atomic writes, report storage failures, and preserve direct startup behavior. Keep the menu and documentation in English.
-
-Show the current profile name (or Not saved) in the main summary and Saved configurations menu. Track the exact saved values of all twenty-one profile fields to show Modified only when they differ. Successful load and Save as set the current profile; successful Update current refreshes it after explicit overwrite confirmation. Share serialization between saving and comparison. Failed or canceled operations must preserve tracking and saved files. Deleting the current profile clears its association only after successful deletion while preserving current settings. Track the association for the running launcher session only; global paths remain separate, though selecting another model through folder discovery changes the profile's model field.
-
-## User documentation
-
-Keep `README.md` in English, short, practical and understandable without programming knowledge. Aim for 80–100 lines or fewer and keep the first-launch instructions easy to scan. Lead with what Mir.cpp does, then cover Linux and macOS support and CUDA validation status, minimal bootstrap prerequisites, assisted dependency installation on Ubuntu/Debian and macOS, quick installation with curl, starting `mir`, first-time folder selection and model selection through the TUI. Present the menus as the normal workflow: users choose discovered GGUF files inside Model settings rather than typing a model path into a command. Keep direct startup, environment overrides and pass-through arguments in the advanced user guide, preserving their functionality and compatibility. Keep complete manual dependency commands in the advanced guide. Distinguish launcher dependencies from the separate llama.cpp build, GPU drivers and model files; link to the official llama.cpp build instructions instead of duplicating them.
-
-Include two readable screenshots captured from the real terminal interface: the main menu and Model settings. Store them under `mir/docs/screenshots/`, use relative Markdown links, provide descriptive alt text and a short explanatory caption, and update them when the pictured interface changes. Do not fabricate interface elements, results or server readiness; omit unrelated desktop content and private paths. Keep images supplementary to usable text instructions.
-
-Keep installation steps, paths, menu labels, defaults and examples aligned with the actual script and installer. Explain port shutdown confirmations, model capability and memory limits, and the distinction between terminal configuration and browser chat in a few plain sentences. Do not claim that every model supports every context size. Put detailed menus, environment controls, sampling tables, maintenance, troubleshooting and development checks in `mir/docs/guide.md`, linked once from the README. Avoid a manual table of contents, exhaustive option tables, repeated explanations and implementation details in the README.
-
-## Mandatory user approval before changes
-
-EVERY MODIFICATION MUST WAIT FOR THE USER'S EXPLICIT APPROVAL BEFORE IT IS APPLIED. This includes changes to the launcher, supporting files and these instructions, as well as renaming or deleting them.
-
-Read-only inspection is allowed. Before editing, present the proposed changes and their purpose, then wait for approval. A general request to investigate, improve or fix the script is not approval of an unreviewed implementation. Approval applies only to the changes presented; additional changes require new approval. An explicit request to create this initial AGENTS.md authorizes its initial creation.
-
-## Mandatory final code elision
-
-At the end of every development task, review the changed portions and their relevant dependencies for redundant, unused or unnecessary content. Remove it within the approved scope while preserving required functionality, model compatibility and clear error handling. Do not expand the task into unrelated refactoring or a repository-wide cleanup. Documentation-only tasks need no code cleanup.
-
-Include this cleanup in the proposed changes submitted for approval. If further cleanup is discovered after approval, present it and wait for approval before applying it. Do not remove useful validation or configuration merely to shorten the script. If no removable code remains, state that the review found none.
-
-When shell code changes, verify it with Bash syntax checks and ShellCheck when available, plus focused checks appropriate to the changed behavior. For documentation-only changes, check accuracy, links and consistency instead. Follow the release and verification policy for additional checks. Report the changes, verification results and any remaining limitations.
-
-## Mir.cpp identity and compatibility
-
-Use `Mir.cpp` as the product name, `mir.sh` as the main source entry point, `mir` as the installed command, `MIR_ROOT` as the module root, and `MIR_*` for launcher-specific environment controls, including `MIR_LLAMA_CPP_DIR`, `MIR_MODELS_DIR` and `MIR_HOST`. Names describing llama.cpp itself, its executable, arguments and native environment settings must remain accurate. Keep descriptive generic module, function and state names rather than adding unnecessary branding.
-
-Use only `mir.sh` as the source entry point. Centralize launcher-control resolution with precedence `MIR_*`, then legacy `LLAMA_*` aliases. Explicitly set `MIR_*` values take precedence even when empty; retain the existing empty-value behavior of `LLAMA_*` aliases. Keep `LLAMA_CPP_DIR` as the legacy alias of `MIR_LLAMA_CPP_DIR`, and leave native llama.cpp variables such as `LLAMA_ARG_*` unchanged. Read values literally without eval, without altering the environment or leaving stale aliases between initializations.
-
-When `${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp` is absent, import the previous `llama-launcher` directory. Use a temporary copy and atomic activation, preserving originals and never merging with or overwriting existing Mir.cpp settings. Import failures must be clear and preserve the original data. Installing Mir.cpp creates its own command and data directory; preserve unrelated installations and commands. Old product names may appear only where required for compatibility, migration, documentation of those behaviors and their tests.
+Every modification requires explicit user approval of the proposed scope before application, including edits to these instructions, renames and deletions. Existing approval persists for the presented work and its included cleanup; do not repeatedly request it. Read-only investigation is allowed. Present additional changes outside that scope for approval before applying them.
