@@ -29,8 +29,8 @@ host-platform files, without launching a window. `native` includes that check,
 the actual window and, on macOS, desktop Store-feature Clippy checks. These two
 suites require the host's Tauri build prerequisites.
 
-CI runs frontend checks once and independent runtime/browser/native jobs on Linux
-and macOS CPU runners. Developing on one OS does not require the other OS's tools;
+CI runs frontend checks once and independent Linux/macOS jobs for runtime, browser
+and native checks on CPU runners. Developing on one OS does not require the other OS's tools;
 its actual process services, WebView and package behavior still need its CI runner.
 Playwright WebKit on Linux is useful renderer coverage, not a macOS WebView test.
 

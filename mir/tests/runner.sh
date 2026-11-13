@@ -44,5 +44,33 @@ printf '%s\n' "$*" >> "$TEST_TOOL_LOG"
                             env=environment, capture_output=True, text=True, timeout=5)
     assert result.returncode != 0 and 'Usage:' in result.stderr
     assert not (work/'commands').exists()
+
+    # Exercise Linux display dispatch on either host without a compositor or Xvfb.
+    (commands/'dirname').symlink_to(shutil.which('dirname'))
+    uname = commands/'uname'
+    uname.write_text('#!/bin/sh\nprintf "Linux\\n"\n')
+    uname.chmod(0o755)
+    headless = environment | {'PATH': str(commands), 'DISPLAY': '', 'WAYLAND_DISPLAY': ''}
+    result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), 'native'],
+                            env=headless, capture_output=True, text=True, timeout=5)
+    assert result.returncode != 0 and 'graphical session' in result.stderr, result.stderr
+    assert not (work/'commands').exists()
+    display_tools = {
+        'xvfb-run': '#!/bin/sh\nshift\nexec "$@"\n',
+        'dbus-run-session': '''#!/bin/sh
+[ "$1" = -- ] || exit 99
+[ "$LIBGL_ALWAYS_SOFTWARE" = 1 ] && [ "$WEBKIT_DISABLE_COMPOSITING_MODE" = 1 ] || exit 99
+printf 'virtual display and private bus\n' >> "$TEST_TOOL_LOG"
+''',
+    }
+    for name, body in display_tools.items():
+        executable = commands/name
+        executable.write_text(body)
+        executable.chmod(0o755)
+    result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), 'native'],
+                            env=headless, capture_output=True, text=True, timeout=5)
+    assert result.returncode == 0, result.stderr
+    assert (work/'commands').read_text().strip() == 'virtual display and private bus'
 print('PASS: frontend/browser checks need no Rust, runtime checks need no npm; invalid suites fail')
+print('PASS: headless native checks require display tools and request software rendering')
 PY
