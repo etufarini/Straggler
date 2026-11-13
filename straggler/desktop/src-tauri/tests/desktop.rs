@@ -11,17 +11,23 @@ use std::{
     time::Duration,
 };
 use straggler_desktop::{
-    configuration::environment::Environment, ChatMessage, ChatRequest, Runtime,
+    configuration::environment::Environment, platform, ChatMessage, ChatRequest, Runtime,
 };
 use uuid::Uuid;
 
-fn reserve_server_port() -> TcpListener {
+static NEXT_SERVER_PORT: AtomicU16 = AtomicU16::new(20000);
+
+fn reserve_server_port(next_port: &AtomicU16) -> TcpListener {
     // Keep server fixtures outside the default Linux/macOS ephemeral ranges:
     // concurrent HTTP clients can otherwise claim a released reservation before startup.
-    static NEXT_PORT: AtomicU16 = AtomicU16::new(20000);
     loop {
-        let port = NEXT_PORT.fetch_add(1, Ordering::Relaxed);
+        let port = next_port.fetch_add(1, Ordering::Relaxed);
         assert!(port < 30000, "No fixture server ports available");
+        // Match native startup: an IPv6 or another assigned-address listener
+        // also blocks launch even when IPv4 loopback can be reserved.
+        if platform::inspect_port(port).unwrap().occupied {
+            continue;
+        }
         // Do not reuse TIME_WAIT ports: the unrelated-listener fixture uses
         // an exclusive socket, unlike Rust's TcpListener::bind on Unix.
         let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
@@ -35,6 +41,28 @@ fn reserve_server_port() -> TcpListener {
             Err(error) => panic!("Cannot reserve fixture server port {port}: {error}"),
         }
     }
+}
+
+#[test]
+fn fixture_port_selection_skips_an_ipv6_listener() {
+    let reservation = reserve_server_port(&NEXT_SERVER_PORT);
+    let port = reservation.local_addr().unwrap().port();
+    drop(reservation);
+
+    let listener = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP)).unwrap();
+    listener.set_only_v6(true).unwrap();
+    listener
+        .bind(&std::net::SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], port)).into())
+        .unwrap();
+    listener.listen(1).unwrap();
+
+    // The IPv4 loopback address is free, but native launch must reject this port.
+    let ipv4 = TcpListener::bind(("127.0.0.1", port)).unwrap();
+    drop(ipv4);
+    assert!(platform::inspect_port(port).unwrap().occupied);
+    let next_port = AtomicU16::new(port);
+    let selected = reserve_server_port(&next_port);
+    assert_ne!(selected.local_addr().unwrap().port(), port);
 }
 
 struct Fixture {
@@ -60,7 +88,7 @@ impl Fixture {
         let server = llama.join("build/bin/llama-server");
         fs::write(&server, include_str!("../../tests/fixtures/server.py")).unwrap();
         fs::set_permissions(&server, fs::Permissions::from_mode(0o755)).unwrap();
-        let reservation = reserve_server_port();
+        let reservation = reserve_server_port(&NEXT_SERVER_PORT);
         let port = reservation.local_addr().unwrap().port();
         let record = root.join("request.json");
         let variables = std::collections::BTreeMap::from([
