@@ -21,8 +21,25 @@ jobs:
   backend-packaging:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.packaging }}
     uses: ./.github/workflows/backend-packaging.yml
+  frontend:
+    name: Frontend without native build tools
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mir/desktop/package-lock.json
+      - name: Frontend dependencies
+        working-directory: mir/desktop
+        run: npm ci --no-audit --no-fund
+      - name: Frontend checks
+        run: bash mir/tests/run.sh frontend
   check:
-    name: Wrapper and GUI on ${{ matrix.suite }}
+    name: Runtime and native GUI on ${{ matrix.suite }}
     strategy:
       fail-fast: false
       matrix:
@@ -60,10 +77,14 @@ jobs:
           npx playwright install --with-deps chromium webkit
       - name: Shared checks
         run: bash mir/tests/run.sh common
-      - name: Platform checks
-        run: bash mir/tests/run.sh "${{ matrix.suite }}"
-      - name: Desktop checks without inference
-        run: bash mir/tests/run.sh desktop
+      - name: Both adapter contracts and host OS checks
+        run: |
+          bash mir/tests/run.sh linux
+          bash mir/tests/run.sh macos
+      - name: Rust runtime without GUI or inference
+        run: bash mir/tests/run.sh runtime
+      - name: Browser flows on the host platform
+        run: bash mir/tests/run.sh browser
       - name: Native window on Linux
         if: runner.os == 'Linux'
         # Xvfb supplies a display, but no desktop session or GPU compositor.
@@ -74,3 +95,10 @@ jobs:
       - name: Native window on macOS
         if: runner.os == 'macOS'
         run: bash mir/tests/run.sh native
+      - name: Retain browser and native-window evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-checks-${{ matrix.suite }}
+          path: mir/desktop/test-results/
+          if-no-files-found: warn

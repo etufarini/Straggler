@@ -11,11 +11,28 @@ rustfmt and Clippy. Native window builds also require the platform's
 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 From the repository root, run `bash mir/tests/run.sh` for the complete automated
-suite, including the native window when a graphical session is available, or select `common`, `linux`, `macos`, `desktop`, `native` or `packaging`. The runner
-prepares npm dependencies and browser downloads when needed. Tests use isolated
+suite, including the native window when a graphical session is available. Select
+`frontend` for formatting, lint, types, production assets and unit contracts;
+`browser` for Chromium/WebKit flows; or `runtime` for Rust checks without the GUI.
+Frontend/browser work needs no Rust or native Tauri packages. Runtime work needs
+Rust and Python for local server fixtures, but no npm or Tauri GUI build. Rust
+tests still need the host linker (Apple command line tools on macOS).
+`desktop` combines these three suites. The runner prepares npm dependencies and
+browser downloads only for suites that use them. Tests use isolated
 directories, fake executables and a local HTTP server; no GPU, models or working
 llama.cpp installation are needed. Linux native-window tests use a private D-Bus
 session, Xvfb and software rendering, as configured in the CI workflow.
+`common`, `linux`, `macos` and `packaging` remain focused launcher/packaging suites.
+Both adapter contract suites run on either OS; native checks explicitly skip the
+opposite host. `isolation` compiles the real desktop from only common and
+host-platform files, without launching a window. `native` includes that check,
+the actual window and, on macOS, desktop Store-feature Clippy checks. These two
+suites require the host's Tauri build prerequisites.
+
+CI runs frontend checks once and independent runtime/browser/native jobs on Linux
+and macOS CPU runners. Developing on one OS does not require the other OS's tools;
+its actual process services, WebView and package behavior still need its CI runner.
+Playwright WebKit on Linux is useful renderer coverage, not a macOS WebView test.
 
 From this directory, `npm run dev` opens the frontend development server.
 Append `?scenario=empty`, `cpu`, `multiple`, `unknown-memory`, `occupied`,

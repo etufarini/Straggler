@@ -7,7 +7,10 @@ if [[ "$RUNTIME_BASH" != "$BASH" ]]; then exec "$RUNTIME_BASH" "${BASH_SOURCE[0]
 # Test subprocesses use the same compatible interpreter as this runner.
 export PATH="${BASH%/*}:$PATH"
 suite=${1:-all}
-case "$suite" in common|linux|macos|desktop|native|packaging|all) ;; *) printf 'Usage: bash mir/tests/run.sh [common|linux|macos|desktop|native|packaging|all]\n' >&2; exit 1 ;; esac
+case "$suite" in
+    common|linux|macos|frontend|runtime|browser|desktop|isolation|native|packaging|all) ;;
+    *) printf 'Usage: bash mir/tests/run.sh [common|linux|macos|frontend|runtime|browser|desktop|isolation|native|packaging|all]\n' >&2; exit 1 ;;
+esac
 if (( $# > 1 )); then exit 1; fi
 lint_pids=()
 finish_lint() {
@@ -27,6 +30,20 @@ run() {
         printf 'FAIL: %s\n' "$1" >&2
         return 1
     fi
+}
+require_tools() {
+    local tool
+    for tool in "$@"; do
+        command -v "$tool" >/dev/null || {
+            printf 'Missing developer tool: %s. See mir/desktop/README.md.\n' "$tool" >&2
+            return 1
+        }
+    done
+}
+desktop_dependencies() {
+    require_tools npm
+    cd -- "$MIR_ROOT/desktop"
+    if [[ ! -d node_modules ]]; then npm ci --no-audit --no-fund; fi
 }
 if [[ "$suite" == common || "$suite" == all ]]; then
     run architecture.sh
@@ -56,9 +73,11 @@ if [[ "$suite" == common || "$suite" == all ]]; then
     run regression.sh
     run portability.sh
     run bootstrap.sh
+    run runner.sh
     finish_lint
 fi
 if [[ "$suite" == packaging ]]; then
+    require_tools cargo python3
     python3 -I "$MIR_ROOT/desktop/tests/test_macos_packaging.py"
     python3 -I "$MIR_ROOT/desktop/tests/test_ubuntu_packaging.py"
     cargo test --locked --manifest-path "$MIR_ROOT/desktop/src-tauri/Cargo.toml" --no-default-features --test bundled_backend --test direct_start
@@ -79,39 +98,50 @@ if [[ "$suite" == macos || "$suite" == all ]]; then
     run native/macos.sh
 fi
 
-if [[ "$suite" == desktop || "$suite" == all || "$suite" == native ]]; then
-    for tool in npm cargo python3; do
-        command -v "$tool" >/dev/null || { printf 'Missing developer tool: %s. See mir/desktop/README.md.\n' "$tool" >&2; exit 1; }
-    done
-    cd -- "$MIR_ROOT/desktop"
-    if [[ ! -d node_modules ]]; then npm ci --no-audit --no-fund; fi
-    if [[ "$suite" == native ]]; then
-        npm run test:native
-    else
-        npm run format:check
-        npm run lint
-        npm run build
-        cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-        cargo clippy --locked --manifest-path src-tauri/Cargo.toml --no-default-features --all-targets -- -D warnings
-        npm test
-        npm run test:runtime
-        if [[ "$PLATFORM_ID" == macos ]]; then
-            cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features --features app-store --test store_distribution
-            cargo clippy --locked --manifest-path src-tauri/Cargo.toml --features app-store --all-targets -- -D warnings
-        fi
-        npm exec -- playwright install chromium webkit
-        npm run test:e2e
+if [[ "$suite" == frontend || "$suite" == desktop || "$suite" == all ]]; then
+    desktop_dependencies
+    npm run format:check
+    npm run lint
+    npm run build
+    npm test
+fi
+if [[ "$suite" == runtime || "$suite" == desktop || "$suite" == all ]]; then
+    require_tools cargo python3
+    manifest="$MIR_ROOT/desktop/src-tauri/Cargo.toml"
+    cargo fmt --manifest-path "$manifest" -- --check
+    cargo clippy --locked --manifest-path "$manifest" --no-default-features --all-targets -- -D warnings
+    cargo test --locked --manifest-path "$manifest" --no-default-features
+    if [[ "$PLATFORM_ID" == macos ]]; then
+        cargo test --locked --manifest-path "$manifest" --no-default-features --features app-store --test store_distribution
     fi
 fi
-
-if [[ "$suite" == all ]]; then
+if [[ "$suite" == browser || "$suite" == desktop || "$suite" == all ]]; then
+    desktop_dependencies
+    npm exec -- playwright install chromium webkit
+    npm run test:e2e
+fi
+if [[ "$suite" == isolation ]]; then
+    require_tools cargo python3
+    run desktop-isolation.sh
+fi
+if [[ "$suite" == native || "$suite" == all ]]; then
     if [[ "$PLATFORM_ID" == linux && -z ${DISPLAY:-} && -z ${WAYLAND_DISPLAY:-} ]]; then
-        if command -v xvfb-run >/dev/null; then
-            xvfb-run -a "$BASH" "$MIR_ROOT/tests/run.sh" native
+        if command -v xvfb-run >/dev/null && command -v dbus-run-session >/dev/null; then
+            LIBGL_ALWAYS_SOFTWARE=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 \
+                xvfb-run -a dbus-run-session -- "$BASH" "$MIR_ROOT/tests/run.sh" native
+        elif [[ "$suite" == all ]]; then
+            printf 'SKIP: native GUI needs a graphical session or xvfb-run and dbus-run-session; CI runs this check.\n'
         else
-            printf 'SKIP: native GUI needs a graphical session or xvfb-run; CI runs this check.\n'
+            printf 'Native GUI needs a graphical session or xvfb-run and dbus-run-session.\n' >&2
+            exit 1
         fi
     else
+        require_tools cargo python3
+        run desktop-isolation.sh
+        desktop_dependencies
+        if [[ "$PLATFORM_ID" == macos ]]; then
+            cargo clippy --locked --manifest-path src-tauri/Cargo.toml --features app-store --all-targets -- -D warnings
+        fi
         npm run test:native
     fi
 fi

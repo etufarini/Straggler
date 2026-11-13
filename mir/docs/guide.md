@@ -411,22 +411,46 @@ server and close the desktop first. An unrelated command is never replaced or re
 Mir.cpp is written for humans to read, maintain, and improve. Keep responsibilities
 explicit and use the formatter instead of compressing control flow or JSX.
 
-Developer tools are Bash 4.4+, Python 3, compatible Node/npm and Rust with rustfmt
-and Clippy. ShellCheck is recommended. Native builds additionally need the platform's
-Tauri prerequisites; these are development dependencies, not inference hardware.
+Use either Linux or macOS as the development host. Keep shared React and Rust
+behavior common, with OS services behind the shell/Rust platform adapters. Native
+dependencies and Tauri bundle configuration belong to the selected OS. A Linux
+checkout can prepare the desktop without macOS implementation files, and vice versa.
+
+The test entry point requires Bash 4.4+. Install compatible Node/npm for frontend
+work, Rust with rustfmt/Clippy and Python 3 for runtime work, or both sets for the
+complete suite. ShellCheck is recommended for launcher changes. Native builds also
+need the host platform's [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/);
+these are development dependencies, not inference hardware.
+Rust tests need a working host linker, including Apple command line tools on macOS,
+even when the Tauri GUI is disabled.
 
 ```bash
-bash mir/tests/run.sh          # Common, platform, desktop and available native-window checks
-bash mir/tests/run.sh common   # Launcher and preparation tests
-bash mir/tests/run.sh desktop  # Frontend, contracts, Rust and browser flows
-bash mir/tests/run.sh native   # Real desktop window with local test server
+bash mir/tests/run.sh           # All suites and available host-native checks
+bash mir/tests/run.sh frontend  # Formatting, lint, types, assets and unit contracts; no Rust
+bash mir/tests/run.sh browser   # Chromium/WebKit flows; no Rust or native Tauri build
+bash mir/tests/run.sh runtime   # Rust fmt, Clippy and tests; no npm or GUI build
+bash mir/tests/run.sh desktop   # Frontend + runtime + browser
+bash mir/tests/run.sh common    # Launcher, preparation, architecture and runner contracts
+bash mir/tests/run.sh linux     # Linux adapter/installer contracts, native checks on Linux
+bash mir/tests/run.sh macos     # macOS adapter/installer contracts, native checks on macOS
+bash mir/tests/run.sh isolation # Compile from shared + host-only sources; no window
+bash mir/tests/run.sh native    # Isolation check and real window with local test server
 bash mir/tests/run.sh packaging # Offline archive and backend lifecycle checks
 ```
 
-The runner prepares missing npm dependencies and Playwright browsers. It never
-installs system packages or downloads model weights. Tests isolate HOME and XDG
-directories. Native OS checks run on the matching host and report other checks
-as skipped. Linux native-window tests need a graphical session or `xvfb-run`.
+The runner prepares missing npm dependencies and Playwright browsers only when
+the selected suite needs them. It never installs system packages or downloads
+model weights. Tests isolate HOME and XDG directories. Both platform contract
+suites run on either host with fake OS commands; native OS checks run on the
+matching host and report other checks as skipped. Headless Linux native-window
+tests use `xvfb-run`, a private `dbus-run-session` and software rendering. `all`
+reports a skip if these tools and a display are unavailable; explicit `native`
+fails with setup instructions instead of silently skipping.
+
+`isolation` copies only the files selected by the installation manifests and
+compiles the actual desktop, including the Store feature on macOS. This checks
+that the opposite platform's sources/configuration are unnecessary. It reuses
+the checkout's Cargo build cache but does not install tools or start the app.
 
 For UI work, run `npm run dev` from mir/desktop and open one of these URLs:
 
@@ -467,8 +491,22 @@ is enabled only by the explicit `native-tests` feature in debug builds; release
 compilation rejects that feature. The harness uses the standard HTTP protocol,
 without a custom WebKit inspector client or another JavaScript test framework.
 
-CI runs common, platform, desktop and native-window checks on Ubuntu and macOS
-CPU runners. A developer needs one personal computer. Real inference and GPU checks
+CI runs frontend checks in a separate job, plus common checks, both adapter
+contracts, runtime tests, browser flows and native-window checks independently on
+Ubuntu and macOS CPU runners. Native macOS checks also compile the Store GUI
+feature. The optional packaging workflow builds the actual platform packages on
+their matching runners. See [GitHub job matrices](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/run-job-variations).
+
+The host's runtime tests exercise its actual process and filesystem services.
+Browser fixtures validate common UI behavior; even Playwright WebKit on Linux
+does not validate macOS WKWebView or sandbox permissions. The embedded
+[Tauri WebDriver](https://v2.tauri.app/develop/tests/webdriver/) exercises each host's
+real window. Bundle construction, OS file pickers, signing and sandbox grants
+still need the corresponding platform; do not report opposite-host fixture
+success as native validation. macOS bundle builds use a Mac runner, as described
+in [Tauri's bundle guide](https://v2.tauri.app/distribute/macos-application-bundle/).
+
+A developer needs one personal computer. Real inference and GPU checks
 are optional diagnostics for the external integration, never a GUI development or
 release gate. Validate API and command contracts, error handling and user flows;
 llama.cpp remains responsible for inference correctness and backend performance.
