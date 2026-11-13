@@ -46,7 +46,7 @@ jobs:
         os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
     env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/straggler-playwright
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
     steps:
       - uses: actions/checkout@v7
         with:
