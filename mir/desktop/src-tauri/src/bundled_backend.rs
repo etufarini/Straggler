@@ -1,4 +1,4 @@
-//! Packaging diagnostics bypass the launcher, configuration and personal data.
+//! Packaging diagnostics use isolated configuration and data.
 
 use crate::Result;
 use serde::Serialize;

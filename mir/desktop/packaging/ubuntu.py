@@ -117,7 +117,7 @@ def prepare(target, archive_path=None):
         files = {"/" + INSTALL_BACKEND: str(destination / "backend")}
         files.update({"/usr/share/doc/mir-cpp/" + installed: str(destination / source)
                       for source, installed in DOCUMENTS.items()})
-        config = {"mainBinaryName": "mir", "bundle": {
+        config = {"bundle": {
             "targets": ["deb"],
             "linux": {"deb": {
                 "depends": ["libc6 (>= 2.39)", "libstdc++6", "libgomp1", "libssl3t64 | libssl3"],
@@ -141,7 +141,13 @@ def verify_package(package, prepared, target):
         for name, installed_name in DOCUMENTS.items():
             if (root / "usr/share/doc/mir-cpp" / installed_name).read_bytes() != (prepared / name).read_bytes():
                 raise ValueError(f"Incorrect packaged resource: {name}")
-        executable = root / "usr/bin/mir"
+        executable = root / "usr/bin/mir-desktop"
+        if (root / "usr/bin/mir").exists():
+            raise ValueError("The package must not install the removed mir launcher")
+        entries = list((root / "usr/share/applications").glob("*.desktop"))
+        if not any(line == "Exec=mir-desktop" or line.startswith("Exec=mir-desktop ")
+                   for entry in entries for line in entry.read_text().splitlines()):
+            raise ValueError("The application menu must launch mir-desktop")
         environment = {key: value for key, value in os.environ.items()
                        if not key.startswith(("MIR_", "LLAMA_", "LD_", "XDG_"))}
         environment.update(HOME=str(root), PATH="/usr/bin:/bin",
@@ -151,13 +157,6 @@ def verify_package(package, prepared, target):
             if "not found" in result.stdout:
                 raise ValueError(f"Unresolved dependency in {binary.name}: {result.stdout}")
         subprocess.run([str(executable), "--mir-check"], env=environment, check=True, timeout=20)
-        fixture = root / "direct-check.gguf"
-        fixture.write_bytes(b"Invalid GGUF packaging fixture; not model weights.\n")
-        direct = subprocess.run([str(executable), str(fixture), "--port", "65535", "--help"],
-                                env=environment, capture_output=True, text=True, timeout=30)
-        if direct.returncode != 0 or "--model" not in direct.stdout + direct.stderr:
-            raise ValueError("The installed mir command did not pass direct-start arguments to its backend:\n"
-                             + direct.stdout + direct.stderr)
         for flag in ("--version", "--help"):
             result = subprocess.run([str(installed / "llama-server"), flag], env=environment,
                                     capture_output=True, text=True, check=True, timeout=30)
@@ -165,7 +164,7 @@ def verify_package(package, prepared, target):
                 manifest = json.loads((prepared / "backend-provenance.json").read_text())
                 if manifest["commit"][:7] not in result.stdout + result.stderr:
                     raise ValueError("The packaged backend does not report the pinned source commit")
-        print(f"Verified {target} package, resources, dynamic loaders, direct startup and backend version/help: {package}")
+        print(f"Verified {target} package, resources, dynamic loaders and backend version/help: {package}")
 
 
 def main():

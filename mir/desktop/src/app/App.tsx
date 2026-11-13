@@ -135,8 +135,7 @@ export default function App() {
         )}
         {!native && (
           <div className="notice">
-            This is the interface preview. Start the desktop app with <code>bash mir/mir.sh</code>{' '}
-            to use local models.
+            This is the interface preview. Open the Mir.cpp desktop app to use local models.
           </div>
         )}
         <ServerFeedback controller={controller} />

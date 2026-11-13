@@ -9,66 +9,57 @@ your model settings and conversations on your computer.
 
 Mir.cpp is written for humans to read, maintain, and improve.
 
-This development branch introduces the desktop interface. The published stable
-release is still **v1.0.0**, which uses terminal menus and browser chat.
-To try this branch's desktop, run `bash mir/mir.sh` from its checkout.
-
-Mir.cpp targets Linux and macOS. llama.cpp supplies CPU and accelerator support;
-packaged backends are pinned to a selected upstream release. External builds remain
-selectable. Earlier hardware checks apply to their recorded configurations.
-
 [<img src="mir/docs/screenshots/desktop-chat.png" alt="Mir.cpp desktop conversation screen before configuring a model" width="640">](mir/docs/screenshots/desktop-chat.png)
 
-*Choose a model and chat locally. This first-launch screen shows no inference.*
+*First-launch screen, before loading a model.*
 
-## Requirements
+## Installation
 
-- A graphical Linux session or macOS 13.5 or newer.
-- For source preparation: Bash, curl, working HTTPS certificates and network access.
-- For source preparation on macOS, an existing [Homebrew](https://brew.sh/) installation.
-- For chat, a GGUF supported by your llama.cpp build and enough hardware memory.
+The desktop is intended for distribution as precompiled packages: a macOS disk
+image and an Ubuntu Debian package, each including a pinned llama.cpp backend.
+**No desktop release has been published yet.** The older v1.0.0 terminal edition
+is separate from this development branch.
 
-Source startup prepares the desktop automatically. The running desktop uses native
-Rust services and does not require Bash or Python. Missing system packages require your
-consent; assisted installation supports Ubuntu/Debian and existing Homebrew setups.
-Model files and GPU drivers are separate requirements. Building llama.cpp on macOS
-also requires Apple's command line tools. See the
-[official llama.cpp build instructions](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md).
+When desktop packages are released, open the macOS disk image and drag Mir.cpp to
+Applications, or install the Ubuntu `.deb` with your package manager. Launch
+**Mir.cpp** from Applications or the desktop application menu.
 
-## Stable installation
+Requirements:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/etufarini/Mir.cpp/v1.0.0/mir/sh/install.sh | bash
-mir
-```
+- macOS 13.5+ or a graphical Ubuntu 24.04+ session, on a supported architecture.
+- A local GGUF supported by the selected llama.cpp backend and enough memory.
+- Any GPU drivers required by an external backend.
 
-This installs the published **v1.0.0 terminal edition** for your user in
-`~/.local/share/mir.cpp/` and creates `~/.local/bin/mir`. The desktop changes in
-this branch have not been published. Existing profiles remain compatible.
+Packaged startup needs no Bash, Python, Node.js or Rust toolchain. Model weights
+are supplied separately. The regular desktop also accepts an existing external
+llama.cpp build; capabilities are discovered from that build.
 
-## Desktop first launch
+## First launch
 
-```bash
-bash mir/mir.sh
-```
+1. In **Settings → Folders**, choose your models folder. Subfolders are searched too.
+2. Choose a model in **Model settings**, review its settings and launch the server.
+3. Start chatting. Optionally save your settings in **Saved configurations**.
 
-1. Open **Settings → llama.cpp** to review the bundled backend or choose an external
-   build. Source builds without a bundled backend need an existing llama.cpp folder.
-2. Choose your **Models folder** in **Folders**. Subfolders are searched too.
-3. Choose a model in **Model settings**, review its settings and launch the server.
-4. Optionally save the configuration through **Saved configurations**.
+**Modified** marks changes to a saved configuration. **Restart required** marks
+changes to the running server. Stop response preserves partial text; closing the
+app confirms shutdown of its server.
 
 [<img src="mir/docs/screenshots/desktop-settings.png" alt="Mir.cpp model settings before choosing a GGUF" width="640">](mir/docs/screenshots/desktop-settings.png)
 
-*Model and server settings stay separate from conversations.*
+## Try the source locally
 
-**Modified** marks changes to a saved configuration. **Restart required** marks
-changes to the running server. Model capabilities and usable context vary;
-missing memory information does not prevent using the controls.
+Install Node.js 22.13+, 24 or 26+, Rust 1.92+ and the platform's
+[Tauri development prerequisites](https://v2.tauri.app/start/prerequisites/), then
+run from the repository root:
 
-**Stop response** keeps partial text. Closing the app confirms shutdown of its
-server. An occupied port blocks startup; stopping another process requires
-confirmation, with a separate confirmation for a force stop.
+```bash
+npm --prefix mir/desktop ci
+npm --prefix mir/desktop run desktop
+```
 
-See the [user and developer guide](mir/docs/guide.md) for settings, direct startup,
-updates, removal, troubleshooting and development without inference hardware.
+After setup, only the second command is needed. A source development session has
+no bundled backend: select an existing llama.cpp folder in **Settings → llama.cpp**.
+You can open the app without model weights or an inference service.
+
+See the [user and developer guide](mir/docs/guide.md) for settings, projects,
+data locations, development checks, packaging and troubleshooting.

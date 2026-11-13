@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   packaging:
-    name: Sandbox check on ${{ matrix.target }}
+    name: macOS packages on ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
@@ -40,8 +40,16 @@ jobs:
           rustup default stable
           rustup target add "${{ matrix.target }}"
           npm ci --no-audit --no-fund
-      - name: Build and sign the sandboxed packaging check
+      - name: Build the desktop application and disk image
         run: python3 packaging/macos.py bundle --target "${{ matrix.target }}"
+      - name: Retain the local desktop candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-package-${{ matrix.target }}
+          path: mir/desktop/packaging/generated/build/${{ matrix.target }}/release/bundle/macos/*.dmg
+          if-no-files-found: error
+      - name: Build and sign the sandboxed packaging check
+        run: python3 packaging/macos.py bundle --probe --target "${{ matrix.target }}"
       - name: Run with system tools only and no model
         env:
           CHECK_TARGET: ${{ matrix.target }}
@@ -54,7 +62,7 @@ jobs:
           import tempfile
 
           generated = Path('packaging/generated').resolve()
-          app = generated / 'build' / os.environ['CHECK_TARGET'] / 'release/bundle/macos/Mir.cpp Backend Check.app'
+          app = generated / 'build-probe' / os.environ['CHECK_TARGET'] / 'release/bundle/macos/Mir.cpp Backend Check.app'
           executable = app / 'Contents/MacOS/mir-desktop'
           environment = {key: value for key, value in os.environ.items()
                          if not key.startswith(('MIR_', 'LLAMA_'))}

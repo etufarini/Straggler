@@ -2,11 +2,11 @@
 
 ## Purpose and boundaries
 
-Mir.cpp is a GUI and launcher wrapper, not an inference engine. Development and required automated checks must run without GPU hardware, model weights, or a working llama.cpp installation. Validate Mir.cpp's interface contracts, user flows, persistence, and process lifecycle. Real inference and backend hardware checks are optional integration diagnostics.
+Mir.cpp is a desktop application and llama.cpp supervisor, not an inference engine. Development and required automated checks must run without GPU hardware, model weights, or a working llama.cpp installation. Validate Mir.cpp's interface contracts, user flows, persistence, and process lifecycle. Real inference and backend hardware checks are optional integration diagnostics.
 
-Target Linux and macOS with Tauri 2, React and TypeScript. Keep device discovery and inference delegated to the installed llama.cpp. Derive selectable features from its advertised capabilities; do not hardcode models, device names, hardware vendors or assumed memory capacity. Missing telemetry must not block server controls. Earlier hardware records describe only those configurations, not validation of later GUI changes.
+Target Linux and macOS with Tauri 2, React and TypeScript. Keep device discovery and inference delegated to the selected llama.cpp backend. Derive selectable features from its advertised capabilities; do not hardcode models, device names, hardware vendors or assumed memory capacity. Missing telemetry must not block server controls. Earlier hardware records describe only those configurations, not validation of later GUI changes.
 
-The desktop is the normal interface. Preserve direct startup with a GGUF path, native argument pass-through, existing settings and installation layout. Remove the compatibility TUI; do not introduce a second interactive interface. All code comments, UI messages and project documentation must be in English.
+The desktop is the only application interface. Distribute precompiled native packages with a pinned backend. Preserve existing settings and conversation formats. Do not reintroduce a TUI, public command-line launcher or curl installer. All code comments, UI messages and project documentation must be in English.
 
 ## Human-readable code
 
@@ -18,21 +18,21 @@ At the end of development, review changed code and its dependencies for redundan
 
 ## Repository structure
 
-Keep the visible root limited to README.md, AGENTS.md, LICENSE and mir/. The only shell launcher entry point is mir/mir.sh; installed startup remains mir. Resolve resources from MIR_ROOT independently of the working directory, including bundled desktop resources.
+Keep the visible root limited to README.md, AGENTS.md, LICENSE and mir/. Keep desktop code in mir/desktop/, the development test runner in mir/tests/run.sh, and documentation in mir/docs/. Use npm --prefix mir/desktop run desktop for local native development. Resolve bundled resources relative to the executable or native resource directory, independently of the working directory.
 
-Keep shared launcher behavior in mir/lib/, platform adapters in mir/lib/platform/, shell tests in mir/tests/, the installer in mir/sh/, desktop code in mir/desktop/, and documentation in mir/docs/. Use explicit module imports. Adapters define functions without effects on import; shared features call platform services rather than branching on the OS. Linux must work without macOS files or Homebrew. Keep bootstrap syntax compatible with macOS Bash 3.2, then select and reuse Bash 4.4+ without changing the user's shell.
+Keep configuration, discovery and process supervision in Rust. Separate platform services into native Linux/macOS modules. Linux must work without macOS files or Homebrew. The app must not invoke shell/Python helpers or install build tools and system packages at runtime. Python packaging utilities and test fixtures are development tools only. The test runner must work with macOS system Bash 3.2 without a replacement shell.
 
-Organize the frontend into app composition, features, shared components, domain data and a typed desktop service. Keep Tauri IPC access in that service. Separate edited settings, saved settings and the active server configuration. Keep native commands thin and separate bridge operations, process supervision, builds, streaming and history.
+Organize the frontend into app composition, features, shared components, domain data and a typed desktop service. Keep Tauri IPC access in that service. Separate edited settings, saved settings and the active server configuration. Keep native commands thin and separate configuration, process supervision, streaming and history.
 
 ## Configuration and compatibility
 
-Use Mir.cpp, mir.sh, mir, MIR_ROOT and MIR_* consistently. Preserve MIR_* precedence over legacy LLAMA_* aliases, including explicit empty MIR_* values; leave native LLAMA_ARG_* variables unchanged. Read configuration and profiles as literal data, never source or eval.
+Use Mir.cpp for the product, mir-desktop for its native executable, and MIR_* for environment controls. Preserve MIR_* precedence over legacy LLAMA_* aliases, including explicit empty MIR_* values; leave native LLAMA_ARG_* variables unchanged. Read configuration and profiles as literal data, never source or eval.
 
 Keep paths in ${XDG_CONFIG_HOME:-$HOME/.config}/mir.cpp/paths.conf and profiles in its profiles/ directory. Preserve release and earlier desktop profile compatibility: validate recognized fields transactionally, ignore removed or unknown keys, and initialize missing fields from documented defaults independently of the current session. Loading returns to configuration review without launching. Compare and save through the same field serialization; confirm overwrite and deletion. Keep migration atomic, preserve originals and never merge over existing settings.
 
 Folders must be configurable and readable. Accept source builds with build/bin/llama-server and packaged builds with bin/llama-server. Discover GGUF files recursively, allow empty model folders, and report missing server/model files clearly. Browsing, accepting a directory and canceling are separate actions; hidden directories remain accessible.
 
-Preserve release defaults, sampling presets, seed/output independence, cache types and advanced GPU settings. Discover supported cache types and split modes through native help. Auto omits the corresponding arguments; CPU only disables GPU layers. Explicit trailing arguments retain precedence. Do not infer model support from filenames or hardware identity from backend labels.
+Preserve release defaults, sampling presets, seed/output independence, cache types and advanced GPU settings. Discover supported cache types and split modes through native help. Auto omits the corresponding arguments; CPU only disables GPU layers. Do not infer model support from filenames or hardware identity from backend labels.
 
 ## Desktop behavior and data
 
@@ -42,23 +42,23 @@ Store conversations under ${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/desktop/,
 
 Start supervised desktop servers on loopback without opening a browser. Check ports before startup and after changes; unidentified listeners still block launch. Show available process details, recheck identity before signaling, request explicit SIGTERM confirmation for unrelated listeners and separate SIGKILL confirmation. Never elevate process-control permissions. Closing the app confirms cancellation, saving and cleanup of its own processes.
 
-## Preparation and installation
+## Development and distribution
 
-Source and installed startup prepare the same embedded desktop automatically. Reuse compatible Node/Rust tools or checksum-verified private toolchains. Cache verified builds by source content, supervise cancellation and run compilation as the user. Internal bridge calls bypass GUI preparation. System package installation requires consent and is limited to supported Ubuntu/Debian or existing Homebrew setups; model files and GPU drivers remain external requirements.
+Use existing Node/npm, Rust and platform development dependencies. Document explicit setup with npm ci; do not download private toolchains or compile during installed startup. Ship the pinned backend and its required libraries, licenses and provenance with native packages. Model files and GPU drivers remain external requirements. Backend updates arrive through application updates; the regular desktop may select an existing external build.
 
-Keep mir/sh/install.sh generated from install-core.sh and canonical adapters using build-install.sh; verify with --check. Update extraction manifests when moving runtime files. Activate an installed update only after desktop preparation succeeds, preserve the working installation on failure, and reject updates during an active desktop session.
+Keep macOS GUI packaging the default; sandbox diagnostics and the App Store variant are explicit options. Keep signing and sandbox entitlements appropriate to each variant. Verify extracted Debian payloads, native resource paths, dynamic dependencies and the pinned backend identity. Build packages on matching target architectures. Local ad hoc signing is not distribution signing or notarization. Preparing packages does not publish a release.
 
 ## Verification
 
-Use bash mir/tests/run.sh as the development entry point. Keep focused suites available and report skipped checks. Required checks use temporary user directories, fake executables and local HTTP fixtures; they must not install system packages, contact inference services or use personal configuration. Verify test fixtures against real bridge contracts and pinned upstream examples/documentation to prevent drift.
+Use bash mir/tests/run.sh as the development entry point. Keep focused suites available and report skipped checks. Required checks use temporary user directories, fake executables and local HTTP fixtures; they must not install system packages, contact inference services or use personal configuration. Verify test fixtures against native service contracts and pinned upstream examples/documentation to prevent drift.
 
-Run Bash syntax checks and ShellCheck for shell changes, frontend type/lint/format checks, relevant unit and integration suites, and Linux/macOS CI. Test native windows, resources and process behavior on CPU runners of each target OS. Exercise storage failures, cancellation, process identity, migration and installation rollback when affected. No GPU, inference workload or hardware inventory is a release gate. Choose representative interactions and boundaries rather than exhaustive combinations or coverage quotas.
+Run Bash syntax checks and ShellCheck for shell changes, frontend type/lint/format checks, relevant unit and integration suites, and Linux/macOS CI. Test native windows, resources and process behavior on CPU runners of each target OS. Exercise storage failures, cancellation, process identity, migration and transactional backend preparation when affected. No GPU, inference workload or hardware inventory is a release gate. Choose representative interactions and boundaries rather than exhaustive combinations or coverage quotas.
 
 ## Documentation and releases
 
-Keep README.md concise and practical: local desktop chat, requirements, stable curl installation, mir startup, first configuration and one link to mir/docs/guide.md. Include the human-maintainer principle. Keep detailed settings, direct startup, development commands, architecture, preparation, troubleshooting and earlier hardware records in the guide. Use real interface screenshots without fabricated readiness, inference or private paths.
+Keep README.md concise and practical: local desktop chat, package availability, requirements, native application startup, first configuration and one link to mir/docs/guide.md. Include the human-maintainer principle. Keep settings, data compatibility, development, packaging and troubleshooting in the guide. Keep the developer README focused on commands and upstream fixture contracts. Remove obsolete installation paths, launcher instructions and duplicated historical records. Use real interface screenshots without fabricated readiness, inference or private paths.
 
-Preserve versioned stable installation: README curl and installer download refer to the same published stable tag. main is development, and merging does not publish a release. Keep the installer version in its single release_tag value and regenerate the standalone artifact. Never move published tags. Use semantic versions and obtain approval for the exact version, candidate SHA and notes before tagging or publishing. Do not delete remote branches without approval.
+main is development, and merging does not publish a release. Do not advertise desktop packages as published before they exist. Never move published tags. Use semantic versions and obtain approval for the exact version, candidate SHA and notes before tagging or publishing. Do not delete remote branches without approval.
 
 ## Approval
 
