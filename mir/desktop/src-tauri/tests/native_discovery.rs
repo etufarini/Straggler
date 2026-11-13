@@ -237,3 +237,80 @@ fn native_port_inspection_blocks_busy_ports_and_identifies_owned_sockets() {
     drop(listener);
     assert!(!platform::inspect_port(port).unwrap().occupied);
 }
+
+#[test]
+fn malformed_and_bounded_gguf_metadata_remains_selectable_without_reading_tensors() {
+    use std::io::{Seek, SeekFrom, Write};
+
+    fn header(version: u32, count: u64) -> Vec<u8> {
+        let mut bytes = b"GGUF".to_vec();
+        bytes.extend(version.to_le_bytes());
+        bytes.extend(0_u64.to_le_bytes());
+        bytes.extend(count.to_le_bytes());
+        bytes
+    }
+
+    fn string(bytes: &mut Vec<u8>, value: &str) {
+        bytes.extend((value.len() as u64).to_le_bytes());
+        bytes.extend(value.as_bytes());
+    }
+
+    let work = tempfile::tempdir().unwrap();
+    let root = work.path();
+    let mut oversized = header(3, 1);
+    oversized.extend(u64::MAX.to_le_bytes());
+    let mut strings = header(3, 1);
+    string(&mut strings, "tokenizer.ggml.tokens");
+    strings.extend(9_u32.to_le_bytes());
+    strings.extend(8_u32.to_le_bytes());
+    strings.extend(100_001_u64.to_le_bytes());
+    strings.resize(strings.len() + 100_001 * 8, 0);
+    let mut unknown_type = header(3, 1);
+    string(&mut unknown_type, "future");
+    unknown_type.extend(99_u32.to_le_bytes());
+    let mut version_two = gguf("model", 0, false);
+    version_two[4..8].copy_from_slice(&2_u32.to_le_bytes());
+    for (name, bytes) in [
+        ("future.gguf", header(99, 0)),
+        ("truncated.gguf", b"GGUF\x03".to_vec()),
+        ("oversized.gguf", oversized),
+        ("too-many-fields.gguf", header(3, 100_001)),
+        ("too-many-strings.gguf", strings),
+        ("unknown-type.gguf", unknown_type),
+        ("v2.gguf", version_two),
+    ] {
+        fs::write(root.join(name), bytes).unwrap();
+    }
+    let mut budget = fs::File::create(root.join("metadata-budget.gguf")).unwrap();
+    let mut bytes = header(3, 1);
+    string(&mut bytes, "ignored");
+    bytes.extend(8_u32.to_le_bytes());
+    bytes.extend((33_u64 * 1024 * 1024).to_le_bytes());
+    budget.write_all(&bytes).unwrap();
+    budget.seek(SeekFrom::Current(33 * 1024 * 1024)).unwrap();
+    budget.write_all(&[0]).unwrap();
+    fs::write(root.join("adapter.gguf"), gguf("adapter", 0, false)).unwrap();
+    std::os::unix::fs::symlink(root.join("v2.gguf"), root.join("linked.gguf")).unwrap();
+    std::os::unix::fs::symlink(root.join("missing.gguf"), root.join("broken.gguf")).unwrap();
+    let link = root.join("root-link");
+    std::os::unix::fs::symlink(root, &link).unwrap();
+    let expected = [
+        "future.gguf",
+        "linked.gguf",
+        "metadata-budget.gguf",
+        "oversized.gguf",
+        "too-many-fields.gguf",
+        "too-many-strings.gguf",
+        "truncated.gguf",
+        "unknown-type.gguf",
+        "v2.gguf",
+    ];
+    for directory in [root, &link] {
+        let discovered = models::discover(directory).unwrap();
+        let labels: Vec<_> = discovered
+            .iter()
+            .map(|model| model.label.as_str())
+            .collect();
+        assert_eq!(labels, expected);
+    }
+}

@@ -281,10 +281,20 @@ cd mir/desktop
 npm exec -- playwright install chromium webkit
 cd ../..
 bash mir/tests/run.sh           # Desktop, offline packaging and native window
-bash mir/tests/run.sh desktop   # Formatting, lint, build, Rust and browser flows
+bash mir/tests/run.sh common    # Runner boundaries, shell checks and offline fixtures
+bash mir/tests/run.sh frontend  # Formatting, lint, types, assets and unit tests
+bash mir/tests/run.sh runtime   # Rust without npm or native GUI libraries
+bash mir/tests/run.sh browser   # Chromium/WebKit without Rust or native GUI libraries
+bash mir/tests/run.sh desktop   # Frontend, runtime and browser suites
+bash mir/tests/run.sh isolation # Compile with only shared and host-platform inputs
 bash mir/tests/run.sh native    # Real native window with a fixture server
 bash mir/tests/run.sh packaging # Offline archive/backend and Store boundaries
 ```
+
+Choose frontend/browser suites for UI work without Rust or Tauri prerequisites.
+Runtime checks require Rust, Python fixture support and the host linker, but no
+npm or native GUI libraries. Isolation and native-window checks require the host's
+Tauri development dependencies. All dependencies are installed explicitly.
 
 The runner is the only shell script and works with macOS system Bash. ShellCheck
 is optional locally and installed in CI. Tests use temporary user directories,
@@ -293,8 +303,11 @@ On headless Linux, the native suite uses Xvfb, a private D-Bus session and softw
 rendering when available. An explicitly requested native suite fails if neither
 a display nor those tools exists; the default suite reports that check as skipped.
 
-CI runs desktop, packaging boundaries and real native windows on Linux and macOS
-CPU runners. Native WebDriver is debug-only and rejected in release builds.
+CI runs frontend checks once and independent runtime, browser, offline packaging
+and real native-window checks on Linux/macOS CPU runners. The isolation check
+compiles the actual desktop without the opposite platform's module/configuration.
+WebKit on Linux does not replace the native macOS WebView and process checks.
+Native WebDriver is debug-only and rejected in release builds.
 See [desktop development](../desktop/README.md) for focused commands and pinned
 upstream fixture contracts.
 

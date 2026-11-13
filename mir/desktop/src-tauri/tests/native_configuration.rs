@@ -162,3 +162,111 @@ fn saves_are_literal_atomic_and_require_overwrite_and_delete_confirmation() {
     store.delete_profile("My profile", true).unwrap();
     assert!(store.profiles().unwrap().is_empty());
 }
+
+#[test]
+fn release_profile_fields_keep_independent_defaults_and_ignore_removed_keys() {
+    use mir_desktop::configuration::settings::PROFILE_FIELDS;
+
+    let complete = Settings {
+        model: "/literal model.gguf".into(),
+        context: "8192".into(),
+        port: "10001".into(),
+        device: "Future1,Future0".into(),
+        threads: "4".into(),
+        gpu_layers: "12".into(),
+        prompt_processing: "large-batch".into(),
+        cache_type_k: "q8_0".into(),
+        cache_type_v: "f16".into(),
+        split_mode: "layer".into(),
+        tensor_split: "2,1".into(),
+        fit_target: "2048,1024".into(),
+        temperature: "0.6".into(),
+        seed: "42".into(),
+        max_tokens: "1024".into(),
+        chat_system_prompt: "Literal $(touch unsafe)\nUnicode: caffè ☕".into(),
+        chat_reasoning: "off".into(),
+        chat_reasoning_effort: "xhigh".into(),
+        ..Settings::default()
+    };
+    let data = complete.profile_data().unwrap();
+    assert_eq!(data.lines().count(), PROFILE_FIELDS.len());
+    let defaults = Settings::default().fields();
+    for field in PROFILE_FIELDS {
+        let partial = data
+            .lines()
+            .filter(|line| line.split_once('=').unwrap().0 != *field)
+            .collect::<Vec<_>>()
+            .join("\n");
+        if *field == "model" {
+            assert!(Settings::from_profile(&partial).is_err());
+        } else {
+            let mut expected = complete.fields();
+            expected.insert((*field).into(), defaults[*field].clone());
+            assert_eq!(Settings::from_profile(&partial).unwrap().fields(), expected);
+        }
+        let duplicate = data
+            .lines()
+            .find(|line| line.split_once('=').unwrap().0 == *field)
+            .unwrap();
+        assert!(Settings::from_profile(&format!("{data}{duplicate}\n")).is_err());
+    }
+    let compatible = format!(
+        "{data}reasoning=on\nremoved_control=auto\nremoved_control=off\nfuture_control=$(touch unsafe)\n"
+    );
+    let loaded = Settings::from_profile(&compatible).unwrap();
+    assert_eq!(loaded, complete);
+    assert_eq!(loaded.profile_data().unwrap(), data);
+    let minimal = Settings::from_profile("model=/literal model.gguf").unwrap();
+    assert_eq!(
+        minimal,
+        Settings {
+            model: complete.model,
+            ..Settings::default()
+        }
+    );
+}
+
+#[test]
+fn profile_storage_failures_preserve_saved_data_and_remove_temporary_files() {
+    let work = tempfile::tempdir().unwrap();
+    let store = Store::new(environment(work.path(), &[])).unwrap();
+    let model = work.path().join("model.gguf");
+    fs::write(&model, []).unwrap();
+    let settings = Settings {
+        model: model.to_str().unwrap().into(),
+        ..Settings::default()
+    };
+    store.save_profile("Saved", &settings, false).unwrap();
+    let directory = store.environment.config.join("profiles");
+    let original = fs::read(directory.join("Saved.conf")).unwrap();
+    fs::create_dir(directory.join("Blocked.conf")).unwrap();
+    assert!(store.save_profile("Blocked", &settings, true).is_err());
+    assert_eq!(fs::read(directory.join("Saved.conf")).unwrap(), original);
+    assert_eq!(fs::read_dir(&directory).unwrap().count(), 2);
+    fs::remove_dir(directory.join("Blocked.conf")).unwrap();
+    let backup = store.environment.config.join("profiles-backup");
+    fs::rename(&directory, &backup).unwrap();
+    fs::write(&directory, b"Blocked storage").unwrap();
+    assert!(store.save_profile("Saved", &settings, true).is_err());
+    assert_eq!(fs::read(backup.join("Saved.conf")).unwrap(), original);
+    assert_eq!(fs::read(&directory).unwrap(), b"Blocked storage");
+}
+
+#[test]
+fn saved_configuration_names_are_bounded_and_cannot_escape_the_profile_folder() {
+    use mir_desktop::configuration::storage::profile_name;
+
+    for name in [
+        "",
+        ".hidden",
+        "../escape",
+        "a/b",
+        "-name",
+        "$(touch unsafe)",
+    ] {
+        assert!(!profile_name(name), "{name}");
+    }
+    assert!(!profile_name(&"Z".repeat(81)));
+    assert!(profile_name(&"Z".repeat(80)));
+    assert!(profile_name("Name with spaces._-"));
+}

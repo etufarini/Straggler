@@ -394,20 +394,7 @@ async fn preferences_save(
 
 fn native_environment() -> Result<mir_desktop::configuration::environment::Environment> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    let bundled = executable.parent().and_then(|directory| {
-        let adjacent = directory.join("mir-llama-server");
-        if adjacent.is_file() {
-            return Some(adjacent);
-        }
-        #[cfg(target_os = "linux")]
-        {
-            let packaged = directory.join("../lib/mir.cpp/backend/llama-server");
-            if packaged.is_file() {
-                return Some(packaged);
-            }
-        }
-        None
-    });
+    let bundled = mir_desktop::platform::bundled_server(&executable);
     mir_desktop::configuration::environment::Environment::capture(bundled)
 }
 

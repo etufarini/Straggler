@@ -2,12 +2,10 @@ use super::{
     environment::Environment,
     settings::{literal, token},
 };
-use crate::{files::write_atomic, workspace::Settings, Result};
+use crate::{files::write_atomic, platform, workspace::Settings, Result};
 use std::{
     collections::BTreeMap,
-    ffi::CString,
     fs,
-    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
 };
 
@@ -43,29 +41,6 @@ fn copy_directory(source: &Path, destination: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
-}
-
-fn activate_migration(source: &Path, destination: &Path) -> std::io::Result<()> {
-    let source = CString::new(source.as_os_str().as_bytes())?;
-    let destination = CString::new(destination.as_os_str().as_bytes())?;
-    #[cfg(target_os = "linux")]
-    let result = unsafe {
-        libc::renameat2(
-            libc::AT_FDCWD,
-            source.as_ptr(),
-            libc::AT_FDCWD,
-            destination.as_ptr(),
-            libc::RENAME_NOREPLACE,
-        )
-    };
-    #[cfg(target_os = "macos")]
-    let result =
-        unsafe { libc::renamex_np(source.as_ptr(), destination.as_ptr(), libc::RENAME_EXCL) };
-    if result == 0 {
-        Ok(())
-    } else {
-        Err(std::io::Error::last_os_error())
-    }
 }
 
 fn record(path: &Path) -> Result<BTreeMap<String, String>> {
@@ -143,7 +118,7 @@ impl Store {
                 "Cannot import previous launcher settings. Original settings were kept: {error}"
             )
         })?;
-        match activate_migration(temporary.path(), destination) {
+        match platform::rename_directory_exclusive(temporary.path(), destination) {
             Ok(()) => {
                 let _ = temporary.keep();
                 Ok(())

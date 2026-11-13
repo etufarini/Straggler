@@ -1,12 +1,43 @@
 use crate::{workspace::Listener, Result};
 use std::{
     collections::BTreeSet,
+    ffi::CString,
     fs,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
-        unix::fs::MetadataExt,
+        unix::{ffi::OsStrExt, fs::MetadataExt},
     },
+    path::{Path, PathBuf},
 };
+
+pub fn rename_directory_exclusive(source: &Path, destination: &Path) -> std::io::Result<()> {
+    let source = CString::new(source.as_os_str().as_bytes())?;
+    let destination = CString::new(destination.as_os_str().as_bytes())?;
+    let result = unsafe {
+        libc::renameat2(
+            libc::AT_FDCWD,
+            source.as_ptr(),
+            libc::AT_FDCWD,
+            destination.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        )
+    };
+    if result == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
+}
+
+pub fn bundled_server(executable: &Path) -> Option<PathBuf> {
+    let directory = executable.parent()?;
+    [
+        directory.join("mir-llama-server"),
+        directory.join("../lib/mir.cpp/backend/llama-server"),
+    ]
+    .into_iter()
+    .find(|path| path.is_file())
+}
 
 pub fn available_memory() -> Option<u64> {
     fs::read_to_string("/proc/meminfo")

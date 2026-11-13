@@ -21,8 +21,25 @@ jobs:
   backend-packaging:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.packaging }}
     uses: ./.github/workflows/backend-packaging.yml
+  frontend:
+    name: Frontend without native build tools
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mir/desktop/package-lock.json
+      - name: Frontend dependencies
+        working-directory: mir/desktop
+        run: npm ci --no-audit --no-fund
+      - name: Frontend checks
+        run: bash mir/tests/run.sh frontend
   check:
-    name: Desktop on ${{ matrix.os }}
+    name: Runtime and native GUI on ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -54,10 +71,12 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium webkit
-      - name: Offline packaging and native platform checks
-        run: bash mir/tests/run.sh packaging
-      - name: Desktop checks without inference
-        run: bash mir/tests/run.sh desktop
+      - name: Shared checks
+        run: bash mir/tests/run.sh common
+      - name: Rust runtime without GUI or inference
+        run: bash mir/tests/run.sh runtime
+      - name: Browser flows on the host platform
+        run: bash mir/tests/run.sh browser
       - name: Native window on Linux
         if: runner.os == 'Linux'
         # Xvfb supplies a display, but no desktop session or GPU compositor.
@@ -68,3 +87,10 @@ jobs:
       - name: Native window on macOS
         if: runner.os == 'macOS'
         run: bash mir/tests/run.sh native
+      - name: Retain browser and native-window evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-checks-${{ matrix.os }}
+          path: mir/desktop/test-results/
+          if-no-files-found: warn

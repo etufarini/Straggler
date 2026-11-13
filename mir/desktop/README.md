@@ -36,15 +36,26 @@ From this directory:
 
 Install browser engines with `npm exec -- playwright install chromium webkit`.
 On Linux, browser installation may also require Playwright system dependencies.
-The runner requires explicit dependency setup and supports `desktop`, `native`,
-`packaging` and the default `all` suite. See the [guide](../docs/guide.md#local-development)
+The runner requires explicit dependency setup. Focused suites are `common`,
+`frontend`, `runtime`, `browser`, `desktop`, `isolation`, `native` and `packaging`,
+with `all` as the default. `frontend` checks formatting, lint, types, production
+assets and unit contracts; `browser` runs Chromium/WebKit flows. Neither needs Rust
+or native Tauri libraries. `runtime` checks Rust without GUI features and requires
+Rust, Python for fixtures and the host linker, but no npm or GUI libraries.
+`desktop` combines these three suites. `common` checks runner boundaries, Bash
+syntax/ShellCheck and offline archive fixtures. `isolation` compiles the actual
+native desktop after removing the opposite platform's sources and configuration;
+`native` includes that check, desktop Clippy and the real window. These last two
+suites require the host Tauri prerequisites. CI runs frontend checks once and
+runtime/browser/native checks on independent Linux/macOS CPU runners. See the [guide](../docs/guide.md#local-development)
 for headless Linux requirements. Native Windows is not a supported target.
 
 ## Test boundaries
 
 Tests use temporary directories, tiny generated documents, fake executables and
 local HTTP/SSE fixtures. No GPU, model weights or working llama.cpp installation is
-required. Native defaults in `src-tauri/src/configuration/defaults.json` are shared
+required. Browser WebKit on Linux is renderer coverage; native macOS WebView,
+process and package behavior still require a macOS runner. Native defaults in `src-tauri/src/configuration/defaults.json` are shared
 with frontend fixtures. Rust checks cover legacy profiles/migration, literal
 serialization, process identity, cancellation, storage recovery and streaming.
 

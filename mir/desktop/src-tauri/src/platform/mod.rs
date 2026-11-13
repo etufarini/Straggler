@@ -5,9 +5,15 @@ mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "linux")]
-pub use linux::{available_memory, identity, listeners, signal_listener};
+pub use linux::{
+    available_memory, bundled_server, identity, listeners, rename_directory_exclusive,
+    signal_listener,
+};
 #[cfg(target_os = "macos")]
-pub use macos::{available_memory, identity, listeners, signal_listener};
+pub use macos::{
+    available_memory, bundled_server, identity, listeners, rename_directory_exclusive,
+    signal_listener,
+};
 
 use crate::{workspace::Listener, Result};
 use socket2::{Domain, Protocol, Socket, Type};

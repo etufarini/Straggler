@@ -21,14 +21,14 @@ export function errorDetail(error: unknown): { message: string; field?: string }
     };
   }
   const message = String(error);
-  // Some bridge operations return the same validation record inside stderr.
+  // Native configuration failures can carry a JSON validation record as text.
   for (const line of message.split('\n')) {
     try {
       const value = JSON.parse(line);
       if (value?.mirValidation === true && typeof value.message === 'string')
         return errorDetail(value);
     } catch {
-      // Preserve unstructured diagnostics from older launcher versions.
+      // Keep unstructured native diagnostics intact.
     }
   }
   return { message };

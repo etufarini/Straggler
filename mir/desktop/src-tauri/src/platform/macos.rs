@@ -6,6 +6,28 @@ use libproc::{
     proc_pid::{listpidinfo, pidinfo, pidpath},
     processes::{pids_by_type, ProcFilter},
 };
+use std::{
+    ffi::CString,
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf},
+};
+
+pub fn rename_directory_exclusive(source: &Path, destination: &Path) -> std::io::Result<()> {
+    let source = CString::new(source.as_os_str().as_bytes())?;
+    let destination = CString::new(destination.as_os_str().as_bytes())?;
+    let result =
+        unsafe { libc::renamex_np(source.as_ptr(), destination.as_ptr(), libc::RENAME_EXCL) };
+    if result == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
+}
+
+pub fn bundled_server(executable: &Path) -> Option<PathBuf> {
+    let server = executable.parent()?.join("mir-llama-server");
+    server.is_file().then_some(server)
+}
 
 #[allow(deprecated)] // libc deprecates its Mach bindings, not the public macOS APIs.
 pub fn available_memory() -> Option<u64> {
