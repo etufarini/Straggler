@@ -120,18 +120,20 @@ also lists optional packages for other platforms and unused integrations; these
 do not require installation. Keep the lockfile's platform packages for Linux/macOS
 portability.
 
-The audit reports 10 moderate development-dependency entries from one advisory,
-[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), with none
-in production dependencies. The affected package is `minimatch@10.2.6`, reached
-through `eslint@10.14.0`, `@eslint/config-array@0.23.5` and
-`@typescript-eslint/typescript-estree@8.72.2`. Their latest stable releases still
-require minimatch 10; the fix begins at 11.0.1. The issue concerns excessive CPU
-and memory use when processing attacker-controlled glob patterns at optimization
-level 2 or higher. It remains unresolved in the development toolchain.
+The development toolchain uses temporary, version-scoped overrides for
+`eslint@^10.14.0`, `@eslint/config-array@0.23.5` and
+`@typescript-eslint/typescript-estree@8.72.2` to select `minimatch@11.0.8`.
+This addresses the 10 moderate development-dependency entries from
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249): excessive
+CPU and memory use with attacker-controlled glob patterns at optimization level
+2 or higher. The fix begins at 11.0.1; production dependencies were unaffected.
 
-Do not force minimatch 11 outside its parents' declared ranges or apply the audit's
-suggested ESLint/TypeScript ESLint downgrades. Recheck the advisory and parent
-releases for a supported fix. Keep audit output visible.
+These overrides are an explicit compatibility exception to the parents'
+minimatch 10 ranges. Minimatch 11 removes APIs and changes its matching engine;
+check the actual callers, file selection and diagnostics when updating this
+toolchain. Revalidate the scoped overrides when parent versions change, and
+remove each one when its parent supports a patched release. Do not apply the
+audit's suggested ESLint/TypeScript ESLint downgrades or suppress audit output.
 
 `npm outdated` reports newer major versions of Vite, its React plugin, TypeScript,
 Lucide React and Node types. Retain the current compatible versions: these updates
