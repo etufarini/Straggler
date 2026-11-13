@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { errorDetail } from '../../domain/errors';
 import { isContextRejection } from '../../domain/errors';
 import { ProjectLimitFeedback } from '../projects/ProjectCapacity';
+import brandMark from '../../assets/brand-mark.svg';
 export default function ChatPanel({ controller }: { controller: WorkspaceController }) {
   const [copied, setCopied] = useState('');
   const lastEditor = useRef<string | null>(null);
@@ -131,7 +132,13 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
           <div className="message-column">
             {chat.messages.map((message) => (
               <article className={`message ${message.role}`} key={message.id}>
-                <div className="message-avatar">{message.role === 'user' ? 'Y' : 'm·'}</div>
+                <div className="message-avatar">
+                  {message.role === 'user' ? (
+                    'Y'
+                  ) : (
+                    <img src={brandMark} width={22} height={22} alt="" />
+                  )}
+                </div>
                 <div className="message-body">
                   <div className="message-heading">
                     {message.role === 'user' ? 'You' : 'Straggler'}

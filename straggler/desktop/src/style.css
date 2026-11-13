@@ -927,9 +927,7 @@ textarea:disabled {
   height: 28px;
   margin-top: 2px;
   border-radius: 8px;
-  color: var(--ui-accent-text);
   background: var(--ui-raised);
-  font-size: 16px;
 }
 .user .message-avatar {
   color: #d3dbf5;
