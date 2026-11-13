@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="straggler/desktop/src-tauri/icons/icon.png" alt="Straggler logo" width="220">
+  <img src="straggler/desktop/src-tauri/icons/icon.png" alt="Straggler logo" width="96" height="96">
 </p>
 
 # Straggler
