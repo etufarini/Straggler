@@ -1,0 +1,24 @@
+{
+  "repository": "ggml-org/llama.cpp",
+  "tag": "b12248",
+  "commit": "3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8",
+  "purpose": "Pinned backend for Straggler development; no desktop release has been published",
+  "artifacts": {
+    "aarch64-apple-darwin": {
+      "name": "llama-b12248-bin-macos-arm64.tar.gz",
+      "sha256": "7f643b4d35803ccc69270302f3368d9e8a40f56f74ef5a266e6f686d9dc7d3c6"
+    },
+    "x86_64-apple-darwin": {
+      "name": "llama-b12248-bin-macos-x64.tar.gz",
+      "sha256": "08824b35d82994979835fc40bf07ebd03a903866cba76440848e8f52f6bd03e6"
+    },
+    "x86_64-unknown-linux-gnu": {
+      "name": "llama-b12248-bin-ubuntu-x64.tar.gz",
+      "sha256": "6b3a530b44f6b0a4ae4872d3b3c8d1edc2ac6bba7d8bd211329a4ba644c0dc65"
+    },
+    "aarch64-unknown-linux-gnu": {
+      "name": "llama-b12248-bin-ubuntu-arm64.tar.gz",
+      "sha256": "edf412b7b33736920f3702e523b3a875083796ed7d7544a75cf73a404bcdfc8f"
+    }
+  }
+}

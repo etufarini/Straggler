@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="mir/docs/images/logo.png" alt="Mir.cpp logo" width="220">
+  <img src="straggler/desktop/src-tauri/icons/icon.png" alt="Straggler logo" width="220">
 </p>
 
-# Mir.cpp
+# Straggler
 
-Chat with local GGUF models in a desktop app. Mir.cpp manages llama.cpp,
+Chat with local GGUF models in a desktop app. Straggler manages llama.cpp,
 your model settings and conversations on your computer.
 
-Mir.cpp is written for humans to read, maintain, and improve.
+Straggler is written for humans to read, maintain, and improve.
 
-[<img src="mir/docs/screenshots/desktop-chat.png" alt="Mir.cpp desktop conversation screen before configuring a model" width="640">](mir/docs/screenshots/desktop-chat.png)
+[<img src="straggler/docs/screenshots/desktop-chat.png" alt="Straggler desktop conversation screen before configuring a model" width="640">](straggler/docs/screenshots/desktop-chat.png)
 
 *First-launch screen, before loading a model.*
 
@@ -20,9 +20,9 @@ image and an Ubuntu Debian package, each including a pinned llama.cpp backend.
 **No desktop release has been published yet.** The older v1.0.0 terminal edition
 is separate from this development branch.
 
-When desktop packages are released, open the macOS disk image and drag Mir.cpp to
+When desktop packages are released, open the macOS disk image and drag Straggler to
 Applications, or install the Ubuntu `.deb` with your package manager. Launch
-**Mir.cpp** from Applications or the desktop application menu.
+**Straggler** from Applications or the desktop application menu.
 
 Requirements:
 
@@ -44,7 +44,7 @@ llama.cpp build; capabilities are discovered from that build.
 changes to the running server. Stop response preserves partial text; closing the
 app confirms shutdown of its server.
 
-[<img src="mir/docs/screenshots/desktop-settings.png" alt="Mir.cpp model settings before choosing a GGUF" width="640">](mir/docs/screenshots/desktop-settings.png)
+[<img src="straggler/docs/screenshots/desktop-settings.png" alt="Straggler model settings before choosing a GGUF" width="640">](straggler/docs/screenshots/desktop-settings.png)
 
 ## Try the source locally
 
@@ -53,13 +53,13 @@ Install Node.js 22.13+, 24 or 26+, Rust 1.92+ and the platform's
 run from the repository root:
 
 ```bash
-npm --prefix mir/desktop ci
-npm --prefix mir/desktop run desktop
+npm --prefix straggler/desktop ci
+npm --prefix straggler/desktop run desktop
 ```
 
 After setup, only the second command is needed. A source development session has
 no bundled backend: select an existing llama.cpp folder in **Settings → llama.cpp**.
 You can open the app without model weights or an inference service.
 
-See the [user and developer guide](mir/docs/guide.md) for settings, projects,
+See the [user and developer guide](straggler/docs/guide.md) for settings, projects,
 data locations, development checks, packaging and troubleshooting.
