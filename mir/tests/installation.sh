@@ -37,7 +37,16 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
     bin_dir = work / 'mock-bin'
     bin_dir.mkdir()
     archive = work / 'source.tar.gz'
-    files = ['mir.sh', 'sh/uninstall.sh', 'desktop/runtime-files.txt'] + (root / 'desktop/runtime-files.txt').read_text().splitlines() + [
+    platform = 'linux' if target_os == 'Linux' else 'macos'
+    other = 'macos' if platform == 'linux' else 'linux'
+    manifests = ['desktop/runtime-files.txt', 'desktop/runtime-files.linux.txt', 'desktop/runtime-files.macos.txt']
+    platform_files = (root / f'desktop/runtime-files.{platform}.txt').read_text().splitlines()
+    unselected_files = set((root / f'desktop/runtime-files.{other}.txt').read_text().splitlines())
+    unselected_files.update((f'desktop/runtime-files.{other}.txt', f'lib/platform/{other}.sh'))
+    if other == 'macos':
+        unselected_files.add('lib/platform/macos-bootstrap.sh')
+    files = ['mir.sh', 'sh/uninstall.sh', *manifests] + [
+        name for manifest in manifests for name in (root / manifest).read_text().splitlines()] + [
         str(p.relative_to(root)) for p in sorted((root / 'lib').rglob('*')) if p.suffix in ('.sh', '.py')]
     documents = ['README.md', 'mir/docs/guide.md', 'mir/docs/images/logo.png',
                  'mir/docs/screenshots/desktop-chat.png', 'mir/docs/screenshots/desktop-settings.png',
@@ -46,9 +55,10 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
     def source_path(name):
         return (root.parent if name in documents else root) / name
     def package(omit=None, broken=False, marker='', prefix=archive_root):
+        omitted = {omit} if isinstance(omit, str) else set(omit or ())
         with tarfile.open(archive, 'w:gz', compresslevel=1) as tar:
             for name in files:
-                if name == omit:
+                if name in omitted:
                     continue
                 data = source_path(name).read_bytes()
                 if name == 'mir.sh':
@@ -181,7 +191,7 @@ exec /bin/rm "$@"
     assert command.is_file() and os.access(command, os.X_OK)
     selected_adapters = {'lib/platform/linux.sh'} if target_os == 'Linux' else {'lib/platform/macos.sh', 'lib/platform/macos-bootstrap.sh'}
     for name in files:
-        if name.startswith('lib/platform/') and name not in selected_adapters:
+        if name in unselected_files:
             assert not (target / name).exists()
         elif name != 'mir.sh':
             expected = source_path(name).read_bytes()
@@ -241,7 +251,7 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     assert (install_dir / 'current').resolve() == updated
     assert command.read_bytes() == snapshot
     assert set((install_dir / 'releases').iterdir()) == releases
-    for omitted in [*selected_adapters, 'lib/runtime.sh', 'lib/bootstrap.sh', 'desktop/src/app/App.tsx', 'lib/desktop.py', 'sh/uninstall.sh', *documents]:
+    for omitted in [*selected_adapters, *platform_files, f'desktop/runtime-files.{platform}.txt', 'lib/runtime.sh', 'lib/bootstrap.sh', 'desktop/src/app/App.tsx', 'lib/desktop.py', 'sh/uninstall.sh', *documents]:
         package(omit=omitted)
         install(success=False)
         assert (install_dir / 'current').resolve() == updated
@@ -361,11 +371,13 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     install({'HOME':str(other_home), 'XDG_DATA_HOME':str(custom_data)})
     assert (custom_data / 'mir.cpp/current/lib/config.sh').is_file()
     assert (other_home / '.local/bin/mir').is_file()
-    other_adapter = 'lib/platform/macos.sh' if target_os == 'Linux' else 'lib/platform/linux.sh'
-    package(omit=other_adapter)
+    package(omit=unselected_files)
     install({'HOME':str(other_home), 'XDG_DATA_HOME':str(custom_data)})
-    assert not (custom_data / 'mir.cpp/current' / other_adapter).exists()
-    print('PASS: only the selected adapter is required and installed')
+    for name in unselected_files:
+        assert not (custom_data / 'mir.cpp/current' / name).exists(), name
+    for name in platform_files:
+        assert (custom_data / 'mir.cpp/current' / name).is_file(), name
+    print('PASS: installation and preparation require only common and selected-platform files')
     print('PASS: XDG data directory')
 
     def uninstall(arguments=(), overrides=None, success=True):

@@ -62,7 +62,8 @@ Read the [template capabilities](https://github.com/ggml-org/llama.cpp/blob/3837
 and [stream serialization](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-task.cpp)
 when updating those fixtures.
 
-Keep runtime-files.txt aligned with bundled sources and regenerate the standalone
+Keep runtime-files.txt (shared sources) and runtime-files.linux.txt/runtime-files.macos.txt
+(platform sources and configuration) aligned with bundled sources and regenerate the standalone
 installer after moving runtime files. Do not include generated output, tests,
 node_modules or target in the runtime manifest.
 

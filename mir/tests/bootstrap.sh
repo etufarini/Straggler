@@ -24,7 +24,9 @@ with tempfile.TemporaryDirectory(prefix='mir-bootstrap-') as temporary:
         shutil.copy2(original / name, root / name)
     for name in ('lib', 'sh'):
         shutil.copytree(original / name, root / name)
-    for name in (original / 'desktop/runtime-files.txt').read_text().splitlines():
+    manifests = ['desktop/runtime-files.txt', 'desktop/runtime-files.linux.txt', 'desktop/runtime-files.macos.txt']
+    files = manifests + [name for manifest in manifests for name in (original / manifest).read_text().splitlines()]
+    for name in files:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(original / name, target)
@@ -77,13 +79,39 @@ cp "$CARGO_TARGET_DIR/release/mir-desktop" "$CARGO_TARGET_DIR/release/bundle/mac
     started = run()
     assert started.returncode == 0 and b'Desktop started' in started.stdout, started.stderr
     assert (work / 'npm').read_bytes() == calls
+    platform = 'macos' if sys.platform == 'darwin' else 'linux'
+    other = 'linux' if platform == 'macos' else 'macos'
+    other_files = (root / f'desktop/runtime-files.{other}.txt').read_text().splitlines()
+    for name in other_files:
+        with (root / name).open('a') as source:
+            source.write('\n// Unrelated platform change\n')
+    started = run()
+    assert started.returncode == 0 and (work / 'npm').read_bytes() == calls, started.stderr
+    for name in other_files + [f'desktop/runtime-files.{other}.txt', f'lib/platform/{other}.sh']:
+        (root / name).unlink()
+    if other == 'macos':
+        (root / 'lib/platform/macos-bootstrap.sh').unlink()
+    started = run()
+    assert started.returncode == 0 and (work / 'npm').read_bytes() == calls, started.stderr
+    # Force compilation without the opposite platform, rather than only testing cache hits.
+    config = root / f'desktop/src-tauri/tauri.{platform}.conf.json'
+    config.write_text(config.read_text() + '\n')
+    prepared = run(['--prepare-desktop'])
+    assert prepared.returncode == 0, prepared.stderr
+    assert (work / 'npm').read_bytes() != calls
+    binaries = set(cache.glob(binary_glob))
+    calls = (work / 'npm').read_bytes()
+    print('PASS: opposite-platform changes/removal preserve cache; selected config changes rebuild in isolation')
     with (root / 'sh/uninstall.sh').open('a') as source:
         source.write('\n# Unrelated installer change\n')
     started = run()
     assert started.returncode == 0 and b'Desktop started' in started.stdout, started.stderr
     assert (work / 'npm').read_bytes() == calls
     print('PASS: source startup outside the repository, automatic preparation, MIR_ROOT and cache reuse')
-    damaged = next(iter(binaries))
+    identity = subprocess.check_output(
+        ['python3', str(root / 'lib/desktop.py'), 'fingerprint', str(root), platform], env=env,
+    ).decode().strip()
+    damaged = next(binary for binary in binaries if identity in binary.parts)
     damaged.write_text('#!/usr/bin/env bash\nexit 1\n')
     repaired = run(['--prepare-desktop'])
     assert repaired.returncode == 0, repaired.stderr

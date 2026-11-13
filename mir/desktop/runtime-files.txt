@@ -26,7 +26,6 @@ desktop/src-tauri/src/lib.rs
 desktop/src-tauri/src/main.rs
 desktop/src-tauri/src/model.rs
 desktop/src-tauri/src/model_access.rs
-desktop/src-tauri/src/model_access/macos.rs
 desktop/src-tauri/src/packaging_probe.rs
 desktop/src-tauri/src/preferences.rs
 desktop/src-tauri/src/projects.rs
@@ -35,7 +34,6 @@ desktop/src-tauri/src/stream.rs
 desktop/src-tauri/src/tokens.rs
 desktop/src-tauri/src/workspace.rs
 desktop/src-tauri/tauri.conf.json
-desktop/src-tauri/tauri.macos.conf.json
 desktop/src/app/App.tsx
 desktop/src/app/ConfirmationDialog.tsx
 desktop/src/app/ConversationMenu.tsx
@@ -111,6 +109,4 @@ desktop/src-tauri/src/configuration/capabilities.rs
 desktop/src-tauri/src/configuration/defaults.json
 desktop/src-tauri/src/configuration/models.rs
 desktop/src-tauri/src/configuration/native.rs
-desktop/src-tauri/src/platform/linux.rs
-desktop/src-tauri/src/platform/macos.rs
 desktop/src-tauri/src/platform/mod.rs

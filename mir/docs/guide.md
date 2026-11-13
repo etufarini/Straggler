@@ -529,8 +529,11 @@ check ports and attribute listeners; unidentified owners still block launch.
 Linux uses procfs and pidfd signaling, and macOS uses libproc. No inspection utility
 is executed by the desktop. Source preparation and direct GGUF startup remain
 compatible shell entry points. The old private shell bridge has been removed.
-The UI does not select behavior from hardware brands. Keep runtime-files.txt and
-the generated installer aligned when moving bundled source files. Regenerate with
+The UI does not select behavior from hardware brands. Keep the shared runtime-files.txt
+and the runtime-files.linux.txt/runtime-files.macos.txt platform manifests aligned
+when moving bundled source files. Preparation, fingerprints and installation select
+the same shared and host-specific inputs; changes to the other platform's files do
+not invalidate the desktop cache. Regenerate the installer with
 `bash mir/sh/build-install.sh`; verify with `--check`.
 
 Shell responsibilities are limited to source startup and preparation, the direct

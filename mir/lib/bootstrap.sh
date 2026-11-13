@@ -66,10 +66,10 @@ desktop_compile() {
 
 prepare_desktop() {
     local cache="${XDG_CACHE_HOME:-$HOME/.cache}/mir.cpp/desktop" tools="${XDG_DATA_HOME:-$HOME/.local/share}/mir.cpp/toolchains"
-    local identity binary stage artifact=mir-desktop result=0 worker='' worker_identity='' interrupted=0
+    local identity binary stage sources file destination artifact=mir-desktop result=0 worker='' worker_identity='' interrupted=0
     platform_ensure_dependencies desktop-runtime >&2 || exit 1
     tools+="/$(uname -s)-$(uname -m)"
-    identity=$(python3 "$MIR_ROOT/lib/desktop.py" fingerprint "$MIR_ROOT") || exit 1
+    identity=$(platform_helper fingerprint "$MIR_ROOT" "$PLATFORM_ID") || exit 1
     [[ "$cache" == /* && "$tools" == /* ]] || fail 'User cache and data directories must be absolute.'
     mkdir -p -- "$cache" || exit 1
     binary="$cache/$identity/mir-desktop"
@@ -95,13 +95,13 @@ prepare_desktop() {
     trap 'result=$?; stop_preparation; exit "$result"' EXIT
     trap 'interrupted=130' INT
     trap 'interrupted=143' TERM HUP
-    mkdir -p "$stage/desktop/src-tauri" || exit 1
-    cp -- "$MIR_ROOT/desktop/"{package.json,package-lock.json,index.html,tsconfig.json,vite.config.ts} "$stage/desktop/" || exit 1
-    cp -a -- "$MIR_ROOT/desktop/src" "$stage/desktop/" || exit 1
-    mkdir -p -- "$stage/desktop/packaging" || exit 1
-    cp -- "$MIR_ROOT/desktop/packaging/llama-runtime.json" "$stage/desktop/packaging/" || exit 1
-    cp -- "$MIR_ROOT/desktop/src-tauri/"{Cargo.toml,Cargo.lock,build.rs,tauri.conf.json,tauri.macos.conf.json} "$stage/desktop/src-tauri/" || exit 1
-    cp -a -- "$MIR_ROOT/desktop/src-tauri/"{src,icons,capabilities} "$stage/desktop/src-tauri/" || exit 1
+    # Fingerprinting, compilation and installation select the same build inputs.
+    sources=$(platform_helper sources "$MIR_ROOT" "$PLATFORM_ID") || exit 1
+    while IFS= read -r file; do
+        destination="$stage/$file"
+        mkdir -p -- "${destination%/*}" || exit 1
+        cp -- "$MIR_ROOT/$file" "$destination" || exit 1
+    done <<< "$sources"
     printf 'Preparing Mir.cpp desktop. The first compilation can take several minutes...\n' >&2
     # shellcheck disable=SC2016 # Arguments are expanded inside the compiler worker.
     platform_start_worker "$BASH" -euo pipefail -c 'MIR_ROOT=$1; PLATFORM_ID=$4; source "$1/lib/platform.sh"; load_platform "$4"; source "$1/lib/bootstrap.sh"; desktop_compile "$2" "$3"' \
