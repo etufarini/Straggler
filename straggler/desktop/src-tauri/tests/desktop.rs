@@ -1,15 +1,41 @@
+use socket2::{Domain, Protocol, Socket, Type};
 use std::{
     fs,
     net::TcpListener,
     os::unix::fs::PermissionsExt,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU16, Ordering},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 use straggler_desktop::{
     configuration::environment::Environment, ChatMessage, ChatRequest, Runtime,
 };
 use uuid::Uuid;
+
+fn reserve_server_port() -> TcpListener {
+    // Keep server fixtures outside the default Linux/macOS ephemeral ranges:
+    // concurrent HTTP clients can otherwise claim a released reservation before startup.
+    static NEXT_PORT: AtomicU16 = AtomicU16::new(20000);
+    loop {
+        let port = NEXT_PORT.fetch_add(1, Ordering::Relaxed);
+        assert!(port < 30000, "No fixture server ports available");
+        // Do not reuse TIME_WAIT ports: the unrelated-listener fixture uses
+        // an exclusive socket, unlike Rust's TcpListener::bind on Unix.
+        let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
+        let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+        match socket.bind(&address.into()) {
+            Ok(()) => {
+                socket.listen(1).unwrap();
+                return socket.into();
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
+            Err(error) => panic!("Cannot reserve fixture server port {port}: {error}"),
+        }
+    }
+}
 
 struct Fixture {
     _directory: tempfile::TempDir,
@@ -34,7 +60,7 @@ impl Fixture {
         let server = llama.join("build/bin/llama-server");
         fs::write(&server, include_str!("../../tests/fixtures/server.py")).unwrap();
         fs::set_permissions(&server, fs::Permissions::from_mode(0o755)).unwrap();
-        let reservation = TcpListener::bind("127.0.0.1:0").unwrap();
+        let reservation = reserve_server_port();
         let port = reservation.local_addr().unwrap().port();
         let record = root.join("request.json");
         let variables = std::collections::BTreeMap::from([

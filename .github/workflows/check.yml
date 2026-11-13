@@ -68,9 +68,25 @@ jobs:
           rustup default stable
       - name: Desktop dependencies
         working-directory: straggler/desktop
+        run: npm ci --no-audit --no-fund
+      - name: Browser system dependencies
+        working-directory: straggler/desktop
+        run: npx playwright install-deps chromium webkit
+      - name: Download test browsers
+        working-directory: straggler/desktop
+        shell: bash
         run: |
-          npm ci --no-audit --no-fund
-          npx playwright install --with-deps chromium webkit
+          for attempt in 1 2 3; do
+            if npx playwright install chromium webkit; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Browser download failed after three attempts." >&2
+              exit 1
+            fi
+            echo "Browser download failed; retrying after $((attempt * 10)) seconds." >&2
+            sleep "$((attempt * 10))"
+          done
       - name: Shared checks
         run: bash straggler/tests/run.sh common
       - name: Rust runtime without GUI or inference
