@@ -52,14 +52,27 @@ impl Fixture {
         );
     }
 
-    async fn cancel_when_started(&self, cancelled: &AtomicBool) {
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
-        while !self.directory.path().join("pid.txt").exists()
-            && std::time::Instant::now() < deadline
-        {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
+    async fn cancel_when_started(&self, cancelled: &AtomicBool) -> bool {
+        // The fixture writes its PID after installing its signal handler.
+        // File creation alone can precede that completed readiness record.
+        let ready = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let ready = fs::read_to_string(self.directory.path().join("pid.txt"))
+                    .ok()
+                    .and_then(|value| value.parse::<u32>().ok())
+                    .is_some_and(|pid| pid > 0);
+                if ready {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .is_ok();
+        // Even on timeout, let the owned process finish cleanup before callers
+        // assert readiness after joining the check and cancellation futures.
         cancelled.store(true, Ordering::Relaxed);
+        ready
     }
 }
 
@@ -160,7 +173,9 @@ async fn cancellation_and_timeout_reap_owned_processes() {
         let cancelled = AtomicBool::new(false);
         let cancellation = async {
             if cancel {
-                fixture.cancel_when_started(&cancelled).await;
+                fixture.cancel_when_started(&cancelled).await
+            } else {
+                true
             }
         };
         let mut refuse_force = |_| false;
@@ -171,7 +186,11 @@ async fn cancellation_and_timeout_reap_owned_processes() {
             Duration::from_secs(5),
             &mut refuse_force,
         );
-        let (result, ()) = tokio::join!(check, cancellation);
+        let (result, ready) = tokio::join!(check, cancellation);
+        assert!(
+            ready,
+            "Backend fixture did not become ready for cancellation"
+        );
         assert!(!result.success);
         assert!(result
             .error
@@ -179,6 +198,27 @@ async fn cancellation_and_timeout_reap_owned_processes() {
             .contains(if cancel { "cancelled" } else { "timed out" }));
         fixture.assert_reaped();
     }
+}
+
+#[tokio::test]
+async fn missing_readiness_still_cancels_and_reaps_the_owned_process() {
+    let fixture = Fixture::new();
+    fixture.flag("wait");
+    let missing_readiness = Fixture::new();
+    let cancelled = AtomicBool::new(false);
+    let mut refuse_force = |_| panic!("The waiting fixture must stop with SIGTERM");
+    let check = check_command(
+        &fixture.server,
+        "--version",
+        &cancelled,
+        Duration::from_secs(10),
+        &mut refuse_force,
+    );
+    let (result, ready) = tokio::join!(check, missing_readiness.cancel_when_started(&cancelled));
+    assert!(!ready);
+    assert!(!result.success);
+    assert!(result.error.unwrap().contains("cancelled"));
+    fixture.assert_reaped();
 }
 
 #[tokio::test]
@@ -203,7 +243,11 @@ async fn sigkill_requires_a_separate_confirmation_after_sigterm() {
         Duration::from_secs(10),
         &mut confirm_force,
     );
-    let (result, ()) = tokio::join!(check, fixture.cancel_when_started(&cancelled));
+    let (result, ready) = tokio::join!(check, fixture.cancel_when_started(&cancelled));
+    assert!(
+        ready,
+        "Backend fixture did not become ready for cancellation"
+    );
     assert!(!result.success);
     assert_eq!(confirmations, 1);
     fixture.assert_reaped();

@@ -159,10 +159,19 @@ mod tests {
     use super::*;
     use std::io::Read;
     use std::net::{TcpListener, TcpStream};
+    use std::sync::atomic::{AtomicU16, Ordering};
 
-    #[test]
-    fn occupied_ports_are_detected_on_wildcard_and_assigned_addresses() {
-        for address in bind_addresses(0).unwrap() {
+    fn listening_socket(mut address: SocketAddr) -> Socket {
+        // Select a port free across the same addresses as native startup,
+        // outside the default client ephemeral ranges.
+        static NEXT_PORT: AtomicU16 = AtomicU16::new(10000);
+        loop {
+            let port = NEXT_PORT.fetch_add(1, Ordering::Relaxed);
+            assert!(port < 20000, "No platform test ports available");
+            if inspect_port(port).unwrap().occupied {
+                continue;
+            }
+            address.set_port(port);
             let socket = Socket::new(
                 Domain::for_address(address),
                 Type::STREAM,
@@ -173,8 +182,21 @@ mod tests {
             if address.is_ipv6() {
                 socket.set_only_v6(true).unwrap();
             }
-            socket.bind(&address.into()).unwrap();
-            socket.listen(1).unwrap();
+            match socket.bind(&address.into()) {
+                Ok(()) => {
+                    socket.listen(1).unwrap();
+                    return socket;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
+                Err(error) => panic!("Cannot bind platform test listener at {address}: {error}"),
+            }
+        }
+    }
+
+    #[test]
+    fn occupied_ports_are_detected_on_wildcard_and_assigned_addresses() {
+        for address in bind_addresses(0).unwrap() {
+            let socket = listening_socket(address);
             let port = socket.local_addr().unwrap().as_socket().unwrap().port();
             assert!(
                 inspect_port(port).unwrap().occupied,
@@ -190,12 +212,7 @@ mod tests {
 
     #[test]
     fn closed_connections_do_not_block_server_port_reuse() {
-        let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
-        socket.set_reuse_address(true).unwrap();
-        socket
-            .bind(&SocketAddr::from((Ipv4Addr::LOCALHOST, 0)).into())
-            .unwrap();
-        socket.listen(1).unwrap();
+        let socket = listening_socket(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)));
         let listener = TcpListener::from(socket);
         let address = listener.local_addr().unwrap();
         let mut client = TcpStream::connect(address).unwrap();

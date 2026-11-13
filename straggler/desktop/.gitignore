@@ -1,8 +1,14 @@
+# Dependencies and build output
 node_modules/
 dist/
 src-tauri/target/
 src-tauri/gen/
+packaging/generated/
+
+# Test reports and screenshots
 playwright-report/
 test-results/
-packaging/generated/
-packaging/__pycache__/
+
+# Python bytecode caches
+__pycache__/
+*.py[cod]

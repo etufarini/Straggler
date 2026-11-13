@@ -225,8 +225,6 @@ test('reduced-motion presence draws a still and destroys the renderer in Setting
   await page.goto('/?scenario=cancel');
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep generating');
-  await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'generating');
   await page.evaluate(() => {
     const original = CanvasRenderingContext2D.prototype.clearRect;
     (window as unknown as { orbTestFrames: number }).orbTestFrames = 0;
@@ -236,10 +234,25 @@ test('reduced-motion presence draws a still and destroys the renderer in Setting
       return original.apply(this, args);
     };
   });
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'generating');
+  // The React state can commit before its still frame and resize callbacks.
+  // Allow both paint opportunities before measuring continued animation.
+  const stillFrames = await page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resolve((window as unknown as { orbTestFrames: number }).orbTestFrames);
+          });
+        });
+      }),
+  );
+  expect(stillFrames).toBeGreaterThan(0);
   await page.waitForTimeout(1100);
   expect(
     await page.evaluate(() => (window as unknown as { orbTestFrames: number }).orbTestFrames),
-  ).toBe(0);
+  ).toBe(stillFrames);
   await page.getByRole('button', { name: 'Stop response' }).click();
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'stopped');
   await expect(page.locator('.presence-caption')).toContainText('Stopped by you');

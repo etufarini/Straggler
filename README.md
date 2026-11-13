@@ -4,8 +4,9 @@
 
 # Straggler
 
-Chat with local GGUF models in a desktop app. Straggler manages llama.cpp,
-your model settings and conversations on your computer.
+Chat with local GGUF models on Linux and macOS. Straggler starts and stops
+llama.cpp for you and keeps your conversations, files and model settings on your
+computer. Projects let you share instructions and documents across chats.
 
 Straggler is written for humans to read, maintain, and improve.
 
@@ -13,53 +14,56 @@ Straggler is written for humans to read, maintain, and improve.
 
 *First-launch screen, before loading a model.*
 
-## Installation
+## Availability and requirements
 
-The desktop is intended for distribution as precompiled packages: a macOS disk
-image and an Ubuntu Debian package, each including a pinned llama.cpp backend.
-**No desktop release has been published yet.** The older v1.0.0 terminal edition
-is separate from this development branch.
+**No desktop release has been published yet.** You can run the current app from
+source using the commands below. Desktop packages are being prepared as a macOS
+disk image and an Ubuntu Debian package, with a pinned llama.cpp backend included.
+The older v1.0.0 terminal release does not install this desktop app.
 
-When desktop packages are released, open the macOS disk image and drag Straggler to
-Applications, or install the Ubuntu `.deb` with your package manager. Launch
-**Straggler** from Applications or the desktop application menu.
+To chat, you need:
 
-Requirements:
+- macOS 13.5+ or Ubuntu 24.04+ with a graphical session, on ARM64 or x86_64.
+- A local GGUF model supported by your selected llama.cpp backend and enough
+  memory to load it. Model files are supplied separately.
+- Any GPU drivers required by your backend. The bundled Ubuntu backend is CPU-only;
+  the regular desktop also accepts an existing external build with GPU support.
 
-- macOS 13.5+ or a graphical Ubuntu 24.04+ session, on a supported architecture.
-- A local GGUF supported by the selected llama.cpp backend and enough memory.
-- Any GPU drivers required by an external backend.
+Once packages are available, drag Straggler from the macOS disk image to
+Applications, or install the Ubuntu `.deb` with your package manager. Open
+**Straggler** from Applications or the desktop application menu. Packaged startup
+needs no Bash, Python, Node.js or Rust toolchain.
 
-Packaged startup needs no Bash, Python, Node.js or Rust toolchain. Model weights
-are supplied separately. The regular desktop also accepts an existing external
-llama.cpp build; capabilities are discovered from that build.
-
-## First launch
-
-1. In **Settings → Folders**, choose your models folder. Subfolders are searched too.
-2. Choose a model in **Model settings**, review its settings and launch the server.
-3. Start chatting. Optionally save your settings in **Saved configurations**.
-
-**Modified** marks changes to a saved configuration. **Restart required** marks
-changes to the running server. Stop response preserves partial text; closing the
-app confirms shutdown of its server.
-
-[<img src="straggler/docs/screenshots/desktop-settings.png" alt="Straggler model settings before choosing a GGUF" width="640">](straggler/docs/screenshots/desktop-settings.png)
-
-## Try the source locally
+## Run from source
 
 Install Node.js 22.13+, 24 or 26+, Rust 1.92+ and the platform's
-[Tauri development prerequisites](https://v2.tauri.app/start/prerequisites/), then
-run from the repository root:
+[Tauri development prerequisites](https://v2.tauri.app/start/prerequisites/).
+From the repository root, run:
 
 ```bash
 npm --prefix straggler/desktop ci
 npm --prefix straggler/desktop run desktop
 ```
 
-After setup, only the second command is needed. A source development session has
-no bundled backend: select an existing llama.cpp folder in **Settings → llama.cpp**.
-You can open the app without model weights or an inference service.
+The second command opens the native app; use it again for subsequent sessions.
+Source development has no bundled backend: in **Settings → llama.cpp**, select an
+existing llama.cpp folder containing `build/bin/llama-server` or `bin/llama-server`.
+You can open and develop the app without model weights or an inference service.
 
-See the [user and developer guide](straggler/docs/guide.md) for settings, projects,
-data locations, development checks, packaging and troubleshooting.
+## First launch
+
+1. In **Settings → Folders**, choose your models folder and confirm **Use this
+   folder**. Straggler searches subfolders too.
+2. In **Model settings**, choose a model and review the settings. Select **Apply
+   changes**, then **Back to chat**.
+3. Select **Launch server** and wait for **Ready**, then send a message.
+4. To reuse these settings, save them in **Settings → Saved configurations**.
+
+The model selector and server controls stay at the top of chat. **Stop response**
+keeps the text received so far; **Stop server** shuts down llama.cpp. Closing the
+app asks you to confirm saving and server shutdown.
+
+[<img src="straggler/docs/screenshots/desktop-settings.png" alt="Straggler model settings before choosing a GGUF" width="640">](straggler/docs/screenshots/desktop-settings.png)
+
+See the [user and developer guide](straggler/docs/guide.md) for chat, files,
+projects, settings, backups, troubleshooting, development and packaging.
