@@ -53,12 +53,22 @@ impl Fixture {
     }
 
     async fn cancel_when_started(&self, cancelled: &AtomicBool) {
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
-        while !self.directory.path().join("pid.txt").exists()
-            && std::time::Instant::now() < deadline
-        {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
+        // The fixture writes its PID after installing its signal handler.
+        // File creation alone can precede that completed readiness record.
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let ready = fs::read_to_string(self.directory.path().join("pid.txt"))
+                    .ok()
+                    .and_then(|value| value.parse::<u32>().ok())
+                    .is_some_and(|pid| pid > 0);
+                if ready {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("Backend fixture did not become ready for cancellation");
         cancelled.store(true, Ordering::Relaxed);
     }
 }
