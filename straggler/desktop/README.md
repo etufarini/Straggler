@@ -143,3 +143,23 @@ Use the [packaging guide](../docs/guide.md#building-packages) to produce GUI pac
 with the pinned backend. Plain `npm run bundle` is a Tauri build and does not
 prepare that backend. Python, Node and Rust are build/test dependencies only.
 Local candidate builds do not publish releases or submit to an app store.
+
+## Branding assets
+
+The supplied Straggler artwork uses a blue star above chat dots. The sidebar's
+`src/assets/brand-mark.svg` uses the simplified small-size mark. Native icon
+sources are `src-tauri/icons/icon.svg` and `icon-small.svg`; the latter preserves
+the two-dot variant for the 32 px icon. The README reuses the native icon.
+
+To regenerate the checked-in PNGs from this directory:
+
+```bash
+npm exec -- tauri icon src-tauri/icons/icon.svg --output packaging/generated/icons
+npm exec -- tauri icon src-tauri/icons/icon-small.svg --output packaging/generated/icons-small --png 32
+cp packaging/generated/icons/icon.png packaging/generated/icons/128x128.png packaging/generated/icons/128x128@2x.png src-tauri/icons/
+cp packaging/generated/icons-small/32x32.png src-tauri/icons/
+```
+
+macOS packaging generates the complete ICNS from `icon.svg`, including its
+1024 px representation. The app loads bundled SVG/PNG assets without external
+fonts, artwork scripts or network requests.

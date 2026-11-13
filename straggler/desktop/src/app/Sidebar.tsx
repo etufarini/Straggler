@@ -15,6 +15,7 @@ import { projectUpdatedAt } from '../domain/projects';
 import type { Conversation } from '../domain/types';
 import { errorDetail } from '../domain/errors';
 import type { WorkspaceController } from './useWorkspace';
+import brandMark from '../assets/brand-mark.svg';
 
 export default function Sidebar({ controller }: { controller: WorkspaceController }) {
   const {
@@ -53,10 +54,8 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
   return (
     <aside id="sidebar" className={`sidebar ${preferences.sidebarCollapsed ? 'is-compact' : ''}`}>
       <div className="brand">
-        <span className="brand-symbol">
-          S<span>·</span>
-        </span>
-        <span>
+        <img className="brand-symbol" src={brandMark} width={32} height={32} alt="" />
+        <span className="brand-name">
           Straggler<small>YOUR LOCAL SPACE</small>
         </span>
         <button
