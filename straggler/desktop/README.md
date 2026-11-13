@@ -148,11 +148,12 @@ Local candidate builds do not publish releases or submit to an app store.
 
 ## Branding assets
 
-The supplied Straggler artwork uses a blue star above chat dots. The sidebar and
-assistant message avatars share the simplified small-size mark in
+The supplied Straggler artwork uses two overlapping stars with a cyan center
+(the "Fusion" proposal). The sidebar and assistant message avatars share
 `src/assets/brand-mark.svg`. Native icon sources are `src-tauri/icons/icon.svg` and
-`icon-small.svg`; the latter preserves the two-dot variant for the 32 px icon.
-The README reuses the native icon.
+`icon-small.svg`; both use the same symbol. The small source uses a 24 px symbol
+inside a 32 px frame, matching the supplied artwork. The README reuses the native
+icon.
 
 To regenerate the checked-in PNGs from this directory:
 
