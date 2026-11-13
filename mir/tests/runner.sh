@@ -18,39 +18,43 @@ with tempfile.TemporaryDirectory(prefix='mir-runner-') as temporary:
     # The runner prepends its interpreter directory so tests use a private Bash path.
     interpreter = commands/'bash'
     interpreter.symlink_to(shutil.which('bash'))
+    for name in ('dirname', 'uname'):
+        (commands/name).symlink_to(shutil.which(name))
+    (commands/'python3').symlink_to(sys.executable)
+    brew = commands/'brew'
+    brew.write_text('#!/bin/sh\nprintf "%s\\n" "$TEST_PREFIX"\n')
+    brew.chmod(0o755)
     for name in ('npm', 'cargo'):
         executable = commands/name
         executable.write_text('''#!/bin/sh
-if [ "${0##*/}" = "$TEST_FORBIDDEN_TOOL" ]; then
-    printf 'Unexpected tool: %s\n' "$0" >&2
-    exit 99
-fi
 printf '%s\n' "$*" >> "$TEST_TOOL_LOG"
 ''')
         executable.chmod(0o755)
     environment = {key: value for key, value in os.environ.items()
                    if not key.startswith(('MIR_', 'LLAMA_', 'XDG_'))}
-    environment.update(HOME=str(work), PATH=str(commands) + ':' + os.environ['PATH'],
+    environment.update(HOME=str(work), PATH=str(commands), TEST_PREFIX=str(work),
                        TEST_TOOL_LOG=str(work/'commands'))
     for suite, forbidden in (('frontend', 'cargo'), ('browser', 'cargo'), ('runtime', 'npm')):
+        (commands/forbidden).rename(work/forbidden)
         result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), suite],
-                                env=environment | {'TEST_FORBIDDEN_TOOL': forbidden}, cwd=work,
+                                env=environment, cwd=work,
                                 capture_output=True, text=True, timeout=15)
         assert result.returncode == 0, (suite, result.stdout, result.stderr)
         assert (work/'commands').is_file(), f'{suite} did not run checks'
         assert (work/'commands').read_text().strip(), f'{suite} did not run checks'
         (work/'commands').unlink()
+        (work/forbidden).rename(commands/forbidden)
     result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), 'unknown-suite'],
                             env=environment, capture_output=True, text=True, timeout=5)
     assert result.returncode != 0 and 'Usage:' in result.stderr
     assert not (work/'commands').exists()
 
     # Exercise Linux display dispatch on either host without a compositor or Xvfb.
-    (commands/'dirname').symlink_to(shutil.which('dirname'))
     uname = commands/'uname'
+    uname.unlink()
     uname.write_text('#!/bin/sh\nprintf "Linux\\n"\n')
     uname.chmod(0o755)
-    headless = environment | {'PATH': str(commands), 'DISPLAY': '', 'WAYLAND_DISPLAY': ''}
+    headless = environment | {'DISPLAY': '', 'WAYLAND_DISPLAY': ''}
     result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), 'native'],
                             env=headless, capture_output=True, text=True, timeout=5)
     assert result.returncode != 0 and 'graphical session' in result.stderr, result.stderr
