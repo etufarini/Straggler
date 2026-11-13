@@ -201,6 +201,27 @@ async fn cancellation_and_timeout_reap_owned_processes() {
 }
 
 #[tokio::test]
+async fn missing_readiness_still_cancels_and_reaps_the_owned_process() {
+    let fixture = Fixture::new();
+    fixture.flag("wait");
+    let missing_readiness = Fixture::new();
+    let cancelled = AtomicBool::new(false);
+    let mut refuse_force = |_| panic!("The waiting fixture must stop with SIGTERM");
+    let check = check_command(
+        &fixture.server,
+        "--version",
+        &cancelled,
+        Duration::from_secs(10),
+        &mut refuse_force,
+    );
+    let (result, ready) = tokio::join!(check, missing_readiness.cancel_when_started(&cancelled));
+    assert!(!ready);
+    assert!(!result.success);
+    assert!(result.error.unwrap().contains("cancelled"));
+    fixture.assert_reaped();
+}
+
+#[tokio::test]
 async fn sigkill_requires_a_separate_confirmation_after_sigterm() {
     let fixture = Fixture::new();
     fixture.flag("wait");
