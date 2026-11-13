@@ -25,6 +25,28 @@ const binary =
   process.env.MIR_TEST_NATIVE || path.join(desktop, 'src-tauri/target/debug/mir-desktop');
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+function pdfFixture() {
+  const text = 'BT /F1 12 Tf 40 750 Td (Native PDF attachment text) Tj ET';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${Buffer.byteLength(text)} >>\nstream\n${text}\nendstream`,
+  ];
+  let document = '%PDF-1.4\n';
+  const offsets = [];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(document));
+    document += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(document);
+  document += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  document += offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  document += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(document);
+}
+
 async function freePort() {
   const socket = net.createServer();
   socket.listen(0, '127.0.0.1');
@@ -217,7 +239,7 @@ try {
     );
     await sendMessage('Native test question');
     await until(
-      () => evaluate('!!document.querySelector(".copy-button")'),
+      () => evaluate(`!!document.querySelector('[aria-label="Copy response"]')`),
       'native streaming response',
     );
     assert.match(
@@ -243,6 +265,86 @@ try {
       path.join(desktop, 'test-results/native-chat.png'),
       Buffer.from(shot, 'base64'),
     );
+    // Exercise file commands against real IPC and temporary documents, then use
+    // the native window to reopen and remove the stored attachment conversation.
+    const attachmentChatId = crypto.randomUUID();
+    const attachmentChat = {
+      id: attachmentChatId,
+      title: 'Attachment contract',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      model: null,
+      messages: [],
+    };
+    const invokeNative = (command, args) =>
+      evaluate(
+        `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)})`,
+      );
+    await invokeNative('history_create', { conversation: attachmentChat });
+    for (const [extension, original, text] of [
+      ['txt', Buffer.from('Native attachment text ☕'), 'Native attachment text ☕'],
+      ['pdf', pdfFixture(), 'Native PDF attachment text'],
+    ]) {
+      const source = path.join(stage, `attachment.${extension}`);
+      await writeFile(source, original);
+      const attached = await invokeNative('attachment_add', { id: attachmentChatId, path: source });
+      const attachment = attached.attachments.at(-1);
+      assert.equal(attachment.extension, extension);
+      assert.ok(attachment.text.includes(text));
+      await rm(source);
+      const downloaded = path.join(stage, `download.${extension}`);
+      await invokeNative('attachment_download', {
+        id: attachmentChatId,
+        attachmentId: attachment.id,
+        destination: downloaded,
+      });
+      assert.deepEqual(await readFile(downloaded), original);
+    }
+    const exported = path.join(stage, 'export.json');
+    await invokeNative('write_export', {
+      path: exported,
+      contents: JSON.stringify([{ role: 'user', content: 'Imported text' }]),
+    });
+    const imported = await invokeNative('read_conversation_import', { path: exported });
+    assert.equal(imported.messages[0].content, 'Imported text');
+    await evaluate('location.reload()');
+    await until(
+      () => evaluate(`!!document.querySelector('[title="Attachment contract"]')`),
+      'native attachment history',
+    );
+    await evaluate(`document.querySelector('[title="Attachment contract"]').click()`);
+    await until(
+      () => evaluate('document.querySelector(".file-name")?.textContent === "attachment.txt"'),
+      'native attachment rail',
+    );
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".type-pdf .file-name")?.textContent === "attachment.pdf"',
+        ),
+      'native PDF attachment rail',
+    );
+    await evaluate(
+      `document.querySelector('[aria-label="Options for Attachment contract"]').click()`,
+    );
+    await until(
+      () => evaluate('!!document.querySelector(".chat-menu")'),
+      'native conversation menu',
+    );
+    await evaluate(
+      `document.querySelector('[role="menuitem"][aria-label="Delete Attachment contract"]').click()`,
+    );
+    await until(
+      () => evaluate('!!document.querySelector(".confirmation .danger-button")'),
+      'native delete confirmation',
+    );
+    await evaluate('document.querySelector(".confirmation .danger-button").click()');
+    await until(
+      () => evaluate('!document.querySelector(".confirmation")'),
+      'native attachment deletion',
+    );
+    assert.ok(!(await readdir(history)).includes(attachmentChatId));
+    await evaluate(`document.querySelector('[title="Native test question"]').click()`);
     await sendMessage('oom-stream');
     await until(
       () =>

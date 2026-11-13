@@ -5,6 +5,7 @@ export default function ReasoningControls({
   reasoning,
   effort,
   details,
+  disabled = false,
   effortPresentation = 'select',
   onReasoning,
   onEffort,
@@ -12,6 +13,7 @@ export default function ReasoningControls({
   reasoning: 'auto' | 'on' | 'off';
   effort: string;
   details: ServerDetails | null;
+  disabled?: boolean;
   effortPresentation?: 'select' | 'segments';
   onReasoning: (value: 'on' | 'off') => void;
   onEffort: (value: string) => void;
@@ -21,7 +23,7 @@ export default function ReasoningControls({
   const levels = details?.effortLevels ?? [];
   return (
     <>
-      <fieldset className="choice-group" disabled={!available}>
+      <fieldset className="choice-group" disabled={disabled || !available}>
         <legend>Reasoning</legend>
         <div className="segmented">
           {(['on', 'off'] as const).map((value) => (
@@ -48,7 +50,10 @@ export default function ReasoningControls({
       </p>
       {effortPresentation === 'segments' ? (
         <>
-          <fieldset className="choice-group" disabled={!available || reasoning === 'off'}>
+          <fieldset
+            className="choice-group"
+            disabled={disabled || !available || reasoning === 'off'}
+          >
             <legend>Reasoning effort</legend>
             <div className="segmented">
               {levels.map((value) => (
@@ -77,7 +82,7 @@ export default function ReasoningControls({
           <span>Reasoning effort</span>
           <select
             aria-label="Reasoning effort"
-            disabled={!available || reasoning === 'off' || !levels.length}
+            disabled={disabled || !available || reasoning === 'off' || !levels.length}
             value={effort}
             onChange={(event) => onEffort(event.target.value)}
           >

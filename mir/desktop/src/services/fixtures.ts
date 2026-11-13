@@ -1,3 +1,4 @@
+import type { DragDropEvent } from '@tauri-apps/api/webview';
 import type {
   Configuration,
   Conversation,
@@ -9,6 +10,7 @@ import type {
   ServerDetails,
 } from '../domain/types';
 import { emptyServer } from '../domain/types';
+import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 
 export type Scenario =
   | 'normal'
@@ -291,6 +293,80 @@ export function createFixture(scenario: Scenario) {
         }
         return configuration();
       }
+      case 'tokenize_text':
+        if (status.phase !== 'ready' || localStorage.getItem('mir-fixture-tokenize-unavailable'))
+          throw new Error('Tokenization unavailable');
+        return approximateTokens(String(args.content));
+      case 'prompt_tokens': {
+        if (status.phase !== 'ready' || localStorage.getItem('mir-fixture-tokenize-unavailable'))
+          throw new Error('Tokenization unavailable');
+        const messages = args.messages as { content: string }[];
+        return {
+          tokens:
+            Number(localStorage.getItem('mir-fixture-prompt-tokens')) ||
+            approximatePromptTokens(messages),
+          templated: true,
+        };
+      }
+      case 'attachment_add': {
+        while (localStorage.getItem('mir-fixture-reading-paused'))
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        const conversation = structuredClone(history.find((item) => item.id === args.id));
+        if (!conversation) throw new Error('Conversation does not exist');
+        const name = String(args.path).split('/').at(-1)!;
+        const suffix = name.split('.').at(-1)!.toLowerCase();
+        if (suffix === 'ppt')
+          throw new Error(
+            'PowerPoint 97–2003 (.ppt) is not supported. Save it as .pptx and add it again.',
+          );
+        const extension = attachmentTypes.find((type) => type === suffix);
+        if (!extension) throw new Error('This file type is not supported.');
+        const text = `Extracted fixture text from ${name}.`;
+        conversation.attachments = [
+          ...(conversation.attachments || []),
+          { id: crypto.randomUUID(), name, extension, size: 1234, text },
+        ];
+        conversation.updatedAt = Date.now();
+        history[history.findIndex((item) => item.id === args.id)] = conversation;
+        persistHistory();
+        return conversation;
+      }
+      case 'attachment_remove': {
+        const conversation = structuredClone(history.find((item) => item.id === args.id));
+        if (!conversation) throw new Error('Conversation does not exist');
+        conversation.attachments = conversation.attachments?.filter(
+          (item) => item.id !== args.attachmentId,
+        );
+        history[history.findIndex((item) => item.id === args.id)] = conversation;
+        persistHistory();
+        return conversation;
+      }
+      case 'attachment_download':
+        localStorage.setItem('mir-fixture-download', String(args.attachmentId));
+        return;
+      case 'read_conversation_import':
+        if (localStorage.getItem('mir-fixture-import-error'))
+          throw new Error('Message 2 has an unsupported role: tool.');
+        return {
+          title: 'Imported conversation',
+          createdAt: '2026-11-10T00:00:00Z',
+          model: 'imported.gguf',
+          systemPrompt: 'Imported instructions',
+          messages: [
+            { role: 'user', content: 'Imported question', reasoning: '', model: null },
+            {
+              role: 'assistant',
+              content: 'Imported answer',
+              reasoning: 'Imported reasoning',
+              model: 'imported.gguf',
+            },
+          ],
+        };
+      case 'write_export':
+        if (localStorage.getItem('mir-fixture-write-error'))
+          throw new Error('Destination is not writable');
+        localStorage.setItem('mir-fixture-export', String(args.contents));
+        return;
       case 'history_list':
         if (
           scenario === 'history-error' &&
@@ -299,13 +375,20 @@ export function createFixture(scenario: Scenario) {
           throw new Error('Conversation storage is unavailable');
         }
         return structuredClone(history);
+      case 'history_create':
       case 'history_save': {
+        if (localStorage.getItem('mir-fixture-fail-next-save') === 'true') {
+          localStorage.removeItem('mir-fixture-fail-next-save');
+          throw new Error('Disk is full');
+        }
         if (failedWrites > 0) {
           failedWrites--;
           throw new Error('Disk is full');
         }
         const conversation = structuredClone(args.conversation as Conversation);
         const index = history.findIndex((value) => value.id === conversation.id);
+        if (command === 'history_create' && index !== -1)
+          throw new Error('Conversation already exists');
         if (index === -1) history.push(conversation);
         else history[index] = conversation;
         persistHistory();
@@ -372,5 +455,25 @@ export function createFixture(scenario: Scenario) {
         throw new Error(`Unexpected fixture command: ${command}`);
     }
   }
-  return { invoke };
+  function chooseSavePath(defaultPath: string) {
+    localStorage.setItem('mir-fixture-save-name', defaultPath);
+    const selected = localStorage.getItem('mir-fixture-save-path');
+    return selected === 'cancel' ? null : selected || '/fixture/export.json';
+  }
+  function chooseImportPath() {
+    return localStorage.getItem('mir-fixture-import-path') === 'cancel'
+      ? null
+      : '/fixture/import.json';
+  }
+  function chooseAttachmentFiles(): string[] {
+    return JSON.parse(
+      localStorage.getItem('mir-fixture-attachment-paths') || '["/fixture/meeting-notes.txt"]',
+    );
+  }
+  function watchAttachmentDrop(handler: (event: DragDropEvent) => void) {
+    const receive = (event: Event) => handler((event as CustomEvent<DragDropEvent>).detail);
+    window.addEventListener('mir-fixture-drag-drop', receive);
+    return () => window.removeEventListener('mir-fixture-drag-drop', receive);
+  }
+  return { invoke, chooseSavePath, chooseImportPath, chooseAttachmentFiles, watchAttachmentDrop };
 }

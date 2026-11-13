@@ -95,10 +95,18 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   reasoning: string;
+  model?: string;
   status: MessageStatus;
   error?: string;
   metrics?: GenerationMetrics;
   serverRunId?: string;
+}
+export interface Attachment {
+  id: string;
+  name: string;
+  extension: 'txt' | 'md' | 'docx' | 'xlsx' | 'pptx' | 'pdf';
+  size: number;
+  text: string;
 }
 export interface Conversation {
   id: string;
@@ -108,6 +116,7 @@ export interface Conversation {
   model: string | null;
   messages: Message[];
   options?: ChatOptions;
+  attachments?: Attachment[];
 }
 export interface Delta {
   metrics?: GenerationMetrics;

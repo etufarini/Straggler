@@ -1,19 +1,20 @@
+import ConversationMenu from './ConversationMenu';
 import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   MessageSquare,
-  Trash2,
   Settings2,
+  Import,
 } from 'lucide-react';
 import { newConversation } from '../domain/types';
 import { invoke } from '../services/desktop';
 import type { WorkspaceController } from './useWorkspace';
 export default function Sidebar({ controller }: { controller: WorkspaceController }) {
   const {
-    generating,
+    chatOptionsDisabled,
+    editingBusy,
     updateChat,
-    setInput,
     setPanel,
     panel,
     conversations,
@@ -57,16 +58,31 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         className="new-chat"
         aria-label="New chat"
         title="New chat"
-        disabled={generating || (!!storageError && chat.messages.length > 0)}
+        disabled={chatOptionsDisabled || (!!storageError && chat.messages.length > 0)}
         onClick={() => {
-          updateChat(newConversation());
-          setInput('');
+          openConversation(newConversation());
           setPanel(null);
         }}
       >
         <Plus size={17} /> <span className="sidebar-label">New chat</span>
       </button>
-      <div className="section-label">CONVERSATIONS</div>
+      <div className="section-label has-action">
+        <span>CONVERSATIONS</span>
+        <button
+          type="button"
+          className="section-action"
+          aria-label="Import conversation"
+          title="Import a conversation from a .json export"
+          disabled={!controller.native || controller.importBusy || editingBusy}
+          onClick={() => {
+            setPanel(null);
+            void controller.importChat();
+          }}
+        >
+          <Import size={13} />
+          <span>Import</span>
+        </button>
+      </div>
       <div className="conversation-list">
         {conversations.length === 0 && (
           <p className="history-empty">
@@ -81,7 +97,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             className={`conversation-row ${chat.id === value.id ? 'selected' : ''}`}
           >
             <button
-              disabled={generating || (!!storageError && chat.messages.length > 0)}
+              disabled={chatOptionsDisabled || (!!storageError && chat.messages.length > 0)}
               onClick={() => {
                 openConversation(value);
                 setPanel(null);
@@ -91,11 +107,11 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
               <MessageSquare size={15} />
               <span>{value.title}</span>
             </button>
-            <button
-              className="delete-chat"
-              aria-label={`Delete ${value.title}`}
-              disabled={generating}
-              onClick={() =>
+            <ConversationMenu
+              conversation={value}
+              onExport={(includesReasoning) => void controller.exportChat(value, includesReasoning)}
+              disabled={chatOptionsDisabled}
+              onDelete={() =>
                 setConfirmation({
                   title: 'Delete conversation?',
                   actionLabel: 'Delete conversation',
@@ -109,9 +125,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
                   },
                 })
               }
-            >
-              <Trash2 size={14} />
-            </button>
+            />
           </div>
         ))}
       </div>

@@ -68,6 +68,9 @@ export default function App() {
   return (
     <div className="app-shell">
       <Sidebar controller={controller} />
+      <span role="status" className="visually-hidden">
+        {controller.attachments.announcement}
+      </span>
 
       <main
         className={`workspace ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
@@ -164,11 +167,12 @@ export default function App() {
             </Feedback>
           </div>
         )}
-        {storageError && panel === 'settings' && (
-          <div className="workspace-feedback">
-            <StorageFeedback controller={controller} />
-          </div>
-        )}
+        {(storageError || controller.fileError || controller.fileNotice) &&
+          panel === 'settings' && (
+            <div className="workspace-feedback">
+              <StorageFeedback controller={controller} />
+            </div>
+          )}
 
         {panel === 'settings' && config && draft ? (
           <SettingsPage
@@ -194,6 +198,7 @@ export default function App() {
               <ChatPanel controller={controller} />
             </div>
             <PresencePanel
+              attachments={controller.attachments}
               state={presence}
               metrics={lastResponse?.metrics}
               preferences={controller.preferences}

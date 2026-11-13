@@ -1,5 +1,7 @@
 import { useServerDetails } from '../features/server/useServerDetails';
 import { useUiPreferences } from './useUiPreferences';
+import { useAttachments } from '../features/attachments/useAttachments';
+import { useContextEstimate } from '../features/chat/useContextEstimate';
 import { useConversation } from '../features/chat/useConversation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
@@ -45,7 +47,34 @@ export function useWorkspace() {
   const closeAction = useRef<() => void>(() => {});
   const native = isTauri();
   const ui = useUiPreferences();
+  const serverDetails = useServerDetails(server);
+  const conversation = useConversation(server, config?.settings, serverDetails?.contextSize);
+  const attachments = useAttachments(conversation, server);
+  const contextEstimate = useContextEstimate(
+    conversation.chat,
+    conversation.input,
+    config?.settings,
+    server,
+    serverDetails,
+  );
   const {
+    chatOptionsDisabled,
+    flushSaves,
+    contextError,
+    importChat,
+    importBusy,
+    importError,
+    setImportError,
+    exportChat,
+    fileError,
+    setFileError,
+    fileNotice,
+    editor,
+    setEditor,
+    editingBusy,
+    beginEdit,
+    saveEdit,
+    regenerate,
     generationPhase,
     setChatOptions,
     conversations,
@@ -68,8 +97,7 @@ export function useWorkspace() {
     cancel,
     send,
     openConversation,
-  } = useConversation(server, config?.settings);
-  const serverDetails = useServerDetails(server);
+  } = conversation;
 
   function reviewSettings(section: Section) {
     setSettingsSection(section);
@@ -216,7 +244,7 @@ export function useWorkspace() {
       action: async () => {
         await invoke('cancel_build');
         await stop();
-        await saveQueue.current;
+        await flushSaves();
         await ui.preferenceSaveQueue.current;
         await getCurrentWindow().destroy();
       },
@@ -276,10 +304,35 @@ export function useWorkspace() {
   const active = serverActive(server);
   const displayModel = active ? server.model : selected;
   const canSend =
-    native && server.phase === 'ready' && historyReady && !storageError && !generating && !busy;
+    native &&
+    server.phase === 'ready' &&
+    historyReady &&
+    !storageError &&
+    !chatOptionsDisabled &&
+    !busy &&
+    !editor &&
+    !contextEstimate.overflow;
 
   return {
     ...ui,
+    chatOptionsDisabled,
+    attachments,
+    contextEstimate,
+    contextError,
+    importChat,
+    importBusy,
+    importError,
+    setImportError,
+    exportChat,
+    fileError,
+    setFileError,
+    fileNotice,
+    editor,
+    setEditor,
+    editingBusy,
+    beginEdit,
+    saveEdit,
+    regenerate,
     generationPhase,
     setChatOptions,
     serverDetails,

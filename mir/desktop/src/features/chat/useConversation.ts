@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Channel, invoke, isTauri } from '../../services/desktop';
-import { newConversation, requestMessages } from '../../domain/types';
+import {
+  Channel,
+  invoke,
+  isTauri,
+  saveConversationExport,
+  chooseConversationImport,
+  estimatePromptTokens,
+} from '../../services/desktop';
+import { fileName, newConversation } from '../../domain/types';
 import { inheritedChatOptions, resolveChatOptions } from '../../domain/chat';
+import { replaceMessage, regenerationHistory } from '../../domain/messageActions';
+import { materializeImport } from '../../domain/conversationImport';
+import type { ImportedConversation } from '../../domain/conversationImport';
+import { composeRequest } from '../../domain/attachments';
+import { exportFileName, serializeConversation } from '../../domain/conversationExport';
 import { errorDetail } from '../../domain/errors';
 import type {
   Conversation,
@@ -13,11 +25,30 @@ import type {
   ChatOptions,
 } from '../../domain/types';
 
-export function useConversation(server: ServerStatus, settings?: Settings) {
+export function useConversation(
+  server: ServerStatus,
+  settings?: Settings,
+  contextSize?: number | null,
+) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
   const [input, setInput] = useState('');
+  const [contextError, setContextError] = useState('');
+  const [editor, setEditor] = useState<{ messageId: string; text: string } | null>(null);
+  const [editingBusy, setEditingBusy] = useState(false);
+  const mutation = useRef(false);
   const [storageError, setStorageError] = useState('');
+  const [fileError, setFileError] = useState('');
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState<{ fileName: string; details: string } | null>(
+    null,
+  );
+  const [fileNotice, setFileNotice] = useState('');
+  useEffect(() => {
+    if (!fileNotice) return;
+    const timer = setTimeout(() => setFileNotice(''), 3500);
+    return () => clearTimeout(timer);
+  }, [fileNotice]);
   const [historyReady, setHistoryReady] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generationPhase, setGenerationPhase] = useState<'waiting' | 'reasoning' | 'generating'>(
@@ -32,9 +63,27 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
   const messageList = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    setContextError('');
+  }, [input, chat.attachments, contextSize]);
+
+  async function flushSaves() {
+    let pending: Promise<void>;
+    do {
+      pending = saveQueue.current;
+      await pending;
+    } while (pending !== saveQueue.current);
+  }
   function updateChat(value: Conversation) {
     chatRef.current = value;
     setChat(value);
+  }
+  function updateConversations(value: Conversation) {
+    setConversations((values) =>
+      [value, ...values.filter((item) => item.id !== value.id)].sort(
+        (a, b) => b.updatedAt - a.updatedAt,
+      ),
+    );
   }
   const loadHistory = useCallback(async () => {
     try {
@@ -58,26 +107,28 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
   useLayoutEffect(() => {
     const list = messageList.current;
     if (follow.current && list)
-      list.scrollTo({ top: list.scrollHeight, behavior: generating ? 'instant' : 'smooth' });
+      list.scrollTo({
+        top: list.scrollHeight,
+        behavior:
+          generating || matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'instant'
+            : 'smooth',
+      });
   }, [chat, generating]);
-  function save(value: Conversation): Promise<void> {
+  function save(value: Conversation, create = false): Promise<void> {
     const snapshot = structuredClone(value);
     const pending = saveQueue.current
       .catch(() => {})
       .then(async () => {
-        await invoke('history_save', { conversation: snapshot });
+        await invoke(create ? 'history_create' : 'history_save', { conversation: snapshot });
         if (mounted.current) {
-          setStorageError('');
-          setConversations((current) =>
-            [snapshot, ...current.filter((c) => c.id !== snapshot.id)].sort(
-              (a, b) => b.updatedAt - a.updatedAt,
-            ),
-          );
+          if (historyReady) setStorageError('');
+          updateConversations(snapshot);
         }
       });
     saveQueue.current = pending;
     void pending.catch((e) => {
-      if (mounted.current) setStorageError(errorDetail(e).message);
+      if (mounted.current && !create) setStorageError(errorDetail(e).message);
     });
     return pending;
   }
@@ -89,15 +140,21 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
     }
   }
 
-  async function send() {
+  async function send(replacement?: Message[]) {
     const text = input.trim();
-    if (!text || requestRef.current || server.phase !== 'ready' || !historyReady || storageError)
+    if (
+      (!replacement && (!text || editor)) ||
+      requestRef.current ||
+      mutation.current ||
+      server.phase !== 'ready' ||
+      !historyReady ||
+      storageError
+    )
       return;
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     setGenerating(true);
     setGenerationPhase('waiting');
-    setInput('');
     follow.current = true;
     const user: Message = {
       id: crypto.randomUUID(),
@@ -110,6 +167,7 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
       id: crypto.randomUUID(),
       role: 'assistant',
       serverRunId: server.runId,
+      ...(server.model ? { model: server.model } : {}),
       content: '',
       reasoning: '',
       status: 'streaming',
@@ -119,9 +177,28 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
       updatedAt: Date.now(),
       model: server.model,
       title: chatRef.current.messages.length ? chatRef.current.title : text.slice(0, 80),
-      messages: [...chatRef.current.messages, user, assistant],
+      messages: [...(replacement ?? [...chatRef.current.messages, user]), assistant],
     };
-    updateChat(current);
+    const options = resolveChatOptions(current.options, settings);
+    const messages = composeRequest(
+      current.messages.slice(0, -1),
+      options.systemPrompt,
+      current.attachments ?? [],
+    );
+    const estimate = await estimatePromptTokens(messages);
+    if (contextSize && estimate.tokens > contextSize) {
+      setContextError(
+        `The prompt and attachments exceed the ${contextSize.toLocaleString('en-US')}-token context. Remove files, shorten your message or increase the context size.`,
+      );
+      requestRef.current = null;
+      setGenerating(false);
+      return;
+    }
+    setContextError('');
+    if (!replacement) {
+      setInput('');
+      updateChat(current);
+    }
     const onDelta = new Channel<Delta>();
     let generationStarted = false;
     let lastSave = Date.now();
@@ -144,10 +221,11 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
         void save(current).catch(() => {});
       }
     };
-    const options = resolveChatOptions(current.options, settings);
     try {
       // Persist the user's message before asking the server to generate.
       await save(current);
+      updateChat(current);
+      setEditor(null);
       generationStarted = true;
       const response: Response =
         cancelledRef.current === requestId
@@ -155,12 +233,7 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
           : await invoke<Response>('generate', {
               request: {
                 requestId,
-                messages: [
-                  ...(options.systemPrompt
-                    ? [{ role: 'system', content: options.systemPrompt }]
-                    : []),
-                  ...requestMessages(current.messages.slice(0, -1)),
-                ],
+                messages,
                 options: { reasoning: options.reasoning, effort: options.effort },
               },
               onDelta,
@@ -182,32 +255,163 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
         updatedAt: Date.now(),
         messages: [...current.messages.slice(0, -1), { ...assistant }],
       };
-      updateChat(current);
-      await save(current).catch(() => {});
+      if (!replacement || generationStarted) {
+        updateChat(current);
+        await save(current).catch(() => {});
+      }
       setGenerating(false);
       textarea.current?.focus();
     }
   }
 
+  function acceptStoredConversation(value: Conversation) {
+    updateChat(value);
+    updateConversations(value);
+  }
+
+  async function runConversationMutation(operation: () => Promise<void>) {
+    if (requestRef.current || mutation.current)
+      throw new Error('Wait for the current conversation operation to finish.');
+    mutation.current = true;
+    setEditingBusy(true);
+    try {
+      await saveQueue.current;
+      await save(chatRef.current);
+      const pending = operation();
+      saveQueue.current = pending;
+      await pending;
+    } finally {
+      mutation.current = false;
+      setEditingBusy(false);
+    }
+  }
+
+  async function importChat() {
+    if (mutation.current || importBusy) return;
+    let path: string | null = null;
+    mutation.current = true;
+    setImportBusy(true);
+    try {
+      path = await chooseConversationImport();
+      if (!path) return;
+      setImportError(null);
+      const imported = await invoke<ImportedConversation>('read_conversation_import', { path });
+      // Validate before disturbing an active response or writing any conversation.
+      await cancel();
+      await sendPromise.current;
+      await saveQueue.current;
+      const value = materializeImport(
+        imported,
+        conversations.reduce((latest, item) => Math.max(latest, item.updatedAt + 1), Date.now()),
+      );
+      await save(value, true);
+      setEditor(null);
+      updateChat(value);
+      setInput('');
+      follow.current = true;
+    } catch (error) {
+      setImportError({
+        fileName: path ? fileName(path) : 'File selection',
+        details: errorDetail(error).message,
+      });
+    } finally {
+      mutation.current = false;
+      setImportBusy(false);
+    }
+  }
+
+  async function exportChat(value: Conversation, includesReasoning: boolean) {
+    setFileError('');
+    try {
+      const snapshot = value.id === chatRef.current.id ? chatRef.current : value;
+      const contents = serializeConversation(
+        snapshot,
+        includesReasoning,
+        new Date().toISOString(),
+        settings,
+      );
+      if (await saveConversationExport(exportFileName(snapshot.title), contents))
+        setFileNotice('Conversation exported.');
+    } catch (error) {
+      setFileError(errorDetail(error).message);
+    }
+  }
+
+  function beginEdit(message: Message) {
+    if (requestRef.current || mutation.current) return;
+    setEditor({ messageId: message.id, text: message.content });
+  }
+
+  async function regenerate(messageId: string, text?: string) {
+    const original = chatRef.current;
+    const value =
+      text === undefined ? original : replaceMessage(original, messageId, text, Date.now());
+    const pending = send(regenerationHistory(value, messageId));
+    sendPromise.current = pending;
+    await pending;
+  }
+
+  async function saveEdit() {
+    if (!editor || mutation.current || requestRef.current) return;
+    const original = chatRef.current;
+    const message = original.messages.find((value) => value.id === editor.messageId);
+    if (!message) return;
+    if (message.role === 'user') {
+      await regenerate(message.id, editor.text);
+      return;
+    }
+    mutation.current = true;
+    setEditingBusy(true);
+    try {
+      const value = replaceMessage(original, message.id, editor.text, Date.now());
+      await save(value);
+      updateChat(value);
+      setEditor(null);
+    } finally {
+      mutation.current = false;
+      setEditingBusy(false);
+    }
+  }
+
   function setChatOptions(patch: Partial<ChatOptions>) {
-    if (requestRef.current) return;
+    if (requestRef.current || mutation.current) return;
     const value = {
       ...chatRef.current,
       options: { ...inheritedChatOptions, ...chatRef.current.options, ...patch },
       updatedAt: Date.now(),
     };
     updateChat(value);
-    if (value.messages.length) void save(value).catch(() => {});
+    if (value.messages.length || value.attachments?.length) void save(value).catch(() => {});
   }
 
   function openConversation(value: Conversation) {
-    if (generating) return;
+    if (requestRef.current || mutation.current) return;
+    setEditor(null);
     updateChat(structuredClone(value));
     setInput('');
     follow.current = true;
   }
 
   return {
+    chatOptionsDisabled: generating || editingBusy || importBusy,
+    flushSaves,
+    runConversationMutation,
+    acceptStoredConversation,
+    contextError,
+    importChat,
+    importBusy,
+    importError,
+    setImportError,
+    exportChat,
+    fileError,
+    setFileError,
+    fileNotice,
+    editor,
+    setEditor,
+    editingBusy,
+    beginEdit,
+    saveEdit,
+    regenerate,
     generationPhase,
     setChatOptions,
     conversations,
@@ -232,3 +436,5 @@ export function useConversation(server: ServerStatus, settings?: Settings) {
     openConversation,
   };
 }
+
+export type ConversationController = ReturnType<typeof useConversation>;

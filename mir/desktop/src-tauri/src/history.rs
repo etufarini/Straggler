@@ -1,4 +1,7 @@
-use crate::Result;
+use crate::{
+    attachments::{self, Attachment},
+    Result,
+};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, os::unix::fs::DirBuilderExt, path::PathBuf, sync::Mutex};
 use uuid::Uuid;
@@ -11,6 +14,8 @@ pub struct Message {
     pub content: String,
     #[serde(default)]
     pub reasoning: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     pub status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -29,6 +34,8 @@ pub struct Conversation {
     pub updated_at: u64,
     pub model: Option<String>,
     pub messages: Vec<Message>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<Attachment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<ConversationOptions>,
 }
@@ -96,21 +103,141 @@ impl History {
     pub fn save(&self, conversation: &Conversation) -> Result<()> {
         validate(conversation)?;
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.write(conversation, false)
+    }
+
+    pub fn create(&self, conversation: &Conversation) -> Result<()> {
+        validate(conversation)?;
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.write(conversation, true)
+    }
+
+    fn write(&self, conversation: &Conversation, create: bool) -> Result<()> {
         let mut file = tempfile::NamedTempFile::new_in(&self.directory)
             .map_err(|e| format!("Cannot create a conversation file: {e}"))?;
         serde_json::to_writer(&mut file, conversation).map_err(|e| e.to_string())?;
         file.write_all(b"\n").map_err(|e| e.to_string())?;
         file.as_file().sync_all().map_err(|e| e.to_string())?;
-        file.persist(self.directory.join(format!("{}.json", conversation.id)))
-            .map_err(|e| format!("Cannot save conversation. Previous data was kept: {e}"))?;
+        let path = self.directory.join(format!("{}.json", conversation.id));
+        let result = if create {
+            file.persist_noclobber(path)
+        } else {
+            file.persist(path)
+        };
+        result.map_err(|e| format!("Cannot save conversation. Previous data was kept: {e}"))?;
         Ok(())
+    }
+
+    fn read_one(&self, id: Uuid) -> Result<Conversation> {
+        let bytes = fs::read(self.directory.join(format!("{id}.json")))
+            .map_err(|e| format!("Cannot read conversation: {e}"))?;
+        let conversation: Conversation =
+            serde_json::from_slice(&bytes).map_err(|e| format!("Cannot read conversation: {e}"))?;
+        if conversation.id != id {
+            return Err("The conversation identifier does not match its file.".into());
+        }
+        validate(&conversation)?;
+        Ok(conversation)
+    }
+
+    fn original_path(&self, conversation: Uuid, attachment: &Attachment) -> PathBuf {
+        self.directory
+            .join(conversation.to_string())
+            .join("attachments")
+            .join(format!("{}.{}", attachment.id, attachment.extension))
+    }
+
+    pub fn add_attachment(&self, id: Uuid, path: &std::path::Path) -> Result<Conversation> {
+        let extracted = attachments::extract(path)?;
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        let mut conversation = self.read_one(id)?;
+        let original_path = self.original_path(id, &extracted.attachment);
+        let parent = original_path
+            .parent()
+            .ok_or("Attachment storage has no parent directory.")?;
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(parent)
+            .map_err(|e| format!("Cannot create attachment storage: {e}"))?;
+        let mut file = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+        file.write_all(&extracted.original)
+            .and_then(|()| file.as_file().sync_all())
+            .map_err(|e| format!("Cannot store the original attachment: {e}"))?;
+        file.persist_noclobber(&original_path)
+            .map_err(|e| format!("Cannot store the original attachment: {e}"))?;
+        conversation.attachments.push(extracted.attachment);
+        conversation.updated_at = timestamp();
+        if let Err(error) = self.write(&conversation, false) {
+            return match fs::remove_file(&original_path) {
+                Ok(()) => Err(error),
+                Err(cleanup) => Err(format!(
+                    "{error} Cannot remove the unreferenced copy: {cleanup}"
+                )),
+            };
+        }
+        Ok(conversation)
+    }
+
+    pub fn remove_attachment(&self, id: Uuid, attachment_id: Uuid) -> Result<Conversation> {
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        let previous = self.read_one(id)?;
+        let mut conversation = previous.clone();
+        let index = conversation
+            .attachments
+            .iter()
+            .position(|item| item.id == attachment_id)
+            .ok_or("This attachment is no longer in the conversation.")?;
+        let attachment = conversation.attachments.remove(index);
+        conversation.updated_at = timestamp();
+        self.write(&conversation, false)?;
+        let path = self.original_path(id, &attachment);
+        if path.exists() {
+            if let Err(error) = fs::remove_file(path) {
+                self.write(&previous, false).map_err(|rollback| format!("Cannot remove the original: {error}. Cannot restore its record: {rollback}"))?;
+                return Err(format!(
+                    "Cannot remove the original attachment. Its record was kept: {error}"
+                ));
+            }
+        }
+        Ok(conversation)
+    }
+
+    pub fn download_attachment(
+        &self,
+        id: Uuid,
+        attachment_id: Uuid,
+        destination: &std::path::Path,
+    ) -> Result<()> {
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        let conversation = self.read_one(id)?;
+        let attachment = conversation
+            .attachments
+            .iter()
+            .find(|item| item.id == attachment_id)
+            .ok_or("This attachment is no longer in the conversation.")?;
+        let original = fs::read(self.original_path(id, attachment))
+            .map_err(|e| format!("Cannot read the stored original attachment: {e}"))?;
+        crate::files::write_atomic(destination, &original)
     }
 
     pub fn delete(&self, id: Uuid) -> Result<()> {
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        let attachments = self.directory.join(id.to_string());
+        if attachments.exists() {
+            fs::remove_dir_all(attachments)
+                .map_err(|e| format!("Cannot delete conversation attachments: {e}"))?;
+        }
         fs::remove_file(self.directory.join(format!("{id}.json")))
             .map_err(|e| format!("Cannot delete conversation: {e}"))
     }
+}
+
+fn timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }
 
 fn validate(conversation: &Conversation) -> Result<()> {
@@ -132,6 +259,16 @@ fn validate(conversation: &Conversation) -> Result<()> {
                 .is_some_and(|value| !crate::model::valid_effort(value))
         {
             return Err("Invalid conversation options.".into());
+        }
+    }
+    let mut identifiers = std::collections::HashSet::new();
+    for attachment in &conversation.attachments {
+        if !attachments::supported(&attachment.extension)
+            || attachment.size > attachments::MAX_FILE_BYTES
+            || attachment.name.is_empty()
+            || !identifiers.insert(attachment.id)
+        {
+            return Err("Invalid conversation attachment.".into());
         }
     }
     for message in &conversation.messages {
@@ -159,11 +296,13 @@ mod tests {
             updated_at: 2,
             model: None,
             options: None,
+            attachments: Vec::new(),
             messages: vec![Message {
                 id: Uuid::new_v4(),
                 role: "assistant".into(),
                 content: "Partial response".into(),
                 reasoning: String::new(),
+                model: None,
                 status: "streaming".into(),
                 error: None,
                 metrics: None,
@@ -186,6 +325,52 @@ mod tests {
         assert_eq!(history.list().unwrap()[0].messages[0].status, "complete");
         history.delete(chat.id).unwrap();
         assert!(history.list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn creating_an_import_never_overwrites_an_existing_conversation() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::new(dir.path().to_owned()).unwrap();
+        let mut chat = conversation();
+        history.create(&chat).unwrap();
+        chat.title = "Replacement".into();
+        assert!(history.create(&chat).is_err());
+        assert_eq!(history.list().unwrap()[0].title, "A local chat");
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn attachment_copies_survive_source_deletion_and_are_removed_with_their_conversation() {
+        let directory = tempfile::tempdir().unwrap();
+        let history = History::new(directory.path().join("history")).unwrap();
+        let chat = conversation();
+        history.save(&chat).unwrap();
+        let source = directory.path().join("notes.txt");
+        fs::write(&source, "Stored attachment ☕").unwrap();
+        let attached = history.add_attachment(chat.id, &source).unwrap();
+        let attachment = &attached.attachments[0];
+        fs::remove_file(&source).unwrap();
+        let destination = directory.path().join("download.txt");
+        history
+            .download_attachment(chat.id, attachment.id, &destination)
+            .unwrap();
+        assert_eq!(
+            fs::read_to_string(destination).unwrap(),
+            "Stored attachment ☕"
+        );
+        assert_eq!(
+            history.list().unwrap()[0].attachments[0].text,
+            "Stored attachment ☕"
+        );
+        let original = history.original_path(chat.id, attachment);
+        history.remove_attachment(chat.id, attachment.id).unwrap();
+        assert!(!original.exists());
+        assert!(history.list().unwrap()[0].attachments.is_empty());
+        fs::write(&source, "Another attachment").unwrap();
+        history.add_attachment(chat.id, &source).unwrap();
+        history.delete(chat.id).unwrap();
+        assert!(history.list().unwrap().is_empty());
+        assert!(!history.directory.join(chat.id.to_string()).exists());
     }
 
     #[test]

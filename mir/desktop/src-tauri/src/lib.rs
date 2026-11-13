@@ -1,11 +1,15 @@
+pub mod attachments;
 mod builds;
 mod chat;
+pub mod conversation_import;
 pub mod diagnostics;
+pub mod files;
 pub mod history;
 pub mod model;
 pub mod preferences;
 mod server;
 pub mod stream;
+pub mod tokens;
 pub mod workspace;
 pub use workspace::{Configuration, JobStatus, Listener, Settings};
 

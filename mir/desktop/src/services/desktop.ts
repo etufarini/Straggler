@@ -1,3 +1,8 @@
+import { getCurrentWebview } from '@tauri-apps/api/webview';
+import type { DragDropEvent } from '@tauri-apps/api/webview';
+import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
+import type { Attachment, Conversation } from '../domain/types';
+import { save as nativeSave, open as nativeOpen } from '@tauri-apps/plugin-dialog';
 import {
   Channel as NativeChannel,
   invoke as nativeInvoke,
@@ -35,6 +40,14 @@ export type DesktopCommand =
   | 'stop_server'
   | 'generate'
   | 'cancel_generation'
+  | 'tokenize_text'
+  | 'prompt_tokens'
+  | 'attachment_add'
+  | 'attachment_remove'
+  | 'attachment_download'
+  | 'read_conversation_import'
+  | 'history_create'
+  | 'write_export'
   | 'history_list'
   | 'history_save'
   | 'history_delete';
@@ -124,4 +137,91 @@ export async function watchWindowVisibility(
     clearInterval(timer);
     events.forEach((unlisten) => unlisten());
   };
+}
+
+export async function saveConversationExport(
+  defaultPath: string,
+  contents: string,
+): Promise<boolean> {
+  const path = fixture
+    ? (await fixture).chooseSavePath(defaultPath)
+    : await nativeSave({
+        title: 'Export conversation',
+        defaultPath,
+        filters: [{ name: 'JSON conversation', extensions: ['json'] }],
+      });
+  if (!path) return false;
+  await invoke('write_export', { path, contents });
+  return true;
+}
+
+export async function chooseConversationImport(): Promise<string | null> {
+  if (fixture) return (await fixture).chooseImportPath();
+  return nativeOpen({
+    title: 'Import conversation',
+    multiple: false,
+    directory: false,
+    filters: [{ name: 'JSON conversation', extensions: ['json'] }],
+  });
+}
+
+export async function addAttachment(id: string, path: string) {
+  return invoke<Conversation>('attachment_add', { id, path });
+}
+export async function removeAttachment(id: string, attachmentId: string) {
+  return invoke<Conversation>('attachment_remove', { id, attachmentId });
+}
+export async function downloadAttachment(id: string, attachment: Attachment): Promise<boolean> {
+  const destination = fixture
+    ? (await fixture).chooseSavePath(attachment.name)
+    : await nativeSave({ title: 'Download attachment', defaultPath: attachment.name });
+  if (!destination) return false;
+  await invoke('attachment_download', { id, attachmentId: attachment.id, destination });
+  return true;
+}
+
+export type { DragDropEvent };
+export async function chooseAttachmentFiles(): Promise<string[]> {
+  if (fixture) return (await fixture).chooseAttachmentFiles();
+  const paths = await nativeOpen({
+    title: 'Attach files',
+    multiple: true,
+    directory: false,
+    filters: [{ name: 'Documents', extensions: [...attachmentTypes] }],
+  });
+  return paths || [];
+}
+export async function watchAttachmentDrop(
+  handler: (event: DragDropEvent) => void,
+): Promise<UnlistenFn> {
+  if (fixture) return (await fixture).watchAttachmentDrop(handler);
+  if (!nativeAvailable()) return () => {};
+  return getCurrentWebview().onDragDropEvent((event) => handler(event.payload));
+}
+export interface TokenEstimate {
+  tokens: number;
+  source: 'server' | 'approximate';
+  templated?: boolean;
+}
+export async function estimateTextTokens(content: string): Promise<TokenEstimate> {
+  try {
+    return { tokens: await invoke<number>('tokenize_text', { content }), source: 'server' };
+  } catch {
+    return { tokens: approximateTokens(content), source: 'approximate' };
+  }
+}
+export async function estimatePromptTokens(
+  messages: { role: string; content: string }[],
+): Promise<TokenEstimate> {
+  try {
+    const result = await invoke<{ tokens: number; templated: boolean }>('prompt_tokens', {
+      messages,
+    });
+    return { ...result, source: 'server' };
+  } catch {
+    return {
+      tokens: approximatePromptTokens(messages),
+      source: 'approximate',
+    };
+  }
 }
