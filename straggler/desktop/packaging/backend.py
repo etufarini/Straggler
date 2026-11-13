@@ -1,15 +1,64 @@
 """Checksum-verified, transactional backend preparation shared by packagers."""
 
+import argparse
+from datetime import datetime
 import fcntl
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
+import os
+import re
 import shutil
 import tarfile
 import tempfile
 import urllib.request
 
 BUNDLE_RESOURCES = ("LICENSE.Straggler", "LICENSE.llama.cpp", "backend-provenance.json")
+
+
+def validate_release_metadata(manifest):
+    version = manifest.get("version")
+    number = manifest.get("buildNumber")
+    date = manifest.get("releaseDate")
+    if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version):
+        raise ValueError("Pin the backend version before packaging")
+    if type(number) is not int or number < 0 or manifest.get("tag") != f"b{number}":
+        raise ValueError("The backend buildNumber must match its pinned bNNNN tag")
+    try:
+        published = datetime.fromisoformat(date.replace("Z", "+00:00"))
+        if published.tzinfo is None:
+            raise ValueError("Missing release timezone")
+    except (AttributeError, TypeError, ValueError) as error:
+        raise ValueError("Pin the GitHub published_at releaseDate before packaging") from error
+
+
+def refresh_release_metadata(path, version):
+    """Explicit build-time operation; installed applications never call GitHub."""
+    manifest = json.loads(path.read_text())
+    tag = manifest["tag"]
+    if not re.fullmatch(r"b\d+", tag):
+        raise ValueError("Expected a pinned bNNNN release tag")
+    url = f"https://api.github.com/repos/{manifest['repository']}/releases/tags/{tag}"
+    request = urllib.request.Request(url, headers={"User-Agent": "Straggler-packaging"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        release = json.load(response)
+    if release.get("tag_name") != tag or release.get("draft"):
+        raise ValueError("GitHub did not return the pinned published release")
+    manifest.update(version=version, buildNumber=int(tag[1:]), releaseDate=release.get("published_at"))
+    validate_release_metadata(manifest)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as output:
+            temporary = Path(output.name)
+            json.dump(manifest, output, indent=2)
+            output.write("\n")
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.chmod(path.stat().st_mode & 0o777)
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 class BackendArchive:
@@ -53,6 +102,7 @@ class BackendArchive:
 
 def prepare_backend(packaging, target, archive_path, populate, variant=""):
     manifest = json.loads((packaging / "llama-runtime.json").read_text())
+    validate_release_metadata(manifest)
     artifact = manifest["artifacts"][target]
     url = (f"https://github.com/{manifest['repository']}/releases/download/"
            f"{manifest['tag']}/{artifact['name']}")
@@ -78,7 +128,9 @@ def prepare_backend(packaging, target, archive_path, populate, variant=""):
                 raise ValueError("Backend archive SHA-256 does not match llama-runtime.json")
             stage = work / "prepared"
             stage.mkdir()
-            provenance = {key: manifest[key] for key in ("repository", "tag", "commit", "purpose")}
+            provenance = {key: manifest[key] for key in (
+                "repository", "tag", "commit", "purpose", "version", "buildNumber", "releaseDate"
+            )}
             provenance.update(target=target, archive=artifact["name"], sha256=digest, url=url)
             (stage / "backend-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
             (stage / "LICENSE.Straggler").write_bytes((Path(__file__).resolve().parents[3] / "LICENSE").read_bytes())
@@ -97,3 +149,11 @@ def prepare_backend(packaging, target, archive_path, populate, variant=""):
             if previous.exists():
                 shutil.rmtree(previous)
     return destination
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Refresh pinned backend metadata before packaging")
+    parser.add_argument("--refresh-release-metadata", action="store_true", required=True)
+    parser.add_argument("--version", required=True, help="Version reported by the pinned llama-server --version")
+    arguments = parser.parse_args()
+    refresh_release_metadata(Path(__file__).with_name("llama-runtime.json"), arguments.version)

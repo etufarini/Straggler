@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 PACKAGING = Path(__file__).resolve().parents[1] / "packaging"
 sys.path.insert(0, str(PACKAGING))
+import backend
 spec = importlib.util.spec_from_file_location("macos_packaging", PACKAGING / "macos.py")
 packaging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(packaging)
@@ -53,16 +54,16 @@ class PackagingTests(unittest.TestCase):
         links = links if links is not None else {"libllama.0.dylib": "libllama.1.dylib"}
         with tarfile.open(destination, "w:gz") as archive:
             for name, contents in files.items():
-                member = tarfile.TarInfo(name if name.startswith("/") else "llama-fixture/" + name)
+                member = tarfile.TarInfo(name if name.startswith("/") else "llama-b1/" + name)
                 member.size = len(contents)
                 archive.addfile(member, io.BytesIO(contents))
             for name, link in links.items():
-                member = tarfile.TarInfo("llama-fixture/" + name)
+                member = tarfile.TarInfo("llama-b1/" + name)
                 member.type = tarfile.SYMTYPE
                 member.linkname = link
                 archive.addfile(member)
         manifest = {
-            "repository": "ggml-org/llama.cpp", "tag": "fixture", "commit": "a" * 40,
+            "repository": "ggml-org/llama.cpp", "tag": "b1", "version": "0.9.0-test", "buildNumber": 1, "releaseDate": "2026-01-01T00:00:00Z", "commit": "a" * 40,
             "purpose": "Offline test", "artifacts": {TARGET: {
                 "name": destination.name, "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
             }},
@@ -73,6 +74,29 @@ class PackagingTests(unittest.TestCase):
     def prepare(self, archive):
         with patch.object(packaging, "PACKAGING", self.root):
             return packaging.prepare(TARGET, archive, probe=True)
+
+    def test_release_metadata_is_included_without_network_during_archive_preparation(self):
+        archive = self.archive()
+        with patch.object(backend.urllib.request, "urlopen", side_effect=AssertionError("Offline fixture")):
+            prepared = self.prepare(archive)
+        provenance = json.loads((prepared / "backend-provenance.json").read_text())
+        self.assertEqual(provenance["version"], "0.9.0-test")
+        self.assertEqual(provenance["buildNumber"], 1)
+        self.assertEqual(provenance["releaseDate"], "2026-01-01T00:00:00Z")
+
+    def test_refresh_uses_github_published_at_and_rejects_another_tag_transactionally(self):
+        self.archive()
+        path = self.root / "llama-runtime.json"
+        release = {"tag_name": "b1", "draft": False, "published_at": "2026-02-03T04:05:06Z"}
+        with patch.object(backend.urllib.request, "urlopen", return_value=io.BytesIO(json.dumps(release).encode())):
+            backend.refresh_release_metadata(path, "0.9.0-test")
+        self.assertEqual(json.loads(path.read_text())["releaseDate"], release["published_at"])
+        previous = path.read_bytes()
+        release["tag_name"] = "b2"
+        with patch.object(backend.urllib.request, "urlopen", return_value=io.BytesIO(json.dumps(release).encode())):
+            with self.assertRaisesRegex(ValueError, "pinned published release"):
+                backend.refresh_release_metadata(path, "0.9.0-test")
+        self.assertEqual(path.read_bytes(), previous)
 
     def test_probe_copies_transitive_libraries_and_required_resources(self):
         prepared = self.prepare(self.archive())

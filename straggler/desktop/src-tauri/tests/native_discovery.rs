@@ -33,6 +33,35 @@ fn unused_port() -> u16 {
 }
 
 #[test]
+fn external_build_version_comes_from_stderr_without_release_date_or_metadata_files() {
+    use straggler_desktop::configuration::{native::NativeConfiguration, storage::Paths};
+    let work = tempfile::tempdir().unwrap();
+    let bin = work.path().join("bin");
+    fs::create_dir(&bin).unwrap();
+    let server = bin.join("llama-server");
+    fs::write(&server, include_bytes!("../../tests/fixtures/server.py")).unwrap();
+    fs::set_permissions(&server, fs::Permissions::from_mode(0o755)).unwrap();
+    let native = NativeConfiguration::new(isolated_environment(work.path(), None)).unwrap();
+    let config = native
+        .snapshot(
+            &Paths {
+                llama: work.path().to_string_lossy().into_owned(),
+                ..Paths::default()
+            },
+            Settings {
+                port: unused_port().to_string(),
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+    assert!(config.server_available);
+    assert_eq!(config.build["version"], "0.9.0-test");
+    assert_eq!(config.build["buildNumber"], 42);
+    assert_eq!(config.build["commit"], "abc1234");
+    assert!(config.build["releaseDate"].is_null());
+}
+
+#[test]
 fn a_mismatched_bundled_version_is_reported_and_cannot_be_launched() {
     use straggler_desktop::configuration::{native::NativeConfiguration, storage::Paths};
     let work = tempfile::tempdir().unwrap();

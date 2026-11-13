@@ -3171,3 +3171,29 @@ input:focus-visible {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.build-summary > strong {
+  display: block;
+}
+.build-version {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 32px;
+  margin: 12px 0 0;
+}
+.build-version dt {
+  font-size: 11px;
+  color: var(--ui-subtle);
+}
+.build-version dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.build-version dd small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ui-muted);
+}

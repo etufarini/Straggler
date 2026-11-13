@@ -3,6 +3,7 @@ use super::{
     environment::Environment,
     models, settings,
     storage::{executable, readable_model, server_path, Paths, Store},
+    version,
 };
 use crate::{
     platform,
@@ -27,6 +28,7 @@ struct Discovery {
     devices_reported: bool,
     warning: String,
     valid: bool,
+    version: Option<version::BackendVersion>,
 }
 
 pub struct NativeConfiguration {
@@ -66,16 +68,14 @@ impl NativeConfiguration {
         }
     }
 
-    fn verify_bundled(&self, server: &Path) -> Result<()> {
+    fn verify_bundled(&self, output: &str) -> Result<()> {
         let manifest = bundled_manifest();
         let commit = manifest["commit"]
             .as_str()
             .ok_or("The bundled backend manifest has no source commit.")?;
-        let version =
-            capabilities::probe(&self.store.environment, server, "--version", &self.closing)?;
         if !commit
             .get(..7)
-            .is_some_and(|prefix| version.contains(prefix))
+            .is_some_and(|prefix| output.contains(prefix))
         {
             let remedy = if cfg!(feature = "app-store") {
                 "Reinstall Straggler from the App Store."
@@ -145,10 +145,24 @@ impl NativeConfiguration {
                     discovery.devices_reported = output.contains("Available devices:");
                     discovery.devices = capabilities::devices(&output);
                 }
-                if paths.llama.is_empty() {
-                    if let Err(error) = self.verify_bundled(server) {
-                        discovery.valid = false;
-                        discovery.warning.push_str(&format!("\n{error}"));
+                let reported = capabilities::probe(environment, server, "--version", &self.closing);
+                match reported {
+                    Ok(output) => {
+                        discovery.version = version::parse(&output);
+                        if paths.llama.is_empty() {
+                            if let Err(error) = self.verify_bundled(&output) {
+                                discovery.valid = false;
+                                discovery.warning.push_str(&format!("\n{error}"));
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        if paths.llama.is_empty() {
+                            discovery.valid = false;
+                        }
+                        discovery
+                            .warning
+                            .push_str(&format!("\nCannot read backend version. {error}"));
                     }
                 }
             }
@@ -189,7 +203,16 @@ impl NativeConfiguration {
             manifest["previous"] = json!("");
             manifest
         } else if !paths.llama.is_empty() {
-            external_build(Path::new(&paths.llama)).unwrap_or(Value::Null)
+            let mut build = external_build(Path::new(&paths.llama))
+                .unwrap_or_else(|| json!({"backend": "external", "previous": ""}));
+            build["releaseDate"] = Value::Null;
+            if let Some(version) = &discovery.version {
+                build["version"] = json!(version.version);
+                build["buildNumber"] = json!(version.build_number);
+                build["commit"] = json!(version.commit);
+                build["tag"] = json!(format!("b{}", version.build_number));
+            }
+            build
         } else {
             Value::Null
         };

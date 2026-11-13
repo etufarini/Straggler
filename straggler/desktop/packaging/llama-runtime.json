@@ -20,5 +20,8 @@
       "name": "llama-b12248-bin-ubuntu-arm64.tar.gz",
       "sha256": "edf412b7b33736920f3702e523b3a875083796ed7d7544a75cf73a404bcdfc8f"
     }
-  }
+  },
+  "version": "0.9.0-dev",
+  "buildNumber": 12248,
+  "releaseDate": "2026-11-10T16:08:46Z"
 }

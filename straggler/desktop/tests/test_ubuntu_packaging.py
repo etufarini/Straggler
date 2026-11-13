@@ -56,13 +56,13 @@ class UbuntuPackagingTests(unittest.TestCase):
         source = self.root / "fixture.tar.gz"
         with tarfile.open(source, "w:gz") as package:
             for name, contents in files.items():
-                member = tarfile.TarInfo("llama-fixture/" + name)
+                member = tarfile.TarInfo("llama-b1/" + name)
                 member.size = len(contents)
                 package.addfile(member, io.BytesIO(contents))
-            link = tarfile.TarInfo("llama-fixture/libllama.so.0")
+            link = tarfile.TarInfo("llama-b1/libllama.so.0")
             link.type, link.linkname = tarfile.SYMTYPE, "libllama.so.1"
             package.addfile(link)
-        manifest = {"repository": "ggml-org/llama.cpp", "tag": "fixture",
+        manifest = {"repository": "ggml-org/llama.cpp", "tag": "b1", "version": "0.9.0-test", "buildNumber": 1, "releaseDate": "2026-01-01T00:00:00Z",
                     "commit": "a" * 40, "purpose": "Offline fixture", "artifacts": {
                         TARGET: {"name": source.name, "sha256": hashlib.sha256(source.read_bytes()).hexdigest()}}}
         (self.root / "llama-runtime.json").write_text(json.dumps(manifest))

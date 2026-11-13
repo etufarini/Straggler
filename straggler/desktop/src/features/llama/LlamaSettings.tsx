@@ -20,13 +20,34 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
         </strong>
         {config.build && (
           <>
-            <span>
-              {config.build.tag} · {config.build.backend}
-            </span>
-            <code>{config.build.commit}</code>
+            {config.build.tag && (
+              <span>
+                {config.build.tag} · {config.build.backend}
+              </span>
+            )}
+            {config.build.commit && <code>{config.build.commit}</code>}
           </>
         )}
         {config.llamaDir && <code>{config.llamaDir}</code>}
+        <dl className="build-version">
+          <div>
+            <dt>Version</dt>
+            <dd>
+              {config.build?.version ?? 'Not reported'}
+              {config.build?.buildNumber !== undefined && (
+                <small> · b{config.build.buildNumber}</small>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Release date</dt>
+            <dd>
+              {bundled && config.build?.releaseDate
+                ? config.build.releaseDate.split('T')[0]
+                : 'Not reported'}
+            </dd>
+          </div>
+        </dl>
       </div>
       {!config.bundledAvailable && (
         <p>

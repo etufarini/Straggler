@@ -149,8 +149,19 @@ export function createFixture(scenario: Scenario) {
               backend: 'bundled',
               commit: backendManifest.commit,
               previous: '',
+              version: backendManifest.version,
+              buildNumber: backendManifest.buildNumber,
+              releaseDate: backendManifest.releaseDate,
             }
-          : null,
+          : scenario === 'empty'
+            ? null
+            : {
+                backend: 'external',
+                version: '0.9.0-fixture',
+                buildNumber: 42,
+                commit: 'abc1234',
+                releaseDate: null,
+              },
       profiles: [...profiles.keys()],
       currentProfile,
       savedSettings,

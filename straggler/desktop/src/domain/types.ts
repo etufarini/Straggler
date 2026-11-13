@@ -60,7 +60,15 @@ export interface Configuration {
   devices: { name: string; label: string }[];
   listeners: Listener[];
   memory: Memory;
-  build: { tag: string; backend: string; commit: string; previous: string } | null;
+  build: {
+    tag?: string;
+    backend?: string;
+    commit?: string;
+    previous?: string;
+    version?: string;
+    buildNumber?: number;
+    releaseDate?: string | null;
+  } | null;
   capabilities: {
     cacheTypesK: string[];
     cacheTypesV: string[];
