@@ -45,7 +45,10 @@ fn reserve_server_port(next_port: &AtomicU16) -> TcpListener {
 
 #[test]
 fn fixture_port_selection_skips_an_ipv6_listener() {
-    let reservation = reserve_server_port(&NEXT_SERVER_PORT);
+    // Use a separate range so this test cannot take another fixture's port
+    // between releasing its reservation and launching the server.
+    let next_port = AtomicU16::new(10000);
+    let reservation = reserve_server_port(&next_port);
     let port = reservation.local_addr().unwrap().port();
     drop(reservation);
 
@@ -60,7 +63,7 @@ fn fixture_port_selection_skips_an_ipv6_listener() {
     let ipv4 = TcpListener::bind(("127.0.0.1", port)).unwrap();
     drop(ipv4);
     assert!(platform::inspect_port(port).unwrap().occupied);
-    let next_port = AtomicU16::new(port);
+    next_port.store(port, Ordering::Relaxed);
     let selected = reserve_server_port(&next_port);
     assert_ne!(selected.local_addr().unwrap().port(), port);
 }
@@ -126,9 +129,17 @@ impl Fixture {
         Arc::new(Runtime::new(self.environment.clone(), self.data.clone()).unwrap())
     }
 
-    async fn ready(&self, runtime: &Runtime) {
+    fn start(&self, runtime: &Runtime) {
         self.release_port();
-        runtime.start(self.model.clone()).unwrap();
+        runtime.start(self.model.clone()).unwrap_or_else(|error| {
+            let inspection =
+                platform::inspect_port(self.port).map(|status| (status.occupied, status.listeners));
+            panic!("Cannot start fixture server: {error}; current port inspection: {inspection:?}");
+        });
+    }
+
+    async fn ready(&self, runtime: &Runtime) {
+        self.start(runtime);
         tokio::time::timeout(Duration::from_secs(15), async {
             loop {
                 let status = runtime.status().await.unwrap();
@@ -280,7 +291,7 @@ async fn startup_and_request_oom_are_distinguished_from_recoverable_errors() {
     wait_phase(&runtime, "needs-restart").await;
     runtime.stop().unwrap();
     fs::write(format!("{}.oom-init", fixture.record.display()), []).unwrap();
-    runtime.start(fixture.model.clone()).unwrap();
+    fixture.start(&runtime);
     let status = wait_phase(&runtime, "needs-restart").await;
     assert_eq!(
         status.issue.unwrap().kind,
