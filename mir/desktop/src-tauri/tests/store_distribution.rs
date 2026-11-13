@@ -21,18 +21,6 @@ fn store_rejects_external_code_and_paths_without_native_picker_grants() {
     assert!(configuration.app_store);
     assert!(configuration.llama_dir.is_empty());
     assert!(configuration.warning.contains("included backend"));
-    let native = mir_desktop::configuration::native::NativeConfiguration::new(
-        Environment::from_variables(
-            BTreeMap::from([("HOME".into(), work.path().as_os_str().to_owned())]),
-            None,
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    assert!(native
-        .direct_command(&models.join("model.gguf"), &[])
-        .unwrap_err()
-        .contains("native picker"));
     let error = runtime
         .workspace_action("set-path", vec!["llama".into(), "/external".into()], vec![])
         .unwrap_err();

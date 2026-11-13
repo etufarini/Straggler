@@ -1,3 +1,0 @@
-desktop/src-tauri/tauri.macos.conf.json
-desktop/src-tauri/src/platform/macos.rs
-desktop/src-tauri/src/model_access/macos.rs

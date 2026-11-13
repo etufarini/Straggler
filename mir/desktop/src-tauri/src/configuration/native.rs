@@ -11,10 +11,8 @@ use crate::{
 };
 use serde_json::{json, Value};
 use std::{
-    ffi::OsString,
     fs,
     path::{Path, PathBuf},
-    process::Command,
     sync::{
         atomic::{AtomicBool, Ordering},
         Mutex,
@@ -89,64 +87,6 @@ impl NativeConfiguration {
             ));
         }
         Ok(())
-    }
-
-    pub fn direct_command(&self, model: &Path, trailing: &[OsString]) -> Result<Command> {
-        if cfg!(feature = "app-store") {
-            return Err("Open the App Store edition normally and choose a models folder with its native picker.".into());
-        }
-        let model = model
-            .canonicalize()
-            .map_err(|error| format!("GGUF model missing or unreadable: {error}"))?;
-        let model = model
-            .to_str()
-            .ok_or("The model path must be valid UTF-8.")?;
-        if !readable_model(model) {
-            return Err(format!("GGUF model missing or unreadable: {model}"));
-        }
-        let paths = self.store.paths();
-        let settings = Settings {
-            model: model.into(),
-            ..Settings::from_environment(&self.store.environment)?
-        };
-        let server = self.server(&paths).filter(|server| executable(server)).ok_or("llama-server is unavailable. Set an existing backend in Folders, or install a package with its bundled backend.")?;
-        if paths.llama.is_empty() {
-            self.verify_bundled(&server)?;
-        }
-        let arguments = capabilities::direct_arguments(&settings, &self.store.environment)?;
-        // Explicit endpoint options stay literal and are checked by llama.cpp's
-        // own parser/bind; trailing arguments are never rewritten here.
-        let configured_host = self.store.environment.control(
-            "HOST",
-            self.store
-                .environment
-                .value("LLAMA_HOST")
-                .unwrap_or_default(),
-        );
-        let native_endpoint = !configured_host.is_empty()
-            || self
-                .store
-                .environment
-                .value("LLAMA_ARG_HOST")
-                .is_some_and(|host| !host.is_empty())
-            || trailing
-                .iter()
-                .filter_map(|argument| argument.to_str())
-                .any(|argument| {
-                    matches!(argument, "--port" | "--host")
-                        || argument.starts_with("--port=")
-                        || argument.starts_with("--host=")
-                });
-        let port = settings
-            .port
-            .parse::<u16>()
-            .map_err(|error| error.to_string())?;
-        if !native_endpoint && platform::inspect_port(port)?.occupied {
-            return Err(format!("Port {}: IN USE. Choose another port.", port));
-        }
-        let mut command = self.store.environment.command(server);
-        command.args(arguments).args(trailing);
-        Ok(command)
     }
 
     pub fn snapshot(&self, paths: &Paths, mut settings: Settings) -> Result<Configuration> {

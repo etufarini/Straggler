@@ -438,34 +438,6 @@ fn shutdown_on_signals(handle: tauri::AppHandle, runtime: Arc<Runtime>) {
 }
 
 fn main() {
-    let arguments: Vec<_> = std::env::args_os().skip(1).collect();
-    // The Debian package installs the CLI entry point as mir. Application
-    // bundles retain their existing handling of platform launch arguments.
-    let cli_entry = std::env::current_exe()
-        .ok()
-        .is_some_and(|executable| executable.file_name().is_some_and(|name| name == "mir"));
-    if let Some(model) = arguments.first().filter(|argument| {
-        cli_entry && *argument != "--mir-check" && !cfg!(feature = "packaging-probe")
-    }) {
-        if model == "--help" || model == "-h" {
-            if cfg!(feature = "app-store") {
-                println!("Open Mir.cpp normally and choose your models folder in Settings.");
-            } else {
-                println!("Usage: mir [MODEL.gguf [llama-server arguments...]]\nRun without arguments to open the desktop.");
-            }
-            return;
-        }
-        use std::os::unix::process::CommandExt;
-        let command = native_environment()
-            .and_then(mir_desktop::configuration::native::NativeConfiguration::new)
-            .and_then(|native| native.direct_command(std::path::Path::new(model), &arguments[1..]));
-        let error = match command {
-            Ok(mut command) => format!("Cannot execute llama-server: {}", command.exec()),
-            Err(error) => error,
-        };
-        eprintln!("{error}");
-        std::process::exit(1);
-    }
     let context = tauri::generate_context!();
     if std::env::args().nth(1).as_deref() == Some("--mir-check") {
         if cfg!(feature = "custom-protocol") && context.assets().get(&"index.html".into()).is_none()

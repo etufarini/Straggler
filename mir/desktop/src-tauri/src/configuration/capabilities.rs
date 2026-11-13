@@ -181,28 +181,6 @@ pub fn arguments(
     devices: Option<&[Device]>,
     environment: &Environment,
 ) -> Result<Vec<String>> {
-    let mut arguments = configured_arguments(settings, help, devices, environment)?;
-    arguments.extend(["--host".into(), "127.0.0.1".into()]);
-    Ok(arguments)
-}
-
-pub fn direct_arguments(settings: &Settings, environment: &Environment) -> Result<Vec<String>> {
-    // The native CLI validates the final values after trailing overrides. GUI
-    // capability checks must not reject a default that the user overrides there.
-    let mut arguments = configured_arguments(settings, "", None, environment)?;
-    let host = environment.control("HOST", environment.value("LLAMA_HOST").unwrap_or_default());
-    if !host.is_empty() {
-        arguments.extend(["--host".into(), host]);
-    }
-    Ok(arguments)
-}
-
-fn configured_arguments(
-    settings: &Settings,
-    help: &str,
-    devices: Option<&[Device]>,
-    environment: &Environment,
-) -> Result<Vec<String>> {
     let mut pairs: Vec<(String, String)> = vec![
         ("model".into(), settings.model.clone()),
         ("port".into(), settings.port.clone()),
@@ -303,8 +281,10 @@ fn configured_arguments(
             "GPU split mode '{split}' is not advertised by this llama-server."
         ));
     }
-    Ok(pairs
+    let mut arguments: Vec<String> = pairs
         .into_iter()
         .flat_map(|(flag, value)| [format!("--{flag}"), value])
-        .collect())
+        .collect();
+    arguments.extend(["--host".into(), "127.0.0.1".into()]);
+    Ok(arguments)
 }

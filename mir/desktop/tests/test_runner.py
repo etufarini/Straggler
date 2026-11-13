@@ -1,8 +1,4 @@
-#!/usr/bin/env bash
-# Suite boundaries must keep unrelated developer tools out of local work.
-set -euo pipefail
-TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-python3 -I - "$TEST_ROOT" <<'PY'
+"""Check developer-suite boundaries with unrelated tools absent."""
 import os
 from pathlib import Path
 import shutil
@@ -10,20 +6,16 @@ import subprocess
 import sys
 import tempfile
 
-root = Path(sys.argv[1]).resolve()
+root = Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix='mir-runner-') as temporary:
     work = Path(temporary)
     commands = work/'bin'
     commands.mkdir()
-    # The runner prepends its interpreter directory so tests use a private Bash path.
     interpreter = commands/'bash'
     interpreter.symlink_to(shutil.which('bash'))
     for name in ('dirname', 'uname'):
         (commands/name).symlink_to(shutil.which(name))
     (commands/'python3').symlink_to(sys.executable)
-    brew = commands/'brew'
-    brew.write_text('#!/bin/sh\nprintf "%s\\n" "$TEST_PREFIX"\n')
-    brew.chmod(0o755)
     for name in ('npm', 'cargo'):
         executable = commands/name
         executable.write_text('''#!/bin/sh
@@ -32,7 +24,7 @@ printf '%s\n' "$*" >> "$TEST_TOOL_LOG"
         executable.chmod(0o755)
     environment = {key: value for key, value in os.environ.items()
                    if not key.startswith(('MIR_', 'LLAMA_', 'XDG_'))}
-    environment.update(HOME=str(work), PATH=str(commands), TEST_PREFIX=str(work),
+    environment.update(HOME=str(work), PATH=str(commands),
                        TEST_TOOL_LOG=str(work/'commands'))
     for suite, forbidden in (('frontend', 'cargo'), ('browser', 'cargo'), ('runtime', 'npm')):
         (commands/forbidden).rename(work/forbidden)
@@ -47,6 +39,11 @@ printf '%s\n' "$*" >> "$TEST_TOOL_LOG"
     result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), 'unknown-suite'],
                             env=environment, capture_output=True, text=True, timeout=5)
     assert result.returncode != 0 and 'Usage:' in result.stderr
+    assert not (work/'commands').exists()
+
+    result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), 'frontend', 'extra'],
+                            env=environment, capture_output=True, text=True, timeout=5)
+    assert result.returncode != 0 and 'Expected at most one suite' in result.stderr
     assert not (work/'commands').exists()
 
     # Exercise Linux display dispatch on either host without a compositor or Xvfb.
@@ -77,4 +74,3 @@ printf 'virtual display and private bus\n' >> "$TEST_TOOL_LOG"
     assert (work/'commands').read_text().strip() == 'virtual display and private bus'
 print('PASS: frontend/browser checks need no Rust, runtime checks need no npm; invalid suites fail')
 print('PASS: headless native checks require display tools and request software rendering')
-PY

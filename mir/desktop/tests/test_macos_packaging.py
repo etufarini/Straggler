@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import plistlib
+import shutil
 import struct
 import sys
 import tarfile
@@ -71,15 +72,13 @@ class PackagingTests(unittest.TestCase):
 
     def prepare(self, archive):
         with patch.object(packaging, "PACKAGING", self.root):
-            return packaging.prepare(TARGET, archive)
+            return packaging.prepare(TARGET, archive, probe=True)
 
-    def test_copies_transitive_libraries_and_replaces_launcher_resources(self):
+    def test_probe_copies_transitive_libraries_and_required_resources(self):
         prepared = self.prepare(self.archive())
-        config = json.loads((prepared / "tauri.backend-check.json").read_text())
+        config = json.loads((prepared / "tauri.packaging.json").read_text())
         self.assertEqual(config["app"]["windows"], [])
-        base = json.loads((packaging.DESKTOP / "src-tauri/tauri.conf.json").read_text())
         self.assertEqual(config["bundle"]["resources"], {
-            **{source: None for source in base["bundle"]["resources"]},
             str(prepared / "LICENSE.Mir.cpp"): "LICENSE.Mir.cpp",
             str(prepared / "LICENSE.llama.cpp"): "LICENSE.llama.cpp",
             str(prepared / "backend-provenance.json"): "backend-provenance.json",
@@ -95,14 +94,41 @@ class PackagingTests(unittest.TestCase):
     def test_regular_desktop_bundle_keeps_its_identity_and_native_window(self):
         archive = self.archive()
         with patch.object(packaging, "PACKAGING", self.root):
-            prepared = packaging.prepare(TARGET, archive, desktop=True)
-        config = json.loads((prepared / "tauri.backend-check.json").read_text())
+            prepared = packaging.prepare(TARGET, archive)
+        config = json.loads((prepared / "tauri.packaging.json").read_text())
         base = json.loads((packaging.DESKTOP / "src-tauri/tauri.conf.json").read_text())
         self.assertEqual(config["identifier"], base["identifier"])
         self.assertEqual(config["productName"], base["productName"])
         self.assertNotIn("windows", config["app"])
         self.assertIsNone(config["bundle"]["macOS"]["entitlements"])
         self.assertTrue(config["bundle"]["externalBin"])
+
+    def test_disk_image_preserves_signed_app_and_provides_applications_shortcut(self):
+        app = self.root / "Mir.cpp.app"
+        app.mkdir()
+        (app / "signed-payload").write_bytes(b"signed application")
+        commands = []
+
+        def run(*arguments):
+            commands.append(arguments)
+            if arguments[0] == "ditto":
+                shutil.copytree(arguments[1], arguments[2])
+            elif arguments[:2] == ("hdiutil", "create"):
+                stage = Path(arguments[arguments.index("-srcfolder") + 1])
+                self.assertEqual((stage / app.name / "signed-payload").read_bytes(), b"signed application")
+                self.assertEqual((stage / "Applications").readlink(), Path("/Applications"))
+                Path(arguments[-1]).write_bytes(b"disk image fixture")
+
+        with patch.object(packaging, "run", side_effect=run):
+            image = packaging.create_disk_image(app, "Developer ID fixture")
+        self.assertEqual(image.read_bytes(), b"disk image fixture")
+        self.assertEqual(commands[-3:], [
+            ("codesign", "--force", "--sign", "Developer ID fixture", str(image)),
+            ("codesign", "--verify", str(image)),
+            ("hdiutil", "verify", str(image)),
+        ])
+        self.assertEqual((app / "signed-payload").read_bytes(), b"signed application")
+        self.assertFalse(list(self.root.glob(".dmg-*")))
 
     def test_bundle_resources_must_be_at_the_runtime_paths_and_match_preparation(self):
         prepared = self.prepare(self.archive())
@@ -200,8 +226,8 @@ class PackagingTests(unittest.TestCase):
         archive = self.archive()
         with patch.object(packaging, "PACKAGING", self.root), \
                 patch.object(packaging, "store_entitlements", return_value={"fixture": True}):
-            prepared = packaging.prepare(TARGET, archive, desktop=True, app_store=True, store_check=True)
-        config = json.loads((prepared / "tauri.backend-check.json").read_text())
+            prepared = packaging.prepare(TARGET, archive, app_store=True, store_check=True)
+        config = json.loads((prepared / "tauri.packaging.json").read_text())
         self.assertTrue(config["identifier"].endswith(".store-check"))
         self.assertEqual(config["app"], {})
         self.assertTrue(prepared.name.endswith("-app-store-check"))

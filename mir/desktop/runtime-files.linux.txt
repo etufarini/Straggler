@@ -1,2 +1,0 @@
-desktop/src-tauri/tauri.linux.conf.json
-desktop/src-tauri/src/platform/linux.rs
