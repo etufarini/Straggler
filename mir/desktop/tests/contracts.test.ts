@@ -6,7 +6,7 @@ import { describe, expect, test } from 'vitest';
 import { defaultSettings } from '../src/services/fixtures';
 import type { Configuration } from '../src/domain/types';
 
-// Check development defaults against the real bridge rather than a second schema.
+// Check native-owned defaults and profile serialization against the compatibility launcher.
 describe('desktop contract', () => {
   test('fixture settings and release serialization agree with the launcher', () => {
     const root = path.resolve(import.meta.dirname, '../..');
@@ -55,11 +55,6 @@ describe('desktop contract', () => {
         expect(detail.field).toBe('threads');
         expect(detail.message).toContain('positive integer');
       }
-      expect(
-        config.backends.every(
-          (backend) => typeof backend.id === 'string' && typeof backend.label === 'string',
-        ),
-      ).toBe(true);
 
       // The old desktop's removed reasoning field is tolerated without rewriting it.
       const profiles = path.join(temporary, 'config/mir.cpp/profiles');

@@ -1,7 +1,7 @@
 import { measureNativeOrb } from './native-orb-performance.mjs';
-// Real Tauri/WebKit window, real launcher and a test server; no model inference.
+// Real Tauri/WebKit window, native services and a test server; no model inference.
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { createWriteStream } from 'node:fs';
 import {
@@ -21,8 +21,11 @@ import { fileURLToPath } from 'node:url';
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stage = await mkdtemp(path.join(tmpdir(), 'mir-native-test-'));
-const binary =
+const builtBinary =
   process.env.MIR_TEST_NATIVE || path.join(desktop, 'src-tauri/target/debug/mir-desktop');
+const binary =
+  process.env.MIR_TEST_NATIVE || path.join(stage, 'desktop without launcher', 'mir-desktop');
+const forbiddenCommands = path.join(stage, 'unexpected-desktop-command');
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 function pdfFixture() {
@@ -74,6 +77,27 @@ async function until(predicate, description) {
 
 let app, driver, session, inspectPage;
 try {
+  if (!process.env.MIR_TEST_NATIVE) {
+    await mkdir(path.dirname(binary));
+    await copyFile(builtBinary, binary);
+    await chmod(binary, 0o755);
+  }
+  const guards = path.join(stage, 'guarded-tools');
+  await mkdir(guards);
+  const rejectCommandBody = 'printf "%s\\n" "$0 $*" >> "$MIR_FORBIDDEN_COMMANDS"\nexit 99\n';
+  for (const tool of ['bash', 'curl', 'ss', 'ps', 'find', 'gfind', 'gmv', 'gtimeout', 'timeout']) {
+    await writeFile(path.join(guards, tool), '#!/bin/sh\n' + rejectCommandBody, { mode: 0o755 });
+  }
+  const python = execFileSync('python3', ['-c', 'import sys;print(sys.executable)'], {
+    encoding: 'utf8',
+  }).trim();
+  await writeFile(
+    path.join(guards, 'python3'),
+    '#!/bin/sh\nif [ "$1" != "$MIR_FIXTURE_SERVER" ]; then\n' +
+      rejectCommandBody +
+      'fi\nexec "$MIR_FIXTURE_PYTHON" "$@"\n',
+    { mode: 0o755 },
+  );
   const llama = path.join(stage, 'llama.cpp');
   const models = path.join(stage, 'models');
   await mkdir(path.join(llama, 'build/bin'), { recursive: true });
@@ -90,6 +114,11 @@ try {
     Object.entries(process.env).filter(([key]) => !/^(MIR_|SPUTNIK_|LLAMA_)/.test(key)),
   );
   Object.assign(environment, {
+    PATH: guards + path.delimiter + process.env.PATH,
+    HOME: stage,
+    MIR_FORBIDDEN_COMMANDS: forbiddenCommands,
+    MIR_FIXTURE_PYTHON: python,
+    MIR_FIXTURE_SERVER: path.join(llama, 'build/bin/llama-server'),
     XDG_CONFIG_HOME: path.join(stage, 'config'),
     XDG_DATA_HOME: path.join(stage, 'data'),
     MIR_LLAMA_CPP_DIR: llama,
@@ -98,7 +127,6 @@ try {
     TEST_REQUEST: path.join(stage, 'request.json'),
     TAURI_WEBDRIVER_PORT: String(automationPort),
   });
-  if (!process.env.MIR_TEST_NATIVE) environment.MIR_ROOT = path.resolve(desktop, '..');
   if (process.env.MIR_CAPTURE_DOCS)
     Object.assign(environment, { MIR_LLAMA_CPP_DIR: '', MIR_MODELS_DIR: '', MIR_PORT: '9931' });
   const log = createWriteStream(path.join(stage, 'app.log'));
@@ -678,8 +706,9 @@ try {
     released.listen(port, '127.0.0.1');
     await once(released, 'listening');
     await new Promise((resolve) => released.close(resolve));
+    assert.equal(await readFile(forbiddenCommands, 'utf8').catch(() => ''), '');
     console.log(
-      `PASS: real Tauri/WebKit window, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.MIR_TEST_SHUTDOWN === 'signal' || process.env.MIR_MEASURE_ORB === '1' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
+      `PASS: native desktop without launcher or utility subprocesses, real Tauri/WebKit window, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.MIR_TEST_SHUTDOWN === 'signal' || process.env.MIR_MEASURE_ORB === '1' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
     );
     console.log(
       'Screenshots: test-results/native-chat.png and test-results/native-project.png (test server; no model inference)',

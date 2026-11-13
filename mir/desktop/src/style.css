@@ -297,22 +297,6 @@ select:disabled {
 .build-summary p {
   margin: 0;
 }
-.build-log {
-  background: #0f1521;
-  border: 1px solid #34425e;
-  padding: 14px;
-  font-size: 11px;
-  line-height: 1.8;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: 300px;
-  overflow: auto;
-  border-radius: 7px;
-}
-.job-status {
-  font-size: 11px;
-  color: #a4b8df;
-}
 .memory-summary {
   margin-top: 30px;
   border-top: 1px solid #384660;
@@ -1927,7 +1911,6 @@ select:focus-visible {
   border-color: #3d55a6;
   color: #e3eaff;
 }
-.build-log,
 .server-log,
 .process-details,
 .directory-list {
@@ -1936,7 +1919,6 @@ select:focus-visible {
   color: #d3dbf5;
   font-size: 12px;
 }
-.job-status,
 .directory-list p,
 .folder-tools,
 .folder-tools button {

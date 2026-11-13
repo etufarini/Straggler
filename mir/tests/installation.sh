@@ -70,6 +70,28 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
     executable(bin_dir / 'pkg-config', '#!/bin/sh\nexit 0\n')
     executable(bin_dir / 'dpkg-query', '#!/bin/sh\nprintf "install ok installed"\n')
     executable(bin_dir / 'pkexec', '#!/bin/sh\nexit 99\n')
+    if target_os == 'Darwin':
+        # Simulate SDK discovery without consulting the host's Xcode installation.
+        developer = work / 'developer tools'
+        sdk = developer / 'SDKs/MacOSX.sdk'
+        sdk.mkdir(parents=True)
+        executable(bin_dir / 'xcode-select', '''#!/bin/sh
+[ "${TEST_SDK_FAIL:-0}" = 0 ] || exit 1
+[ "$#" = 1 ] && [ "$1" = -p ] || exit 2
+printf '%s\\n' DEVELOPER
+'''.replace('DEVELOPER', shlex.quote(str(developer))))
+        executable(bin_dir / 'xcrun', '''#!/bin/sh
+[ "${TEST_SDK_FAIL:-0}" = 0 ] || exit 1
+case "$*" in
+    '--find clang') command -v cc ;;
+    '--find clang++') command -v c++ ;;
+    '--sdk macosx --show-sdk-path') printf '%s\\n' SDK_PATH ;;
+    *) exit 2 ;;
+esac
+'''.replace('SDK_PATH', shlex.quote(str(sdk))))
+        timer = shutil.which('gtimeout') or shutil.which('timeout')
+        assert timer, 'Installer tests require GNU timeout'
+        (bin_dir / 'gtimeout').symlink_to(timer)
     executable(bin_dir / 'cargo', '''#!/usr/bin/env bash
 mkdir -p "$CARGO_TARGET_DIR/release/bundle/macos/Mir.cpp.app/Contents/MacOS"
 printf '#!/bin/sh\\nexit 0\\n' > "$CARGO_TARGET_DIR/release/mir-desktop"
@@ -180,6 +202,14 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     assert result.returncode == 0, result.stderr
     assert (work / 'args').read_bytes().endswith(b'--alias\x00two words\x00')
     print('PASS: piped installer, complete runtime, paths with spaces, wrapper and personal configuration')
+
+    if target_os == 'Darwin':
+        package(marker='missing-sdk')
+        result = install({'TEST_SDK_FAIL':'1'}, success=False)
+        assert b'Apple command line tools and a macOS SDK are required' in result.stderr
+        assert (install_dir / 'current').resolve() == target and command.is_file()
+        assert (config / 'profiles/Personal.conf').read_text() == 'existing profile\n'
+        print('PASS: unavailable macOS SDK preserves the active installation and settings')
 
     package(marker='failed-desktop')
     result = install({'TEST_GUI_BUILD':'1'}, success=False)
@@ -292,7 +322,10 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     restricted.mkdir()
     tools = 'uname brew bash curl tar gzip mktemp chmod mkdir mv ln rm flock ps find sort grep dirname sleep cp'.split()
     tools += ['python3', 'node', 'npm', 'cargo', 'rustc', 'cc', 'c++', 'make', 'pkg-config', 'pkexec', 'setsid', 'awk', 'head', 'tr', 'cat', 'tee']
-    tools += ['gfind', 'gmv', 'lsof', 'netstat'] if target_os == 'Darwin' else ['ss']
+    if target_os == 'Darwin':
+        tools += ['gfind', 'gmv', 'lsof', 'netstat', 'git', 'gtimeout', 'xcode-select', 'xcrun']
+    else:
+        tools.append('ss')
     for tool in tools:
         source = bin_dir / tool
         if source.exists():

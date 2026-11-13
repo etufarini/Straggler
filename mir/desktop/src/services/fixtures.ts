@@ -1,9 +1,10 @@
+import nativeDefaults from '../../src-tauri/src/configuration/defaults.json';
+import backendManifest from '../../packaging/llama-runtime.json';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
 import type {
   Configuration,
   Conversation,
   Delta,
-  JobStatus,
   Settings,
   ServerStatus,
   UiPreferences,
@@ -27,7 +28,7 @@ export type Scenario =
   | 'oom'
   | 'oom-startup'
   | 'oom-and-save-error'
-  | 'build-error'
+  | 'backend-error'
   | 'history-error'
   | 'compute-error'
   | 'no-metrics'
@@ -38,32 +39,10 @@ export type Scenario =
   | 'reasoning-stream';
 
 // Development data deliberately uses generic device names and no personal paths.
-export const defaultSettings: Settings = {
-  chat_system_prompt: '',
-  chat_reasoning: 'auto',
-  chat_reasoning_effort: 'auto',
+export const defaultSettings = {
+  ...nativeDefaults,
   model: '/fixture/models/example.gguf',
-  context: 'auto',
-  port: '9931',
-  device: 'auto',
-  threads: 'auto',
-  gpu_layers: 'auto',
-  prompt_processing: 'auto',
-  cache_type_k: 'q4_0',
-  cache_type_v: 'q4_0',
-  split_mode: 'auto',
-  tensor_split: 'auto',
-  fit_target: 'auto',
-  temperature: 'auto',
-  top_p: 'auto',
-  top_k: 'auto',
-  min_p: 'auto',
-  repeat_penalty: 'auto',
-  presence_penalty: 'auto',
-  frequency_penalty: 'auto',
-  seed: 'auto',
-  max_tokens: 'auto',
-};
+} as Settings;
 
 export const scenarios: Scenario[] = [
   'normal',
@@ -79,7 +58,7 @@ export const scenarios: Scenario[] = [
   'oom',
   'oom-startup',
   'oom-and-save-error',
-  'build-error',
+  'backend-error',
   'history-error',
   'compute-error',
   'no-metrics',
@@ -93,8 +72,8 @@ export const scenarios: Scenario[] = [
 export function createFixture(scenario: Scenario) {
   let settings = { ...defaultSettings, model: scenario === 'empty' ? '' : defaultSettings.model };
   let status: ServerStatus = { ...emptyServer };
-  let job: JobStatus = { phase: 'idle', logs: [], error: null };
   let llamaDir = scenario === 'empty' ? '' : '/fixture/llama.cpp';
+  const bundledAvailable = scenario !== 'empty';
   let modelsDir = scenario === 'empty' ? '' : '/fixture/models';
   let currentProfile: string | null = null;
   let savedSettings: Settings | null = null;
@@ -136,7 +115,9 @@ export function createFixture(scenario: Scenario) {
     return {
       llamaDir,
       modelsDir,
-      serverAvailable: !!llamaDir,
+      serverAvailable: !!llamaDir || bundledAvailable,
+      bundledAvailable,
+      appStore: false,
       settings: structuredClone(settings),
       port: Number(settings.port),
       portStatus: `Port ${settings.port}: ${occupied ? 'IN USE' : 'FREE'}`,
@@ -154,15 +135,22 @@ export function createFixture(scenario: Scenario) {
         ? [{ pid: 12345, identity: 'fixture-process', details: '12345 fixture Example listener' }]
         : [],
       memory: { availableRamMiB: scenario === 'unknown-memory' ? null : 8192, devices: [] },
-      backends: [{ id: 'fixture', label: 'Example build backend' }],
       capabilities: {
         cacheTypesK: ['q4_0', 'f16'],
         cacheTypesV: ['q4_0', 'f16'],
         splitModes: ['layer', 'row'],
         multipleDevices: devices.length > 1,
-        buildNote: 'Available backends are supplied by the build adapter.',
+        buildNote: 'Available features are advertised by the selected llama-server.',
       },
-      build: null,
+      build:
+        !llamaDir && bundledAvailable
+          ? {
+              tag: backendManifest.tag,
+              backend: 'bundled',
+              commit: backendManifest.commit,
+              previous: '',
+            }
+          : null,
       profiles: [...profiles.keys()],
       currentProfile,
       savedSettings,
@@ -239,21 +227,6 @@ export function createFixture(scenario: Scenario) {
       case 'cancel_generation':
         finish?.();
         return;
-      case 'job_status':
-        return job;
-      case 'start_build':
-        job =
-          scenario === 'build-error'
-            ? {
-                phase: 'failed',
-                logs: ['Fixture compiler failure'],
-                error: 'The compiler exited with an error.',
-              }
-            : { phase: 'ready', logs: ['Fixture build completed'], error: null };
-        return;
-      case 'cancel_build':
-        job = { phase: 'canceled', logs: [], error: null };
-        return;
       case 'workspace_action': {
         const action = String(args.action);
         const values = (args.arguments || []) as string[];
@@ -289,16 +262,13 @@ export function createFixture(scenario: Scenario) {
                 ...(values[1] === 'true' ? [{ name: '.hidden', path: '/fixture/.hidden' }] : []),
               ],
             };
-          case 'latest':
-            return { tag: 'b12345' };
-          case 'build-plan':
-            return { packages: [] };
-          case 'build-log':
-            return { logs: ['Fixture build output'] };
+          case 'use-bundled':
+            if (scenario === 'backend-error')
+              throw new Error('The bundled backend could not be selected.');
+            llamaDir = '';
+            break;
           case 'stop-listeners':
             if (values[0] === 'KILL') occupied = false;
-            break;
-          case 'restore':
             break;
           default:
             throw new Error(`Unknown fixture action: ${action}`);

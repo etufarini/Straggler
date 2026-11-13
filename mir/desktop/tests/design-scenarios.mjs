@@ -86,12 +86,12 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
       );
     }
     if (['BUILD-02', 'BUILD-03'].includes(screen)) {
-      await button('Install or change build').click();
+      await button('Use bundled backend').click();
       await expect(page.getByRole('alertdialog')).toBeVisible();
       if (screen === 'BUILD-03') {
         await page
           .getByRole('alertdialog')
-          .getByRole('button', { name: 'Build llama.cpp', exact: true })
+          .getByRole('button', { name: 'Use bundled backend', exact: true })
           .click();
         await expect(page.getByText('Build status: ready', { exact: true })).toBeVisible();
       }
@@ -123,7 +123,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     'SET-03B': 'occupied',
     'DIALOG-03': 'occupied',
     'DIALOG-04': 'occupied',
-    'BUILD-01': 'build-error',
+    'BUILD-01': 'backend-error',
   };
   await page.goto(
     `${baseUrl}/${screen === 'CHAT-08' ? '' : `?scenario=${scenarios[screen] || 'normal'}`}`,
@@ -286,12 +286,14 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     await expect(page.getByRole('button', { name: '.hidden' })).toBeVisible();
   }
   if (screen === 'BUILD-01') {
-    await button('Install or change build').click();
+    await button('Use bundled backend').click();
     await page
       .getByRole('alertdialog')
-      .getByRole('button', { name: 'Build llama.cpp', exact: true })
+      .getByRole('button', { name: 'Use bundled backend', exact: true })
       .click();
-    await expect(page.getByText('llama.cpp build failed', { exact: true })).toBeVisible();
+    await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText(
+      'The action could not be completed',
+    );
   }
   await page.locator('.app-shell').waitFor();
 }

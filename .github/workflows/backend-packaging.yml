@@ -1,0 +1,156 @@
+name: Optional desktop backend packaging
+
+# Downloads the pinned upstream backend, but never downloads or loads a model.
+# Normal checks remain offline with respect to llama.cpp and inference services.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  packaging:
+    name: Sandbox check on ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mir/desktop
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mir/desktop/package-lock.json
+      - name: Prepare build tools
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add "${{ matrix.target }}"
+          npm ci --no-audit --no-fund
+      - name: Build and sign the sandboxed packaging check
+        run: python3 packaging/macos.py bundle --target "${{ matrix.target }}"
+      - name: Run with system tools only and no model
+        env:
+          CHECK_TARGET: ${{ matrix.target }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import tempfile
+
+          generated = Path('packaging/generated').resolve()
+          app = generated / 'build' / os.environ['CHECK_TARGET'] / 'release/bundle/macos/Mir.cpp Backend Check.app'
+          executable = app / 'Contents/MacOS/mir-desktop'
+          environment = {key: value for key, value in os.environ.items()
+                         if not key.startswith(('MIR_', 'LLAMA_'))}
+          environment['PATH'] = '/usr/bin:/bin:/usr/sbin:/sbin'
+          with tempfile.TemporaryDirectory(prefix='mir-packaging-run-') as work:
+              result = subprocess.run([str(executable), '--no-dialog', '--allow-force-stop'],
+                                      cwd=work, env=environment, capture_output=True, text=True, timeout=150)
+          (generated / 'check-stdout.txt').write_text(result.stdout)
+          (generated / 'check-stderr.txt').write_text(result.stderr)
+          print(result.stdout)
+          print(result.stderr)
+          result.check_returncode()
+          report = json.loads(next(line for line in reversed(result.stdout.splitlines()) if line.startswith('{')))
+          assert report['success'] is True, report
+          assert report['modelCheckRequested'] is False, report
+          assert [check['operation'] for check in report['checks']] == ['--version', '--help'], report
+          PY
+      - name: Retain diagnostic output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-check-${{ matrix.target }}
+          path: mir/desktop/packaging/generated/check-*.txt
+          if-no-files-found: warn
+      - name: Build the sandboxed Store GUI check
+        run: python3 packaging/macos.py bundle --app-store --store-check --debug --target "${{ matrix.target }}"
+      - name: Exercise the actual signed Store GUI without models
+        env:
+          MIR_PACKAGE_TEST_BINARY: ${{ github.workspace }}/mir/desktop/packaging/generated/build-app-store-check/${{ matrix.target }}/debug/bundle/macos/Mir.cpp Store Check.app/Contents/MacOS/mir-desktop
+        run: node tests/package-smoke.mjs
+      - name: Retain Store GUI evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: store-gui-${{ matrix.target }}
+          path: mir/desktop/test-results/store-settings.png
+          if-no-files-found: warn
+
+  ubuntu:
+    name: Debian package on ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mir/desktop
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mir/desktop/package-lock.json
+      - name: Prepare native packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev xvfb dbus-daemon
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          npm ci --no-audit --no-fund
+      - name: Build and verify the real Debian package without models
+        run: xvfb-run -a dbus-run-session -- python3 packaging/ubuntu.py bundle --target "${{ matrix.target }}"
+      - name: Native GUI and process lifecycle on the packaging runner
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
+        run: xvfb-run -a dbus-run-session -- bash ../tests/run.sh native
+      - name: Native GUI with the extracted package's backend and layout
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
+          MIR_PACKAGE_TEST_BINARY: ${{ github.workspace }}/mir/desktop/src-tauri/target/debug/mir-desktop
+        run: |
+          packages=("$PWD/packaging/generated/build-ubuntu/${{ matrix.target }}/release/bundle/deb/"*.deb)
+          export MIR_PACKAGE_TEST_DEB="${packages[0]}"
+          xvfb-run -a dbus-run-session -- node tests/package-smoke.mjs
+      - name: Retain the local candidate package
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ubuntu-package-${{ matrix.target }}
+          path: mir/desktop/packaging/generated/build-ubuntu/${{ matrix.target }}/release/bundle/deb/*.deb
+          if-no-files-found: warn
+      - name: Retain the package GUI screenshot
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ubuntu-gui-${{ matrix.target }}
+          path: mir/desktop/test-results/ubuntu-settings.png
+          if-no-files-found: warn

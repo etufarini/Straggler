@@ -2,7 +2,7 @@ import type { SettingsController } from './useSettings';
 import { Folder } from 'lucide-react';
 
 export default function FolderSettings({ controller }: { controller: SettingsController }) {
-  const { config, setSection, busy, setFolder, native, active, building } = controller;
+  const { config, setSection, busy, setFolder, native, active } = controller;
   return (
     <>
       <h2>Folders</h2>
@@ -13,21 +13,29 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
       ].map(([kind, label, path]) => (
         <div className="folder-setting" key={kind}>
           <h3>{label}</h3>
-          <code>{path || 'Not configured'}</code>
-          <button
-            disabled={busy || !native || (kind === 'llama' && (active || building))}
-            onClick={() => setFolder(kind as 'llama' | 'models')}
-          >
-            <Folder size={15} />
-            Choose folder
-          </button>
+          <code>
+            {path ||
+              (kind === 'llama' && config.bundledAvailable
+                ? 'Bundled with Mir.cpp'
+                : 'Not configured')}
+          </code>
+          {!(kind === 'llama' && config.appStore) && (
+            <button
+              disabled={busy || !native || (kind === 'llama' && active)}
+              onClick={() => setFolder(kind as 'llama' | 'models')}
+            >
+              <Folder size={15} />
+              Choose folder
+            </button>
+          )}
         </div>
       ))}
       <p className="field-help">
-        The models folder can be empty. The llama.cpp folder must contain llama-server, in bin or
-        build/bin.
+        {config.appStore
+          ? 'Choose a models folder to allow access after restarting the app. The folder can be empty.'
+          : 'The models folder can be empty. The llama.cpp folder must contain llama-server, in bin or build/bin.'}
       </p>
-      <button onClick={() => setSection('llama')}>Install / update llama.cpp</button>
+      <button onClick={() => setSection('llama')}>Backend details</button>
     </>
   );
 }

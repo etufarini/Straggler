@@ -93,6 +93,7 @@ def fingerprint(root):
     files += list((root / 'lib').rglob('*.sh')) + list((root / 'lib').rglob('*.py'))
     files += list((root / 'sh').glob('*.sh'))
     desktop = root / 'desktop'
+    files.append(desktop / 'packaging/llama-runtime.json')
     files += [desktop / name for name in ('package.json', 'package-lock.json', 'index.html', 'tsconfig.json', 'vite.config.ts')]
     files += [desktop / 'src-tauri' / name for name in ('Cargo.toml', 'Cargo.lock', 'build.rs', 'tauri.conf.json', 'tauri.macos.conf.json')]
     for directory in ('src', 'src-tauri/src', 'src-tauri/icons', 'src-tauri/capabilities'):

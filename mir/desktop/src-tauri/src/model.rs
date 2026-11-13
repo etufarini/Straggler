@@ -48,9 +48,8 @@ impl Runtime {
             system_role_supported: None,
             error: None,
         };
-        match self.read_model_details(&url, &mut details).await {
-            Ok(()) => {}
-            Err(error) => details.error = Some(error),
+        if let Err(error) = self.read_model_details(&url, &mut details).await {
+            details.error = Some(error);
         }
         let server = self.server.lock().map_err(|e| e.to_string())?;
         if server.run != run || server.phase != "ready" {

@@ -12,7 +12,6 @@ import type {
   ServerDetails,
   Configuration,
   Confirmation,
-  JobStatus,
   Listener,
   ServerStatus,
   Settings as Values,
@@ -22,12 +21,10 @@ export function useSettings({
   draft,
   setDraft,
   server,
-  job,
   accept,
   confirm,
   onError,
   onBack,
-  onJob,
   section,
   setSection,
   failure,
@@ -39,12 +36,10 @@ export function useSettings({
   draft: Values;
   setDraft: (value: Values) => void;
   server: ServerStatus;
-  job: JobStatus;
   accept: (value: Configuration) => void;
   confirm: (value: Confirmation) => void;
   onError: (error: unknown) => void;
   onBack: () => void;
-  onJob: (value: JobStatus) => void;
   section: Section;
   setSection: (section: Section) => void;
   failure: SettingsFailure | null;
@@ -54,11 +49,7 @@ export function useSettings({
   const [message, setMessage] = useState('');
   const [profile, setProfile] = useState(config.currentProfile || config.profiles[0] || '');
   const [name, setName] = useState('');
-  const [folder, setFolder] = useState<'llama' | 'models' | null>(null);
-  const [backend, setBackend] = useState(config.build?.backend || 'cpu');
-  const [version, setVersion] = useState('latest');
-  const [tag, setTag] = useState('');
-  const [jobs, setJobs] = useState('2');
+  const [folder, setFolderDialog] = useState<'llama' | 'models' | null>(null);
   const [forceTargets, setForceTargets] = useState<Listener[]>([]);
   const [showSampling, setShowSampling] = useState(false);
   useEffect(() => {
@@ -66,7 +57,6 @@ export function useSettings({
   }, [draft.port]);
   const native = isTauri();
   const active = serverActive(server);
-  const building = ['running', 'stopping'].includes(job.phase);
   const dirty = !equalSettings(draft, config.settings);
   const modified = config.savedSettings ? !equalSettings(draft, config.savedSettings) : false;
   const restart =
@@ -99,6 +89,21 @@ export function useSettings({
     return invoke<Configuration>('workspace_action', { action, arguments: args, targets });
   }
 
+  function setFolder(kind: 'llama' | 'models' | null) {
+    if (!kind || !config.appStore) {
+      setFolderDialog(kind);
+      return;
+    }
+    if (kind !== 'models') return;
+    void run(async () => {
+      const value = await invoke<Configuration | null>('choose_models_folder');
+      if (value) {
+        accept(value);
+        setDraft({ ...draft, model: value.settings.model });
+      }
+    });
+  }
+
   async function saveProfile(profileName: string, replace: boolean) {
     await apply();
     const value = await operation('save-profile', [profileName, replace ? 'replace' : 'new']);
@@ -118,47 +123,6 @@ export function useSettings({
         action: () => saveProfile(target, true),
       });
     else void run(() => saveProfile(target, false));
-  }
-
-  async function requestBuild(update = false) {
-    setBusy(true);
-    setMessage('');
-    onClearError();
-    try {
-      const selectedBackend = update ? config.build?.backend || backend : backend;
-      const release =
-        update || version === 'latest'
-          ? (
-              await invoke<{ tag: string }>('workspace_action', {
-                action: 'latest',
-                arguments: [],
-                targets: [],
-              })
-            ).tag
-          : tag;
-      if (update && release === config.build?.tag) {
-        setMessage(`llama.cpp ${release} is already up to date.`);
-        return;
-      }
-      const plan = await invoke<{ packages: string[] }>('workspace_action', {
-        action: 'build-plan',
-        arguments: [selectedBackend],
-        targets: [],
-      });
-      confirm({
-        title: 'Build llama.cpp?',
-        actionLabel: 'Build llama.cpp',
-        text: `Download and compile ${release} (${selectedBackend}) with ${jobs} compiler jobs? The working build will be kept until verification succeeds.${plan.packages.length ? ` Required packages: ${plan.packages.join(', ')}. Installation requests any required system authorization.` : ''}`,
-        action: async () => {
-          await invoke('start_build', { tag: release, backend: selectedBackend, jobs });
-          onJob({ phase: 'running', logs: [], error: null });
-        },
-      });
-    } catch (e) {
-      onError(e);
-    } finally {
-      setBusy(false);
-    }
   }
 
   function stopListeners(force: boolean) {
@@ -192,12 +156,10 @@ export function useSettings({
     draft,
     setDraft,
     server,
-    job,
     accept,
     confirm,
     onError,
     onBack,
-    onJob,
     section,
     setSection,
     busy,
@@ -209,20 +171,11 @@ export function useSettings({
     setName,
     folder,
     setFolder,
-    backend,
-    setBackend,
-    version,
-    setVersion,
-    tag,
-    setTag,
-    jobs,
-    setJobs,
     forceTargets,
     showSampling,
     setShowSampling,
     native,
     active,
-    building,
     dirty,
     modified,
     restart,
@@ -233,7 +186,6 @@ export function useSettings({
     operation,
     saveProfile,
     requestSave,
-    requestBuild,
     stopListeners,
     failure,
     fieldError,

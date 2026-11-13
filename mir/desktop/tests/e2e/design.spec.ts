@@ -33,7 +33,7 @@ test('restart indication remains accessible after returning to chat', async ({ p
   await expect(page.locator('.configuration-strip, .settings-launch')).toHaveCount(0);
 });
 
-test('settings keep their save action visible and folders and builds have their own actions', async ({
+test('settings keep their save action visible and folders and backend selection have their own actions', async ({
   page,
 }) => {
   await page.goto('/?scenario=normal');
@@ -52,9 +52,9 @@ test('settings keep their save action visible and folders and builds have their 
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Install or change build' }).click();
+  await page.getByRole('button', { name: 'Use bundled backend', exact: true }).click();
   await expect(
-    page.getByRole('alertdialog').getByRole('button', { name: 'Build llama.cpp' }),
+    page.getByRole('alertdialog').getByRole('button', { name: 'Use bundled backend', exact: true }),
   ).toBeVisible();
 });
 

@@ -100,6 +100,8 @@ prepare_desktop() {
     cp -a -- "$MIR_ROOT/lib" "$MIR_ROOT/sh" "$stage/" || exit 1
     cp -- "$MIR_ROOT/desktop/"{package.json,package-lock.json,index.html,tsconfig.json,vite.config.ts} "$stage/desktop/" || exit 1
     cp -a -- "$MIR_ROOT/desktop/src" "$stage/desktop/" || exit 1
+    mkdir -p -- "$stage/desktop/packaging" || exit 1
+    cp -- "$MIR_ROOT/desktop/packaging/llama-runtime.json" "$stage/desktop/packaging/" || exit 1
     cp -- "$MIR_ROOT/desktop/src-tauri/"{Cargo.toml,Cargo.lock,build.rs,tauri.conf.json,tauri.macos.conf.json} "$stage/desktop/src-tauri/" || exit 1
     cp -a -- "$MIR_ROOT/desktop/src-tauri/"{src,icons,capabilities} "$stage/desktop/src-tauri/" || exit 1
     printf 'Preparing Mir.cpp desktop. The first compilation can take several minutes...\n' >&2

@@ -37,11 +37,6 @@ export interface Memory {
   availableRamMiB: number | null;
   devices: { name: string; availableMiB: number }[];
 }
-export interface JobStatus {
-  phase: string;
-  logs: string[];
-  error: string | null;
-}
 export interface Confirmation {
   title: string;
   text: string;
@@ -53,6 +48,8 @@ export interface Configuration {
   llamaDir: string;
   modelsDir: string;
   serverAvailable: boolean;
+  bundledAvailable: boolean;
+  appStore: boolean;
   port: number;
   portStatus: string;
   warning: string;
@@ -64,7 +61,6 @@ export interface Configuration {
   listeners: Listener[];
   memory: Memory;
   build: { tag: string; backend: string; commit: string; previous: string } | null;
-  backends: { id: string; label: string }[];
   capabilities: {
     cacheTypesK: string[];
     cacheTypesV: string[];

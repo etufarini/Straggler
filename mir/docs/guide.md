@@ -25,7 +25,7 @@ Settings has six sections:
 | Server & port | TCP port, listener details, normal and separately confirmed force shutdown |
 | Saved configurations | Load for review, save to selected, save as new and confirmed deletion |
 | Folders | llama.cpp and recursively searched model directories |
-| llama.cpp | Managed installation, updates, cancellation, rollback and build logs |
+| llama.cpp | Pinned bundled backend details and explicit selection of an external build |
 
 The model selector, server controls and logs remain available from chat. Edited
 settings are distinct from the running configuration. Apply validates a draft;
@@ -219,8 +219,8 @@ can stop at the context limit; an input prompt that already exceeds the window
 is rejected. When context shift is enabled and supported, the server can discard
 part of the earlier context and continue. A `length` finish reason can also mean
 an output-token limit. Mir.cpp does not claim which occurred without evidence.
-See the pinned [server contract](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/README.md)
-and [context implementation](https://github.com/ggml-org/llama.cpp/blob/a4d4f2fd4ec85ec6a0a9ece4870416c1b6cc24f5/tools/server/server-context.cpp).
+See the pinned [server contract](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/README.md)
+and [context implementation](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-context.cpp).
 
 ## Devices and memory
 
@@ -388,10 +388,11 @@ uses an existing Homebrew installation and Apple command line tools. Other Linux
 distributions need equivalent dependencies installed manually. Builds run as the
 user. Administrator authorization is restricted to package installation.
 
-Managed llama.cpp updates retain the working build until checkout, compilation
-and executable checks succeed. Source tags and Web UI assets are matched and
-checksummed. Restore previous build selects the previous verified managed build.
-Model settings and conversations are preserved. GPU drivers are external requirements.
+The normal desktop receives its pinned backend with application updates. It does
+not download latest llama.cpp or compile a backend. Existing managed or external
+build folders remain selectable through Folders; changing a backend preserves
+model settings and conversations. GPU drivers remain external requirements.
+The compatibility shell build operations are retained for older source workflows.
 
 Mir.cpp installation uses versioned archives and a managed wrapper. Updating an
 active desktop is rejected. Desktop preparation must succeed before activation;
@@ -416,6 +417,7 @@ bash mir/tests/run.sh          # Common, platform, desktop and available native-
 bash mir/tests/run.sh common   # Launcher and preparation tests
 bash mir/tests/run.sh desktop  # Frontend, contracts, Rust and browser flows
 bash mir/tests/run.sh native   # Real desktop window with local test server
+bash mir/tests/run.sh packaging # Offline archive and backend lifecycle checks
 ```
 
 The runner prepares missing npm dependencies and Playwright browsers. It never
@@ -441,7 +443,7 @@ For UI work, run `npm run dev` from mir/desktop and open one of these URLs:
 | `?scenario=oom-and-save-error` | Independent server and persistence failures |
 | `?scenario=compute-error` | Unknown compute failure without an OOM diagnosis |
 | `?scenario=history-error` | Unavailable conversation storage |
-| `?scenario=build-error` | Build failure in the llama.cpp settings section |
+| `?scenario=backend-error` | Failed selection of the bundled backend |
 
 These pages clearly identify simulated services. They need neither Tauri nor
 llama.cpp. Fixture transport is removed from production assets. A preview without
@@ -450,10 +452,11 @@ development; `npm run format` applies frontend formatting.
 
 The frontend's desktop service owns Tauri access. Development scenarios replace
 that boundary; browser tests use the same scenarios instead of rewriting Tauri's
-private internals. A contract test compares fixture settings with the real Bash
-bridge and checks older desktop profiles. Rust integration tests use that bridge,
-a local HTTP server and compiler fixtures to verify streaming, persistence,
-configuration, process identity, cancellation, builds and rollback.
+private internals. A contract test compares shared native defaults with the
+compatibility Bash bridge and checks older desktop profiles. Rust integration
+tests use native configuration, fake executables and a local HTTP server to verify
+streaming, persistence, configuration, process identity and cancellation. Shell
+suites retain installation/build rollback checks for source workflows.
 
 Native tests use an embedded W3C WebDriver server on Linux and macOS. Automation
 is enabled only by the explicit `native-tests` feature in debug builds; release
@@ -470,14 +473,15 @@ llama.cpp remains responsible for inference correctness and backend performance.
 
 Frontend code is grouped into app composition, feature components/hooks, shared
 controls, domain types and the desktop service. Native modules separate commands,
-workspace/bridge, server supervision, diagnostics, chat streaming, builds and history.
-The launcher owns setting validation and returns field identifiers through the
-private bridge. The UI uses shared Feedback, FieldError, popover and reasoning controls; each feature
+workspace, native configuration/persistence, platform services, server supervision,
+diagnostics, chat streaming and history. Rust owns desktop validation and returns
+field identifiers through Tauri IPC. Native defaults are shared with development
+fixtures; the compatibility launcher is checked against the same defaults. The UI uses shared Feedback, FieldError, popover and reasoning controls; each feature
 owns the placement and recovery actions for its errors.
 
 ```text
-React features → desktop service → Tauri runtime → mir.sh --desktop
-                                              → local llama-server HTTP API
+React features → desktop service → Tauri runtime → native configuration and OS services
+                                              → supervised llama-server and local HTTP/SSE API
 ```
 
 Assistant presence is a presentation boundary accepting only its seven-state
@@ -514,9 +518,14 @@ Production layouts use explicit React classes instead of `:has()`. Composer widt
 observation also handles webviews without container queries, and the save bar has
 a fallback layout for missing sticky positioning. The design's type floor is 11px.
 
-The private bridge reuses launcher validation, profiles, discovery and native
-argument construction. Platform services own OS operations and build metadata;
-the UI does not select behavior from hardware brands. Keep runtime-files.txt and
+The desktop reads literal profiles and paths directly in Rust, preserves old
+profile defaults and migrations, inspects GGUF metadata without tensors, and
+derives devices/cache/split options from llama-server output. Native OS services
+check ports and attribute listeners; unidentified owners still block launch.
+Linux uses procfs and pidfd signaling, and macOS uses libproc. No inspection utility
+is executed by the desktop. Source preparation and direct GGUF startup remain
+compatible shell entry points; the GUI does not call their private bridge.
+The UI does not select behavior from hardware brands. Keep runtime-files.txt and
 the generated installer aligned when moving bundled source files. Regenerate with
 `bash mir/sh/build-install.sh`; verify with `--check`.
 
@@ -526,6 +535,335 @@ for the approved version, regenerate the installer, and test its exact archive.
 Removing the old interface affects documented behavior and must be reflected in
 the version and release notes. Obtain approval for version, full candidate SHA and
 notes before creating a tag or publishing. Never move an existing tag.
+
+## macOS backend packaging experiment
+
+This branch includes local packaging procedures, not a published desktop release. The same Tauri executable can be built in `packaging-probe` mode to check
+an included official `llama-server` without starting the Bash/Python bridge or
+loading profiles, conversations or preferences. The normal desktop now runs its
+configuration, discovery and process supervision directly in Rust. Ubuntu Debian packaging
+and a separate sandboxed Store GUI are described below; these remain local candidates,
+not published releases.
+
+`mir/desktop/packaging/llama-runtime.json` pins candidate upstream release `b12248`,
+its full source commit, and independent SHA-256 digests for macOS ARM64/Intel
+and Ubuntu ARM64/x64 CPU artifacts.
+This candidate is not the backend of a published Mir.cpp release. Preparation
+verifies the entire archive before reading its members, follows the server's
+transitive Mach-O library dependencies, rejects external installation paths, and
+copies only the server, required libraries, application/archive licenses and provenance. It
+never extracts archive paths or creates archive-provided links. Failed preparation
+keeps the previous prepared backend; an interrupted directory replacement leaves
+a `.previous` directory that must be recovered before retrying.
+
+From `mir/desktop`, inspect and prepare either target on Linux or macOS:
+
+```bash
+python3 packaging/macos.py prepare --target aarch64-apple-darwin
+python3 packaging/macos.py prepare --target x86_64-apple-darwin
+```
+
+Preparation requires Python 3.9+ and network access to the pinned GitHub asset.
+`--archive /absolute/path/to/archive.tar.gz` accepts an already downloaded archive
+and still checks its pinned digest. Generated files stay in the ignored
+`packaging/generated/` directory. No model is downloaded or executed by preparation.
+
+On a Mac with the existing frontend/Rust development tools and Xcode command line
+tools, build the matching architecture:
+
+```bash
+npm ci --no-audit --no-fund
+python3 packaging/macos.py bundle --target aarch64-apple-darwin
+```
+
+To build the regular GUI for direct distribution with the same pinned backend:
+
+```bash
+python3 packaging/macos.py bundle --desktop --target aarch64-apple-darwin
+```
+
+That mode builds `Mir.cpp.app` with its normal window and identifier. It does not
+compile `packaging-probe` or enable App Sandbox. The desktop detects the included
+`mir-llama-server` beside its executable and checks its reported source commit.
+It also accepts external build folders; a stopped server is required to switch.
+The base Tauri bundle includes no launcher resources or shell-tool dependencies.
+The direct-distribution GUI has separate build and interaction checks; evidence
+from the earlier sandbox diagnostic does not validate later GUI changes.
+
+Use `x86_64-apple-darwin` on Intel. The default diagnostic command builds an `.app` named
+`Mir.cpp Backend Check.app`, includes the pinned server and libraries, adjusts the
+server's library search path, signs nested libraries and the helper before the
+application, then verifies the signatures and the helper's entitlements. The
+default identity is `-`, a local ad hoc signature. `--signing-identity "IDENTITY"`
+selects a certificate already present in the developer's keychain; no certificate
+is created, exported or uploaded. This command does not notarize, publish, or
+submit the application to the Store.
+
+The ad hoc helper omits Hardened Runtime because
+[library validation](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.cs.disable-library-validation)
+requires a shared signing Team ID, which ad hoc signatures do not provide. The parent keeps
+Hardened Runtime. Certificate signing enables it for both executables; that path
+still needs validation with a suitable certificate. Both signing identities retain the
+same sandbox entitlements in diagnostic mode, without a library-validation exception.
+The regular `--desktop` build signs both executables without sandbox entitlements
+for direct distribution.
+
+The parent enables App Sandbox, user-selected read-only files and client/server
+network access. The helper has exactly `app-sandbox` and `inherit`; it obtains
+the parent's static permissions. The generated configuration replaces launcher
+resources with the application license, archive license and provenance. It uses the distinct application
+identifier `io.github.etufarini.mir.packaging-check` for native diagnostic storage.
+Python, Node, Rust and command line build tools are developer requirements, not
+dependencies of the resulting diagnostic app.
+
+Resource mappings place the license and provenance directly in `Contents/Resources`.
+All bundle modes carry the application license, backend license and provenance as resources. Before signing, the build checks the bundled resource paths and bytes
+against preparation and rejects bundles that still include the launcher.
+
+Launch the app to check `--version` and `--help`, including whether the backend
+reports the pinned commit. Its result dialog gives the path to the atomic
+`backend-check.json` report in that application's native data directory. A failure
+to save the report is itself a failed check. For unattended execution:
+
+```bash
+"packaging/generated/build/aarch64-apple-darwin/release/bundle/macos/Mir.cpp Backend Check.app/Contents/MacOS/mir-desktop" --no-dialog --allow-force-stop
+```
+
+`--allow-force-stop` explicitly permits SIGKILL only for a still-owned diagnostic
+child that fails to exit after SIGTERM. Interactive runs request separate native
+confirmation. Refusing SIGKILL keeps waiting with ownership of the child; a
+noninteractive run without the flag also keeps waiting instead of forcing exit.
+Quit requests confirm cancellation and wait for cleanup. SIGINT, SIGTERM and
+SIGHUP request cancellation directly.
+
+For the optional model access check, launch with `--select-model`. Choose a local
+GGUF in the native picker, or cancel. The helper loads it with GPU layers disabled,
+a context of 512, one slot and warmup disabled, checks loopback `/health`, and stops
+without generating a response. This may require significant RAM and is an optional
+integration diagnostic. No real model or hardware is required by automated tests.
+The report contains logs which can include the selected model's private path;
+review it before sharing. Model readiness is not evidence of successful inference.
+
+The `Optional desktop backend packaging` workflow is manually dispatched on Apple
+Silicon and Intel CPU runners. It builds with local signing and runs only version
+and help checks with system-only `PATH`, without model weights or Homebrew tools
+available to the app. Diagnostic output is retained; this experiment publishes no
+releases. It also exercises the signed sandboxed Store-check GUI on both Mac
+architectures and builds/extracts/verifies Debian packages on Ubuntu 24.04 x64
+and ARM64. Candidate packages and diagnostic screenshots are retained as workflow
+artifacts. It is not a replacement for the normal Linux/macOS CI checks.
+
+On a development branch where GitHub has not registered the optional workflow
+on the default branch yet, dispatch the existing checks workflow with packaging
+enabled. It calls the packaging workflow from the same commit:
+
+```bash
+gh workflow run check.yml --ref YOUR_BRANCH -f packaging=true
+```
+
+Normal pushes keep the backend download/build experiment disabled. Both paths
+retain candidate artifacts in GitHub Actions; neither submits anything to Apple.
+
+Before adopting this packaging for releases, run it on the target Macs and verify
+native model selection, cancellation, loading, shutdown and report storage. The
+current experiment does not implement persistent security-scoped bookmarks or
+demonstrate reopening a model after relaunch. Distribution signing, notarization,
+Store provisioning, dependency notices and the minimum supported macOS version
+still need validation. In particular, the upstream Intel artifact disables Metal;
+backend availability must be discovered from each selected artifact.
+
+The fixture flags and health statuses follow the candidate's
+[argument definitions](https://github.com/ggml-org/llama.cpp/blob/b12248/common/arg.cpp)
+and [server contract](https://github.com/ggml-org/llama.cpp/blob/b12248/tools/server/README.md).
+Packaging follows [Tauri sidecars](https://v2.tauri.app/develop/sidecar/),
+[Tauri macOS bundles](https://v2.tauri.app/distribute/macos-application-bundle/),
+and Apple's [embedded helper signing guidance](https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app).
+Apple documents [file access and bookmarks](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox)
+separately; passing a pathname alone must be tested in the signed sandbox.
+
+### Local ARM64 validation, 2026-11-12
+
+The prototype was exercised on macOS 26.6.2 (25G83), ARM64, with candidate `b12248`
+at source commit `3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8` and local ad hoc signing.
+`codesign --verify --deep --strict` passed. Runtime sandbox inspection confirmed
+the parent and model-loading helper were sandboxed. With system-only `PATH`, the
+app ran version/help checks, matched the pinned commit and saved its report in its
+separate application container.
+
+Canceling the native picker recorded `selectionCancelled: true` without loading a
+model. Selecting the existing local `gpt_oss_20b_q4_k_m.gguf` granted the helper
+read access. The CPU loading check reached loopback health readiness with context
+512, one slot and no warmup, then completed normal shutdown. The child was reaped,
+the listener disappeared and the port could be reused. No response was generated.
+Sending SIGTERM to the diagnostic app during another load recorded cancellation,
+reaped its sandboxed helper and released its port without SIGKILL.
+
+These observations cover this local prototype only. They do not validate Intel,
+macOS 13.5, certificate signing, notarization, Store distribution or persistent
+model permissions after relaunch. Required automated checks continue to use fake
+servers and temporary data; real model loading remains optional.
+
+## Ubuntu Debian packaging
+
+`packaging/ubuntu.py` prepares the pinned official CPU backend for
+`x86_64-unknown-linux-gnu` or `aarch64-unknown-linux-gnu`. Preparation can run on
+macOS or Linux. It verifies the full archive digest, reads ELF64 dependencies
+without executing downloaded files, includes dynamically discovered CPU/RPC
+modules and transitive libraries, and rejects unknown external dependencies.
+The shared archive reader and transactional activation are the same as macOS.
+No models, CUDA runtimes or GPU drivers are included. A user can select an
+existing external GPU-enabled backend in the regular Ubuntu edition.
+
+Build on Ubuntu 24.04 with the matching native architecture, the normal desktop
+development tools, Tauri prerequisites, `patchelf` and `dpkg-deb`:
+
+```bash
+cd mir/desktop
+npm ci --no-audit --no-fund
+python3 packaging/ubuntu.py prepare --target aarch64-unknown-linux-gnu
+python3 packaging/ubuntu.py bundle --target aarch64-unknown-linux-gnu
+```
+
+Use `x86_64-unknown-linux-gnu` for x64. Both actions accept `--archive` with a
+local official archive and still verify its pinned digest. The build patches each
+backend ELF's runtime search path to `$ORIGIN`, then packages the native GUI as
+`/usr/bin/mir`, the private backend under `/usr/lib/mir.cpp/backend/`, and licenses
+and provenance under `/usr/share/doc/mir-cpp/`. No wrapper script or build tools
+are needed at runtime. The GUI resolves the private backend relative to its own
+executable, including in an extracted package.
+
+With no arguments, installed `mir` opens the GUI. A command such as
+`mir /path/to/model.gguf --ctx-size 4096` runs the selected backend in the foreground with the same
+MIR settings/defaults and literal trailing arguments; those final arguments retain
+native precedence. Ctrl+C and the exit status belong directly to that backend.
+The packaged direct mode does not need shell helpers or open a browser. Explicit
+endpoint arguments are left to llama.cpp's own parser and socket binding. The
+Store edition requires its native model picker and does not offer this CLI path.
+
+The `.deb` is under
+`packaging/generated/build-ubuntu/<target>/release/bundle/deb/`. Its version is
+inherited from the development application; creating a package does not publish
+that version. Install a reviewed candidate with `sudo apt install ./<package>.deb`,
+then launch `mir` or the desktop application entry. Runtime dependencies include
+WebKitGTK 4.1, GTK 3, glibc 2.39+, libstdc++, OpenMP and OpenSSL 3. Ubuntu 24.04 is
+the supported build baseline; older distributions are not claimed compatible.
+
+After building, the packager extracts the actual `.deb` into a temporary user
+directory, compares every backend/resource file, checks dynamic loader resolution,
+runs the GUI's embedded-interface check and checks backend version/help with a
+system-only PATH. A tiny invalid GGUF plus trailing `--help` verifies the installed
+`mir` direct-start argument path without loading it. No model is loaded. The optional packaging workflow repeats
+this on both architectures and runs native-window lifecycle tests with fixture
+servers. A second native test extracts the actual package and substitutes only
+the debug GUI to enable WebDriver; it checks bundled-backend discovery, storage
+and relaunch using that package's real backend libraries and layout. Production
+executables cannot contain WebDriver. `bash mir/tests/run.sh packaging` remains offline and uses tiny ELF and
+Mach-O fixtures rather than downloading upstream code.
+
+## Mac App Store variant
+
+The Store GUI is built with the `app-store` Cargo feature. It uses only the bundled
+backend and does not expose external executable selection. The Ubuntu and direct
+macOS editions retain external-backend support. Backend updates arrive with app
+updates; there is no runtime code downloader.
+
+The Store parent enables App Sandbox, user-selected read/write files,
+app-scoped bookmarks and client/server networking. The helper inherits the parent
+sandbox. Model folders use the native macOS picker. Cancel preserves the previous
+selection. Successful selections retain read-only security-scoped bookmarks;
+startup resolves them without displaying dialogs, refreshes stale records when
+possible, and holds access until shutdown. Missing/expired grants are reported
+with instructions to select the folder again. If a folder is moved and its saved
+path is no longer usable, select it again. Persisted grants are stored separately
+from `paths.conf`, in `desktop/model-folders.json`; failed writes preserve the
+previous record. Conversation imports and attachments are copied into the app's
+storage and do not depend on reopening the source file later.
+
+Store configuration and data use `.config/mir.cpp/` and
+`.local/share/mir.cpp/desktop/` beneath macOS's sandbox home. External HOME/XDG root
+overrides do not redirect Store storage outside its container. Existing direct
+installation data is not automatically imported. Other MIR setting precedence is
+unchanged. Export and attachment-download destinations are granted by the native
+Save panel and use Foundation's atomic writer in this edition.
+
+For local checks, use a distinct application identifier and container:
+
+```bash
+cd mir/desktop
+python3 packaging/macos.py bundle --app-store --store-check --debug --target aarch64-apple-darwin
+MIR_PACKAGE_TEST_BINARY="$PWD/packaging/generated/build-app-store-check/aarch64-apple-darwin/debug/bundle/macos/Mir.cpp Store Check.app/Contents/MacOS/mir-desktop" node tests/package-smoke.mjs
+```
+
+`--store-check` uses `io.github.etufarini.mir.store-check` and ad hoc signing.
+`--debug` enables the debug-only WebDriver; release builds reject that feature.
+The smoke test creates a unique directory inside the check container and verifies
+the real sandbox window, backend discovery, external-code rejection, attachment
+storage and persistence across a full app relaunch. Its screenshots describe test
+data, not inference. Native picker interaction still needs a manual check: cancel,
+choose an external temporary models folder, close the application completely,
+reopen it, and confirm that the models can still be read. Also check a native file
+import and export to a destination outside the container. No real model or GPU is
+required: an invalid tiny GGUF can verify readable access and expected load failure.
+
+To prepare a certificate-signed candidate using existing developer assets:
+
+```bash
+python3 packaging/macos.py bundle --app-store --target aarch64-apple-darwin \
+  --signing-identity "3rd Party Mac Developer Application: YOUR IDENTITY" \
+  --provisioning-profile /absolute/path/Mir.provisionprofile \
+  --pkg-signing-identity "3rd Party Mac Developer Installer: YOUR IDENTITY"
+```
+
+This checks a current Mac App Store Connect profile for the exact app identifier
+and Team ID, generates its signing entitlements, embeds the profile before final
+signing, verifies parent/helper entitlements and the signed application's Team ID,
+checks that the profile authorizes the actual public signing certificate, then
+uses `xcrun productbuild` to create a `.pkg` and checks its signature.
+Output is under `packaging/generated/build-app-store/<target>/release/bundle/macos/`.
+Without installer identity it produces only the signed `.app`. Without certificate
+and profile, `--app-store` creates an ad hoc local bundle, not a submission artifact.
+No command creates, exports or uploads keys, registers an app, or submits to Apple.
+Mac bundle builds generate a complete ICNS, including the 1024-pixel image,
+from the existing vector icon. Other generated platform icons are discarded;
+the checked-in artwork and small PNG assets are preserved.
+
+The official [Tauri Store procedure](https://v2.tauri.app/distribute/app-store/)
+and [Apple sandbox file-access documentation](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox)
+are the reference for signing, provisioning and scoped access. Before publishing,
+validate the exact distribution certificate/profile pair and signed package, finish
+third-party dependency notices and Store metadata/privacy/export declarations, and
+check the minimum supported macOS version and each advertised architecture.
+Version, candidate SHA and release notes still require the repository's explicit
+release approval. Ad hoc sandbox checks do not imply App Review acceptance.
+
+### Local packaging GUI checks, 2026-11-12
+
+The macOS ARM64 direct GUI and release Store GUI were built with local ad hoc
+signatures, with their expected distinct entitlement sets. The Store-check window
+passed automatic backend-discovery, attachment and relaunch-persistence checks.
+Manual native picker checks confirmed cancellation, external model-folder selection
+and restored read access after a complete app restart. A tiny invalid GGUF was
+read by the CPU helper and rejected for its format, rather than denied file access;
+no model weights or inference were involved. Native attachment selection and
+export outside the container also passed, including byte-for-byte export checks.
+
+Ubuntu 24.04 ARM64 and emulated x64 containers built, extracted and verified real
+Debian packages and passed the native package-layout GUI check. Installation and
+replacement of the ARM64 package succeeded in the disposable
+container, with the installed `mir` entry point and desktop entry. Native Linux
+window/process tests passed on both. The runtime suite passed on ARM64; under x64
+emulation, the missing-executable diagnostic fixture returns child exit 127 rather
+than a spawn error, and the unrelated-listener shutdown fixture reports an
+unimplemented `pidfd` syscall. Those two existing checks therefore fail under this
+emulator; they pass on native ARM64 Linux. The macOS port probe now checks wildcard
+and assigned interface addresses: a reused wildcard bind can coexist with an
+existing loopback listener on macOS. Regression checks cover occupied IPv4/IPv6
+addresses and reuse after a closed connection. The complete macOS runtime suite
+passes after this correction, including listener identity and confirmed shutdown.
+These observations do
+not validate a distribution certificate/profile pair, Store submission, Intel
+macOS or the minimum macOS version. The optional CI matrix supplies the matching
+architecture build procedures; a configured job is not evidence that it has run.
 
 ## Troubleshooting
 

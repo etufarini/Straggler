@@ -14,8 +14,8 @@ release is still **v1.0.0**, which uses terminal menus and browser chat.
 To try this branch's desktop, run `bash mir/mir.sh` from its checkout.
 
 Mir.cpp targets Linux and macOS. llama.cpp supplies CPU and accelerator support;
-managed builds cover CPU, Vulkan and CUDA on Linux, and CPU and Metal on macOS.
-Earlier CUDA checks apply to the recorded release configurations, not this GUI.
+packaged backends are pinned to a selected upstream release. External builds remain
+selectable. Earlier hardware checks apply to their recorded configurations.
 
 [<img src="mir/docs/screenshots/desktop-chat.png" alt="Mir.cpp desktop conversation screen before configuring a model" width="640">](mir/docs/screenshots/desktop-chat.png)
 
@@ -24,11 +24,12 @@ Earlier CUDA checks apply to the recorded release configurations, not this GUI.
 ## Requirements
 
 - A graphical Linux session or macOS 13.5 or newer.
-- Bash, curl, working HTTPS certificates and network access during preparation.
-- On macOS, an existing [Homebrew](https://brew.sh/) installation.
+- For source preparation: Bash, curl, working HTTPS certificates and network access.
+- For source preparation on macOS, an existing [Homebrew](https://brew.sh/) installation.
 - For chat, a GGUF supported by your llama.cpp build and enough hardware memory.
 
-Startup prepares the desktop automatically. Missing system packages require your
+Source startup prepares the desktop automatically. The running desktop uses native
+Rust services and does not require Bash or Python. Missing system packages require your
 consent; assisted installation supports Ubuntu/Debian and existing Homebrew setups.
 Model files and GPU drivers are separate requirements. Building llama.cpp on macOS
 also requires Apple's command line tools. See the
@@ -51,8 +52,8 @@ this branch have not been published. Existing profiles remain compatible.
 bash mir/mir.sh
 ```
 
-1. Open **Settings → llama.cpp** to install a build, or select an existing build
-   through **Folders**.
+1. Open **Settings → llama.cpp** to review the bundled backend or choose an external
+   build. Source builds without a bundled backend need an existing llama.cpp folder.
 2. Choose your **Models folder** in **Folders**. Subfolders are searched too.
 3. Choose a model in **Model settings**, review its settings and launch the server.
 4. Optionally save the configuration through **Saved configurations**.

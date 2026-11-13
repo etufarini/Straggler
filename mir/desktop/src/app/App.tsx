@@ -27,7 +27,6 @@ export default function App() {
     setConfirmation,
     native,
     selected,
-    job,
     config,
     start,
     error,
@@ -37,7 +36,6 @@ export default function App() {
     panel,
     setDraft,
     acceptConfiguration,
-    setJob,
     confirmation,
     requestStop,
     settingsSection,
@@ -121,13 +119,7 @@ export default function App() {
             ) : (
               <button
                 className="primary-button"
-                disabled={
-                  !native ||
-                  !selected ||
-                  busy ||
-                  ['running', 'stopping'].includes(job.phase) ||
-                  !config?.serverAvailable
-                }
+                disabled={!native || !selected || busy || !config?.serverAvailable}
                 onClick={() => void start()}
               >
                 Launch server
@@ -203,7 +195,6 @@ export default function App() {
             draft={draft}
             setDraft={setDraft}
             server={server}
-            job={job}
             accept={acceptConfiguration}
             confirm={setConfirmation}
             onError={reportSettingsError}
@@ -212,7 +203,6 @@ export default function App() {
             section={settingsSection}
             setSection={setSettingsSection}
             onBack={() => setPanel(null)}
-            onJob={setJob}
           />
         ) : controller.view === 'projects' ? (
           <ProjectsPage controller={controller} />

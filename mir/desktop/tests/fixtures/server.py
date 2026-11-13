@@ -9,7 +9,7 @@ import sys
 import time
 
 if '--version' in sys.argv:
-    print('Test llama-server')
+    print(os.environ.get('TEST_BACKEND_VERSION', 'Test llama-server'))
     sys.exit()
 if '--help' in sys.argv:
     print('--model FNAME\n--port PORT\n--host HOST\n--ctx-size N\n--cache-type-k TYPE\n--cache-type-v TYPE\n--split-mode MODE\n--tensor-split N\n--fit-target N\n--device DEV\n--threads N\n--gpu-layers N\n--batch-size N\n--ubatch-size N\n--temperature N\n--top-p N\n--top-k N\n--min-p N\n--repeat-penalty N\n--presence-penalty N\n--frequency-penalty N\n--seed N\n--n-predict N')
@@ -144,7 +144,7 @@ def report_memory_failure():
     print('backend is in error state from a previous command buffer failure - recreate the backend to recover', file=sys.stderr, flush=True)
 
 
-if os.environ.get('TEST_SERVER_MODE') == 'oom-init':
+if os.environ.get('TEST_SERVER_MODE') == 'oom-init' or os.path.exists(os.environ['TEST_REQUEST'] + '.oom-init'):
     report_memory_failure()
 print('Test server started', flush=True)
 ThreadingHTTPServer((options.host, options.port), Handler).serve_forever()
