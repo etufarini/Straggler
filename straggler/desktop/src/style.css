@@ -1,4 +1,16 @@
 :root {
+  /* Static stellar layers from the approved D003 proposal. */
+  --stars-field: url('./assets/starfield.svg');
+  --stars-field-light: url('./assets/starfield-light.svg');
+  --stars-cluster: url('./assets/globular-cluster.svg');
+  --star-o: #9db4ff;
+  --star-a: #cad8ff;
+  --star-f: #f8f7ff;
+  --star-g: #fff4ea;
+  --star-k: #ffd2a1;
+  --star-m: #ffcc6f;
+  --ui-deep: #080d26;
+
   font-family:
     Inter,
     ui-sans-serif,
@@ -164,8 +176,9 @@ select:disabled {
   z-index: 3;
   margin: -8px 0 0;
   padding: 12px 0 13px;
-  background: var(--ui-background);
+  background: color-mix(in srgb, #0f1738 88%, transparent);
   box-shadow: 0 1px 0 #2e3d72;
+  backdrop-filter: blur(10px);
 }
 .configuration-heading > span {
   display: flex;
@@ -281,7 +294,6 @@ select:disabled {
 }
 .build-summary {
   padding: 14px;
-  background: #202a3c;
   border: 1px solid #364868;
   border-radius: 7px;
   font-size: 12px;
@@ -448,7 +460,10 @@ code {
   width: var(--ui-sidebar-width);
   flex-shrink: 0;
   background:
-    radial-gradient(420px 240px at -10% -8%, #4f86ff26, transparent 70%), var(--ui-surface);
+    var(--stars-cluster) no-repeat 50% calc(100% - 40px) / 460px 460px,
+    var(--stars-field) 0 0 / 720px 720px,
+    radial-gradient(420px 240px at -10% -8%, #4f86ff33, transparent 70%),
+    linear-gradient(180deg, var(--ui-surface) 0%, var(--ui-deep) 100%);
   border-right: 1px solid #263464;
   padding: 27px 15px 15px;
   display: flex;
@@ -469,6 +484,7 @@ code {
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
+  filter: drop-shadow(0 0 10px #9db4ffaa);
 }
 .brand small {
   display: block;
@@ -480,7 +496,6 @@ code {
 }
 .new-chat {
   justify-content: flex-start;
-  background: var(--ui-raised);
   border: 1px solid #36425d;
   color: #eef2ff;
   padding: 10px 12px;
@@ -590,7 +605,12 @@ code {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(900px 420px at 72% -14%, #4f86ff2e, transparent 62%), var(--ui-background);
+    var(--stars-field-light) 0 0 / 900px 900px,
+    radial-gradient(360px 220px at 78% -4%, #cad8ff2e, transparent 70%),
+    radial-gradient(760px 520px at 84% -8%, #4f86ff47, transparent 65%),
+    radial-gradient(820px 620px at 6% 108%, #6a5cff33, transparent 65%),
+    radial-gradient(620px 440px at 102% 104%, #ff9e6b17, transparent 70%),
+    linear-gradient(180deg, var(--ui-background) 0%, #0d1534 55%, var(--ui-deep) 100%);
 }
 .topbar {
   height: 79px;
@@ -651,7 +671,6 @@ code {
   border-radius: 20px;
   padding: 5px 10px 5px 11px;
   border-color: #3a4c8a;
-  background: #1c275099;
   cursor: pointer;
 }
 .messages {
@@ -718,7 +737,9 @@ h1 {
     var(--ui-holo-soft) border-box;
   border: 1px solid transparent;
   border-radius: 16px;
-  box-shadow: 0 20px 50px -26px #4f86ffaa;
+  box-shadow:
+    0 20px 60px -24px #4f86ffcc,
+    0 0 0 1px #9db4ff14;
   position: relative;
   container-type: inline-size;
 }
@@ -806,7 +827,6 @@ textarea:disabled {
   gap: 10px;
   padding: 10px 14px;
   margin: 12px var(--ui-gutter) 0;
-  background: #22336e;
   border: 1px solid #3c4c6d;
   border-radius: 7px;
   font-size: 12px;
@@ -1174,9 +1194,6 @@ textarea:disabled {
   font-weight: 550;
   font-size: 12px;
   padding: 10px 17px;
-  box-shadow:
-    0 1px 0 #ffffff33 inset,
-    0 8px 22px -12px #2f63f2;
 }
 .primary-button:hover:not(:disabled) {
   background: var(--ui-primary-hover);
@@ -1332,6 +1349,11 @@ textarea:disabled {
 .sidebar.is-compact {
   width: 68px;
   padding: 22px 14px 15px;
+  background-size:
+    300px 300px,
+    720px 720px,
+    auto,
+    auto;
 }
 .sidebar.is-compact .brand {
   flex-direction: column;
@@ -1375,7 +1397,6 @@ textarea:disabled {
   top: 9px;
   bottom: 9px;
   width: 2px;
-  background: linear-gradient(180deg, var(--ui-cyan), #4f86ff);
 }
 .local-badge svg {
   color: var(--ui-subtle);
@@ -1667,7 +1688,9 @@ textarea:disabled {
   padding: 16px 22px 22px;
   border-left: 1px solid #263464;
   background:
-    radial-gradient(360px 300px at 50% 26%, #4f86ff2b, transparent 70%), var(--ui-surface);
+    var(--stars-field) 0 0 / 720px 720px,
+    radial-gradient(360px 300px at 50% 26%, #4f86ff33, transparent 70%),
+    linear-gradient(180deg, var(--ui-surface) 0%, var(--ui-deep) 100%);
 }
 .presence-toggle {
   position: absolute;
@@ -1719,7 +1742,6 @@ textarea:disabled {
   min-width: 0;
   padding: 9px 10px;
   border-radius: var(--ui-radius);
-  background: var(--ui-raised);
 }
 .presence-stats dt {
   font-size: 11px;
@@ -1866,7 +1888,6 @@ textarea:disabled {
   bottom: 9px;
   width: 2px;
   border-radius: 2px;
-  background: linear-gradient(180deg, var(--ui-cyan), #4f86ff);
 }
 button:focus-visible,
 textarea:focus-visible,
@@ -2993,4 +3014,34 @@ select:focus-visible {
   .project-detail-head {
     flex-direction: column;
   }
+}
+
+.notice,
+.presence-stats div,
+.build-summary,
+.new-chat,
+.local-badge {
+  background-color: color-mix(in srgb, var(--ui-raised) 72%, transparent);
+  background-image: linear-gradient(180deg, #ffffff0d, #ffffff00 70%);
+  box-shadow: inset 0 1px 0 #ffffff14;
+  backdrop-filter: blur(8px);
+}
+
+.notice {
+  background-color: color-mix(in srgb, #22336e 70%, transparent);
+}
+
+.primary-button,
+.send-button:not(:disabled) {
+  box-shadow:
+    0 1px #ffffff40 inset,
+    0 0 0 1px #9db4ff40,
+    0 0 22px -4px #4f86ffcc;
+}
+
+:is(.conversation-row, .sidebar-project-row).selected::before,
+.settings-nav button.selected::before,
+.sidebar-bottom .nav-item.selected::before {
+  background: linear-gradient(180deg, var(--star-a), var(--ui-cyan) 45%, #4f86ff);
+  box-shadow: 0 0 10px #9db4ffcc;
 }
