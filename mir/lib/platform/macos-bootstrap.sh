@@ -16,10 +16,10 @@ bootstrap_macos() {
 }
 
 macos_dependency_hint() {
-    printf 'On macOS, install the launcher dependencies and retry:\n  brew install bash coreutils findutils flock\n'
+    printf 'On macOS, install the launcher dependencies and retry:\n  brew install bash coreutils flock\n'
 }
 
-# Shared by the Bash 3.2 installer bootstrap and the modern build menus.
+# Shared by the Bash 3.2 installer bootstrap and desktop preparation.
 macos_install_packages() {
     local answer brew=${RUNTIME_BREW:-brew}
     printf 'Missing dependency packages: %s\n' "$*" >&2

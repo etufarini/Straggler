@@ -94,12 +94,17 @@ while read -r suffix target value; do
             fi
             initialize_config "$model"
             case "$target" in
-                generation_preset) actual=$(generation_preset) ;;
+                preset_values)
+                    actual=''
+                    for key in "${GENERATION_KEYS[@]:0:7}"; do actual+="${GENERATION[$key]} "; done
+                    actual=${actual% } ;;
                 generation:*) actual=${GENERATION[${target#*:}]} ;;
                 *) actual=${!target} ;;
             esac
-            [[ $actual == "$value" ]] || {
-                printf 'FAIL: %s %s resolved to %q, expected %q\n' "$naming" "$suffix" "$actual" "$value" >&2
+            expected=$value
+            if [[ $target == preset_values ]]; then expected="0.6 0.95 20 0 1 0 0"; fi
+            [[ $actual == "$expected" ]] || {
+                printf 'FAIL: %s %s resolved to %q, expected %q\n' "$naming" "$suffix" "$actual" "$expected" >&2
                 exit 1
             }
         )
@@ -114,7 +119,7 @@ THREADS THREADS 3
 GPU_LAYERS GPU_LAYERS 12
 PROMPT_PROCESSING PROMPT_PROCESSING low-memory
 HOST SERVER_HOST ::1
-GENERATION_PRESET generation_preset focused
+GENERATION_PRESET preset_values focused
 TEMPERATURE generation:temperature 0.7
 TOP_P generation:top_p 0.9
 TOP_K generation:top_k 30

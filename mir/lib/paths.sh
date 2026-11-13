@@ -40,35 +40,3 @@ load_paths() {
     LLAMA_CPP_PATH="${paths[llama_dir]}"
     MODELS_DIR="${paths[models_dir]}"
 }
-
-save_paths() {
-    local temporary
-    mkdir -p -- "$CONFIG_DIR" || return 1
-    temporary=$(mktemp "$CONFIG_DIR/.paths.XXXXXXXX") || return 1
-    if printf 'llama_dir=%s\nmodels_dir=%s\n' "$LLAMA_CPP_PATH" "$MODELS_DIR" > "$temporary" &&
-        mv -f -- "$temporary" "$PATHS_FILE"; then return 0; fi
-    rm -f -- "$temporary"
-    return 1
-}
-
-scan_models() {
-    local i found=false helper="${BASH_SOURCE[0]%/*}/gguf.py"
-    local -a roles=() available=()
-    MODELS=(); MODEL_OPTIONS=()
-    if [[ -d "$MODELS_DIR" && -r "$MODELS_DIR" && -x "$MODELS_DIR" ]]; then
-        # Follow file symlinks, without descending through linked directories.
-        mapfile -d '' -t MODELS < <(platform_find_models "$MODELS_DIR" | sort -z)
-    fi
-    if (( ${#MODELS[@]} )) && [[ -r "$helper" ]] && command -v python3 >/dev/null; then
-        mapfile -d '' -t roles < <(printf '%s\0' "${MODELS[@]}" | python3 "$helper")
-        for i in "${!MODELS[@]}"; do
-            case "${roles[i]:-unknown}" in component|continuation) ;; *) available+=("${MODELS[i]}") ;; esac
-        done
-        MODELS=("${available[@]}")
-    fi
-    for i in "${!MODELS[@]}"; do
-        MODEL_OPTIONS+=("$i" "${MODELS[i]#"$MODELS_DIR"/}")
-        if [[ "${MODELS[i]}" == "$MODEL" ]]; then found=true; fi
-    done
-    if ! "$found"; then MODEL="${MODELS[0]:-}"; fi
-}

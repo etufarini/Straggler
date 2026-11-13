@@ -17,10 +17,10 @@ bootstrap_macos() {
 }
 
 macos_dependency_hint() {
-    printf 'On macOS, install the launcher dependencies and retry:\n  brew install bash coreutils findutils flock\n'
+    printf 'On macOS, install the launcher dependencies and retry:\n  brew install bash coreutils flock\n'
 }
 
-# Shared by the Bash 3.2 installer bootstrap and the modern build menus.
+# Shared by the Bash 3.2 installer bootstrap and desktop preparation.
 macos_install_packages() {
     local answer brew=${RUNTIME_BREW:-brew}
     printf 'Missing dependency packages: %s\n' "$*" >&2
@@ -80,6 +80,7 @@ configure_runtime() {
     return 1
 }
 # Platform contract: load one adapter, preserving configuration in this shell.
+
 load_platform() {
     case "$1" in linux|macos) ;; *) printf 'Invalid platform adapter: %s\n' "$1" >&2; return 1 ;; esac
     if [[ -n "${PLATFORM_LOADED:-}" ]]; then
@@ -93,7 +94,6 @@ load_platform() {
     case "$1" in
         linux)
 platform_required_tools() { REQUIRED_TOOLS=(curl ss); }
-platform_browser_command() { printf xdg-open; }
 platform_move() {
     case "$3" in
         replace) mv -fT -- "$1" "$2" ;;
@@ -112,7 +112,6 @@ platform_dependency_hint() {
             flock) package=util-linux ;;
             ss) package=iproute2 ;;
             ps) package=procps ;;
-            find) package=findutils ;;
             *) package=coreutils ;;
         esac
         hint_packages[$package]=1
@@ -136,19 +135,13 @@ platform_ensure_dependencies() {
     local group=$1 tool package
     local -a tools packages missing=()
     case "$group" in
-        cpu) return 0 ;;
         launcher)
-            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock ss ps find sort grep dirname sleep cp)
-            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux iproute2 procps findutils coreutils grep coreutils coreutils coreutils) ;;
+            tools=(bash curl tar gzip mktemp chmod mkdir mv ln rm flock ss ps sort grep dirname sleep cp)
+            packages=(bash curl tar gzip coreutils coreutils coreutils coreutils coreutils coreutils util-linux iproute2 procps coreutils grep coreutils coreutils coreutils) ;;
         desktop-runtime) tools=(python3); packages=(python3) ;;
         desktop)
-            tools=(python3 cc c++ make pkg-config pkexec setsid)
-            packages=(python3 build-essential build-essential build-essential pkg-config policykit-1 util-linux) ;;
-        build)
-            tools=(git cmake make cc c++ python3 setsid timeout)
-            packages=(git cmake build-essential build-essential build-essential python3 util-linux coreutils) ;;
-        vulkan) tools=(glslc vulkaninfo); packages=(glslc vulkan-tools) ;;
-        cuda) tools=(nvcc); packages=(nvidia-cuda-toolkit) ;;
+            tools=(python3 cc c++ make pkg-config setsid)
+            packages=(python3 build-essential build-essential build-essential pkg-config util-linux) ;;
         *) printf 'Unknown dependency group: %s\n' "$group" >&2; return 1 ;;
     esac
     for tool in "${!tools[@]}"; do
@@ -160,11 +153,9 @@ platform_ensure_dependencies() {
         # Headers and certificates cannot be checked by looking for commands.
         case "$group" in
             launcher) packages=(ca-certificates) ;;
-            build) packages=(libssl-dev libcurl4-openssl-dev) ;;
             # WebKitGTK depends on the distribution's GTK runtime (including t64 variants).
             desktop-runtime) packages=(libwebkit2gtk-4.1-0) ;;
             desktop) packages=(libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev) ;;
-            vulkan) packages=(libvulkan-dev spirv-headers mesa-vulkan-drivers) ;;
             *) packages=() ;;
         esac
         for package in "${packages[@]}"; do
@@ -182,7 +173,7 @@ platform_ensure_dependencies() {
     fi
 }
 install_dependency_packages() {
-    local group=$1 answer
+    local answer
     shift
     local -a missing=("$@") command_prefix=()
     printf 'Missing dependency packages: %s\n' "${missing[*]}" >&2
@@ -197,8 +188,6 @@ install_dependency_packages() {
         command_prefix=(sudo)
     fi
     "${command_prefix[@]}" apt-get update < /dev/tty || return 1
-    # Prefer NVIDIA's toolkit when its repository is already configured.
-    if [[ "$group" == cuda ]] && apt-cache show cuda-toolkit >/dev/null 2>&1; then missing=(cuda-toolkit); fi
     "${command_prefix[@]}" apt-get install --no-remove -y "${missing[@]}" < /dev/tty || {
         printf 'Dependency installation failed. Check your package repositories and retry. GPU drivers are configured separately.\n' >&2
         return 1
@@ -206,8 +195,7 @@ install_dependency_packages() {
 }
             ;;
         macos)
-platform_required_tools() { REQUIRED_TOOLS=(curl gfind gmv lsof netstat); }
-platform_browser_command() { printf open; }
+platform_required_tools() { REQUIRED_TOOLS=(curl gmv lsof netstat); }
 platform_move() {
     case "$3" in
         replace) gmv -fT -- "$1" "$2" ;;
@@ -222,14 +210,12 @@ platform_ensure_dependencies() {
     local group=$1 index tool
     local -a tools=() formulas=() missing=()
     case "$group" in
-        cpu|metal) return 0 ;;
-        launcher) tools=(gmv gfind flock); formulas=(coreutils findutils flock) ;;
-        build) tools=(cmake python3 gtimeout); formulas=(cmake python coreutils) ;;
+        launcher) tools=(gmv flock); formulas=(coreutils flock) ;;
         desktop-runtime) tools=(python3); formulas=(python) ;;
         desktop) tools=(python3 gtimeout); formulas=(python coreutils) ;;
         *) printf 'Unknown dependency group: %s\n' "$group" >&2; return 1 ;;
     esac
-    if [[ "$group" == build || "$group" == desktop ]]; then
+    if [[ "$group" == desktop ]]; then
         if ! xcode-select -p >/dev/null 2>&1 || ! xcrun --find clang >/dev/null 2>&1 ||
             ! xcrun --find clang++ >/dev/null 2>&1 || ! xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1; then
             printf 'Apple command line tools and a macOS SDK are required. Run xcode-select --install, finish installation, then retry.\n' >&2
@@ -248,8 +234,6 @@ platform_ensure_dependencies() {
         else
             macos_install_packages "${missing[@]}" || return 1
         fi
-        # Dependency plans collect package names without installing or rechecking them.
-        if [[ ${3:-} == plan ]]; then return 0; fi
         for tool in "${tools[@]}"; do
             command -v "$tool" >/dev/null || { printf 'Required command still unavailable after installation: %s\n' "$tool" >&2; return 1; }
         done
@@ -268,7 +252,7 @@ check_dependencies() {
     platform_required_tools
     tools=("${REQUIRED_TOOLS[@]}")
     if [[ "$mode" == install ]]; then
-        tools+=(bash uname tar gzip mktemp chmod mkdir mv ln rm flock ps find sort grep dirname sleep cp)
+        tools+=(bash uname tar gzip mktemp chmod mkdir mv ln rm flock ps sort grep dirname sleep cp)
     fi
     for tool in "${tools[@]}"; do
         command -v "$tool" >/dev/null || missing+=("$tool")
@@ -286,7 +270,7 @@ check_dependencies() {
 }
 
 runtime_files() {
-    printf '%s\n' mir.sh sh/uninstall.sh lib/gguf.py lib/desktop.py desktop/runtime-files.txt lib/bootstrap.sh lib/build.sh lib/config.sh lib/desktop.sh lib/launcher.sh lib/memory.sh lib/paths.sh lib/platform.sh lib/processes.sh lib/profiles.sh lib/runtime.sh lib/server.sh desktop/README.md desktop/index.html desktop/package-lock.json desktop/package.json desktop/src-tauri/Cargo.lock desktop/src-tauri/Cargo.toml desktop/src-tauri/build.rs desktop/src-tauri/capabilities/main.json desktop/src-tauri/icons/128x128.png desktop/src-tauri/icons/128x128@2x.png desktop/src-tauri/icons/32x32.png desktop/src-tauri/icons/icon.png desktop/src-tauri/icons/icon.svg desktop/src-tauri/src/attachments.rs desktop/src-tauri/src/bundled_backend.rs desktop/src-tauri/src/chat.rs desktop/src-tauri/src/conversation_import.rs desktop/src-tauri/src/configuration/mod.rs desktop/src-tauri/src/configuration/environment.rs desktop/src-tauri/src/configuration/settings.rs desktop/src-tauri/src/configuration/storage.rs desktop/src-tauri/src/diagnostics.rs desktop/src-tauri/src/files.rs desktop/src-tauri/src/history.rs desktop/src-tauri/src/lib.rs desktop/src-tauri/src/main.rs desktop/src-tauri/src/model.rs desktop/src-tauri/src/model_access.rs desktop/src-tauri/src/model_access/macos.rs desktop/src-tauri/src/packaging_probe.rs desktop/src-tauri/src/preferences.rs desktop/src-tauri/src/projects.rs desktop/src-tauri/src/server.rs desktop/src-tauri/src/stream.rs desktop/src-tauri/src/tokens.rs desktop/src-tauri/src/workspace.rs desktop/src-tauri/tauri.conf.json desktop/src-tauri/tauri.macos.conf.json desktop/src/app/App.tsx desktop/src/app/ConfirmationDialog.tsx desktop/src/app/ConversationMenu.tsx desktop/src/app/Sidebar.tsx desktop/src/app/useUiPreferences.ts desktop/src/app/useWorkspace.ts desktop/src/components/ActionMenu.tsx desktop/src/components/Feedback.tsx desktop/src/components/FieldError.tsx desktop/src/components/FolderBrowser.tsx desktop/src/components/NumberField.tsx desktop/src/components/Popover.tsx desktop/src/components/ReasoningControls.tsx desktop/src/components/focus.ts desktop/src/components/statusLabels.ts desktop/src/domain/attachments.ts desktop/src/domain/chat.ts desktop/src/domain/conversationExport.ts desktop/src/domain/conversationImport.ts desktop/src/domain/errors.ts desktop/src/domain/messageActions.ts desktop/src/domain/presence.ts desktop/src/domain/projectContext.ts desktop/src/domain/projects.ts desktop/src/domain/storageQueue.ts desktop/src/domain/types.ts desktop/src/features/attachments/AttachmentRow.tsx desktop/src/features/attachments/AttachmentSection.tsx desktop/src/features/attachments/useAttachments.ts desktop/src/features/chat/ChatPanel.tsx desktop/src/features/chat/ContextCounter.tsx desktop/src/features/chat/Markdown.tsx desktop/src/features/chat/ReasoningMenu.tsx desktop/src/features/chat/StorageFeedback.tsx desktop/src/features/chat/SystemPromptMenu.tsx desktop/src/features/chat/useContextEstimate.ts desktop/src/features/chat/useConversation.ts desktop/src/features/llama/LlamaSettings.tsx desktop/src/features/presence/AssistantPresence.tsx desktop/src/features/presence/PresencePanel.tsx desktop/src/features/presence/createRenderer.ts desktop/src/features/presence/renderer.ts desktop/src/features/presence/renderers/OrbRenderer.ts desktop/src/features/presence/renderers/orb-engine.d.ts desktop/src/features/presence/renderers/orb-engine.js desktop/src/features/server/ServerFeedback.tsx desktop/src/features/server/ServerPanel.tsx desktop/src/features/server/useServerDetails.ts desktop/src/features/projects/ProjectCapacity.tsx desktop/src/features/projects/ProjectDetail.tsx desktop/src/features/projects/ProjectDialogs.tsx desktop/src/features/projects/ProjectMenu.tsx desktop/src/features/projects/ProjectsPage.tsx desktop/src/features/projects/useProjects.ts desktop/src/features/settings/ChatDefaults.tsx desktop/src/features/settings/FolderSettings.tsx desktop/src/features/settings/ModelSettings.tsx desktop/src/features/settings/PerformanceSettings.tsx desktop/src/features/settings/SavedConfigurations.tsx desktop/src/features/settings/ServerSettings.tsx desktop/src/features/settings/Settings.tsx desktop/src/features/settings/sections.ts desktop/src/features/settings/useSettings.ts desktop/src/main.tsx desktop/src/services/desktop.ts desktop/src/services/fixtures.ts desktop/src/services/projectFixtures.ts desktop/src/style.css desktop/tsconfig.json desktop/vite.config.ts desktop/packaging/llama-runtime.json desktop/src-tauri/src/configuration/capabilities.rs desktop/src-tauri/src/configuration/defaults.json desktop/src-tauri/src/configuration/models.rs desktop/src-tauri/src/configuration/native.rs desktop/src-tauri/src/platform/linux.rs desktop/src-tauri/src/platform/macos.rs desktop/src-tauri/src/platform/mod.rs
+    printf '%s\n' mir.sh sh/uninstall.sh lib/desktop.py desktop/runtime-files.txt lib/bootstrap.sh lib/config.sh lib/paths.sh lib/platform.sh lib/processes.sh lib/runtime.sh lib/server.sh desktop/README.md desktop/index.html desktop/package-lock.json desktop/package.json desktop/src-tauri/Cargo.lock desktop/src-tauri/Cargo.toml desktop/src-tauri/build.rs desktop/src-tauri/capabilities/main.json desktop/src-tauri/icons/128x128.png desktop/src-tauri/icons/128x128@2x.png desktop/src-tauri/icons/32x32.png desktop/src-tauri/icons/icon.png desktop/src-tauri/icons/icon.svg desktop/src-tauri/src/attachments.rs desktop/src-tauri/src/bundled_backend.rs desktop/src-tauri/src/chat.rs desktop/src-tauri/src/conversation_import.rs desktop/src-tauri/src/configuration/mod.rs desktop/src-tauri/src/configuration/environment.rs desktop/src-tauri/src/configuration/settings.rs desktop/src-tauri/src/configuration/storage.rs desktop/src-tauri/src/diagnostics.rs desktop/src-tauri/src/files.rs desktop/src-tauri/src/history.rs desktop/src-tauri/src/lib.rs desktop/src-tauri/src/main.rs desktop/src-tauri/src/model.rs desktop/src-tauri/src/model_access.rs desktop/src-tauri/src/model_access/macos.rs desktop/src-tauri/src/packaging_probe.rs desktop/src-tauri/src/preferences.rs desktop/src-tauri/src/projects.rs desktop/src-tauri/src/server.rs desktop/src-tauri/src/stream.rs desktop/src-tauri/src/tokens.rs desktop/src-tauri/src/workspace.rs desktop/src-tauri/tauri.conf.json desktop/src-tauri/tauri.macos.conf.json desktop/src/app/App.tsx desktop/src/app/ConfirmationDialog.tsx desktop/src/app/ConversationMenu.tsx desktop/src/app/Sidebar.tsx desktop/src/app/useUiPreferences.ts desktop/src/app/useWorkspace.ts desktop/src/components/ActionMenu.tsx desktop/src/components/Feedback.tsx desktop/src/components/FieldError.tsx desktop/src/components/FolderBrowser.tsx desktop/src/components/NumberField.tsx desktop/src/components/Popover.tsx desktop/src/components/ReasoningControls.tsx desktop/src/components/focus.ts desktop/src/components/statusLabels.ts desktop/src/domain/attachments.ts desktop/src/domain/chat.ts desktop/src/domain/conversationExport.ts desktop/src/domain/conversationImport.ts desktop/src/domain/errors.ts desktop/src/domain/messageActions.ts desktop/src/domain/presence.ts desktop/src/domain/projectContext.ts desktop/src/domain/projects.ts desktop/src/domain/storageQueue.ts desktop/src/domain/types.ts desktop/src/features/attachments/AttachmentRow.tsx desktop/src/features/attachments/AttachmentSection.tsx desktop/src/features/attachments/useAttachments.ts desktop/src/features/chat/ChatPanel.tsx desktop/src/features/chat/ContextCounter.tsx desktop/src/features/chat/Markdown.tsx desktop/src/features/chat/ReasoningMenu.tsx desktop/src/features/chat/StorageFeedback.tsx desktop/src/features/chat/SystemPromptMenu.tsx desktop/src/features/chat/useContextEstimate.ts desktop/src/features/chat/useConversation.ts desktop/src/features/llama/LlamaSettings.tsx desktop/src/features/presence/AssistantPresence.tsx desktop/src/features/presence/PresencePanel.tsx desktop/src/features/presence/createRenderer.ts desktop/src/features/presence/renderer.ts desktop/src/features/presence/renderers/OrbRenderer.ts desktop/src/features/presence/renderers/orb-engine.d.ts desktop/src/features/presence/renderers/orb-engine.js desktop/src/features/server/ServerFeedback.tsx desktop/src/features/server/ServerPanel.tsx desktop/src/features/server/useServerDetails.ts desktop/src/features/projects/ProjectCapacity.tsx desktop/src/features/projects/ProjectDetail.tsx desktop/src/features/projects/ProjectDialogs.tsx desktop/src/features/projects/ProjectMenu.tsx desktop/src/features/projects/ProjectsPage.tsx desktop/src/features/projects/useProjects.ts desktop/src/features/settings/ChatDefaults.tsx desktop/src/features/settings/FolderSettings.tsx desktop/src/features/settings/ModelSettings.tsx desktop/src/features/settings/PerformanceSettings.tsx desktop/src/features/settings/SavedConfigurations.tsx desktop/src/features/settings/ServerSettings.tsx desktop/src/features/settings/Settings.tsx desktop/src/features/settings/sections.ts desktop/src/features/settings/useSettings.ts desktop/src/main.tsx desktop/src/services/desktop.ts desktop/src/services/fixtures.ts desktop/src/services/projectFixtures.ts desktop/src/style.css desktop/tsconfig.json desktop/vite.config.ts desktop/packaging/llama-runtime.json desktop/src-tauri/src/configuration/capabilities.rs desktop/src-tauri/src/configuration/defaults.json desktop/src-tauri/src/configuration/models.rs desktop/src-tauri/src/configuration/native.rs desktop/src-tauri/src/platform/linux.rs desktop/src-tauri/src/platform/macos.rs desktop/src-tauri/src/platform/mod.rs
     case "$PLATFORM_ID" in
         linux) printf '%s\n' lib/platform/linux.sh ;;
         macos) printf '%s\n' lib/platform/macos.sh lib/platform/macos-bootstrap.sh ;;

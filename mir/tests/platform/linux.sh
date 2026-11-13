@@ -33,9 +33,7 @@ if platform_listeners 9931; then exit 1; fi
 xdg-open() { [[ "$1" == 'http://[::1]:9931/path with spaces' ]]; }
 platform_open_url 'http://[::1]:9931/path with spaces'
 platform_required_tools
-[[ ${REQUIRED_TOOLS[*]} == 'curl ss' && $(platform_browser_command) == xdg-open ]]
-[[ $(platform_memory_style) == margins ]]
-[[ $(platform_gpu_build_note) == *'drivers'* ]]
+[[ ${REQUIRED_TOOLS[*]} == 'curl ss' ]]
 move_args=''
 mv() { printf -v move_args '%s|' "$@"; }
 platform_move '/source with spaces' '/target with spaces' no-clobber
@@ -45,7 +43,7 @@ platform_move /source /target replace
 if platform_move /source /target invalid; then exit 1; fi
 hint=$(platform_dependency_hint ss flock ps)
 [[ "$hint" == *iproute2* && "$hint" == *util-linux* && "$hint" == *procps* ]]
-printf 'PASS: Linux adapter listeners, inspection failures, browser, tools, memory capability and atomic move contract\n'
+printf 'PASS: Linux adapter listeners, inspection failures, browser, tools and atomic move contract\n'
 
 # shellcheck disable=SC2317,SC2329 # These test doubles are called indirectly by the platform adapter.
 (

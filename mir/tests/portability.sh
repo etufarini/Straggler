@@ -3,7 +3,6 @@
 set -euo pipefail
 TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 python3 -I - "$TEST_ROOT" <<'PY'
-import json
 import os
 from pathlib import Path
 import signal
@@ -254,11 +253,8 @@ prepare_server --host /tmp/mir-test.sock
     assert result.returncode == 0, result.stderr
     check('''initialize_config "$2"
 DEVICE=Vulkan9
-write_profile "$PROFILES_DIR/OtherComputer.conf"
-DEVICE=auto
-load_profile "$PROFILES_DIR/OtherComputer.conf"
 if prepare_server; then exit 1; fi
-[[ $DEVICE == Vulkan9 && $(profile_status) == OtherComputer && $LAUNCH_ERROR == *unavailable* ]]
+[[ $DEVICE == Vulkan9 && $LAUNCH_ERROR == *unavailable* ]]
 platform_timeout() { return 1; }
 DEVICE=none
 GPU_LAYERS=all

@@ -258,14 +258,15 @@ owner and process details. Stopping an unrelated listener requires confirmation;
 force stop requires a separate confirmation after normal shutdown was attempted.
 Process identities are rechecked before signaling. Permissions are never elevated
 for shutdown. Closing Mir.cpp confirms cancellation and saving before stopping its
-own server and build workers.
+own server. Interrupting source preparation stops its compiler workers.
 
 A failed request reports the error and preserves partial text. Stop response keeps
 partial text too. Interrupted responses remain identifiable when history is reopened.
 Request failures stay with their response. Open Technical details for the original
 diagnostic; Review settings opens Model settings. Invalid settings are identified
-under the relevant field without discarding edited values. Build failures appear
-in Settings → llama.cpp, beside the build log.
+under the relevant field without discarding edited values. Source preparation
+failures appear in the launching terminal; backend startup failures appear in the
+server log.
 
 Storage errors remain beside the composer. Retry saving writes the current
 conversation again; Retry loading reloads unavailable history. New chat and history
@@ -392,7 +393,9 @@ The normal desktop receives its pinned backend with application updates. It does
 not download latest llama.cpp or compile a backend. Existing managed or external
 build folders remain selectable through Folders; changing a backend preserves
 model settings and conversations. GPU drivers remain external requirements.
-The compatibility shell build operations are retained for older source workflows.
+The private `mir.sh --desktop` bridge and shell llama.cpp build operations have been
+removed. Prepare an external backend separately, or use the backend included in a
+native Mir.cpp package. Existing managed build folders remain readable.
 
 Mir.cpp installation uses versioned archives and a managed wrapper. Updating an
 active desktop is rejected. Desktop preparation must succeed before activation;
@@ -453,10 +456,11 @@ development; `npm run format` applies frontend formatting.
 The frontend's desktop service owns Tauri access. Development scenarios replace
 that boundary; browser tests use the same scenarios instead of rewriting Tauri's
 private internals. A contract test compares shared native defaults with the
-compatibility Bash bridge and checks older desktop profiles. Rust integration
-tests use native configuration, fake executables and a local HTTP server to verify
-streaming, persistence, configuration, process identity and cancellation. Shell
-suites retain installation/build rollback checks for source workflows.
+direct Bash launcher. Rust integration tests check older desktop profiles,
+independent defaults, storage failures and bounded GGUF discovery. They use native
+configuration, fake executables and a local HTTP server to verify streaming,
+persistence, process identity and cancellation. Shell suites retain installation
+and desktop-preparation rollback checks for source workflows.
 
 Native tests use an embedded W3C WebDriver server on Linux and macOS. Automation
 is enabled only by the explicit `native-tests` feature in debug builds; release
@@ -524,10 +528,36 @@ derives devices/cache/split options from llama-server output. Native OS services
 check ports and attribute listeners; unidentified owners still block launch.
 Linux uses procfs and pidfd signaling, and macOS uses libproc. No inspection utility
 is executed by the desktop. Source preparation and direct GGUF startup remain
-compatible shell entry points; the GUI does not call their private bridge.
+compatible shell entry points. The old private shell bridge has been removed.
 The UI does not select behavior from hardware brands. Keep runtime-files.txt and
 the generated installer aligned when moving bundled source files. Regenerate with
 `bash mir/sh/build-install.sh`; verify with `--check`.
+
+Shell responsibilities are limited to source startup and preparation, the direct
+GGUF launcher, installation/removal and development checks:
+
+| Scripts | Responsibility |
+| --- | --- |
+| `mir/mir.sh` | Public source entry point; prepares the desktop or starts a GGUF directly |
+| `mir/lib/runtime.sh`, `mir/lib/platform.sh`, `mir/lib/platform/*.sh` | Bash selection, platform services and consent for preparation dependencies |
+| `mir/lib/bootstrap.sh` | Toolchains, compilation, verified cache and cancellation |
+| `mir/lib/config.sh`, `mir/lib/paths.sh`, `mir/lib/server.sh`, `mir/lib/processes.sh` | Direct-start settings, saved-path reading/migration, native arguments and port checks |
+| `mir/lib/desktop.py` | Preparation checksums, tool versions and build fingerprints |
+| `mir/sh/install-core.sh` | Canonical installer logic |
+| `mir/sh/build-install.sh` | Generates the standalone installer; `--check` detects drift |
+| `mir/sh/install.sh` | Generated installer distributed through the versioned curl command |
+| `mir/sh/uninstall.sh` | Implements `mir --uninstall` for managed source installations |
+| `mir/tests/*.sh` and subfolders | Isolated automated checks; `download.sh` is an optional network smoke check |
+
+The installer scripts are retained because each serves a different part of the
+supported source installation. The installed wrapper passes the original paths to
+`uninstall.sh`; it verifies ownership and the installation lock before removing
+managed program copies and keeps models, backends, settings and conversations.
+Native packages use their platform's removal mechanism instead. A running native
+GUI requires none of these scripts. Profile persistence, model discovery and
+memory telemetry belong to Rust; direct startup does not load those removed shell
+modules. Desktop cache identity follows desktop sources and the build recipe,
+so an unrelated installer change does not recompile the GUI.
 
 Keep stable installation pinned to a published tag. Before a later desktop
 release, update the canonical installer's release_tag and the README stable command
@@ -539,7 +569,7 @@ notes before creating a tag or publishing. Never move an existing tag.
 ## macOS backend packaging experiment
 
 This branch includes local packaging procedures, not a published desktop release. The same Tauri executable can be built in `packaging-probe` mode to check
-an included official `llama-server` without starting the Bash/Python bridge or
+an included official `llama-server` without shell preparation or
 loading profiles, conversations or preferences. The normal desktop now runs its
 configuration, discovery and process supervision directly in Rust. Ubuntu Debian packaging
 and a separate sandboxed Store GUI are described below; these remain local candidates,
@@ -870,7 +900,8 @@ architecture build procedures; a configured job is not evidence that it has run.
 - **No models:** choose a readable models folder and check that it contains GGUF
   files supported by llama.cpp. Empty folders remain usable configuration states.
 - **Server unavailable:** select a folder containing an executable server or install
-  a managed build. Both source-build and packaged layouts are accepted.
+  a native Mir.cpp package with its backend. Both source-build and packaged
+  llama.cpp layouts are accepted.
 - **Unsupported option or device:** inspect the server log and installed build's
   help/device list. Review explicit settings; another machine may expose other devices.
 - **Port IN USE:** choose a free port or inspect the listener before confirming a stop.

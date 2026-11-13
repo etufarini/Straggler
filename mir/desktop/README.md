@@ -3,7 +3,7 @@
 Mir.cpp is written for human maintainers. Frontend modules separate app composition,
 chat, settings, server controls, llama.cpp maintenance, shared controls and native
 transport. Rust modules separate native configuration/persistence, OS services, server supervision,
-diagnostics, chat and history. The desktop never invokes the shell bridge.
+diagnostics, chat and history. The private shell bridge has been removed; the desktop uses native services.
 
 Normal source startup is `bash mir/mir.sh`; desktop preparation is automatic.
 Developer tools are Bash 4.4+, Python 3, compatible Node/npm and Rust 1.92+ with
@@ -72,7 +72,7 @@ not download llama.cpp or require a Mac, model, GPU or inference service. Those
 tests also run through the regular common/desktop suites.
 
 The optional macOS sandbox diagnostic uses the same Tauri executable compiled
-with `packaging-probe`. It bypasses the shell bridge and creates no chat window.
+with `packaging-probe`. It uses native services and creates no chat window.
 It checks an upstream backend included in the bundle, writes an isolated native
 report and optionally opens a GGUF through the native picker for a CPU loading
 check. This diagnostic mode is separate from the normal desktop startup path. Add

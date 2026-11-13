@@ -21,24 +21,14 @@ with tempfile.TemporaryDirectory(prefix='mir-macos-') as temporary:
         path.write_text(text)
         path.chmod(0o755)
     executable(commands / 'uname', '#!/bin/sh\nprintf "Darwin\\n"\n')
-    snapshot = ('Mach Virtual Memory Statistics: (page size of 16384 bytes)\n'
-                'Pages free: 65536.\nPages inactive: 655360.\nPages speculative: 65536.\n')
-    executable(commands / 'vm_stat', """#!/bin/sh
-printf '%s' "$TEST_VM_STAT"
-exit "${TEST_VM_STAT_EXIT:-0}"
-""")
-    for tool in ('find', 'mv'):
+    for tool in ('mv',):
         (commands / ('g' + tool)).symlink_to(shutil.which('g' + tool) or shutil.which(tool))
     executable(commands / 'netstat', '#!/bin/sh\nprintf "%s\\n" "$TEST_SOCKETS"\nexit "${TEST_NETSTAT_EXIT:-0}"\n')
     executable(commands / 'lsof', '#!/bin/sh\nprintf "%s\\n" "$TEST_PIDS"\nexit "${TEST_LSOF_EXIT:-0}"\n')
     executable(commands / 'open', '#!/bin/sh\nprintf "%s" "$1" > "$TEST_BROWSER"\n')
     executable(commands / 'curl', '#!/bin/sh\nexit 0\n')
-    models = work / 'models with spaces'
-    models.mkdir()
-    model = models / 'model.gguf'
+    model = work / 'model.gguf'
     model.touch()
-    (models / 'linked.gguf').symlink_to(model)
-    (models / '._resource.gguf').touch()
     package = work / 'package with spaces'
     (package / 'bin').mkdir(parents=True)
     executable(package / 'bin/llama-server', '''#!/usr/bin/env bash
@@ -51,8 +41,8 @@ esac
 ''')
     env = {k:v for k,v in os.environ.items() if not k.startswith(('MIR_', 'LLAMA_', 'XDG_'))}
     env.update(PATH=str(commands) + ':' + native_path, HOME=str(work), XDG_CONFIG_HOME=str(work / 'config'),
-               MIR_LLAMA_CPP_DIR=str(package), MIR_MODELS_DIR=str(models), TEST_SOCKETS='', TEST_PIDS='',
-               TEST_VM_STAT=snapshot, TEST_BROWSER=str(work / 'browser'), TEST_ARGS=str(work / 'args'), TEST_DEVICE_PROBES=str(work / 'probes'))
+               MIR_LLAMA_CPP_DIR=str(package), TEST_SOCKETS='', TEST_PIDS='',
+               TEST_BROWSER=str(work / 'browser'), TEST_ARGS=str(work / 'args'), TEST_DEVICE_PROBES=str(work / 'probes'))
     def check(code, overrides=None, success=True):
         result = subprocess.run(['bash', '-euo', 'pipefail', '-c', sources + code, 'test', str(root), str(model)],
                                 env=env | (overrides or {}), capture_output=True, text=True, timeout=25)
@@ -61,8 +51,6 @@ esac
     check('''initialize_config "$2"
 validate_config
 [[ "$SERVER" == "$MIR_LLAMA_CPP_DIR/bin/llama-server" ]]
-scan_models
-(( ${#MODELS[@]} == 2 ))
 DEVICE=none GPU_LAYERS=all
 prepare_server
 [[ " ${ARGS[*]} " == *' --gpu-layers 0 '* ]]
@@ -75,34 +63,12 @@ prepare_server
     check('''initialize_config "$2"
 server_devices
 [[ ${DEVICE_NAMES[*]} == MTL0 ]]
-size=$(wc -c < "$TEST_DEVICE_PROBES")
-memory_available
-[[ $RAM_AVAILABLE == 12288 && ${#DEVICE_FREE[@]} == 0 ]]
-DEVICE=none
-memory_available
-(( $(wc -c < "$TEST_DEVICE_PROBES") == size ))
 DEVICE=MTL0,MTL1 SPLIT_MODE=tensor TENSOR_SPLIT=2,1 FIT_TARGET=2048
 build_model_args
 [[ " ${MODEL_ARGS[*]} " == *' --split-mode tensor '* ]]
 [[ $SPLIT_MODE == tensor && $TENSOR_SPLIT == 2,1 && $FIT_TARGET == 2048 ]]
 ''', {'TEST_DEVICE_DELAY':'0.1'})
-    print('PASS: Darwin memory data, no telemetry GPU probes and preserved explicit settings')
-    for bad in ('', snapshot.replace('Pages inactive: 655360.\n', ''),
-                snapshot + 'Pages free: 1.\n', snapshot.replace('16384', '0'),
-                snapshot.replace('16384', '12345'), snapshot.replace('16384', '99999999'),
-                snapshot.replace('655360.', '$(touch executed).'),
-                snapshot.replace('655360.', '999999999999999999999.'),
-                snapshot.replace('Pages speculative: 65536.', 'Pages speculative: invalid.')):
-        check('platform_memory_snapshot; [[ -z "$RAM_AVAILABLE" ]]', {'TEST_VM_STAT':bad})
-    assert not (work / 'executed').exists()
-    check('platform_memory_snapshot; [[ -z "$RAM_AVAILABLE" ]]', {'TEST_VM_STAT_EXIT':'1'})
-    check('''initialize_config "$2"
-memory_available
-[[ $RAM_AVAILABLE == 0 ]]
-''', {'TEST_VM_STAT':snapshot.replace('655360.', '0.').replace('65536.', '0.')})
-    check('platform_memory_snapshot; [[ $RAM_AVAILABLE == 3072 ]]',
-          {'TEST_VM_STAT':snapshot.replace('16384', '4096')})
-    print('PASS: 4/16 KiB pages, missing/malformed/duplicate counters, zero values and unavailable probes')
+    print('PASS: Darwin device discovery and preserved explicit GPU settings')
 
     busy = 'tcp4 0 0 127.0.0.1.9931 *.* LISTEN\ntcp6 0 0 ::1.9931 *.* LISTEN\n'
     check('PORT=9931; check_port; [[ -z "$LISTENERS" && ${#PIDS[@]} == 0 ]]',

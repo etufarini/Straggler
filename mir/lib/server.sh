@@ -57,33 +57,14 @@ listed_value() {
 }
 
 server_devices() {
-    local line name description total available
-    DEVICE_NAMES=(); DEVICE_DESCRIPTIONS=()
-    GPU_DEVICE_NAMES=()
-    declare -gA DEVICE_FREE=()
+    local line
+    DEVICE_NAMES=()
     DEVICE_OUTPUT=$(platform_timeout 15 "$SERVER" --list-devices) || return 1
     while IFS= read -r line; do
         if [[ "$line" =~ ^[[:space:]]+([^[:space:]:]+):[[:space:]]+(.+)$ ]]; then
             DEVICE_NAMES+=("${BASH_REMATCH[1]}")
-            DEVICE_DESCRIPTIONS+=("${BASH_REMATCH[2]}")
-            name=${BASH_REMATCH[1]}; description=${BASH_REMATCH[2]}
-            # Native device lists may include CPU accelerators with no GPU pool.
-            if [[ "$name" =~ ^[a-zA-Z0-9_.-]+$ && "$description" =~ \(([0-9]{1,10})[[:space:]]MiB,[[:space:]]([0-9]{1,10})[[:space:]]MiB[[:space:]]free\)$ ]]; then
-                total=$((10#${BASH_REMATCH[1]})); available=$((10#${BASH_REMATCH[2]}))
-                if (( total > 0 && available <= total )) && [[ ! -v "DEVICE_FREE[$name]" ]]; then
-                    GPU_DEVICE_NAMES+=("$name")
-                    DEVICE_FREE[$name]=$available
-                fi
-            fi
         fi
     done <<< "$DEVICE_OUTPUT"
-}
-
-multiple_devices_available() {
-    local name
-    local -A distinct=()
-    for name in "${DEVICE_NAMES[@]}"; do distinct[$name]=1; done
-    (( ${#distinct[@]} >= 2 ))
 }
 
 launch_error() { LAUNCH_ERROR=$*; return 1; }
@@ -261,12 +242,10 @@ cleanup() {
         kill -TERM "$SERVER_PID" 2>/dev/null || true
         wait "$SERVER_PID" 2>/dev/null || true
     fi
-    [[ -z "$LOG_FILE" ]] || rm -f -- "$LOG_FILE"
 }
 
 run_server() {
     local OPENED RESULT
-    LOG_FILE=""
     trap 'cleanup' EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM

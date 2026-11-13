@@ -7,22 +7,21 @@ if [[ "$RUNTIME_BASH" != "$BASH" ]]; then exec "$RUNTIME_BASH" "${BASH_SOURCE[0]
 
 source "$MIR_ROOT/lib/platform.sh"
 load_platform "$PLATFORM_ID"
-source "$MIR_ROOT/lib/launcher.sh"
-load_launcher_modules
 
 if [[ ${1:-} == --desktop ]]; then
-    shift
-    source "$MIR_ROOT/lib/desktop.sh"
-    desktop_command "$@"
-    exit
+    fail 'The private shell bridge has been removed. Run mir to open the desktop.'
 fi
 if (( $# == 0 )) || [[ ${1:-} == --prepare-desktop ]]; then
     source "$MIR_ROOT/lib/bootstrap.sh"
     prepare_desktop || fail 'Desktop preparation failed. Existing builds and user data were kept.'
     if (( $# > 0 )); then exit 0; fi
-    exec env MIR_ROOT="$MIR_ROOT" MIR_DESKTOP_BASH="$BASH" "$GUI_BINARY"
+    exec env MIR_ROOT="$MIR_ROOT" "$GUI_BINARY"
 fi
 [[ ${1:-} != --tui ]] || fail 'The terminal interface has been removed. Run mir to open the desktop.'
+source "$MIR_ROOT/lib/config.sh"
+source "$MIR_ROOT/lib/paths.sh"
+source "$MIR_ROOT/lib/processes.sh"
+source "$MIR_ROOT/lib/server.sh"
 initialize_config "$@"
 shift
 validate_config

@@ -4,19 +4,10 @@ set -euo pipefail
 TEST_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 python3 -I - "$TEST_ROOT" <<'PY'
 import os
-import fcntl
-import pty
-import re
-import select
-import signal
-import struct
-import termios
-import time
 from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 
 root = Path(sys.argv[1]).resolve()
@@ -40,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='mir-bootstrap-') as temporary:
     executable(commands / 'brew', '#!/bin/sh\nprintf "%s\\n" "$TEST_PREFIX"\n')
     executable(commands / 'netstat', '#!/bin/sh\nexit 0\n')
     executable(commands / 'lsof', '#!/bin/sh\nexit 1\n')
-    for tool in ('gfind', 'gmv'):
+    for tool in ('gmv',):
         (prefix / 'bin' / tool).symlink_to(shutil.which(tool))
     (prefix / 'bin/bash').symlink_to(modern)
     # Literal punctuation in filenames/arguments must survive interpreter changes.
@@ -78,17 +69,5 @@ exit 7
     assert result.returncode != 0 and not rejected_home.exists()
     assert b'takes no arguments' in result.stderr
     print('PASS: unsupported installer arguments cannot trigger installation')
-    snapshot_code = '''MIR_ROOT=$1
-source "$MIR_ROOT/tests/helpers/core.sh"
-load_test_core macos
-platform_memory_snapshot
-[[ "$RAM_AVAILABLE" =~ ^[0-9]+$ ]]
-(( RAM_AVAILABLE <= $(sysctl -n hw.memsize) / 1048576 ))
-[[ $(platform_memory_style) == system ]]
-'''
-    result = subprocess.run([modern, '-euo', 'pipefail', '-c', snapshot_code, 'test', str(root)],
-                            capture_output=True, text=True, timeout=10)
-    assert result.returncode == 0, result.stderr
-    print('PASS: native macOS available-RAM snapshot and page-size conversion')
 PY
 "$BASH" "$TEST_ROOT/tests/native/ports.sh" macos

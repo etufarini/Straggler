@@ -53,6 +53,8 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
                 data = source_path(name).read_bytes()
                 if name == 'mir.sh':
                     data += b'\nif\n' if broken else ('\n# ' + marker + '\n').encode()
+                if name == 'desktop/src/main.tsx':
+                    data += ('\n// ' + marker + '\n').encode()
                 archive_name = name if name in documents else 'mir/' + name
                 info = tarfile.TarInfo(prefix + '/' + archive_name)
                 info.size = len(data)
@@ -69,7 +71,6 @@ with tempfile.TemporaryDirectory(prefix='mir-install-') as temporary:
     executable(bin_dir / 'rustc', '#!/bin/sh\nprintf "rustc 1.96.1\\n"\n')
     executable(bin_dir / 'pkg-config', '#!/bin/sh\nexit 0\n')
     executable(bin_dir / 'dpkg-query', '#!/bin/sh\nprintf "install ok installed"\n')
-    executable(bin_dir / 'pkexec', '#!/bin/sh\nexit 99\n')
     if target_os == 'Darwin':
         # Simulate SDK discovery without consulting the host's Xcode installation.
         developer = work / 'developer tools'
@@ -125,8 +126,6 @@ exec REAL_MOVE "$@"
     executable(bin_dir / 'gmv', (bin_dir / 'mv').read_text())
     executable(bin_dir / 'netstat', '#!/bin/sh\nexit 0\n')
     executable(bin_dir / 'lsof', '#!/bin/sh\nexit 1\n')
-    if not shutil.which('gfind'):
-        (bin_dir / 'gfind').symlink_to(shutil.which('find'))
     executable(bin_dir / 'rm', '''#!/usr/bin/env bash
 if [[ ${TEST_CLEANUP:-ok} == fail ]]; then
     for target in "$@"; do
@@ -185,7 +184,10 @@ exec /bin/rm "$@"
         if name.startswith('lib/platform/') and name not in selected_adapters:
             assert not (target / name).exists()
         elif name != 'mir.sh':
-            assert (target / name).read_bytes() == source_path(name).read_bytes(), name
+            expected = source_path(name).read_bytes()
+            if name == 'desktop/src/main.tsx':
+                expected += b'\n// first\n'
+            assert (target / name).read_bytes() == expected, name
     assert (config / 'paths.conf').read_text() == 'existing paths\n'
     assert (config / 'profiles/Personal.conf').read_text() == 'existing profile\n'
     # Launch outside the checkout to verify module lookup and literal arguments.
@@ -239,7 +241,7 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     assert (install_dir / 'current').resolve() == updated
     assert command.read_bytes() == snapshot
     assert set((install_dir / 'releases').iterdir()) == releases
-    for omitted in [*selected_adapters, 'lib/runtime.sh', 'lib/memory.sh', 'lib/desktop.sh', 'desktop/src/app/App.tsx', 'lib/gguf.py', 'sh/uninstall.sh', *documents]:
+    for omitted in [*selected_adapters, 'lib/runtime.sh', 'lib/bootstrap.sh', 'desktop/src/app/App.tsx', 'lib/desktop.py', 'sh/uninstall.sh', *documents]:
         package(omit=omitted)
         install(success=False)
         assert (install_dir / 'current').resolve() == updated
@@ -320,10 +322,10 @@ printf '%s\\0' "$@" > "$TEST_ARGS"
     # Control PATH completely so missing-command checks do not depend on the host.
     restricted = work / 'restricted-bin'
     restricted.mkdir()
-    tools = 'uname brew bash curl tar gzip mktemp chmod mkdir mv ln rm flock ps find sort grep dirname sleep cp'.split()
-    tools += ['python3', 'node', 'npm', 'cargo', 'rustc', 'cc', 'c++', 'make', 'pkg-config', 'pkexec', 'setsid', 'awk', 'head', 'tr', 'cat', 'tee']
+    tools = 'uname brew bash curl tar gzip mktemp chmod mkdir mv ln rm flock ps sort grep dirname sleep cp'.split()
+    tools += ['python3', 'node', 'npm', 'cargo', 'rustc', 'cc', 'c++', 'make', 'pkg-config', 'setsid', 'awk', 'head', 'tr', 'cat', 'tee']
     if target_os == 'Darwin':
-        tools += ['gfind', 'gmv', 'lsof', 'netstat', 'git', 'gtimeout', 'xcode-select', 'xcrun']
+        tools += ['gmv', 'lsof', 'netstat', 'git', 'gtimeout', 'xcode-select', 'xcrun']
     else:
         tools.append('ss')
     for tool in tools:

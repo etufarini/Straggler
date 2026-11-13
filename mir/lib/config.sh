@@ -1,14 +1,5 @@
 #!/usr/bin/env bash
 
-fail() { printf '%s\n' "$*" >&2; exit 1; }
-
-invalid_setting() {
-    # The private desktop bridge attaches a field identifier; direct startup
-    # keeps the existing plain-text diagnostics and validation rules.
-    if declare -F desktop_invalid_setting >/dev/null; then desktop_invalid_setting "$@"; fi
-    fail "$2"
-}
-
 # llama.cpp accepts counts as signed 32-bit integers.
 
 valid_count() { [[ "$1" =~ ^(0|[1-9][0-9]{0,9})$ ]] && (( $1 <= 2147483647 )); }
@@ -49,15 +40,6 @@ valid_cache_type() { [[ "$1" =~ ^[a-z][a-z0-9_]{0,31}$ ]]; }
 
 valid_port() { [[ "$1" =~ ^[0-9]{1,5}$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 )); }
 
-# Prompt text is JSON-encoded as one literal profile line, never shell code.
-valid_chat_prompt() {
-    [[ "$1" == '""' ]] || python3 "$MIR_ROOT/lib/desktop.py" chat-prompt "$1" >/dev/null 2>&1
-}
-
-valid_chat_reasoning() { case "$1" in auto|on|off) return 0 ;; *) return 1 ;; esac; }
-
-valid_chat_effort() { [[ "$1" =~ ^[a-z][a-z0-9_-]{0,31}$ ]]; }
-
 # The first seven fields are sampling settings; seed and length stay separate.
 generation_preset_values() {
     case "$1" in
@@ -75,15 +57,6 @@ set_generation_preset() {
     values=$(generation_preset_values "$1") || return 1
     read -r -a fields <<< "$values"
     for i in "${!fields[@]}"; do GENERATION[${GENERATION_KEYS[i]}]=${fields[i]}; done
-}
-
-generation_preset() {
-    local preset values='' key
-    for key in "${GENERATION_KEYS[@]:0:7}"; do values+="${GENERATION[$key]} "; done
-    for preset in default focused exploratory min-p; do
-        if [[ "${values% }" == "$(generation_preset_values "$preset")" ]]; then printf '%s' "$preset"; return; fi
-    done
-    printf custom
 }
 
 valid_generation_value() {
@@ -150,42 +123,31 @@ initialize_config() {
         GENERATION[$key]=$value
     done
     read_launcher_control SERVER_HOST HOST "${LLAMA_HOST:-}"
-    PROFILES_DIR="$CONFIG_DIR/profiles"
-    declare -ga GPU_DEVICE_NAMES=()
-    declare -gA DEVICE_FREE=()
-    CHAT_SYSTEM_PROMPT_JSON='""'
-    CHAT_REASONING=auto
-    CHAT_REASONING_EFFORT=auto
-    CURRENT_PROFILE=""
-    SAVED_PROFILE=""
     CAPABILITIES_SERVER=""
     SERVER_HELP=""
 }
 
 validate_config() {
     local key control
-    valid_port "$PORT" || invalid_setting port 'Port must be an integer between 1 and 65535.'
+    valid_port "$PORT" || fail 'Port must be an integer between 1 and 65535.'
     PORT=$((10#$PORT))
-    valid_context "$CTX_SIZE" || invalid_setting context 'Use Auto or an integer from 0 to 2147483647 for context (0 requests the full model context).'
-    valid_device "$DEVICE" || invalid_setting device 'Use Auto, none or a comma-separated list of device names.'
-    valid_threads "$THREADS" || invalid_setting threads 'CPU threads must be Auto or a positive integer (up to 2147483647).'
-    valid_layers "$GPU_LAYERS" || invalid_setting gpu_layers 'GPU layers must be Auto, all or a nonnegative integer (up to 2147483647).'
-    valid_split_mode "$SPLIT_MODE" || invalid_setting split_mode 'Split mode must be Auto, none, layer, row or tensor.'
-    valid_gpu_list ratios "$TENSOR_SPLIT" || invalid_setting tensor_split 'Use Auto or comma-separated nonnegative proportions, with at least one positive value.'
-    valid_gpu_list margins "$FIT_TARGET" || invalid_setting fit_target 'Use Auto or comma-separated nonnegative MiB integers (up to 2147483647).'
+    valid_context "$CTX_SIZE" || fail 'Use Auto or an integer from 0 to 2147483647 for context (0 requests the full model context).'
+    valid_device "$DEVICE" || fail 'Use Auto, none or a comma-separated list of device names.'
+    valid_threads "$THREADS" || fail 'CPU threads must be Auto or a positive integer (up to 2147483647).'
+    valid_layers "$GPU_LAYERS" || fail 'GPU layers must be Auto, all or a nonnegative integer (up to 2147483647).'
+    valid_split_mode "$SPLIT_MODE" || fail 'Split mode must be Auto, none, layer, row or tensor.'
+    valid_gpu_list ratios "$TENSOR_SPLIT" || fail 'Use Auto or comma-separated nonnegative proportions, with at least one positive value.'
+    valid_gpu_list margins "$FIT_TARGET" || fail 'Use Auto or comma-separated nonnegative MiB integers (up to 2147483647).'
     for key in K V; do
         control="CACHE_TYPE_$key"
-        valid_cache_type "${!control}" || invalid_setting "${control,,}" "MIR_$control must be a lowercase cache type advertised by llama-server (for example q4_0, q8_0 or f16)."
+        valid_cache_type "${!control}" || fail "MIR_$control must be a lowercase cache type advertised by llama-server (for example q4_0, q8_0 or f16)."
     done
     case "$PROMPT_PROCESSING" in
         auto|low-memory|large-batch) ;;
-        *) invalid_setting prompt_processing 'MIR_PROMPT_PROCESSING must be auto, low-memory or large-batch.' ;;
+        *) fail 'MIR_PROMPT_PROCESSING must be auto, low-memory or large-batch.' ;;
     esac
     for key in "${GENERATION_KEYS[@]}"; do
-        valid_generation_value "$key" "${GENERATION[$key]}" || invalid_setting "$key" "Invalid MIR_${key^^}. Use auto or a valid generation value."
+        valid_generation_value "$key" "${GENERATION[$key]}" || fail "Invalid MIR_${key^^}. Use auto or a valid generation value."
     done
-    valid_chat_prompt "$CHAT_SYSTEM_PROMPT_JSON" || invalid_setting chat_system_prompt 'System prompt must be valid text of at most 65536 UTF-8 bytes.'
-    valid_chat_reasoning "$CHAT_REASONING" || invalid_setting chat_reasoning 'Reasoning must use the model default, on or off.'
-    valid_chat_effort "$CHAT_REASONING_EFFORT" || invalid_setting chat_reasoning_effort 'Use a reasoning effort advertised by the loaded chat template or the model default.'
     check_dependencies runtime || exit 1
 }

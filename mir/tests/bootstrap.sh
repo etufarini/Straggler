@@ -35,7 +35,6 @@ with tempfile.TemporaryDirectory(prefix='mir-bootstrap-') as temporary:
         path.write_text(text)
         path.chmod(0o755)
     executable('dpkg-query', '#!/usr/bin/env bash\nprintf "install ok installed"\n')
-    executable('pkexec', '#!/usr/bin/env bash\nprintf "Unexpected privilege request\\n" >&2\nexit 99\n')
     executable('rustc', '#!/usr/bin/env bash\nprintf "rustc 1.96.1\\n"\n')
     executable('node', '#!/usr/bin/env bash\nexit 0\n')
     executable('npm', r'''#!/usr/bin/env bash
@@ -64,6 +63,10 @@ cp "$CARGO_TARGET_DIR/release/mir-desktop" "$CARGO_TARGET_DIR/release/bundle/mac
                XDG_CONFIG_HOME=str(work / 'config'), PATH=str(commands) + ':' + env['PATH'], TEST_WORK=str(work))
     def run(arguments=(), overrides=None):
         return subprocess.run(['bash', str(root / 'mir.sh'), *arguments], cwd='/', env=env | (overrides or {}), capture_output=True, timeout=10)
+    rejected = run(['--desktop', 'inspect'])
+    assert rejected.returncode != 0 and b'private shell bridge has been removed' in rejected.stderr
+    assert not (work / 'npm').exists() and not (work / 'config').exists()
+    print('PASS: removed shell bridge fails explicitly without preparation or settings writes')
     prepared = run(['--prepare-desktop'])
     assert prepared.returncode == 0, prepared.stderr
     cache = work / 'cache/mir.cpp/desktop'
@@ -71,6 +74,11 @@ cp "$CARGO_TARGET_DIR/release/mir-desktop" "$CARGO_TARGET_DIR/release/bundle/mac
     binaries = set(cache.glob(binary_glob))
     assert len(binaries) == 1
     calls = (work / 'npm').read_bytes()
+    started = run()
+    assert started.returncode == 0 and b'Desktop started' in started.stdout, started.stderr
+    assert (work / 'npm').read_bytes() == calls
+    with (root / 'sh/uninstall.sh').open('a') as source:
+        source.write('\n# Unrelated installer change\n')
     started = run()
     assert started.returncode == 0 and b'Desktop started' in started.stdout, started.stderr
     assert (work / 'npm').read_bytes() == calls

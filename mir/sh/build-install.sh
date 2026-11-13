@@ -29,13 +29,13 @@ emit_installer() {
         if [[ "$line" == '    source "$MIR_ROOT/lib/platform/$1.sh" || return 1' ]]; then
             # shellcheck disable=SC2016
             printf '    case "$1" in\n        linux)\n'
-            emit_functions "$ROOT/lib/platform/linux.sh" 'platform_required_tools platform_browser_command platform_move platform_dependency_hint platform_ensure_dependencies debian_package_manager install_dependency_packages'
+            emit_functions "$ROOT/lib/platform/linux.sh" 'platform_required_tools platform_move platform_dependency_hint platform_ensure_dependencies debian_package_manager install_dependency_packages'
             printf '            ;;\n        macos)\n'
-            emit_functions "$ROOT/lib/platform/macos.sh" 'platform_required_tools platform_browser_command platform_move platform_dependency_hint platform_ensure_dependencies'
+            emit_functions "$ROOT/lib/platform/macos.sh" 'platform_required_tools platform_move platform_dependency_hint platform_ensure_dependencies'
             printf '            ;;\n    esac\n'
         else printf '%s\n' "$line"; fi
-    done < <(sed '1d; /^# Shared helpers used/,$d' "$ROOT/lib/platform.sh")
-    printf 'runtime_files() {\n    printf '\''%%s\\n'\'' mir.sh sh/uninstall.sh lib/gguf.py lib/desktop.py desktop/runtime-files.txt'
+    done < <(sed '1d; /^fail() /d; /^# Shared helpers used/,$d' "$ROOT/lib/platform.sh")
+    printf 'runtime_files() {\n    printf '\''%%s\\n'\'' mir.sh sh/uninstall.sh lib/desktop.py desktop/runtime-files.txt'
     for file in "$ROOT"/lib/*.sh; do
         printf ' %q' "${file#"$ROOT"/}"
     done

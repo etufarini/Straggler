@@ -44,8 +44,10 @@ MIR_ROOT=$1
 configure_runtime
 [[ "$PLATFORM_ID" == linux && "$RUNTIME_BASH" == "$BASH" ]]
 load_platform "$PLATFORM_ID"
-source "$1/lib/launcher.sh"
-load_launcher_modules
+source "$1/lib/config.sh"
+source "$1/lib/paths.sh"
+source "$1/lib/processes.sh"
+source "$1/lib/server.sh"
 platform_required_tools
 [[ ${REQUIRED_TOOLS[*]} == 'curl ss' ]]
 load_platform linux

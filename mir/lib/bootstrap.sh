@@ -96,8 +96,6 @@ prepare_desktop() {
     trap 'interrupted=130' INT
     trap 'interrupted=143' TERM HUP
     mkdir -p "$stage/desktop/src-tauri" || exit 1
-    cp -- "$MIR_ROOT/mir.sh" "$stage/" || exit 1
-    cp -a -- "$MIR_ROOT/lib" "$MIR_ROOT/sh" "$stage/" || exit 1
     cp -- "$MIR_ROOT/desktop/"{package.json,package-lock.json,index.html,tsconfig.json,vite.config.ts} "$stage/desktop/" || exit 1
     cp -a -- "$MIR_ROOT/desktop/src" "$stage/desktop/" || exit 1
     mkdir -p -- "$stage/desktop/packaging" || exit 1

@@ -182,7 +182,7 @@ export function createFixture(scenario: Scenario) {
         return configuration();
       case 'apply_settings': {
         const next = args.settings as Settings;
-        // This is a fixture response; numeric validation belongs to the real bridge tests.
+        // This is a fixture response; numeric validation belongs to the native configuration tests.
         if (next.threads === '0')
           throw { field: 'threads', message: 'CPU threads must be positive.' };
         settings = structuredClone(next);

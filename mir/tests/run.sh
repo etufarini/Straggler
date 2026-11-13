@@ -52,13 +52,9 @@ if [[ "$suite" == common || "$suite" == all ]]; then
     fi
     for file in "${source_scripts[@]}" "${test_scripts[@]}"; do "$BASH" -n "$file"; done
     run config.sh
-    run profiles.sh
     run storage.sh
-    run models.sh
-    run processes.sh
     run regression.sh
     run portability.sh
-    run memory.sh
     run bootstrap.sh
     finish_lint
 fi
@@ -73,15 +69,12 @@ fi
 if [[ "$suite" == linux || "$suite" == all ]]; then
     lint_adapter linux
     run platform/linux.sh
-    run build.sh
     run installation.sh Linux
     run native/linux.sh
 fi
 if [[ "$suite" == macos || "$suite" == all ]]; then
     lint_adapter macos
     run platform/macos.sh
-    run platform/macos-build.sh
-    run build.sh macos
     run installation.sh Darwin
     run native/macos.sh
 fi
