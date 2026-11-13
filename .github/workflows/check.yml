@@ -45,6 +45,8 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/straggler-playwright
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,6 +74,11 @@ jobs:
       - name: Browser system dependencies
         working-directory: straggler/desktop
         run: npx playwright install-deps chromium webkit
+      - name: Cache test browsers
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('straggler/desktop/package-lock.json') }}
       - name: Download test browsers
         working-directory: straggler/desktop
         shell: bash
