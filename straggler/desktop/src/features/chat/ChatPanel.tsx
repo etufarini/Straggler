@@ -88,12 +88,20 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
       >
         {chat.messages.length === 0 ? (
           <div className="welcome">
-            <h1>What’s on your mind?</h1>
-            <p>
-              A conversation, a fresh perspective, a place to think.
-              <br />
-              Powered by a model running right here.
-            </p>
+            <h1>{controller.temporary ? 'Temporary chat' : 'What’s on your mind?'}</h1>
+            {controller.temporary ? (
+              <p>
+                Messages, attachments and drafts stay in memory.
+                <br />
+                Save this chat to keep it. Leaving erases it.
+              </p>
+            ) : (
+              <p>
+                A conversation, a fresh perspective, a place to think.
+                <br />
+                Powered by a model running right here.
+              </p>
+            )}
             <div className="suggestions">
               {[
                 [

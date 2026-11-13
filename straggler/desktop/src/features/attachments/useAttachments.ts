@@ -7,6 +7,7 @@ import {
   removeAttachment,
   watchAttachmentDrop,
   isTauri,
+  invoke,
 } from '../../services/desktop';
 import type { DragDropEvent, TokenEstimate } from '../../services/desktop';
 import {
@@ -80,8 +81,16 @@ export function useAttachments(
         for (const [index, path] of paths.entries()) {
           const row = rows[index];
           try {
-            const value = await addAttachment(id, path);
-            current.current.acceptStoredConversation(value);
+            if (current.current.temporaryRef.current === id) {
+              const attachment = await invoke<Attachment>('temporary_attachment_add', { id, path });
+              current.current.updateChat({
+                ...current.current.chatRef.current,
+                attachments: [...(current.current.chatRef.current.attachments ?? []), attachment],
+              });
+            } else {
+              const value = await addAttachment(id, path);
+              current.current.acceptStoredConversation(value);
+            }
             updatePending(id, (values) => values.filter((item) => item.id !== row.id));
           } catch (failure) {
             updatePending(id, (values) =>
@@ -121,8 +130,21 @@ export function useAttachments(
     try {
       setError('');
       await conversation.runConversationMutation(async () => {
-        const value = await removeAttachment(conversation.chat.id, row.id);
-        conversation.acceptStoredConversation(value);
+        if (conversation.temporaryRef.current === conversation.chat.id) {
+          await invoke('temporary_attachment_remove', {
+            id: conversation.chat.id,
+            attachmentId: row.id,
+          });
+          conversation.updateChat({
+            ...conversation.chatRef.current,
+            attachments: conversation.chatRef.current.attachments?.filter(
+              (attachment) => attachment.id !== row.id,
+            ),
+          });
+        } else {
+          const value = await removeAttachment(conversation.chat.id, row.id);
+          conversation.acceptStoredConversation(value);
+        }
       });
     } catch (failure) {
       setError(errorDetail(failure).message);
@@ -131,6 +153,8 @@ export function useAttachments(
   async function downloadFile(attachment: Attachment) {
     try {
       setError('');
+      if (conversation.temporaryRef.current)
+        throw new Error('Save this chat before downloading its attachments.');
       if (await downloadAttachment(conversation.chat.id, attachment))
         setNotice('Attachment downloaded.');
     } catch (failure) {
@@ -189,6 +213,7 @@ export function useAttachments(
     };
   const tokens = stored.reduce((total, attachment) => total + estimate(attachment).tokens, 0);
   return {
+    temporary: !!conversation.temporaryId,
     generating: conversation.generating,
     rows,
     dragged,

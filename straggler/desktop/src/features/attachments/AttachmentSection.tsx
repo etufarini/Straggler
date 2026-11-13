@@ -30,8 +30,12 @@ export default function AttachmentSection({ controller }: { controller: Attachme
                     type="button"
                     className="file-action"
                     aria-label={`Download ${row.name}`}
-                    title={`Download ${row.name}`}
-                    disabled={row.state === 'reading'}
+                    title={
+                      controller.temporary
+                        ? 'Save this chat before downloading its attachments.'
+                        : `Download ${row.name}`
+                    }
+                    disabled={row.state === 'reading' || controller.temporary}
                     onClick={() => row.attachment && void controller.downloadFile(row.attachment)}
                   >
                     <Download size={14} />

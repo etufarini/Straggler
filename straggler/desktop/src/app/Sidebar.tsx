@@ -42,7 +42,11 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         projectUpdatedAt(right, conversations) - projectUpdatedAt(left, conversations),
     );
   const conversationNavigationDisabled =
-    chatOptionsDisabled || (!!storageError && chat.messages.length > 0);
+    controller.busy ||
+    editingBusy ||
+    controller.importBusy ||
+    (!controller.temporary &&
+      (chatOptionsDisabled || (!!storageError && chat.messages.length > 0)));
 
   async function removeFromProject(value: Conversation) {
     try {

@@ -13,6 +13,7 @@ pub mod preferences;
 pub mod projects;
 mod server;
 pub mod stream;
+pub mod temporary;
 pub mod tokens;
 pub mod workspace;
 pub use workspace::{Configuration, Listener, Settings};
@@ -56,6 +57,7 @@ struct Server {
     logs: VecDeque<String>,
     error: Option<String>,
     diagnostics: diagnostics::Diagnostics,
+    temporary: bool,
 }
 
 pub struct Runtime {
@@ -68,6 +70,7 @@ pub struct Runtime {
     pub projects: projects::Projects,
     pub preferences: preferences::Preferences,
     workspace: Mutex<workspace::Workspace>,
+    temporary: Mutex<Option<temporary::TemporaryChat>>,
     _instance: File,
 }
 
@@ -84,6 +87,8 @@ pub struct ChatRequest {
     pub request_id: Uuid,
     #[serde(default)]
     pub conversation_id: Option<Uuid>,
+    #[serde(default)]
+    pub temporary_id: Option<Uuid>,
     pub messages: Vec<ChatMessage>,
     #[serde(default)]
     pub options: ChatOptions,
@@ -134,6 +139,7 @@ impl Runtime {
             preferences: preferences::Preferences::new(data.clone()),
             _instance: instance,
             workspace: Mutex::new(workspace::Workspace::default()),
+            temporary: Mutex::new(None),
             server: Arc::new(Mutex::new(Server {
                 child: None,
                 settings: None,
@@ -144,6 +150,7 @@ impl Runtime {
                 logs: VecDeque::new(),
                 error: None,
                 diagnostics: diagnostics::Diagnostics::default(),
+                temporary: false,
             })),
             active: Mutex::new(Generation::default()),
             model_details: Mutex::new(None),

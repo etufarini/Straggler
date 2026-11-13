@@ -17,7 +17,11 @@ impl Runtime {
         let mut settings = config.settings;
         settings.model = model.clone();
         let settings = settings.validated()?;
-        let (executable, arguments) = self.native.launch(&paths, &settings)?;
+        let (executable, mut arguments) = self.native.launch(&paths, &settings)?;
+        let temporary = self.temporary.lock().map_err(|e| e.to_string())?.is_some();
+        if temporary {
+            arguments.extend(self.native.temporary_arguments()?);
+        }
         let mut state = self.server.lock().map_err(|e| e.to_string())?;
         refresh_child(&mut state)?;
         if state.child.is_some() || state.phase == "stopping" {
@@ -42,6 +46,7 @@ impl Runtime {
         let stdout = child.stdout.take().ok_or("Server output is unavailable.")?;
         let stderr = child.stderr.take().ok_or("Server log is unavailable.")?;
         let url = format!("http://127.0.0.1:{}", settings.port);
+        let resume_model = model.clone();
         *state = Server {
             child: Some(child),
             settings: Some(settings),
@@ -52,7 +57,14 @@ impl Runtime {
             logs: VecDeque::new(),
             error: None,
             diagnostics: crate::diagnostics::Diagnostics::default(),
+            temporary,
         };
+        drop(state);
+        if let Some(chat) = self.temporary.lock().map_err(|e| e.to_string())?.as_mut() {
+            chat.slot = None;
+            chat.ending = false;
+            chat.resume_model = Some(resume_model);
+        }
         read_log(self.server.clone(), run, stdout);
         read_log(self.server.clone(), run, stderr);
         Ok(())
@@ -189,6 +201,10 @@ fn read_log(server: Arc<Mutex<Server>>, run: Uuid, pipe: impl std::io::Read + Se
             };
             if state.run != run {
                 break;
+            }
+            if state.temporary {
+                // An external backend may ignore log flags. Never retain its raw private output.
+                continue;
             }
             if state.logs.len() == 300 {
                 state.logs.pop_front();

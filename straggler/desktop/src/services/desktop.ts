@@ -46,6 +46,10 @@ export type DesktopCommand =
   | 'stop_server'
   | 'generate'
   | 'cancel_generation'
+  | 'temporary_begin'
+  | 'temporary_finish'
+  | 'temporary_attachment_add'
+  | 'temporary_attachment_remove'
   | 'tokenize_text'
   | 'prompt_tokens'
   | 'attachment_add'
@@ -93,8 +97,11 @@ export class Channel<T> {
 export function getCurrentWindow() {
   if (!fixture) return nativeWindow();
   return {
-    onCloseRequested:
-      async (_callback: (event: { preventDefault: () => void }) => void) => () => {},
+    onCloseRequested: async (callback: (event: { preventDefault: () => void }) => void) => {
+      const close = () => callback({ preventDefault: () => {} });
+      window.addEventListener('straggler-fixture-close', close);
+      return () => window.removeEventListener('straggler-fixture-close', close);
+    },
     destroy: async () => {},
   };
 }

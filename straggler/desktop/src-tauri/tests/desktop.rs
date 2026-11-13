@@ -157,6 +157,7 @@ impl Fixture {
 
 fn request(id: Uuid, content: &str) -> ChatRequest {
     ChatRequest {
+        temporary_id: None,
         conversation_id: None,
         options: Default::default(),
         request_id: id,
@@ -165,6 +166,149 @@ fn request(id: Uuid, content: &str) -> ChatRequest {
             content: content.into(),
         }],
     }
+}
+
+fn stored_files(root: &std::path::Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
+    let mut files = std::collections::BTreeMap::new();
+    let mut pending = vec![root.to_owned()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                files.insert(
+                    path.strip_prefix(root).unwrap().to_owned(),
+                    fs::read(path).unwrap(),
+                );
+            }
+        }
+    }
+    files
+}
+
+#[tokio::test]
+async fn temporary_requests_disable_ram_cache_erase_the_advertised_slot_and_never_store_chat_data()
+{
+    for erase_fails in [false, true] {
+        let mut fixture = Fixture::new();
+        fixture
+            .environment
+            .variables
+            .insert("TEST_EMIT_PROMPT_LOG".into(), "1".into());
+        if erase_fails {
+            fixture
+                .environment
+                .variables
+                .insert("TEST_ERASE_FAIL".into(), "1".into());
+        }
+        let runtime = fixture.runtime();
+        fixture.ready(&runtime).await;
+        let before = stored_files(&fixture.data);
+        let id = Uuid::new_v4();
+        runtime.begin_temporary(id).unwrap();
+        wait_phase(&runtime, "ready").await;
+        let launch: serde_json::Value = serde_json::from_slice(
+            &fs::read(fixture._directory.path().join("launch.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(launch["cache_ram"], "0");
+        assert_eq!(launch["slots"], true);
+        assert_eq!(launch["log_disable"], true);
+        assert!(runtime.ensure_persistent(id).is_err());
+        let mut temporary = request(Uuid::new_v4(), "private test prompt");
+        temporary.temporary_id = Some(id);
+        runtime.generate(temporary, |_| Ok(())).await.unwrap();
+        let recorded: serde_json::Value =
+            serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
+        assert_eq!(recorded["cache_prompt"], false);
+        assert_eq!(recorded["id_slot"], 7);
+        assert!(runtime.status().await.unwrap().logs.is_empty());
+        assert_eq!(stored_files(&fixture.data), before);
+        let erased = runtime.erase_temporary_slot(id).await;
+        assert_eq!(erased.is_err(), erase_fails);
+        runtime.finish_temporary(id, None, true).unwrap();
+        wait_phase(&runtime, "ready").await;
+        assert!(fixture.record.with_extension("json.erase").exists());
+        assert!(runtime.history.list().unwrap().is_empty());
+        assert_eq!(stored_files(&fixture.data), before);
+        let launch: serde_json::Value = serde_json::from_slice(
+            &fs::read(fixture._directory.path().join("launch.json")).unwrap(),
+        )
+        .unwrap();
+        assert!(launch["cache_ram"].is_null());
+        assert_eq!(launch["slots"], false);
+        runtime.stop().unwrap();
+    }
+}
+
+#[tokio::test]
+async fn saving_temporary_attachments_is_explicit_and_storage_failure_preserves_memory_for_retry() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    runtime.inspect().unwrap();
+    let before = stored_files(&fixture.data);
+    let id = Uuid::new_v4();
+    runtime.begin_temporary(id).unwrap();
+    let original = fixture._directory.path().join("private.txt");
+    fs::write(&original, "temporary original bytes").unwrap();
+    let attachment = runtime.temporary_attachment(id, &original).unwrap();
+    assert_eq!(stored_files(&fixture.data), before);
+    let chat: straggler_desktop::history::Conversation =
+        serde_json::from_value(serde_json::json!({
+            "id": id, "title": "Saved temporary chat", "createdAt": 1, "updatedAt": 1,
+            "model": null, "messages": [], "attachments": [attachment]
+        }))
+        .unwrap();
+    let directory = fixture.data.join("conversations");
+    let backup = fixture.data.join("kept-conversations");
+    fs::rename(&directory, &backup).unwrap();
+    fs::write(&directory, "storage unavailable").unwrap();
+    runtime.erase_temporary_slot(id).await.unwrap();
+    assert!(runtime
+        .finish_temporary(id, Some(chat.clone()), false)
+        .is_err());
+    assert!(runtime.ensure_persistent(id).is_err());
+    fs::remove_file(&directory).unwrap();
+    fs::rename(&backup, &directory).unwrap();
+    runtime.finish_temporary(id, Some(chat), false).unwrap();
+    runtime.ensure_persistent(id).unwrap();
+    let saved = runtime.history.list().unwrap();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(saved[0].attachments[0].text, "temporary original bytes");
+    let destination = fixture._directory.path().join("saved-original.txt");
+    runtime
+        .history
+        .download_attachment(id, attachment.id, &destination)
+        .unwrap();
+    assert_eq!(fs::read(destination).unwrap(), b"temporary original bytes");
+}
+
+#[tokio::test]
+async fn unsupported_temporary_mode_and_invalid_session_cleanup_leave_the_normal_server_running() {
+    let fixture = Fixture::new();
+    let server = fixture
+        ._directory
+        .path()
+        .join("llama.cpp/build/bin/llama-server");
+    let source = fs::read_to_string(&server)
+        .unwrap()
+        .replace("--cache-ram N", "unsupported option");
+    fs::write(server, source).unwrap();
+    let runtime = fixture.runtime();
+    fixture.ready(&runtime).await;
+    let before = runtime.status().await.unwrap().run_id;
+    assert!(runtime
+        .begin_temporary(Uuid::new_v4())
+        .unwrap_err()
+        .contains("--cache-ram"));
+    assert!(runtime
+        .finish_temporary(Uuid::new_v4(), None, true)
+        .is_err());
+    let after = runtime.status().await.unwrap();
+    assert_eq!(after.run_id, before);
+    assert_eq!(after.phase, "ready");
+    runtime.stop().unwrap();
 }
 
 #[tokio::test]

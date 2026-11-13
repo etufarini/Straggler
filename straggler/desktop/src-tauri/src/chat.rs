@@ -22,6 +22,7 @@ impl Runtime {
         request: ChatRequest,
         mut emit: impl FnMut(stream::Delta) -> Result<()>,
     ) -> Result<String> {
+        self.validate_temporary_request(request.temporary_id, request.conversation_id)?;
         if request.messages.is_empty()
             || request
                 .messages
@@ -60,6 +61,9 @@ impl Runtime {
             }
             if state.phase != "ready" {
                 return Err("Wait until the local model is Ready.".into());
+            }
+            if request.temporary_id.is_some() && !state.temporary {
+                return Err("Restart the backend in temporary mode before sending.".into());
             }
             let url = state
                 .url
@@ -104,6 +108,11 @@ impl Runtime {
             "stream_options": {"include_usage": true},
             "timings_per_token": true,
         });
+        if let Some(id) = request.temporary_id {
+            let run = self.server.lock().map_err(|e| e.to_string())?.run;
+            body["id_slot"] = json!(self.temporary_slot(id, url, run).await?);
+            body["cache_prompt"] = json!(false);
+        }
         let reasoning = request.options.reasoning.as_deref().unwrap_or("auto");
         let effort = request.options.effort.as_deref().unwrap_or("auto");
         if !matches!(reasoning, "auto" | "on" | "off") {
@@ -144,6 +153,9 @@ impl Runtime {
             .map_err(|e| format!("Cannot contact the local model: {e}"))?;
         if !response.status().is_success() {
             let status = response.status();
+            if request.temporary_id.is_some() {
+                return Err(format!("Temporary model request failed ({status}). The backend did not accept the request."));
+            }
             let mut bytes = response.bytes_stream();
             let mut body = Vec::new();
             while let Some(chunk) = bytes.next().await {

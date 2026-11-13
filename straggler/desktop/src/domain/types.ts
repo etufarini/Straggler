@@ -43,6 +43,7 @@ export interface Confirmation {
   action: () => Promise<void>;
   actionLabel: string;
   destructive?: boolean;
+  alternative?: { label: string; action: () => Promise<void> };
 }
 export interface Configuration {
   llamaDir: string;

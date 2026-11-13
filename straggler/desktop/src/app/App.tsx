@@ -1,6 +1,6 @@
 import PresencePanel from '../features/presence/PresencePanel';
 import { assistantState } from '../domain/presence';
-import { Cpu, ChevronDown, Square, Terminal } from 'lucide-react';
+import { Cpu, ChevronDown, Square, Terminal, Eclipse } from 'lucide-react';
 import { fileName, equalSettings, sameServerConfiguration } from '../domain/types';
 import { statusLabel } from '../components/statusLabels';
 import { isFixture } from '../services/desktop';
@@ -74,7 +74,7 @@ export default function App() {
       </span>
 
       <main
-        className={`workspace ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
+        className={`workspace${controller.temporary ? ' is-temporary' : ''} ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
       >
         <header className="topbar">
           <button
@@ -98,6 +98,36 @@ export default function App() {
             <ChevronDown size={15} />
           </button>
           <div className="header-controls">
+            {controller.view === 'chat' &&
+              panel !== 'settings' &&
+              (controller.temporary ? (
+                <>
+                  <span className="temp-status">
+                    <Eclipse aria-hidden="true" />
+                    Temporary · not saved
+                  </span>
+                  <button
+                    disabled={busy || controller.chatOptionsDisabled}
+                    onClick={() => void controller.saveTemporary()}
+                  >
+                    Save chat
+                  </button>
+                </>
+              ) : !controller.chat.messages.length &&
+                !controller.chat.attachments?.length &&
+                !controller.chat.projectId ? (
+                <button
+                  className="temp-toggle"
+                  title="Open temporary chat (Ctrl/⌘ + Shift + N)"
+                  aria-label="Temporary"
+                  aria-pressed="false"
+                  disabled={!native || busy || controller.chatOptionsDisabled}
+                  onClick={() => void controller.beginTemporary()}
+                >
+                  <Eclipse aria-hidden="true" />
+                  Temporary
+                </button>
+              ) : null)}
             <button
               className="local-badge"
               aria-label={`Server log · ${statusLabel[server.phase]}${restartRequired ? ' · Restart required' : ''}`}

@@ -661,6 +661,66 @@ try {
       () => evaluate('!document.querySelector(".workspace-feedback")'),
       'fresh server without stale failure',
     );
+    const historyBeforeTemporary = (await readdir(history)).sort();
+    const originalConversation = await readFile(conversationFile, 'utf8');
+    await evaluate(
+      'document.dispatchEvent(new KeyboardEvent("keydown", {key:"N", ctrlKey:true, shiftKey:true, bubbles:true}))',
+    );
+    await until(
+      () => evaluate('!!document.querySelector(".workspace.is-temporary .temp-status")'),
+      'native temporary chat',
+    );
+    await until(
+      () => evaluate('document.querySelector(".local-badge")?.textContent === "Ready"'),
+      'temporary server with RAM cache disabled',
+    );
+    await sendMessage('hello');
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".assistant .markdown")?.textContent === "caffè ☕" && !document.querySelector(".send-button.stop")',
+        ),
+      'temporary response kept in memory',
+    );
+    assert.deepEqual((await readdir(history)).sort(), historyBeforeTemporary);
+    assert.equal(await readFile(conversationFile, 'utf8'), originalConversation);
+    await writeFile(
+      path.join(desktop, 'test-results/native-temporary.png'),
+      Buffer.from(await screenshot(), 'base64'),
+    );
+    await evaluate(
+      'window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {event:"tauri://close-requested", payload:null})',
+    );
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".confirmation h2")?.textContent === "Quit and erase this temporary chat?"',
+        ),
+      'native temporary window-close confirmation',
+    );
+    await evaluate(
+      'Array.from(document.querySelectorAll(".confirmation button")).find(button => button.textContent === "Cancel").click()',
+    );
+    assert.equal(app.exitCode, null);
+    assert.equal(await evaluate('!!document.querySelector(".temp-status")'), true);
+    await clickControl('button-new-chat');
+    await until(
+      () => evaluate('!!document.querySelector(".confirmation .danger-button")'),
+      'temporary erase confirmation',
+    );
+    await evaluate('document.querySelector(".confirmation .danger-button").click()');
+    await until(
+      () =>
+        evaluate(
+          '!document.querySelector(".temp-status") && !document.querySelector(".confirmation") && document.querySelector(".local-badge")?.textContent === "Ready"',
+        ),
+      'temporary slot erased and normal server restored',
+    );
+    assert.equal(await readFile(path.join(stage, 'request.json.erase'), 'utf8'), 'slot 7 erased');
+    assert.deepEqual((await readdir(history)).sort(), historyBeforeTemporary);
+    await evaluate(
+      `Array.from(document.querySelectorAll('.conversation-row > button')).find(button => button.title === ${JSON.stringify(JSON.parse(originalConversation).title)}).click()`,
+    );
     await sendMessage('wait');
     await until(
       () =>

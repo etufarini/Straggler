@@ -9,6 +9,7 @@ import type {
   ServerStatus,
   UiPreferences,
   ServerDetails,
+  Attachment,
 } from '../domain/types';
 import { emptyServer } from '../domain/types';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
@@ -85,6 +86,7 @@ export function createFixture(scenario: Scenario) {
   let occupied = scenario === 'occupied';
   let memoryFailureSeen = false;
   let generatingConversation: string | null = null;
+  let temporary: { id: string; attachments: Map<string, Attachment> } | null = null;
   const projectFixture = createProjectFixture(
     `straggler-fixture-projects-${scenario}`,
     history,
@@ -172,6 +174,26 @@ export function createFixture(scenario: Scenario) {
 
   function persistHistory() {
     localStorage.setItem(historyKey, JSON.stringify(history));
+  }
+
+  async function readAttachment(path: string): Promise<Attachment> {
+    while (localStorage.getItem('straggler-fixture-reading-paused'))
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    const name = path.split('/').at(-1)!;
+    const suffix = name.split('.').at(-1)!.toLowerCase();
+    if (suffix === 'ppt')
+      throw new Error(
+        'PowerPoint 97–2003 (.ppt) is not supported. Save it as .pptx and add it again.',
+      );
+    const extension = attachmentTypes.find((type) => type === suffix);
+    if (!extension) throw new Error('This file type is not supported.');
+    return {
+      id: crypto.randomUUID(),
+      name,
+      extension,
+      size: 1234,
+      text: `Extracted fixture text from ${name}.`,
+    };
   }
 
   async function invoke(command: string, args: Record<string, unknown> = {}): Promise<unknown> {
@@ -308,22 +330,11 @@ export function createFixture(scenario: Scenario) {
         };
       }
       case 'attachment_add': {
-        while (localStorage.getItem('straggler-fixture-reading-paused'))
-          await new Promise((resolve) => setTimeout(resolve, 20));
         const conversation = structuredClone(history.find((item) => item.id === args.id));
         if (!conversation) throw new Error('Conversation does not exist');
-        const name = String(args.path).split('/').at(-1)!;
-        const suffix = name.split('.').at(-1)!.toLowerCase();
-        if (suffix === 'ppt')
-          throw new Error(
-            'PowerPoint 97–2003 (.ppt) is not supported. Save it as .pptx and add it again.',
-          );
-        const extension = attachmentTypes.find((type) => type === suffix);
-        if (!extension) throw new Error('This file type is not supported.');
-        const text = `Extracted fixture text from ${name}.`;
         conversation.attachments = [
           ...(conversation.attachments || []),
-          { id: crypto.randomUUID(), name, extension, size: 1234, text },
+          await readAttachment(String(args.path)),
         ];
         conversation.updatedAt = Date.now();
         history[history.findIndex((item) => item.id === args.id)] = conversation;
@@ -376,6 +387,8 @@ export function createFixture(scenario: Scenario) {
         return structuredClone(history);
       case 'history_create':
       case 'history_save': {
+        if ((args.conversation as Conversation).id === temporary?.id)
+          throw new Error('Temporary chats can only be stored with Save chat.');
         if (localStorage.getItem('straggler-fixture-fail-next-save') === 'true') {
           localStorage.removeItem('straggler-fixture-fail-next-save');
           throw new Error('Disk is full');
@@ -408,9 +421,48 @@ export function createFixture(scenario: Scenario) {
         );
         persistHistory();
         return;
+      case 'temporary_begin':
+        if (temporary) throw new Error('Leave the current temporary chat first.');
+        temporary = { id: String(args.id), attachments: new Map() };
+        return;
+      case 'temporary_attachment_add': {
+        if (!temporary || temporary.id !== args.id) throw new Error('Temporary chat unavailable.');
+        const attachment = await readAttachment(String(args.path));
+        temporary.attachments.set(attachment.id, attachment);
+        return attachment;
+      }
+      case 'temporary_attachment_remove':
+        if (!temporary || temporary.id !== args.id) throw new Error('Temporary chat unavailable.');
+        temporary.attachments.delete(String(args.attachmentId));
+        return;
+      case 'temporary_finish': {
+        if (!temporary || temporary.id !== args.id) throw new Error('Temporary chat unavailable.');
+        if (args.conversation) {
+          if (localStorage.getItem('straggler-fixture-fail-next-save') === 'true') {
+            localStorage.removeItem('straggler-fixture-fail-next-save');
+            throw new Error('Disk is full');
+          }
+          const conversation = structuredClone(args.conversation as Conversation);
+          if (
+            conversation.id !== temporary.id ||
+            history.some((value) => value.id === conversation.id)
+          )
+            throw new Error('Conversation already exists');
+          history.push(conversation);
+          persistHistory();
+        }
+        temporary = null;
+        return null;
+      }
       case 'generate': {
-        localStorage.setItem('straggler-fixture-request', JSON.stringify(args.request));
-        const request = args.request as { conversationId?: string };
+        const request = args.request as { conversationId?: string; temporaryId?: string };
+        if (request.temporaryId) {
+          if (temporary?.id !== request.temporaryId || request.conversationId)
+            throw new Error('Invalid temporary request');
+        } else {
+          if (temporary) throw new Error('Temporary mode needs its session identifier');
+          localStorage.setItem('straggler-fixture-request', JSON.stringify(args.request));
+        }
         if (request.conversationId) {
           const current = history.find((value) => value.id === request.conversationId);
           if (current?.projectId && projectFixture.find(current.projectId).archived)

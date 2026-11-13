@@ -144,6 +144,56 @@ impl History {
         self.write(conversation, true)
     }
 
+    pub fn create_with_originals(
+        &self,
+        conversation: &Conversation,
+        originals: &std::collections::BTreeMap<Uuid, attachments::ExtractedFile>,
+    ) -> Result<()> {
+        validate(conversation)?;
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
+        self.ensure_writable(conversation)?;
+        let destination = self.directory.join(conversation.id.to_string());
+        if destination.exists()
+            || self
+                .directory
+                .join(format!("{}.json", conversation.id))
+                .exists()
+        {
+            return Err("A conversation with this identifier already exists.".into());
+        }
+        let stage = tempfile::tempdir_in(&self.directory).map_err(|e| e.to_string())?;
+        let files = stage.path().join("attachments");
+        fs::create_dir(&files).map_err(|e| e.to_string())?;
+        for attachment in &conversation.attachments {
+            let original = originals
+                .get(&attachment.id)
+                .ok_or("The original temporary attachment is unavailable.")?;
+            if serde_json::to_value(&original.attachment).map_err(|e| e.to_string())?
+                != serde_json::to_value(attachment).map_err(|e| e.to_string())?
+            {
+                return Err("The temporary attachment no longer matches its original.".into());
+            }
+            crate::files::write_atomic(
+                &files.join(format!("{}.{}", attachment.id, attachment.extension)),
+                &original.original,
+            )?;
+        }
+        if !conversation.attachments.is_empty() {
+            crate::platform::rename_directory_exclusive(stage.path(), &destination)
+                .map_err(|e| e.to_string())?;
+        }
+        if let Err(error) = self.write(conversation, true) {
+            if destination.exists() {
+                fs::remove_dir_all(&destination).map_err(|cleanup| {
+                    format!("{error}. Cannot remove staged attachments: {cleanup}")
+                })?;
+            }
+            return Err(error);
+        }
+        Ok(())
+    }
+
     pub(crate) fn write(&self, conversation: &Conversation, create: bool) -> Result<()> {
         let mut file = tempfile::NamedTempFile::new_in(&self.directory)
             .map_err(|e| format!("Cannot create a conversation file: {e}"))?;

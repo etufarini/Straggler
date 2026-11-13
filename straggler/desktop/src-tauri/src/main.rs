@@ -124,6 +124,55 @@ async fn stop_server(state: State<'_, Application>) -> Result<()> {
 }
 
 #[tauri::command]
+async fn temporary_begin(id: Uuid, state: State<'_, Application>) -> Result<()> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.begin_temporary(id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn temporary_finish(
+    id: Uuid,
+    conversation: Option<Conversation>,
+    restart: bool,
+    state: State<'_, Application>,
+) -> Result<Option<String>> {
+    let runtime = runtime(&state)?;
+    let erase_failed = runtime.erase_temporary_slot(id).await.is_err();
+    let warning = tauri::async_runtime::spawn_blocking(move || {
+        runtime.finish_temporary(id, conversation, restart)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(warning.or_else(|| {
+        erase_failed
+            .then(|| "The temporary backend was stopped to clear its slot and RAM caches.".into())
+    }))
+}
+
+#[tauri::command]
+async fn temporary_attachment_add(
+    id: Uuid,
+    path: PathBuf,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::attachments::Attachment> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.temporary_attachment(id, &path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn temporary_attachment_remove(
+    id: Uuid,
+    attachment_id: Uuid,
+    state: State<'_, Application>,
+) -> Result<()> {
+    runtime(&state)?.remove_temporary_attachment(id, attachment_id)
+}
+
+#[tauri::command]
 async fn server_status(state: State<'_, Application>) -> Result<Status> {
     runtime(&state)?.status().await
 }
@@ -195,6 +244,7 @@ async fn history_list(state: State<'_, Application>) -> Result<Vec<Conversation>
 #[tauri::command]
 async fn history_save(conversation: Conversation, state: State<'_, Application>) -> Result<()> {
     let runtime = runtime(&state)?;
+    runtime.ensure_persistent(conversation.id)?;
     tauri::async_runtime::spawn_blocking(move || runtime.history.save(&conversation))
         .await
         .map_err(|e| e.to_string())?
@@ -270,6 +320,7 @@ async fn read_conversation_import(
 #[tauri::command]
 async fn history_create(conversation: Conversation, state: State<'_, Application>) -> Result<()> {
     let runtime = runtime(&state)?;
+    runtime.ensure_persistent(conversation.id)?;
     tauri::async_runtime::spawn_blocking(move || runtime.history.create(&conversation))
         .await
         .map_err(|e| e.to_string())?
@@ -489,6 +540,10 @@ fn main() {
             server_details,
             generate,
             cancel_generation,
+            temporary_begin,
+            temporary_finish,
+            temporary_attachment_add,
+            temporary_attachment_remove,
             write_export,
             history_list,
             history_save,

@@ -295,6 +295,22 @@ impl NativeConfiguration {
         Ok((server, args))
     }
 
+    pub fn temporary_arguments(&self) -> Result<Vec<String>> {
+        let discovery = self.discovery.lock().map_err(|error| error.to_string())?;
+        for flag in ["--slots", "--cache-ram", "--log-disable"] {
+            if !capabilities::supports(&discovery.help, flag) {
+                return Err(format!("Temporary chat requires a backend advertising {flag}. Select a supported build in Settings."));
+            }
+        }
+        // cache_prompt:false alone cannot prevent the pinned server's idle-slot RAM cache.
+        Ok(vec![
+            "--slots".into(),
+            "--cache-ram".into(),
+            "0".into(),
+            "--log-disable".into(),
+        ])
+    }
+
     pub fn browse(&self, location: &str, hidden: bool) -> Result<Value> {
         let home = &self.store.environment.home;
         let location = match location {

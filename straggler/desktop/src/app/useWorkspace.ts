@@ -40,11 +40,15 @@ export function useWorkspace() {
     setConfig(value);
     setDraft(value.settings);
   }
-  const [panel, setPanel] = useState<Panel>(null);
+  const [panel, updatePanel] = useState<Panel>(null);
   const [view, setView] = useState<'chat' | 'projects' | 'project'>('chat');
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectDialog, updateProjectDialog] = useState<ProjectDialog | null>(null);
   function setProjectDialog(value: ProjectDialog | null, opener?: HTMLElement) {
+    if (value && conversation.temporaryRef.current) {
+      leaveTemporary(() => setProjectDialog(value, opener));
+      return;
+    }
     // WebKit does not focus clicked buttons; make the trigger available for focus restoration.
     opener?.focus({ preventScroll: true });
     updateProjectDialog(value);
@@ -133,7 +137,99 @@ export function useWorkspace() {
     openConversation,
   } = conversation;
 
+  function setPanel(value: Panel) {
+    if (value === 'settings' && conversation.temporaryRef.current) {
+      leaveTemporary(() => updatePanel(value));
+      return;
+    }
+    updatePanel(value);
+  }
+
+  function leaveTemporary(proceed: () => void | Promise<void>, closing = false) {
+    if (!conversation.temporaryRef.current) {
+      void Promise.resolve(proceed()).catch((failure) => setError(errorDetail(failure).message));
+      return;
+    }
+    setConfirmation({
+      title: closing ? 'Quit and erase this temporary chat?' : 'Erase this temporary chat?',
+      text: 'Messages, attachments and the draft will be erased. The temporary backend will be stopped to clear its caches.',
+      actionLabel: closing ? 'Erase and quit' : 'Erase and leave',
+      destructive: true,
+      action: async () => {
+        await conversation.finishTemporary(false, !closing);
+        setServer(await invoke<ServerStatus>('server_status'));
+        await proceed();
+      },
+      alternative: {
+        label: 'Save chat',
+        action: async () => {
+          await conversation.finishTemporary(true, !closing);
+          setServer(await invoke<ServerStatus>('server_status'));
+          await proceed();
+        },
+      },
+    });
+  }
+
+  async function beginTemporary() {
+    if (conversation.temporaryRef.current) {
+      leaveTemporary(beginTemporary);
+      return;
+    }
+    if (busy || editingBusy || importBusy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await cancel();
+      await sendPromise.current;
+      await flushSaves();
+      const value = newConversation();
+      await invoke('temporary_begin', { id: value.id });
+      conversation.enterTemporary(value);
+      setServer(await invoke<ServerStatus>('server_status'));
+      updatePanel(null);
+      setView('chat');
+      textarea.current?.focus();
+    } catch (failure) {
+      setError(errorDetail(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveTemporary() {
+    if (busy || chatOptionsDisabled) return;
+    setBusy(true);
+    setError('');
+    try {
+      await conversation.finishTemporary(true);
+      setServer(await invoke<ServerStatus>('server_status'));
+    } catch (failure) {
+      setError(errorDetail(failure).message);
+      setServer(await invoke<ServerStatus>('server_status'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const temporaryShortcut = useRef(beginTemporary);
+  temporaryShortcut.current = beginTemporary;
+  useEffect(() => {
+    function keydown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        void temporaryShortcut.current();
+      }
+    }
+    document.addEventListener('keydown', keydown);
+    return () => document.removeEventListener('keydown', keydown);
+  }, []);
+
   async function importChat() {
+    if (conversation.temporaryRef.current) {
+      leaveTemporary(importChat);
+      return;
+    }
     const value = await performImport();
     if (value) {
       setView('chat');
@@ -142,16 +238,28 @@ export function useWorkspace() {
   }
 
   function openProject(id: string, files = false) {
+    if (conversation.temporaryRef.current) {
+      leaveTemporary(() => openProject(id, files));
+      return;
+    }
     setProjectId(id);
     setView('project');
     setPanel(null);
     setReviewFiles(files);
   }
   function openProjects() {
+    if (conversation.temporaryRef.current) {
+      leaveTemporary(openProjects);
+      return;
+    }
     setView('projects');
     setPanel(null);
   }
   function openChat(value: Conversation) {
+    if (conversation.temporaryRef.current && value.id !== conversation.temporaryRef.current) {
+      leaveTemporary(() => openChat(value));
+      return;
+    }
     if (value.id === conversation.chatRef.current.id) {
       setView('chat');
       setPanel(null);
@@ -337,18 +445,24 @@ export function useWorkspace() {
   }
 
   closeAction.current = () =>
-    setConfirmation({
-      title: 'Close Straggler?',
-      destructive: true,
-      text: 'Any active response will be stopped and saved. The server started by this app will be shut down.',
-      action: async () => {
-        await stop();
-        await flushSaves();
-        await ui.preferenceSaveQueue.current;
-        await getCurrentWindow().destroy();
-      },
-      actionLabel: 'Close Straggler',
-    });
+    conversation.temporaryRef.current
+      ? leaveTemporary(async () => {
+          await stop();
+          await ui.preferenceSaveQueue.current;
+          await getCurrentWindow().destroy();
+        }, true)
+      : setConfirmation({
+          title: 'Close Straggler?',
+          destructive: true,
+          text: 'Any active response will be stopped and saved. The server started by this app will be shut down.',
+          action: async () => {
+            await stop();
+            await flushSaves();
+            await ui.preferenceSaveQueue.current;
+            await getCurrentWindow().destroy();
+          },
+          actionLabel: 'Close Straggler',
+        });
 
   async function launch() {
     if (!draft || !selected) return;
@@ -387,11 +501,13 @@ export function useWorkspace() {
     }
   }
 
-  async function confirm() {
+  async function confirm(alternative = false) {
     if (!confirmation || confirmBusy) return;
     setConfirmBusy(true);
     try {
-      await confirmation.action();
+      await (alternative && confirmation.alternative
+        ? confirmation.alternative.action()
+        : confirmation.action());
       setConfirmation(null);
     } catch (e) {
       setConfirmError(String(e));
@@ -405,8 +521,7 @@ export function useWorkspace() {
   const canSend =
     native &&
     server.phase === 'ready' &&
-    historyReady &&
-    !storageError &&
+    (!!conversation.temporaryId || (historyReady && !storageError)) &&
     !chatOptionsDisabled &&
     !busy &&
     !editor &&
@@ -419,6 +534,9 @@ export function useWorkspace() {
         projects.context(currentProject).level !== 'over'));
 
   return {
+    temporary: !!conversation.temporaryId,
+    beginTemporary,
+    saveTemporary,
     projects,
     projectDrafts,
     setProjectDrafts,

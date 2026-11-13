@@ -12,6 +12,7 @@ if '--version' in sys.argv:
     print(os.environ.get('TEST_BACKEND_VERSION', 'version: 0.9.0-test (build 42, commit abc1234)'), file=sys.stderr)
     sys.exit()
 if '--help' in sys.argv:
+    print('--slots\n--cache-ram N\n--log-disable')
     print('--model FNAME\n--port PORT\n--host HOST\n--ctx-size N\n--cache-type-k TYPE\n--cache-type-v TYPE\n--split-mode MODE\n--tensor-split N\n--fit-target N\n--device DEV\n--threads N\n--gpu-layers N\n--batch-size N\n--ubatch-size N\n--temperature N\n--top-p N\n--top-k N\n--min-p N\n--repeat-penalty N\n--presence-penalty N\n--frequency-penalty N\n--seed N\n--n-predict N')
     sys.exit()
 if '--list-devices' in sys.argv:
@@ -22,6 +23,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model')
 parser.add_argument('--port', type=int)
 parser.add_argument('--host')
+parser.add_argument('--slots', action='store_true')
+parser.add_argument('--cache-ram')
+parser.add_argument('--log-disable', action='store_true')
 for flag in ('ctx-size', 'cache-type-k', 'cache-type-v', 'split-mode', 'tensor-split', 'fit-target', 'device', 'threads', 'gpu-layers', 'batch-size', 'ubatch-size', 'temperature', 'top-p', 'top-k', 'min-p', 'repeat-penalty', 'presence-penalty', 'frequency-penalty', 'seed', 'n-predict'):
     parser.add_argument('--' + flag)
 options = parser.parse_args()
@@ -35,6 +39,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         data = {'status': 'ok', 'pid': os.getpid()}
+        if self.path == '/slots':
+            data = [{'id': 7, 'is_processing': False}]
         if self.path == '/props':
             data = {'default_generation_settings': {'n_ctx': 4096},
                     'chat_template_caps': {'supports_system_role': True, 'supports_reasoning_effort': True,
@@ -49,6 +55,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        if self.path == '/slots/7?action=erase':
+            with open(os.environ['TEST_REQUEST'] + '.erase', 'w') as record:
+                record.write('slot 7 erased')
+            body = json.dumps({'id_slot': 7, 'n_erased': 12}).encode()
+            self.send_response(503 if os.environ.get('TEST_ERASE_FAIL') else 200)
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == '/tokenize':
             assert request.get('add_special') is False
             assert request.get('with_pieces') is False
@@ -75,6 +90,8 @@ class Handler(BaseHTTPRequestHandler):
         # Failed assistant turns are omitted, so consecutive user turns can be
         # merged. Fixture control words belong to the final user paragraph.
         prompt = request['messages'][-1]['content'].split('\n\n')[-1]
+        if os.environ.get('TEST_EMIT_PROMPT_LOG'):
+            print(prompt, file=sys.stderr, flush=True)
         if prompt == 'context-reject':
             # Pinned server-context.cpp rejects oversized input before the first
             # SSE event, including stream:true requests. Never simulate truncation.

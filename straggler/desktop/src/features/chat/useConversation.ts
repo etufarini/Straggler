@@ -44,6 +44,8 @@ export function useConversation(
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
   const [input, setInput] = useState('');
+  const [temporaryId, setTemporaryId] = useState<string | null>(null);
+  const temporaryRef = useRef<string | null>(null);
   const [contextError, setContextError] = useState('');
   const [editor, setEditor] = useState<{ messageId: string; text: string } | null>(null);
   const [editingBusy, setEditingBusy] = useState(false);
@@ -128,6 +130,7 @@ export function useConversation(
       });
   }, [chat, generating]);
   function save(value: Conversation, create = false): Promise<void> {
+    if (value.id === temporaryRef.current) return Promise.resolve();
     const snapshot = structuredClone(value);
     const pending = serializeStorage(saveQueue, async () => {
       await invoke(create ? 'history_create' : 'history_save', { conversation: snapshot });
@@ -156,8 +159,7 @@ export function useConversation(
       requestRef.current ||
       mutation.current ||
       server.phase !== 'ready' ||
-      !historyReady ||
-      storageError
+      (!temporaryRef.current && (!historyReady || storageError))
     )
       return;
     const project = projects?.current.current.find(
@@ -285,7 +287,8 @@ export function useConversation(
           : await invoke<Response>('generate', {
               request: {
                 requestId,
-                conversationId: current.id,
+                conversationId: temporaryRef.current ? undefined : current.id,
+                temporaryId: temporaryRef.current ?? undefined,
                 messages,
                 options: { reasoning: options.reasoning, effort: options.effort },
               },
@@ -385,6 +388,7 @@ export function useConversation(
   async function exportChat(value: Conversation, includesReasoning: boolean) {
     setFileError('');
     try {
+      if (temporaryRef.current === value.id) throw new Error('Save this chat before exporting it.');
       const snapshot = value.id === chatRef.current.id ? chatRef.current : value;
       const contents = serializeConversation(
         snapshot,
@@ -474,7 +478,42 @@ export function useConversation(
     follow.current = true;
   }
 
+  function enterTemporary(value: Conversation) {
+    temporaryRef.current = value.id;
+    setTemporaryId(value.id);
+    openConversation(value);
+  }
+
+  async function finishTemporary(store: boolean, restart = true) {
+    const id = temporaryRef.current;
+    if (!id) return;
+    await cancel();
+    await sendPromise.current;
+    await saveQueue.current;
+    const snapshot = structuredClone(chatRef.current);
+    const warning = await invoke<string | null>('temporary_finish', {
+      id,
+      conversation: store ? snapshot : null,
+      restart,
+    });
+    temporaryRef.current = null;
+    setTemporaryId(null);
+    if (store) {
+      updateConversations(snapshot);
+      if (warning) setFileNotice(`Chat saved. ${warning}`);
+    } else {
+      updateChat(newConversation());
+      setInput('');
+      setEditor(null);
+    }
+    if (warning && !store) setFileNotice(warning);
+  }
+
   return {
+    temporaryId,
+    temporaryRef,
+    enterTemporary,
+    finishTemporary,
     chatOptionsDisabled: generating || editingBusy || importBusy,
     flushSaves,
     runConversationMutation,
