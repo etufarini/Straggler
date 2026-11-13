@@ -1,5 +1,9 @@
 # Desktop development
 
+Use this page for development commands and fixture contracts. The
+[user and developer guide](../docs/guide.md) covers app behavior, configuration,
+architecture, storage and packaging.
+
 Straggler is written for human maintainers. Keep configuration, native OS services,
 process supervision, streaming and storage in focused Rust modules. Keep React
 features, domain logic and the typed desktop service separate; all IPC belongs in
@@ -7,81 +11,107 @@ features, domain logic and the typed desktop service separate; all IPC belongs i
 
 ## Setup and commands
 
-Install Node.js 22.13+, 24 or 26+, Rust 1.92+ with rustfmt/Clippy, Python 3.9+ for
-fixtures/packaging, and the platform's [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
-From the repository root:
+Install the [development prerequisites](../docs/guide.md#local-development) for
+your platform, then run from the repository root:
 
 ```bash
 npm --prefix straggler/desktop ci
 npm --prefix straggler/desktop run desktop
-bash straggler/tests/run.sh
 ```
 
-The app uses Rust native services directly. Installed packages include the backend;
-source development can select an existing external llama.cpp build. No toolchain
-bootstrap or shell bridge is involved.
+The second command opens the native Tauri window. Source sessions can select an
+existing external llama.cpp build in Settings; opening the app and running the
+required checks need no GPU, model weights or inference service.
 
-From this directory:
+Run the commands in this table from `straggler/desktop`. Prefer the
+[test runner](#test-suites) for complete checks; direct npm commands are useful
+for a specific task.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run desktop` | Vite plus the native development window |
-| `npm run dev` | Browser preview on 127.0.0.1:1420 |
-| `npm run build` | TypeScript check and production frontend |
-| `npm run format` | Format frontend and JavaScript tests |
-| `npm test` | Frontend/domain unit tests |
-| `npm run test:runtime` | Rust unit/integration tests without the desktop feature |
-| `npm run test:e2e` | Chromium and WebKit flows |
-| `npm run test:native` | Actual Tauri window with a local fake backend |
+| `npm run desktop` | Start Vite and the native development window |
+| `npm run dev` | Serve the browser preview on 127.0.0.1:1420 |
+| `npm run build` | Check TypeScript and build production frontend assets |
+| `npm run format` | Format frontend and JavaScript test/configuration files |
+| `npm run format:check` | Check formatting without writing files |
+| `npm run lint` | Check frontend and TypeScript tests with ESLint |
+| `npm run typecheck` | Check TypeScript without building assets |
+| `npm test` | Run frontend/domain unit tests |
+| `npm run test:runtime` | Run Rust unit/integration tests without the desktop feature |
+| `npm run test:e2e` | Run Chromium and WebKit flows |
+| `npm run test:native` | Build and exercise the actual Tauri window with a fake backend |
 
-Install browser engines with `npm exec -- playwright install chromium webkit`.
-On Linux, browser installation may also require Playwright system dependencies.
-The runner requires explicit dependency setup. Focused suites are `common`,
-`frontend`, `runtime`, `browser`, `desktop`, `isolation`, `native` and `packaging`,
-with `all` as the default. `frontend` checks formatting, lint, types, production
-assets and unit contracts; `browser` runs Chromium/WebKit flows. Neither needs Rust
-or native Tauri libraries. `runtime` checks Rust without GUI features and requires
-Rust, Python for fixtures and the host linker, but no npm or GUI libraries.
-`desktop` combines these three suites. `common` checks runner boundaries, Bash
-syntax/ShellCheck and offline archive fixtures. `isolation` compiles the actual
-native desktop after removing the opposite platform's sources and configuration;
-`native` includes that check, desktop Clippy and the real window. These last two
-suites require the host Tauri prerequisites. CI runs frontend checks once and
-runtime/browser/native checks on independent Linux/macOS CPU runners. See the [guide](../docs/guide.md#local-development)
-for headless Linux requirements. Native Windows is not a supported target.
+## Test suites
+
+The development entry point is `bash straggler/tests/run.sh`, run from the
+repository root. Add a suite name to focus the checks:
+
+```bash
+bash straggler/tests/run.sh frontend
+```
+
+| Suite | Checks | Required setup |
+| --- | --- | --- |
+| `all` (default) | Common, frontend, runtime, browser and native checks | Combined prerequisites below; native checks may be skipped on headless Linux |
+| `common` | Runner boundaries, Bash syntax/ShellCheck and offline archive fixtures | Bash 3.2+, Python; ShellCheck is optional locally |
+| `frontend` | Formatting, lint, types, production assets and unit contracts | Node/npm and `npm ci` |
+| `runtime` | Rust formatting, Clippy, runtime tests and macOS Store boundaries | Rust with rustfmt/Clippy, Python and the host linker; no npm or native GUI libraries |
+| `browser` | Chromium/WebKit flows | Node/npm, `npm ci`, Playwright browsers and their system dependencies |
+| `desktop` | Frontend, runtime and browser suites | Combined prerequisites for those three suites |
+| `isolation` | Compile the native desktop with only shared and host-platform inputs | Rust, Python and the host Tauri development dependencies |
+| `native` | Isolation, desktop Clippy and the actual native window | Native app setup, Python and a display or headless Linux tools |
+| `packaging` | Offline archive fixtures and native resource/backend boundaries; Store boundaries on macOS | Rust, Python and the host linker; no model or backend download |
+
+Install browser engines explicitly from `straggler/desktop` before browser checks:
+
+```bash
+npm exec -- playwright install chromium webkit
+```
+
+On Linux, Playwright may also need system dependencies. The runner does not
+install system packages. See the guide for
+[headless Linux behavior and CI coverage](../docs/guide.md#run-the-checks).
+Windows is not a supported native target.
 
 ## Test boundaries
 
-Tests use temporary directories, tiny generated documents, fake executables and
-local HTTP/SSE fixtures. No GPU, model weights or working llama.cpp installation is
-required. Browser WebKit on Linux is renderer coverage; native macOS WebView,
-process and package behavior still require a macOS runner. Native defaults in `src-tauri/src/configuration/defaults.json` are shared
-with frontend fixtures. Rust checks cover legacy profiles/migration, literal
-serialization, process identity, cancellation, storage recovery and streaming.
+Tests use temporary user directories, tiny generated documents, fake executables
+and local HTTP/SSE fixtures. Native defaults in
+`src-tauri/src/configuration/defaults.json` are shared with frontend fixtures.
+Rust checks cover legacy profiles and migration, literal serialization, process
+identity, cancellation, storage recovery and streaming.
 
 The native test copies the GUI away from the source tree and rejects Bash,
-Python-helper, curl and OS utility invocations. Python is permitted only for the
-fake backend. It exercises the actual window, IPC, fatal error recovery, partial
-response persistence, confirmed Stop/restart and shutdown cleanup. WebDriver is
-enabled only by `native-tests` in debug builds; production compilation rejects it.
+Python-helper, curl and OS utility invocations by the app. Python is permitted
+only for the fake backend. The test exercises the actual window, IPC, fatal error
+recovery, partial response persistence, confirmed Stop/restart and shutdown
+cleanup. WebDriver is enabled only by `native-tests` in debug builds; production
+compilation rejects it.
 
-`packaging` tests inspect archive/library boundaries offline using tiny Mach-O and
-ELF fixtures. Optional real package checks use the pinned upstream backend and no
-models. The package-window harness substitutes a debug GUI only when WebDriver is
-needed; real packaged backend libraries and resource paths remain in use.
-
-Browser previews accept `?scenario=empty`, `cpu`, `multiple`, `unknown-memory`,
-`occupied`, `save-error`, `model-error`, `interrupted`, `cancel`, `oom`,
-`oom-startup`, `oom-and-save-error`, `compute-error`, `history-error` and
-`backend-error`. Reasoning/context fixtures include `no-metrics`, `no-reasoning`,
-`effort-levels`, `context-high`, `context-full` and `reasoning-stream`.
-All scenarios are labelled simulations and excluded from production transport.
+Browser WebKit on Linux provides renderer coverage. Native macOS WebView, process
+and package behavior still require a macOS runner. Offline packaging tests use
+tiny Mach-O and ELF fixtures. Optional real package checks use the pinned upstream
+backend without models. The package-window harness substitutes a debug GUI only
+when WebDriver is needed; packaged backend libraries and resource paths stay in use.
 
 Project requests take immutable snapshots of current instructions and selected
 files. `src/domain/projectContext.ts` owns the 25% reply reserve, 75% warning and
 four-characters-per-token fallback. Tests cover unknown capacity without fabricated
 limits, own-prompt restoration, archive guards, atomic recovery and current-prompt
 exports. Attachment checks use native extraction and generated document fixtures.
+
+## Browser fixtures
+
+With Vite running, open a URL such as
+`http://127.0.0.1:1420/?scenario=empty`. Every scenario is labelled as a simulation;
+fixture services are excluded from production transport.
+
+| Area | Scenario values |
+| --- | --- |
+| Setup and devices | `normal`, `empty`, `cpu`, `multiple`, `unknown-memory`, `occupied` |
+| Storage and backend errors | `save-error`, `history-error`, `model-error`, `backend-error` |
+| Generation and recovery | `interrupted`, `cancel`, `oom`, `oom-startup`, `oom-and-save-error`, `compute-error` |
+| Reasoning and context | `no-metrics`, `no-reasoning`, `effort-levels`, `context-high`, `context-full`, `reasoning-stream` |
 
 ## Upstream fixture contracts
 
@@ -97,61 +127,67 @@ changing the pin or fake server; keep fixtures aligned with native services:
 
 ## Optional visual diagnostics
 
-With Vite running, `node tests/design-review.mjs final` captures browser fixture
-views; `node tests/design-review.mjs r001` includes project scenarios. Reference
-captures need the separately supplied design dossier. Generated output is under
-`test-results/design/` and is not evidence of inference.
+Run these commands from `straggler/desktop` with Vite running:
 
-On Linux, `STRAGGLER_MEASURE_ORB=1 bash straggler/tests/run.sh native` from the repository root
-measures CPU/frame rate during fixture streaming and after hiding the native
+| Command | Output |
+| --- | --- |
+| `node tests/design-review.mjs final` | Browser fixture captures under `test-results/design/` |
+| `node tests/design-review.mjs r001` | Captures including project scenarios; reference views need the separately supplied design dossier |
+
+Captures document simulated UI states, not inference results. From the repository
+root on Linux, run the optional animation measurement with:
+
+```bash
+STRAGGLER_MEASURE_ORB=1 bash straggler/tests/run.sh native
+```
+
+It measures CPU/frame rate during fixture streaming and after hiding the native
 window. The hidden sample must render zero frames. Results include GUI and fixture
-overhead, not inference performance.
+overhead rather than inference performance.
 
-## Dependencies and packaging
+## Dependency maintenance
 
-Use `npm ci` for reproducible setup. After dependency updates, run `npm audit`,
-`npm outdated`, `npm ls --all` and the full test runner. Review changed install
-scripts before updating the version-pinned `allowScripts` entries.
+Use `npm ci` for reproducible setup. After dependency updates, run these commands
+from `straggler/desktop`, then run the full test runner from the repository root:
 
-The dependency review on 2026-11-12 updated the transitive browser compatibility
-data in `baseline-browser-mapping` from 2.11.36 to 2.11.37. It found no deprecated
-packages, unused direct dependencies or required peer conflicts. `npm ls --all`
-also lists optional packages for other platforms and unused integrations; these
-do not require installation. Keep the lockfile's platform packages for Linux/macOS
-portability.
+```bash
+npm audit
+npm outdated
+npm ls --all
+```
 
-The development toolchain uses temporary, version-scoped overrides for
+Review changed install scripts before updating version-pinned `allowScripts`
+entries. Keep lockfile packages for other platforms so Linux/macOS installs remain
+portable. Optional packages for other platforms or unused integrations reported
+by `npm ls --all` do not all need to be installed.
+
+The current development toolchain scopes temporary overrides to
 `eslint@^10.14.0`, `@eslint/config-array@0.23.5` and
-`@typescript-eslint/typescript-estree@8.72.2` to select `minimatch@11.0.8`.
-This addresses the 10 moderate development-dependency entries from
-[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249): excessive
-CPU and memory use with attacker-controlled glob patterns at optimization level
-2 or higher. The fix begins at 11.0.1; production dependencies were unaffected.
+`@typescript-eslint/typescript-estree@8.72.2`, selecting `minimatch@11.0.8` for the
+[glob-pattern resource-exhaustion fix](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+These overrides are compatibility exceptions to the parents' minimatch 10 ranges.
+Review the actual callers, file selection and diagnostics when updating them:
+Minimatch 11 changes APIs and matching behavior. Revalidate each override when its
+parent changes and remove it once the parent supports a patched release. Do not
+suppress audit output or apply audit-suggested ESLint/TypeScript ESLint downgrades.
 
-These overrides are an explicit compatibility exception to the parents'
-minimatch 10 ranges. Minimatch 11 removes APIs and changes its matching engine;
-check the actual callers, file selection and diagnostics when updating this
-toolchain. Revalidate the scoped overrides when parent versions change, and
-remove each one when its parent supports a patched release. Do not apply the
-audit's suggested ESLint/TypeScript ESLint downgrades or suppress audit output.
+Review major upgrades against the build pipeline, icon changes and TypeScript
+ESLint's supported TypeScript range. Node types follow the Node 24 CI environment.
 
-`npm outdated` reports newer major versions of Vite, its React plugin, TypeScript,
-Lucide React and Node types. Retain the current compatible versions: these updates
-do not fix the advisory, TypeScript ESLint currently requires TypeScript below
-6.1, and Node types follow the Node 24 CI environment. Review the build pipeline
-and icon changes separately before migrating those majors.
+## Packaging commands
 
-Use the [packaging guide](../docs/guide.md#building-packages) to produce GUI packages
-with the pinned backend. Plain `npm run bundle` is a Tauri build and does not
-prepare that backend. Python, Node and Rust are build/test dependencies only.
-Local candidate builds do not publish releases or submit to an app store.
+Use the [packaging guide](../docs/guide.md#building-packages) for native GUI packages
+with the pinned backend, signing and release candidates. Plain `npm run bundle`
+builds the Tauri app without preparing that backend. Python, Node and Rust are
+build/test dependencies only. Local candidate builds do not publish releases or
+submit to an app store.
 
 ## Branding assets
 
-The supplied Straggler artwork uses two overlapping stars with a cyan center
-(the "Fusion" proposal). The sidebar and assistant message avatars share
-`src/assets/brand-mark.svg`. Native icon sources are `src-tauri/icons/icon.svg` and
-`icon-small.svg`; both use the same symbol. The small source uses a 24 px symbol
+The Straggler mark uses two overlapping stars with a cyan center. The sidebar
+and assistant message avatars share `src/assets/brand-mark.svg`. Native icon sources
+are `src-tauri/icons/icon.svg` and `icon-small.svg`; both use the same symbol.
+The small source uses a 24 px symbol
 inside a 32 px frame, matching the supplied artwork. The README reuses the native
 icon.
 
