@@ -38,6 +38,7 @@ export type Scenario =
   | 'effort-levels'
   | 'context-high'
   | 'context-full'
+  | 'burst-stream'
   | 'reasoning-stream';
 
 // Development data deliberately uses generic device names and no personal paths.
@@ -68,6 +69,7 @@ export const scenarios: Scenario[] = [
   'effort-levels',
   'context-high',
   'context-full',
+  'burst-stream',
   'reasoning-stream',
 ];
 
@@ -519,7 +521,16 @@ export function createFixture(scenario: Scenario) {
           reasoning: 'Example reasoning text.',
         };
         const channel = args.onDelta as { onmessage: (delta: Delta) => void };
-        if (scenario === 'reasoning-stream') {
+        if (scenario === 'burst-stream') {
+          delta.content =
+            '## Streamed answer\n\n' + 'A **local** answer with caffè ☕.\n\n'.repeat(80);
+          for (let offset = 0; offset < delta.content.length; offset += 7)
+            channel.onmessage({
+              content: delta.content.slice(offset, offset + 7),
+              reasoning: offset === 0 ? delta.reasoning : '',
+            });
+          localStorage.setItem('straggler-fixture-burst-emitted', '1');
+        } else if (scenario === 'reasoning-stream') {
           channel.onmessage({ content: '', reasoning: delta.reasoning });
           await new Promise((resolve) => setTimeout(resolve, 1200));
           channel.onmessage({ ...delta, reasoning: '' });

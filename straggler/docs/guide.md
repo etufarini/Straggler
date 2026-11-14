@@ -100,7 +100,9 @@ log. Use the sidebar for conversations, projects and Settings.
 Sidebar and assistant-panel expansion are remembered as desktop preferences,
 separately from saved configurations and browser preferences. The assistant
 animation reflects response state; it does not measure inference speed or prove
-hardware readiness.
+hardware readiness. Visual detail adapts to rendering cost to leave time for chat
+updates. The animation pauses while the window is hidden and respects the system
+reduced-motion preference.
 
 ### Update or remove the app
 

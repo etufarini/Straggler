@@ -38,25 +38,11 @@ async function processTicks(rootPid) {
 }
 
 export async function measureNativeOrb({ pid, evaluate, hide, output }) {
-  if (process.platform !== 'linux') {
-    console.log(
-      'SKIP: native orb CPU measurement requires Linux /proc; animation lifecycle is covered by browser checks.',
-    );
-    return;
-  }
-  await evaluate(`(() => {
-    window.__stragglerOrbFrames=0;
-    window.__stragglerOrbFrameTimes=[];
-    const original=CanvasRenderingContext2D.prototype.clearRect;
-    CanvasRenderingContext2D.prototype.clearRect=function(...args){
-      if(this.canvas.closest('.presence-stage')) {
-        window.__stragglerOrbFrames++;
-        window.__stragglerOrbFrameTimes.push(performance.now());
-      }
-      return original.apply(this,args);
-    };
-  })()`);
-  const hz = Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim());
+  const measureCpu = process.platform === 'linux';
+  if (!measureCpu) console.log('SKIP: native GUI CPU measurement requires Linux /proc.');
+  const hz = measureCpu
+    ? Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim())
+    : null;
   async function sample() {
     const documentHidden = await evaluate('document.hidden');
     const nativeMinimized = await evaluate(
@@ -66,18 +52,20 @@ export async function measureNativeOrb({ pid, evaluate, hide, output }) {
       'window.__TAURI_INTERNALS__.invoke("plugin:window|is_visible",{label:"main"})',
     );
     const hidden = documentHidden || nativeMinimized || !nativeVisible;
-    const frames = await evaluate('window.__stragglerOrbFrames');
-    const before = await processTicks(pid);
+    const frames = await evaluate('window.__stragglerOrbMeasurement.frames.length');
+    const before = measureCpu ? await processTicks(pid) : new Map();
     const start = performance.now();
     await new Promise((resolve) => setTimeout(resolve, 3000));
-    const after = await processTicks(pid);
+    const after = measureCpu ? await processTicks(pid) : new Map();
     const seconds = (performance.now() - start) / 1000;
     const ticks = [...after].reduce(
       (sum, [processId, value]) => sum + Math.max(0, value - (before.get(processId) ?? value)),
       0,
     );
-    const drawn = (await evaluate('window.__stragglerOrbFrames')) - frames;
-    const frameTimes = await evaluate(`window.__stragglerOrbFrameTimes.slice(${frames})`);
+    const frameTimes = await evaluate(
+      `window.__stragglerOrbMeasurement.frames.slice(${frames}).map(frame => frame.time)`,
+    );
+    const drawn = frameTimes.length;
     const intervals = frameTimes
       .slice(1)
       .map((time, index) => time - frameTimes[index])
@@ -88,7 +76,7 @@ export async function measureNativeOrb({ pid, evaluate, hide, output }) {
       nativeMinimized,
       nativeVisible,
       seconds,
-      guiCpuPercent: Math.round((ticks / hz / seconds) * 10000) / 100,
+      guiCpuPercent: measureCpu ? Math.round((ticks / hz / seconds) * 10000) / 100 : null,
       orbFrames: drawn,
       orbFps: drawn / seconds,
       frameIntervalMsMedian: intervals[Math.floor(intervals.length * 0.5)] ?? null,
@@ -99,27 +87,41 @@ export async function measureNativeOrb({ pid, evaluate, hide, output }) {
   await hide();
   await new Promise((resolve) => setTimeout(resolve, 1300));
   const hidden = await sample();
+  const animation = await evaluate('window.__stragglerOrbMeasurement.snapshot()');
+  await evaluate('window.__stragglerOrbMeasurement.stop()');
   await writeFile(
     output,
     JSON.stringify(
       {
         method:
-          'Owned native GUI process tree; CPU percentage of one core; local fixture stream; software rendering.',
+          'Native WebView draw callbacks, not presented frames; local fixture responses; Linux CPU percentage of one core for the owned GUI process tree. Rendering mode depends on the host environment.',
         visible,
         hidden,
+        animation,
       },
       null,
       2,
     ),
   );
+  const cpuLabel = (sample) =>
+    sample.guiCpuPercent === null ? 'CPU unavailable' : `${sample.guiCpuPercent}% CPU`;
   console.log(
-    `Native orb: visible ${visible.guiCpuPercent}% CPU, ${visible.orbFps.toFixed(1)} fps; hidden ${hidden.guiCpuPercent}% CPU, ${hidden.orbFrames} frames. ${output}`,
+    `Native orb: visible ${cpuLabel(visible)}, ${visible.orbFps.toFixed(1)} draws/s; hidden ${cpuLabel(hidden)}, ${hidden.orbFrames} draws. ${output}`,
   );
   assert.equal(visible.hidden, false, 'Visible window must be visible to WebKit');
   assert.ok(
     visible.orbFrames > 0,
     'Live orb must draw while visible; the browser determines the available refresh rate',
   );
+  const maxP95 = process.env.STRAGGLER_ORB_MAX_FRAME_P95_MS;
+  if (maxP95 !== undefined) {
+    const limit = Number(maxP95);
+    assert.ok(Number.isFinite(limit) && limit > 0, 'Frame interval limit must be positive');
+    assert.ok(
+      visible.frameIntervalMsP95 !== null && visible.frameIntervalMsP95 <= limit,
+      `Visible frame interval p95 ${visible.frameIntervalMsP95} ms exceeds ${limit} ms`,
+    );
+  }
   assert.equal(hidden.hidden, true, 'Native window must actually be hidden for the hidden sample');
   assert.equal(hidden.orbFrames, 0, 'Hidden orb must stop drawing');
 }
