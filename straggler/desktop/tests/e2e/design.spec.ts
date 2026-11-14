@@ -315,11 +315,19 @@ test('renderer holds state and size changes while native visibility reports a pa
     };
     const pause = (milliseconds: number) =>
       new Promise((resolve) => setTimeout(resolve, milliseconds));
+    async function waitForFrame(after: number) {
+      const deadline = performance.now() + 5000;
+      while (frames <= after) {
+        if (performance.now() >= deadline)
+          throw new Error('The renderer did not draw an animation frame within five seconds.');
+        await pause(20);
+      }
+    }
     const renderer = new OrbRenderer();
     try {
       renderer.mount(host);
       renderer.setState('generating');
-      await pause(200);
+      await waitForFrame(0);
       renderer.setPaused(true);
       await pause(100);
       const before = frames;
@@ -331,7 +339,7 @@ test('renderer holds state and size changes while native visibility reports a pa
       }
       const paused = frames;
       renderer.setPaused(false);
-      await pause(200);
+      await waitForFrame(paused);
       const resumed = frames;
       renderer.destroy();
       await pause(100);

@@ -43,7 +43,8 @@ export function useConversation(
 ) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
-  const [input, setInput] = useState('');
+  const [input, updateInput] = useState('');
+  const inputRevision = useRef(0);
   const [temporaryId, setTemporaryId] = useState<string | null>(null);
   const temporaryRef = useRef<string | null>(null);
   const [contextError, setContextError] = useState('');
@@ -81,6 +82,11 @@ export function useConversation(
   useEffect(() => {
     setContextError('');
   }, [input, chat.attachments, contextSize]);
+
+  function setInput(value: string) {
+    inputRevision.current += 1;
+    updateInput(value);
+  }
 
   async function flushSaves() {
     await projects?.flush();
@@ -178,6 +184,12 @@ export function useConversation(
     setGenerating(true);
     setGenerationPhase('waiting');
     follow.current = true;
+    if (!replacement) setInput('');
+    const submittedInputRevision = inputRevision.current;
+    function restoreSubmittedInput() {
+      // A late rejection must not replace a draft edited while this request was pending.
+      if (!replacement && inputRevision.current === submittedInputRevision) setInput(text);
+    }
     const user: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -230,6 +242,7 @@ export function useConversation(
         prefixCount.source !== 'server',
       );
       if (capacity.level === 'over') {
+        restoreSubmittedInput();
         setContextError(
           `This project does not fit in the context window. It needs ${capacity.shortfall.toLocaleString('en-US')} more tokens than are available.`,
         );
@@ -240,6 +253,7 @@ export function useConversation(
     }
     const estimate = await estimatePromptTokens(messages);
     if (contextSize && estimate.tokens > contextSize) {
+      restoreSubmittedInput();
       setContextError(
         `The prompt and attachments exceed the ${contextSize.toLocaleString('en-US')}-token context. Remove files, shorten your message or increase the context size.`,
       );
@@ -249,10 +263,7 @@ export function useConversation(
     }
     setContextError('');
     rejectedDraft.current = null;
-    if (!replacement) {
-      setInput('');
-      updateChat(current);
-    }
+    if (!replacement) updateChat(current);
     const onDelta = new Channel<Delta>();
     let generationStarted = false;
     let lastSave = Date.now();
@@ -302,14 +313,14 @@ export function useConversation(
       if (response.error) assistant.error = response.error;
       if (response.error && isContextRejection(response.error) && !replacement) {
         rejectedDraft.current = { chatId: current.id, userId: user.id };
-        setInput(text);
+        restoreSubmittedInput();
       }
     } catch (e) {
       assistant.status = 'error';
       if (generationStarted) assistant.error = errorDetail(e).message;
       if (generationStarted && isContextRejection(errorDetail(e).message) && !replacement) {
         rejectedDraft.current = { chatId: current.id, userId: user.id };
-        setInput(text);
+        restoreSubmittedInput();
       }
     } finally {
       // Ignore any queued IPC deltas once the final snapshot has arrived.
@@ -324,7 +335,6 @@ export function useConversation(
         await save(current).catch(() => {});
       }
       setGenerating(false);
-      textarea.current?.focus();
     }
   }
 

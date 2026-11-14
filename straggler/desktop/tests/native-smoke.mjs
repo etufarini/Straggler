@@ -800,6 +800,12 @@ try {
         ),
       'active partial response',
     );
+    assert.equal(await evaluate('document.querySelector(".composer textarea").disabled'), false);
+    await fillField('.composer textarea', 'Next native question');
+    assert.equal(
+      await evaluate('document.querySelector(".composer textarea").value'),
+      'Next native question',
+    );
     if (process.env.STRAGGLER_MEASURE_ORB === '1') {
       await measureNativeOrb({
         pid: app.pid,
@@ -829,6 +835,10 @@ try {
         'Array.from(document.querySelectorAll(".confirmation button")).find(button => button.textContent === "Cancel").click()',
       );
       assert.equal(app.exitCode, null);
+      assert.equal(
+        await evaluate('document.querySelector(".composer textarea").value'),
+        'Next native question',
+      );
       await evaluate(
         'window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {event:"tauri://close-requested", payload:null})',
       );
