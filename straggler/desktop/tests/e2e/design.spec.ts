@@ -1,4 +1,5 @@
 import { selectValue } from './select';
+import { observeOrb } from './orb';
 import { expect, test } from '@playwright/test';
 
 test('sidebar preference persists and server log restores keyboard focus', async ({ page }) => {
@@ -226,46 +227,43 @@ test('reduced-motion presence draws a still and destroys the renderer in Setting
   await page.goto('/?scenario=cancel');
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep generating');
-  await page.evaluate(() => {
-    const original = CanvasRenderingContext2D.prototype.clearRect;
-    (window as unknown as { orbTestFrames: number }).orbTestFrames = 0;
-    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
-      if (this.canvas.closest('.presence-stage'))
-        (window as unknown as { orbTestFrames: number }).orbTestFrames++;
-      return original.apply(this, args);
-    };
-  });
+  await observeOrb(page);
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'generating');
-  // The React state can commit before its still frame and resize callbacks.
-  // Allow both paint opportunities before measuring continued animation.
+  // A committed caption does not prove that React's passive effect has reached
+  // the renderer. Observe its actual state before checking that drawing stops.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__stragglerOrbMeasurement.draws.some((draw) => draw.state === 'generating'),
+      ),
+    )
+    .toBe(true);
+  // Give layout/resize callbacks their paint opportunities after the real draw.
   const stillFrames = await page.evaluate(
     () =>
       new Promise<number>((resolve) => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            resolve((window as unknown as { orbTestFrames: number }).orbTestFrames);
+            resolve(window.__stragglerOrbMeasurement.frames.length);
           });
         });
       }),
   );
   expect(stillFrames).toBeGreaterThan(0);
   await page.waitForTimeout(1100);
-  expect(
-    await page.evaluate(() => (window as unknown as { orbTestFrames: number }).orbTestFrames),
-  ).toBe(stillFrames);
+  expect(await page.evaluate(() => window.__stragglerOrbMeasurement.frames.length)).toBe(
+    stillFrames,
+  );
   await page.getByRole('button', { name: 'Stop response' }).click();
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'stopped');
   await expect(page.locator('.presence-caption')).toContainText('Stopped by you');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.locator('.presence-stage canvas')).toHaveCount(0);
-  const frames = await page.evaluate(
-    () => (window as unknown as { orbTestFrames: number }).orbTestFrames,
-  );
+  const frames = await page.evaluate(() => window.__stragglerOrbMeasurement.frames.length);
   await page.waitForTimeout(1100);
-  expect(
-    await page.evaluate(() => (window as unknown as { orbTestFrames: number }).orbTestFrames),
-  ).toBe(frames);
+  expect(await page.evaluate(() => window.__stragglerOrbMeasurement.frames.length)).toBe(frames);
+  await page.evaluate(() => window.__stragglerOrbMeasurement.stop());
 });
 
 test('presence follows reasoning deltas and the ready renderer comes to rest', async ({ page }) => {
