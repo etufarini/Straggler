@@ -53,6 +53,9 @@ export default function Select({ value, options, onChange, ...props }: SelectPro
   function show(index = selected) {
     const trigger = button.current;
     if (!trigger || trigger.matches(':disabled') || !enabled.length) return;
+    // WebKit on macOS does not focus buttons when their label is clicked.
+    // Keyboard navigation and aria-activedescendant belong to this trigger.
+    trigger.focus({ preventScroll: true });
     const bounds = trigger.getBoundingClientRect();
     const needed = Math.min(
       288,

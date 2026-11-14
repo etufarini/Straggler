@@ -56,6 +56,10 @@ Use bash straggler/tests/run.sh as the development entry point. Keep focused sui
 
 Run Bash syntax checks and ShellCheck for shell changes, frontend type/lint/format checks, relevant unit and integration suites, and Linux/macOS CI. Test native windows, resources and process behavior on CPU runners of each target OS. Exercise storage failures, cancellation, process identity, migration and transactional backend preparation when affected. No GPU, inference workload or hardware inventory is a release gate. Choose representative interactions and boundaries rather than exhaustive combinations or coverage quotas.
 
+Treat GitHub Actions as a merge gate. Inspect every failed check, fix its cause and require successful frontend and Linux/macOS checks for the exact PR head and its current base before merging. Existing failures on main are still blockers. Do not bypass checks, weaken assertions, remove useful coverage or retry until green to conceal failures. Keep checks tied to supported desktop behavior and remove redundant executions; optional packaging diagnostics remain separate and must pass when the change requires them.
+
+After merging, verify the main workflow succeeds. Once fixes are validated, summarize the failures and their resolutions in the PR, then delete the superseded failed workflow runs covered by that work. Preserve successful runs as validation evidence; never delete an unresolved failure to make CI appear healthy. Clean up canceled runs only when explicitly requested.
+
 ## Documentation and releases
 
 Keep README.md concise and practical: local desktop chat, package availability, requirements, native application startup, first configuration and one link to straggler/docs/guide.md. Include the human-maintainer principle. Keep settings, data compatibility, development, packaging and troubleshooting in the guide. Keep the developer README focused on commands and upstream fixture contracts. Remove obsolete installation paths, launcher instructions and duplicated historical records. Use real interface screenshots without fabricated readiness, inference or private paths.

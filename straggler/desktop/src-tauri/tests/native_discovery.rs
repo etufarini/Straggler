@@ -1,4 +1,6 @@
-use std::{collections::BTreeMap, fs, net::TcpListener};
+mod support;
+
+use std::{collections::BTreeMap, fs};
 use std::{
     os::unix::fs::PermissionsExt,
     sync::Arc,
@@ -25,11 +27,7 @@ fn isolated_environment(
 }
 
 fn unused_port() -> u16 {
-    TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
+    support::reserve_server_port().local_addr().unwrap().port()
 }
 
 #[test]
@@ -251,7 +249,7 @@ fn model_discovery_uses_metadata_recurses_and_preserves_unknown_files() {
 
 #[test]
 fn native_port_inspection_blocks_busy_ports_and_identifies_owned_sockets() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let listener = support::reserve_server_port();
     let port = listener.local_addr().unwrap().port();
     let inspected = platform::inspect_port(port).unwrap();
     assert!(inspected.occupied);

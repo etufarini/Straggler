@@ -725,7 +725,7 @@ engines once before running browser checks:
 
 ```bash
 cd straggler/desktop
-npm exec -- playwright install chromium webkit
+npm exec -- playwright install webkit
 cd ../..
 bash straggler/tests/run.sh
 ```
@@ -760,8 +760,12 @@ On headless Linux, native checks use Xvfb, a private D-Bus session and software
 rendering when available. An explicitly requested `native` suite fails without
 a display or those tools; the default suite reports the native check as skipped.
 
-CI runs frontend checks once and common, runtime, browser and real native-window
-checks on Linux/macOS CPU runners. The isolation check compiles the actual desktop
+CI runs on pull requests and pushes to main, avoiding duplicate branch-push runs.
+It runs frontend checks once and common, runtime, WebKit browser and real native-window
+checks on Linux/macOS CPU runners. Chromium is not a required desktop target.
+The runtime suite runs Rust tests serially to isolate native socket probes and
+process fixtures; tests of concurrent operations still run their own workers.
+The isolation check compiles the actual desktop
 without the opposite platform's module/configuration. Linux browser WebKit does
 not replace native macOS WebView and process checks. Native WebDriver is debug-only
 and rejected in release builds. Pinned upstream fixture contracts are listed in
@@ -894,7 +898,7 @@ Ubuntu DEBs on native ARM64/x64 runners. It retains packages and test evidence a
 Actions artifacts. Trigger it from a branch with:
 
 ```bash
-gh workflow run check.yml --ref YOUR_BRANCH -f packaging=true
+gh workflow run backend-packaging.yml --ref YOUR_BRANCH
 ```
 
 Normal push checks do not download the backend. Candidate artifacts are for

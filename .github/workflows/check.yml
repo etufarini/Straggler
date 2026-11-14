@@ -2,13 +2,9 @@ name: Straggler checks
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      packaging:
-        description: Build and verify pinned backend packages without models
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -18,9 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend-packaging:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.packaging }}
-    uses: ./.github/workflows/backend-packaging.yml
   frontend:
     name: Frontend without native build tools
     runs-on: ubuntu-24.04
@@ -45,6 +38,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
     steps:
@@ -73,7 +67,7 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Browser system dependencies
         working-directory: straggler/desktop
-        run: npx playwright install-deps chromium webkit
+        run: npx playwright install-deps webkit
       - name: Cache test browsers
         uses: actions/cache@v5
         with:
@@ -84,7 +78,7 @@ jobs:
         shell: bash
         run: |
           for attempt in 1 2 3; do
-            if npx playwright install chromium webkit; then
+            if npx playwright install webkit; then
               exit 0
             fi
             if [ "$attempt" -eq 3 ]; then
