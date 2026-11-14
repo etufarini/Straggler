@@ -335,7 +335,6 @@ export function useConversation(
         await save(current).catch(() => {});
       }
       setGenerating(false);
-      textarea.current?.focus();
     }
   }
 
