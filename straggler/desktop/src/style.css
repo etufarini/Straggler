@@ -3197,6 +3197,13 @@ input:focus-visible {
   font-weight: 400;
   color: var(--ui-muted);
 }
+.release-date-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
 
 /* Temporary chat uses the approved empty-sky treatment. */
 :root {

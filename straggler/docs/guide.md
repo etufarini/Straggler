@@ -496,7 +496,20 @@ select an existing build or **Use bundled backend** to return to the included on
 Stop the server before switching. The included backend shows its version, build
 number and release date from packaged metadata, with no runtime release lookup.
 External version/build/commit come from `llama-server --version`, including its
-stderr output; their release date is **Not reported**.
+stderr output. Opening **Settings → llama.cpp** checks the public GitHub API for
+the corresponding upstream release. Its publication date is shown only when the
+release tag resolves to the commit reported by the binary, including abbreviated
+commit hashes and annotated tags. Build-number tags are checked first; stable
+semantic versions also check their version tag. This is the upstream release
+date, not the date a local binary was compiled.
+
+Release lookups run separately from configuration and server controls, with an
+eight-second deadline. Results are cached in memory for five minutes for each
+version/build/commit. The lookup sends only candidate upstream tags; no local
+paths, models or conversations are sent. It never downloads or changes a backend.
+Builds without a usable commit, missing releases and commit mismatches show why
+the date cannot be verified. Network errors and API rate limits show a **Retry
+lookup** action. Backend startup and chat remain available without this lookup.
 
 External builds can advertise different devices and options. Straggler discovers
 those capabilities rather than assuming that every build supports the same

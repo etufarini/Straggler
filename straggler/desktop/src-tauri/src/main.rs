@@ -54,6 +54,13 @@ async fn configuration(state: State<'_, Application>) -> Result<Configuration> {
 }
 
 #[tauri::command]
+async fn backend_release(
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::backend_release::BackendRelease> {
+    runtime(&state)?.backend_release().await
+}
+
+#[tauri::command]
 async fn apply_settings(
     settings: Settings,
     state: State<'_, Application>,
@@ -677,6 +684,7 @@ fn main() {
             #[cfg(feature = "native-tests")]
             test_data_dir,
             configuration,
+            backend_release,
             apply_settings,
             workspace_action,
             choose_models_folder,
