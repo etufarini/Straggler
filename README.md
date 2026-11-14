@@ -10,7 +10,7 @@ computer. Projects let you share instructions and documents across chats.
 
 Straggler is written for humans to read, maintain, and improve.
 
-[<img src="straggler/docs/screenshots/desktop-chat.png" alt="Straggler desktop conversation screen before configuring a model" width="640">](straggler/docs/screenshots/desktop-chat.png)
+[<img src="straggler/docs/screenshots/d008/desktop-chat.png" alt="Straggler desktop conversation screen before configuring a model" width="640">](straggler/docs/screenshots/d008/desktop-chat.png)
 
 *First-launch screen, before loading a model.*
 
@@ -52,8 +52,10 @@ You can open and develop the app without model weights or an inference service.
 
 ## First launch
 
-1. In **Settings → Folders**, choose your models folder and confirm **Use this
-   folder**. Straggler searches subfolders too.
+1. In **Settings → Folders**, use **Choose existing folder** for your GGUF files,
+   or **Create models folder** to create storage in the app data directory. The
+   **Models → Hugging Face** tab can search and download GGUFs on your request;
+   a token is optional and stays in the system keychain.
 2. In **Model settings**, choose a model and review the settings. Select **Apply
    changes**, then **Back to chat**.
 3. Select **Launch server** and wait for **Ready**, then send a message.
@@ -61,9 +63,11 @@ You can open and develop the app without model weights or an inference service.
 
 The model selector and server controls stay at the top of chat. **Stop response**
 keeps the text received so far; **Stop server** shuts down llama.cpp. Closing the
-app asks you to confirm saving and server shutdown.
+app asks you to confirm saving and server shutdown. On a new chat, **Temporary**
+(or Ctrl/⌘+Shift+N) keeps messages and attachments in memory until you choose
+**Save chat**; leaving asks before erasing them.
 
-[<img src="straggler/docs/screenshots/desktop-settings.png" alt="Straggler model settings before choosing a GGUF" width="640">](straggler/docs/screenshots/desktop-settings.png)
+[<img src="straggler/docs/screenshots/d008/desktop-settings.png" alt="Straggler model settings before choosing a GGUF" width="640">](straggler/docs/screenshots/d008/desktop-settings.png)
 
 See the [user and developer guide](straggler/docs/guide.md) for chat, files,
 projects, settings, backups, troubleshooting, development and packaging.

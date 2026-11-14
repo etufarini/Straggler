@@ -83,10 +83,12 @@ identity, cancellation, storage recovery and streaming.
 
 The native test copies the GUI away from the source tree and rejects Bash,
 Python-helper, curl and OS utility invocations by the app. Python is permitted
-only for the fake backend. The test exercises the actual window, IPC, fatal error
-recovery, partial response persistence, confirmed Stop/restart and shutdown
-cleanup. WebDriver is enabled only by `native-tests` in debug builds; production
-compilation rejects it.
+only for the fake backend and the loopback Hub development fixture. The test
+exercises the actual window, IPC, fatal error recovery, partial response persistence, confirmed Stop/restart and shutdown
+cleanup. It also checks temporary chat disposal and a synthetic Hub download
+through real IPC, native filesystem writes and SHA-256 verification; the keychain
+provider is replaced by an in-memory store. WebDriver is enabled only by
+`native-tests` in debug builds; production compilation rejects it.
 
 Browser WebKit on Linux provides renderer coverage. Native macOS WebView, process
 and package behavior still require a macOS runner. Offline packaging tests use
@@ -123,7 +125,27 @@ changing the pin or fake server; keep fixtures aligned with native services:
 - [Stream serialization](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-task.cpp)
 - [Context limits and request rejection](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/tools/server/server-context.cpp)
 - [Fatal Metal diagnostic](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/ggml/src/ggml-metal/ggml-metal-context.m)
+- [Select-only combobox keyboard contract](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/examples/combobox-select-only/)
+- [Hub repository API and tree/LFS metadata](https://huggingface.co/docs/hub/api)
+- [FileChooser portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.FileChooser.html)
 - [Tauri native dialogs](https://v2.tauri.app/plugin/dialog/)
+
+Temporary backend fixtures advertise `--slots`, `--cache-ram` and `--log-disable`,
+provide an idle slot with an arbitrary ID, and implement slot erase. Review the
+pinned server context/slot code when changing privacy flags: `cache_prompt: false`
+alone does not disable global RAM cache. Tests need no model or real inference.
+
+`src-tauri/src/huggingface/tests.rs` and `tests/fixtures/huggingface.py` serve Hub-shaped
+search, immutable repository/tree metadata with LFS SHA-256, Range responses and
+synthetic file bytes on loopback. Tests cover interruption, ignored/invalid Range,
+checksum mismatch, parts, cancellation, storage errors and explicit resume after
+restart. `STRAGGLER_TEST_HF_ENDPOINT` exists only in debug `native-tests` builds,
+accepts IPv4 loopback HTTP and uses a memory token store. It is absent in production.
+The browser Hub fixture uses explicit test controls documented by
+`tests/e2e/hugging-face.spec.ts`, including gated access and low-disk/interruption
+flags; these are development controls, not production preferences.
+Live OS keychain, Flatpak portal grants and signed macOS Store bookmark/child access
+remain platform integration checks; mocks do not establish those permissions.
 
 ## Optional visual diagnostics
 
@@ -134,8 +156,21 @@ Run these commands from `straggler/desktop` with Vite running:
 | `node tests/design-review.mjs final` | Browser fixture captures under `test-results/design/` |
 | `node tests/design-review.mjs r001` | Captures including project scenarios; reference views need the separately supplied design dossier |
 
-Captures document simulated UI states, not inference results. From the repository
-root on Linux, run the optional animation measurement with:
+For real first-use native screenshots, set `STRAGGLER_CAPTURE_DOCS` to a new
+version directory when running the native suite, for example:
+
+```bash
+STRAGGLER_CAPTURE_DOCS=d009 bash straggler/tests/run.sh native
+```
+
+Run that command from the repository root. It creates
+`straggler/docs/screenshots/d009/` exclusively and refuses to overwrite an existing
+version. It opens the real app without a configured backend or model, captures
+chat and settings, then closes the window. Keep the original dossier baseline
+immutable; append evidence in a new dossier revision without using its builder.
+
+Browser captures document simulated UI states, not inference results. From the
+repository root on Linux, run the optional animation measurement with:
 
 ```bash
 STRAGGLER_MEASURE_ORB=1 bash straggler/tests/run.sh native

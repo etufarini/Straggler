@@ -67,10 +67,11 @@ libraries, including WebKitGTK and GTK. Models and GPU drivers remain separate.
    `build/bin/llama-server` or `bin/llama-server`. Packaged builds normally use
    their included backend. If that backend is unavailable, follow
    [troubleshooting](#other-common-problems).
-2. In **Folders**, select **Choose folder** for **Models folder**. Browse to the
-   folder containing your GGUF files and confirm your selection with **Use this
-   folder** in the regular edition, or the native picker in the App Store variant.
-   Subfolders are searched recursively; an empty folder is also valid while you set up.
+2. In **Folders**, select **Choose existing folder** for your GGUF files, or
+   **Create models folder** to create a folder in the Tauri app data directory.
+   The system picker saves the selection only when you accept it; cancellation
+   keeps the previous folder. Straggler searches two subfolder levels. An empty
+   folder is valid; use **Models → Hugging Face** to download a model explicitly.
 3. In **Model settings**, choose a model. Review context size, memory format and
    reply settings, then select **Apply changes**. The
    [settings reference](#settings-reference) explains the controls.
@@ -81,10 +82,10 @@ libraries, including WebKitGTK and GTK. Models and GPU drivers remain separate.
    Select **Stop response** if you want to stop generation and keep the text
    received so far.
 
-In the regular edition, opening folders only navigates: **Use this folder** saves
-and validates your choice; **Cancel** keeps the previous folder. Use **Show hidden
-folders** or enter a path to reach hidden directories. The App Store variant uses
-the native folder picker to grant access to models.
+Models use the system folder picker on both platforms. Hidden folders remain
+accessible through the picker’s hidden-file control or path entry. Flatpak uses
+the FileChooser portal directly. External backend selection uses the existing
+folder browser; **Use this folder** accepts it and **Cancel** preserves the path.
 
 To reuse the model and server settings later, save a configuration under
 [Saved configurations](#saved-configurations). Conversations are stored separately.
@@ -129,6 +130,29 @@ To set instructions for this chat:
 An explicitly empty custom prompt sends no system message. Project chats use
 their project's instructions, as described under
 [Shared instructions](#shared-instructions).
+
+### Temporary chats
+
+On an empty chat outside a project, choose **Temporary** or press Ctrl/⌘+Shift+N.
+The empty-sky appearance marks the session. Messages and attachment originals
+stay in memory: no conversation history, search entries, project association or
+draft is written. Exports and attachment downloads are available after saving.
+**Save chat** creates a normal conversation, including its attachment originals.
+If saving fails, the temporary session remains available for retry.
+
+New chat, another conversation, Settings and native window close ask before
+leaving. Choose to stay, **Save chat**, or erase the temporary conversation.
+Closing the application also confirms server shutdown and pauses downloads.
+
+If a server is running, starting a temporary session restarts it with advertised
+`--slots --cache-ram 0 --log-disable`; unsupported external builds are refused.
+Temporary requests use `cache_prompt: false` and an explicitly discovered slot.
+On exit Straggler erases that slot and stops the owned process, releasing its RAM;
+the normal server restarts for continued use unless the app is closing. Raw
+private backend output and HTTP error bodies are not retained in app logs.
+For the pinned backend, disabling `cache_prompt` alone does not prevent its global
+RAM prompt cache from retaining data; disabling cache RAM and ending the process
+are therefore required.
 
 ### Use reasoning controls
 
@@ -406,19 +430,60 @@ for older files and missing-field defaults.
 
 ### Folders
 
-Use **Choose folder** to change the models directory or the external llama.cpp
-directory. A folder is saved automatically once you select **Use this folder** and
-validation succeeds. Browsing and cancellation leave the previous path in place.
-Hidden folders can be shown or opened by path.
+For models, **Create models folder** creates `models/` beneath Tauri’s app data
+directory for bundle identifier `io.github.etufarini.straggler`. The UI shows the
+resolved path before creation. This is separate from conversation storage. The
+regular Linux path is `${XDG_DATA_HOME:-$HOME/.local/share}/io.github.etufarini.straggler/models`;
+on macOS it is `~/Library/Application Support/io.github.etufarini.straggler/models`
+inside the app container when sandboxed. **Choose existing folder** uses the system
+picker; cancellation preserves the current folder. Flatpak uses FileChooser over
+D-Bus without an external helper fallback. A missing portal produces an error.
 
-Model discovery searches readable folders recursively for GGUFs and allows empty
-folders. An external backend folder must contain an executable
-`build/bin/llama-server` or `bin/llama-server`; the source-build layout takes
-precedence if both are present. Stop the server before changing its backend.
+Discovery searches the selected folder and two nested directory levels. Existing
+root-level GGUF files still work. Split models appear once, using the first part;
+all numbered parts must be present. Empty folders are valid.
 
-The App Store variant uses a native models-folder picker and does not allow
-external backend selection. See [App Store data and permissions](#app-store-data-and-permissions)
-for persistent access.
+For an external llama.cpp build, **Choose folder** opens the existing folder
+browser. Browse without saving, then accept with **Use this folder**. Hidden
+folders can be shown or opened by path. A backend folder must contain executable
+`build/bin/llama-server` or `bin/llama-server`; source builds take precedence.
+Stop the server before changing its backend. The App Store edition uses only its
+included backend and retains model permissions through security-scoped bookmarks.
+
+### Hugging Face
+
+A token is optional. In **Settings → Hugging Face**, save or remove a read token
+in the operating system keychain: Secret Service on Linux, Keychain on macOS.
+It is never saved in settings, browser storage or the download journal. If the
+keychain is unavailable or locked, public access remains available and the UI
+reports the problem. Flatpak must permit access to its system Secret Service.
+
+Open **Models → Hugging Face** and explicitly search for GGUF repositories, paste
+`publisher/repository`, or paste an HTTPS Hugging Face repository/file link. Open
+a result, choose a file version and optionally an mmproj file documented by its
+publisher. Downloading a projector does not enable image input in Straggler.
+**Repository revision** allows a branch, tag or commit; downloads pin the resolved
+commit. File-size memory estimates are approximate: context, cache and device
+placement affect actual use. Unknown RAM does not block downloads.
+
+Review the publisher’s model card and license. Gated repositories may require
+license acceptance or approval in your browser plus an authorized read token.
+Use **Copy repository link**, complete access there, then retry. Straggler does
+not accept licenses or create an account on your behalf.
+
+Files go to `models-folder/publisher/repository/file.gguf`. Space is checked before
+transfer. **Pause** keeps `.gguf.part` and its identity sidecar; **Resume** uses
+HTTP Range, or restarts safely if the server ignores Range. Restarting Straggler
+restores paused downloads without contacting the Hub. Resume is explicit.
+**Cancel** removes only matching partial files. Existing unrelated files remain.
+SHA-256 must be reported by the Hub and match every part before final files are
+published. Split models download and verify as a group, then appear under
+**On this computer**. Closing the app pauses active transfers. Failed writes,
+interrupted transfers and checksum failures are reported with retry controls.
+
+Opening settings, switching tabs, startup and local model discovery do not
+contact Hugging Face. Search, opening/retrying a repository, download and resume
+are the network actions. No inference service is contacted by these controls.
 
 ### llama.cpp
 
@@ -426,7 +491,10 @@ This section identifies the selected backend and displays available version,
 commit and build details. The bundled backend is pinned; its updates arrive with
 application updates. In the regular edition, use **Choose external build** to
 select an existing build or **Use bundled backend** to return to the included one.
-Stop the server before switching.
+Stop the server before switching. The included backend shows its version, build
+number and release date from packaged metadata, with no runtime release lookup.
+External version/build/commit come from `llama-server --version`, including its
+stderr output; their release date is **Not reported**.
 
 External builds can advertise different devices and options. Straggler discovers
 those capabilities rather than assuming that every build supports the same
@@ -514,6 +582,7 @@ regular edition on both Linux and macOS:
 | --- | --- |
 | Saved folders | `${XDG_CONFIG_HOME:-$HOME/.config}/straggler/paths.conf` |
 | Saved configurations | `${XDG_CONFIG_HOME:-$HOME/.config}/straggler/profiles/*.conf` |
+| Hub download journal (no token; restores paused) | `${XDG_DATA_HOME:-$HOME/.local/share}/straggler/desktop/huggingface/downloads.json` |
 | Conversations, attachments, projects, preferences and session lock | `${XDG_DATA_HOME:-$HOME/.local/share}/straggler/desktop/` |
 
 The path notation means: use `XDG_CONFIG_HOME` or `XDG_DATA_HOME` when set to a
@@ -613,7 +682,9 @@ edition storage; use its own container when backing up or restoring data.
 
 Choose model folders through the native picker. Persistent security-scoped
 bookmarks restore access after restart; if a grant is missing, select the folder
-again. Native Save panels grant export and download destinations. This edition
+again. Scopes remain active before launching the bundled child process. Linked
+folder access by that child must be checked in a signed, sandboxed macOS Store
+build; Linux checks cannot establish this platform permission behavior. Native Save panels grant export and download destinations. This edition
 uses only its included backend.
 
 ## Development and architecture
@@ -726,7 +797,12 @@ Plain `npm run bundle` builds the Tauri app without preparing the pinned backend
 use the packaging tools to produce a package containing that backend.
 
 `packaging/llama-runtime.json` pins backend release `b12248`, its source commit and
-per-architecture SHA-256 digests. Preparation verifies archives, copies only required
+per-architecture SHA-256 digests, version, build number and release date.
+The release date is the GitHub `published_at` of the pinned `bNNNN` release,
+recorded during packaging rather than fetched by the installed app. To refresh
+metadata while deliberately updating a pin, run
+`python3 packaging/backend.py --refresh-release-metadata --version VERSION`
+from the desktop directory and review the changed JSON. Preparation verifies archives, copies only required
 executables/libraries, and includes both licenses and provenance. It rejects unsafe
 archive paths and unknown external dependencies. A failed preparation preserves
 the previous result. `prepare` and `bundle` accept `--archive /path/to/archive.tar.gz`
