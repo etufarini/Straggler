@@ -351,6 +351,8 @@ export function createFixture(scenario: Scenario) {
           throw new Error('Tokenization unavailable');
         return approximateTokens(String(args.content));
       case 'prompt_tokens': {
+        while (localStorage.getItem('straggler-fixture-prompt-tokens-paused'))
+          await new Promise((resolve) => setTimeout(resolve, 20));
         if (
           status.phase !== 'ready' ||
           localStorage.getItem('straggler-fixture-tokenize-unavailable')
@@ -503,6 +505,8 @@ export function createFixture(scenario: Scenario) {
           if (current?.projectId && projectFixture.find(current.projectId).archived)
             throw new Error('Restore this project to make changes.');
         }
+        while (localStorage.getItem('straggler-fixture-generation-paused'))
+          await new Promise((resolve) => setTimeout(resolve, 20));
         if (localStorage.getItem('straggler-fixture-context-rejection'))
           throw new Error(
             'HTTP 400: {"error":{"code":400,"type":"exceed_context_size_error","message":"request (5000 tokens) exceeds the available context size (4096 tokens), try increasing it","n_prompt_tokens":5000,"n_ctx":4096}}',
@@ -535,6 +539,8 @@ export function createFixture(scenario: Scenario) {
           channel.onmessage({ ...delta, reasoning: '' });
           await new Promise((resolve) => setTimeout(resolve, 1200));
         } else channel.onmessage(delta);
+        while (localStorage.getItem('straggler-fixture-response-paused'))
+          await new Promise((resolve) => setTimeout(resolve, 20));
         if (['oom', 'oom-and-save-error'].includes(scenario) && !memoryFailureSeen) {
           generatingConversation = null;
           failMemory();

@@ -60,11 +60,132 @@ test('cancel keeps partial response and permits the next conversation', async ({
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Write something');
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.locator('.markdown strong')).toHaveText('local');
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  await expect(composer).toBeEditable();
+  await expect(composer).toBeFocused();
+  await composer.fill('My next question');
+  await composer.press('Enter');
+  await expect(page.locator('.message.user')).toHaveCount(1);
   await page.getByRole('button', { name: 'Stop response' }).click();
   await expect(page.getByText('Response stopped', { exact: true })).toBeVisible();
   await expect(page.locator('.markdown strong')).toHaveText('local');
+  await expect(composer).toHaveValue('My next question');
+  await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled();
   await expect(page.getByRole('button', { name: /New chat/ })).toBeEnabled();
 });
+
+test('typing during prompt validation preserves the next draft and the submitted request', async ({
+  page,
+}) => {
+  await mockDesktop(page);
+  await page.goto('/');
+  await loadModel(page);
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  await composer.fill('First question');
+  await page.evaluate(() => localStorage.setItem('straggler-fixture-prompt-tokens-paused', 'true'));
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(composer).toBeFocused();
+  await expect(composer).toHaveValue('');
+  await composer.fill('Next question');
+  await composer.press('Enter');
+  await expect(composer).toHaveValue('Next question');
+  await page.evaluate(() => localStorage.removeItem('straggler-fixture-prompt-tokens-paused'));
+  await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
+  await expect(composer).toHaveValue('Next question');
+  await expect(page.locator('.message.user')).toHaveCount(1);
+  const request = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('straggler-fixture-request')!),
+  );
+  expect(request.messages).toEqual([{ role: 'user', content: 'First question' }]);
+});
+
+test('streaming permits multiline drafts without duplicate sends and keeps them after completion', async ({
+  page,
+}) => {
+  await mockDesktop(page);
+  await page.goto('/');
+  await loadModel(page);
+  await page.evaluate(() => localStorage.setItem('straggler-fixture-response-paused', 'true'));
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  await composer.fill('First question');
+  await composer.press('Enter');
+  await expect(page.locator('.markdown strong')).toHaveText('local');
+  await expect(composer).toBeEditable();
+  await expect(composer).toBeFocused();
+  await composer.fill('Next question');
+  await composer.press('Shift+Enter');
+  await composer.press('Enter');
+  await expect(composer).toHaveValue('Next question\n');
+  await composer.evaluate((element: HTMLTextAreaElement) => element.form?.requestSubmit());
+  await expect(page.locator('.message.user')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Stop response' })).toBeVisible();
+  await page.evaluate(() => localStorage.removeItem('straggler-fixture-response-paused'));
+  await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled();
+  await expect(composer).toHaveValue('Next question\n');
+  await composer.press('Enter');
+  await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
+  await expect(page.locator('.message.user')).toHaveCount(2);
+  await expect(page.locator('.message.user').last()).toContainText('Next question');
+  const request = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('straggler-fixture-request')!),
+  );
+  expect(request.messages.filter((message: { role: string }) => message.role === 'user')).toEqual([
+    { role: 'user', content: 'First question' },
+    { role: 'user', content: 'Next question' },
+  ]);
+});
+
+for (const edited of [false, true]) {
+  test(`prompt rejection ${edited ? 'keeps a newer draft' : 'restores the untouched submitted text'}`, async ({
+    page,
+  }) => {
+    await mockDesktop(page);
+    await page.goto('/');
+    await loadModel(page);
+    const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    await composer.fill('Rejected question');
+    await page.evaluate(() => {
+      localStorage.setItem('straggler-fixture-prompt-tokens-paused', 'true');
+      localStorage.setItem('straggler-fixture-prompt-tokens', '5000');
+    });
+    await page.getByRole('button', { name: 'Send message' }).click();
+    await expect(composer).toHaveValue('');
+    if (edited) await composer.fill('A newer draft');
+    await page.evaluate(() => localStorage.removeItem('straggler-fixture-prompt-tokens-paused'));
+    await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
+    await expect(composer).toHaveValue(edited ? 'A newer draft' : 'Rejected question');
+    await expect(page.getByRole('alert')).toContainText('exceed the 4,096-token context');
+    await expect(page.locator('.message.user')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-request'))).toBeNull();
+  });
+}
+
+for (const cleared of [false, true]) {
+  test(`late server rejection preserves ${cleared ? 'a deliberately cleared draft' : 'a newer draft'}`, async ({
+    page,
+  }) => {
+    await mockDesktop(page);
+    await page.goto('/');
+    await loadModel(page);
+    await page.evaluate(() => {
+      localStorage.setItem('straggler-fixture-generation-paused', 'true');
+      localStorage.setItem('straggler-fixture-context-rejection', 'true');
+    });
+    const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    await composer.fill('Rejected question');
+    await page.getByRole('button', { name: 'Send message' }).click();
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('straggler-fixture-request')))
+      .not.toBeNull();
+    await composer.fill('A newer draft');
+    if (cleared) await composer.fill('');
+    await page.evaluate(() => localStorage.removeItem('straggler-fixture-generation-paused'));
+    await expect(page.getByText('Response failed', { exact: true })).toBeVisible();
+    await expect(composer).toHaveValue(cleared ? '' : 'A newer draft');
+    await expect(page.locator('.message.user')).toHaveCount(1);
+    await expect(page.locator('.message.user')).toContainText('Rejected question');
+  });
+}
 
 test('clipboard failure stays beside its response without blocking chat', async ({ page }) => {
   await mockDesktop(page);

@@ -8,8 +8,10 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Choose model', exact: true }).click();
   await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.evaluate(() => localStorage.setItem('straggler-fixture-response-paused', 'true'));
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A conversation');
   await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByRole('button', { name: 'Stop response' })).toBeVisible();
   const trigger = page.getByRole('button', { name: 'Options for A conversation' });
   await expect(trigger).toHaveCSS('opacity', '1');
   await expect(trigger).toBeEnabled();
@@ -18,6 +20,9 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   const items = page.getByRole('menuitem');
   await expect(items).toHaveCount(4);
   await expect(items.nth(2)).toHaveText('Move to project…');
+  await expect(items.nth(0)).toBeFocused();
+  await page.evaluate(() => localStorage.removeItem('straggler-fixture-response-paused'));
+  await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
   await expect(items.nth(0)).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(items.nth(1)).toBeFocused();
