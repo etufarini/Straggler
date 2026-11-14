@@ -161,6 +161,17 @@ const HoloOrb = (function (root) {
   };
   // Idle states come to rest (ready after one slow turn: WCAG 2.2.2).
   const RESTING = { offline: 0, stopped: 0, error: 0, ready: 14 };
+  const QUALITY = [
+    { resolution: 1, stride: 1, details: true },
+    { resolution: 0.85, stride: 2, details: true },
+    { resolution: 0.7, stride: 3, details: false },
+  ];
+  const PANEL_LINES = [
+    [0.1, 0.65, 0.26],
+    [0.22, 0.62, 0.44],
+    [0.22, 0.84, 0.62],
+    [0.1, 0.4, 0.8],
+  ];
 
   const hsla = (h, s, l, a) =>
     `hsla(${h.toFixed(0)},${s.toFixed(0)}%,${l.toFixed(0)}%,${a.toFixed(3)})`;
@@ -172,7 +183,13 @@ const HoloOrb = (function (root) {
       this.loop = this.loop.bind(this);
       this.autostart = options.autostart !== false;
       this.size = options.size || canvas.clientWidth || 240;
-      this.dpr = Math.min(Math.max(options.dpr || root.devicePixelRatio || 1, 1.5), 2);
+      this.dpr = clamp(options.dpr || root.devicePixelRatio || 1, 1, 2);
+      this.quality = 0;
+      this.pendingQualityResize = false;
+      this.qualityElapsed = 0;
+      this.recoveryElapsed = 0;
+      this.frameIntervals = [];
+      this.drawTimes = [];
       this.state = options.state || 'ready';
       this.scanlines = options.scanlines !== false;
       this.cur = Object.assign({}, STATES[this.state]);
@@ -258,6 +275,7 @@ const HoloOrb = (function (root) {
           h: 0.22 + r() * 0.08,
           kind: 'screen',
           seed: r(),
+          corners: Array.from({ length: 4 }, () => [0, 0, 0, 0]),
         });
       }
       for (let i = 0; i < 22; i++) {
@@ -268,13 +286,15 @@ const HoloOrb = (function (root) {
           h: 0.03 + r() * 0.025,
           kind: 'strip',
           seed: r(),
+          corners: Array.from({ length: 4 }, () => [0, 0, 0, 0]),
         });
       }
     }
 
     resize(size) {
       if (size) this.size = size;
-      const px = Math.round(this.size * this.dpr);
+      this.pendingQualityResize = false;
+      const px = Math.round(this.size * this.dpr * QUALITY[this.quality].resolution);
       this.canvas.width = px;
       this.canvas.height = px;
       this.canvas.style.width = this.size + 'px';
@@ -339,6 +359,10 @@ const HoloOrb = (function (root) {
       if (this.raf) root.cancelAnimationFrame(this.raf);
       this.raf = 0;
       this.last = null;
+      this.qualityElapsed = 0;
+      this.frameIntervals.length = 0;
+      this.drawTimes.length = 0;
+      this.recoveryElapsed = 0;
     }
 
     wake() {
@@ -359,6 +383,7 @@ const HoloOrb = (function (root) {
         this.stopLoop();
         return;
       }
+      if (this.pendingQualityResize) this.resize();
       if (this.reduce) {
         this.snap();
         this.draw();
@@ -368,15 +393,56 @@ const HoloOrb = (function (root) {
       // The browser owns the refresh cadence, including variable refresh rates.
       // Elapsed time keeps motion independent of that cadence; clamp long stalls
       // so a blocked event loop cannot cause a large jump or catch-up work.
-      const dt = this.last === null ? 0 : Math.min(0.1, (now - this.last) / 1000);
+      const interval = this.last === null ? 0 : now - this.last;
+      const dt = Math.min(0.1, interval / 1000);
       this.last = now;
       if (this.state !== 'stopped') this.step(dt);
+      const drawStart = root.performance.now();
       this.draw();
+      this.recordFrame(interval, root.performance.now() - drawStart);
       if (this.settled()) {
         this.stopLoop();
         return;
       }
       this.wake();
+    }
+
+    recordFrame(interval, drawMs) {
+      // Ignore startup and stalls unrelated to a sustained rendering workload.
+      if (interval <= 0 || interval > 250) return;
+      this.qualityElapsed += interval;
+      this.frameIntervals.push(interval);
+      this.drawTimes.push(drawMs);
+      if (this.qualityElapsed < 1000) return;
+
+      this.frameIntervals.sort((a, b) => a - b);
+      this.drawTimes.sort((a, b) => a - b);
+      const count = this.drawTimes.length;
+      // Reserve most of a frame for the chat and WebView compositing. Faster
+      // displays tighten this budget; missed refreshes must not loosen it.
+      const budget = Math.min(1000 / 60, this.frameIntervals[Math.floor(count * 0.2)]);
+      const average = this.drawTimes.reduce((sum, time) => sum + time, 0) / count;
+      const p95 = this.drawTimes[Math.floor(count * 0.95)];
+      let nextQuality = this.quality;
+      if (average > budget * 0.45 || p95 > budget * 0.7) {
+        nextQuality = Math.min(QUALITY.length - 1, this.quality + 1);
+        this.recoveryElapsed = 0;
+      } else if (average < budget * 0.18 && p95 < budget * 0.35) {
+        this.recoveryElapsed += this.qualityElapsed;
+        if (this.recoveryElapsed >= 8000) {
+          nextQuality = Math.max(0, this.quality - 1);
+          this.recoveryElapsed = 0;
+        }
+      } else this.recoveryElapsed = 0;
+      this.qualityElapsed = 0;
+      this.frameIntervals.length = 0;
+      this.drawTimes.length = 0;
+      if (nextQuality !== this.quality) {
+        this.quality = nextQuality;
+        // Resizing clears a canvas. Apply it before the next draw so the current
+        // frame is presented intact instead of flashing an empty surface.
+        this.pendingQualityResize = true;
+      }
     }
 
     target(key) {
@@ -467,6 +533,7 @@ const HoloOrb = (function (root) {
       const H = c.hue,
         S = c.sat;
       const unit = W / 260;
+      const quality = QUALITY[this.quality];
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalCompositeOperation = 'source-over';
@@ -512,7 +579,7 @@ const HoloOrb = (function (root) {
         return ease(clamp(base * 1.45 - seed * 0.45, 0, 1));
       };
 
-      this.drawPanels(ctx, cosY, sinY, cosX, sinX, R, cx, cy, unit);
+      this.drawPanels(ctx, cosY, sinY, cosX, sinX, R, cx, cy, quality.details);
 
       // Reuse projection buffers across particles to keep garbage collection
       // out of the animation's hot path. Panels retain their own corner arrays.
@@ -526,7 +593,8 @@ const HoloOrb = (function (root) {
         const sprite = this.sprite(H + ring.hueOffset, S, 66);
         const speed = ring.speedFactor * (0.3 + c.spin * 2 + c.waves * 0.6 + c.bands * 0.4);
         const head = (((t * speed) % TAU) + TAU) % TAU;
-        for (const q of ring.points) {
+        for (let index = 0; index < ring.points.length; index += quality.stride) {
+          const q = ring.points[index];
           this.rotate(q.p, cosY, sinY, cosX, sinX, v);
           this.project(v, R, cx, cy, sp);
           let d = Math.abs(q.a - head);
@@ -548,7 +616,8 @@ const HoloOrb = (function (root) {
       const bandAngle = c.bands * t * 0.9;
       const bandCos = Math.cos(bandAngle);
       const bandSin = Math.sin(bandAngle);
-      for (const q of this.shell) {
+      for (let index = 0; index < this.shell.length; index += quality.stride) {
+        const q = this.shell[index];
         const k = scatterOf(q.seed);
         let x = q.p[0];
         let z = q.p[2];
@@ -625,7 +694,7 @@ const HoloOrb = (function (root) {
         ctx.fill();
       }
 
-      if (this.scanlines) {
+      if (this.scanlines && quality.details) {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.globalAlpha = 0.1;
         ctx.fillStyle = '#000';
@@ -636,13 +705,16 @@ const HoloOrb = (function (root) {
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    drawPanels(ctx, cosY, sinY, cosX, sinX, R, cx, cy, unit) {
+    drawPanels(ctx, cosY, sinY, cosX, sinX, R, cx, cy, details) {
       const c = this.cur;
       const t = this.time;
       const W = this.canvas.width;
       const H = c.hue,
         S = c.sat;
+      const position = [0, 0, 0];
+      const rotated = [0, 0, 0];
       for (const q of this.panels) {
+        if (!details && q.kind === 'strip') continue;
         const k = ease(clamp(c.scatter * 1.4 - q.seed * 0.4, 0, 1));
         const radius =
           lerp(1.95, 3.1, k) -
@@ -658,12 +730,15 @@ const HoloOrb = (function (root) {
         if (c.shards > 0.01) py += (q.seed - 0.5) * 0.25 * c.shards;
         const hw = q.w / 2,
           hh = q.h / 2;
-        const corners = [
-          [px - tx * hw, py + hh, pz - tz * hw],
-          [px + tx * hw, py + hh, pz + tz * hw],
-          [px + tx * hw, py - hh, pz + tz * hw],
-          [px - tx * hw, py - hh, pz - tz * hw],
-        ].map((p) => this.project(this.rotate(p, cosY, sinY, cosX, sinX), R, cx, cy));
+        const corners = q.corners;
+        for (let index = 0; index < corners.length; index++) {
+          const side = index === 0 || index === 3 ? -1 : 1;
+          position[0] = px + side * tx * hw;
+          position[1] = py + (index < 2 ? hh : -hh);
+          position[2] = pz + side * tz * hw;
+          this.rotate(position, cosY, sinY, cosX, sinX, rotated);
+          this.project(rotated, R, cx, cy, corners[index]);
+        }
         const vz = (-nx * sinY + nz * cosY) * cosX;
         const facing = 0.3 + 0.7 * clamp((vz + 1) / 2, 0, 1);
         const hue = H + (q.kind === 'strip' ? (q.seed - 0.5) * 2 * c.spread : 0);
@@ -677,26 +752,29 @@ const HoloOrb = (function (root) {
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
-          const rows = [0.26, 0.44, 0.62, 0.8];
-          const lens = [0.55, 0.4, 0.62, 0.3];
-          const ind = [0.1, 0.22, 0.22, 0.1];
           const l = corners[0],
             rr = corners[1],
             bl = corners[3];
-          const at = (u, v) => [
-            l[0] + (rr[0] - l[0]) * u + (bl[0] - l[0]) * v,
-            l[1] + (rr[1] - l[1]) * u + (bl[1] - l[1]) * v,
-          ];
           ctx.lineWidth = Math.max(1, W / 320);
-          rows.forEach((rv, i) => {
-            const p0 = at(ind[i], rv),
-              p1 = at(ind[i] + lens[i], rv);
-            ctx.strokeStyle = hsla(i === 3 ? hue + c.spread * 1.5 : hue, S, 80, 0.95);
-            ctx.beginPath();
-            ctx.moveTo(p0[0], p0[1]);
-            ctx.lineTo(p1[0], p1[1]);
-            ctx.stroke();
-          });
+          ctx.strokeStyle = hsla(hue, S, 80, 0.95);
+          ctx.beginPath();
+          for (let index = 0; index < PANEL_LINES.length; index++) {
+            if (index === 3) {
+              ctx.stroke();
+              ctx.strokeStyle = hsla(hue + c.spread * 1.5, S, 80, 0.95);
+              ctx.beginPath();
+            }
+            const [start, end, row] = PANEL_LINES[index];
+            ctx.moveTo(
+              l[0] + (rr[0] - l[0]) * start + (bl[0] - l[0]) * row,
+              l[1] + (rr[1] - l[1]) * start + (bl[1] - l[1]) * row,
+            );
+            ctx.lineTo(
+              l[0] + (rr[0] - l[0]) * end + (bl[0] - l[0]) * row,
+              l[1] + (rr[1] - l[1]) * end + (bl[1] - l[1]) * row,
+            );
+          }
+          ctx.stroke();
         } else {
           const l = corners[0],
             rr = corners[1],

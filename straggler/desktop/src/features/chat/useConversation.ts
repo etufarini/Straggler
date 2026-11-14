@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Channel,
   invoke,
@@ -72,6 +72,7 @@ export function useConversation(
   const requestRef = useRef<string | null>(null);
   const cancelledRef = useRef<string | null>(null);
   const sendPromise = useRef<Promise<void> | null>(null);
+  const streamFrame = useRef<number | null>(null);
   const localQueue = useRef<Promise<void>>(Promise.resolve());
   const saveQueue = sharedQueue ?? localQueue;
   const rejectedDraft = useRef<{ chatId: string; userId: string } | null>(null);
@@ -122,11 +123,14 @@ export function useConversation(
     if (isTauri()) void loadHistory();
     return () => {
       mounted.current = false;
+      if (streamFrame.current !== null) cancelAnimationFrame(streamFrame.current);
+      streamFrame.current = null;
     };
   }, [loadHistory]);
-  useLayoutEffect(() => {
-    const list = messageList.current;
-    if (follow.current && list)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const list = messageList.current;
+      if (!follow.current || !list) return;
       list.scrollTo({
         top: list.scrollHeight,
         behavior:
@@ -134,6 +138,8 @@ export function useConversation(
             ? 'instant'
             : 'smooth',
       });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [chat, generating]);
   function save(value: Conversation, create = false): Promise<void> {
     if (value.id === temporaryRef.current) return Promise.resolve();
@@ -223,7 +229,8 @@ export function useConversation(
             : chatRef.current.messages),
           user,
         ]),
-        assistant,
+        // Incoming deltas must not mutate a snapshot React is still rendering.
+        { ...assistant },
       ],
     };
     const options = resolveChatOptions(current.options, settings);
@@ -267,22 +274,36 @@ export function useConversation(
     const onDelta = new Channel<Delta>();
     let generationStarted = false;
     let lastSave = Date.now();
+    let phase: 'waiting' | 'reasoning' | 'generating' = 'waiting';
+    function snapshotResponse() {
+      current = {
+        ...current,
+        messages: [...current.messages.slice(0, -1), { ...assistant }],
+        updatedAt: Date.now(),
+      };
+    }
+    function publishResponse() {
+      streamFrame.current = null;
+      if (!mounted.current || requestRef.current !== requestId) return;
+      snapshotResponse();
+      setGenerationPhase(phase);
+      updateChat(current);
+    }
     onDelta.onmessage = (delta) => {
       if (requestRef.current !== requestId) return;
       assistant.content += delta.content;
       assistant.reasoning += delta.reasoning;
       if (delta.metrics)
         assistant.metrics = { ...assistant.metrics, ...delta.metrics, runId: server.runId };
-      if (delta.content) setGenerationPhase('generating');
-      else if (delta.reasoning) setGenerationPhase('reasoning');
-      current = {
-        ...current,
-        messages: [...current.messages.slice(0, -1), { ...assistant }],
-        updatedAt: Date.now(),
-      };
-      updateChat(current);
+      if (delta.content) phase = 'generating';
+      else if (delta.reasoning) phase = 'reasoning';
+      if (streamFrame.current === null && mounted.current)
+        streamFrame.current = requestAnimationFrame(publishResponse);
       if (Date.now() - lastSave > 2000) {
         lastSave = Date.now();
+        // Persistence must keep receiving partial text even when hidden windows
+        // suspend animation callbacks. Visual updates can wait for the next frame.
+        snapshotResponse();
         void save(current).catch(() => {});
       }
     };
@@ -325,11 +346,9 @@ export function useConversation(
     } finally {
       // Ignore any queued IPC deltas once the final snapshot has arrived.
       requestRef.current = null;
-      current = {
-        ...current,
-        updatedAt: Date.now(),
-        messages: [...current.messages.slice(0, -1), { ...assistant }],
-      };
+      if (streamFrame.current !== null) cancelAnimationFrame(streamFrame.current);
+      streamFrame.current = null;
+      snapshotResponse();
       if (!replacement || generationStarted) {
         updateChat(current);
         await save(current).catch(() => {});

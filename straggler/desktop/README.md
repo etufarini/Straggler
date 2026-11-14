@@ -177,15 +177,22 @@ chat and settings, then closes the window. Keep the original dossier baseline
 immutable; append evidence in a new dossier revision without using its builder.
 
 Browser captures document simulated UI states, not inference results. From the
-repository root on Linux, run the optional animation measurement with:
+repository root on Linux or macOS, run the optional animation measurement with:
 
 ```bash
 STRAGGLER_MEASURE_ORB=1 bash straggler/tests/run.sh native
 ```
 
-It measures CPU/frame rate during fixture streaming and after hiding the native
-window. The hidden sample must render zero frames. Results include GUI and fixture
-overhead rather than inference performance.
+It records draw callback intervals through loading, reasoning and a longer
+Markdown response, then samples visible and hidden animation. Linux also measures
+CPU usage for the owned GUI process tree; macOS reports that CPU check as skipped.
+The hidden sample must render zero frames. These are callback measurements, not
+proof that each frame reached the display, and include GUI and fixture overhead
+rather than inference performance. Results are in `test-results/native-orb-cpu.json`.
+For a controlled desktop benchmark, set `STRAGGLER_ORB_MAX_FRAME_P95_MS` to a
+positive interval limit in milliseconds. This optional limit is not a hardware
+requirement for the standard suite. Browser streaming checks also attach
+`orb-performance.json` with draw costs and detail levels.
 
 ## Dependency maintenance
 

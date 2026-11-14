@@ -8,8 +8,11 @@ const callbacks = new Map<number, FrameRequestCallback>();
 const document = Object.assign(new EventTarget(), { hidden: false });
 let nextHandle = 0;
 let now = 0;
+let drawClock = 0;
+let drawCost = 0;
 vi.stubGlobal('window', {
   document,
+  performance: { now: () => drawClock },
   devicePixelRatio: 1,
   matchMedia: () => ({ matches: false }),
   requestAnimationFrame(callback: FrameRequestCallback) {
@@ -22,16 +25,19 @@ vi.stubGlobal('window', {
 });
 const { default: Orb } = await import('../src/features/presence/renderers/orb-engine.js');
 
-type ObservedOrb = HoloOrb & { time: number; yaw: number; draw(): void };
+type ObservedOrb = HoloOrb & { time: number; yaw: number; quality: number; draw(): void };
 const engines: ObservedOrb[] = [];
 
 function createEngine(state: PresenceState = 'generating') {
   const canvas = { style: {}, getContext: () => ({}) } as unknown as HTMLCanvasElement;
   const engine = new Orb(canvas, { size: 224, state, autostart: false }) as ObservedOrb;
   const frames: number[] = [];
-  engine.draw = () => frames.push(now);
+  engine.draw = () => {
+    frames.push(now);
+    drawClock += drawCost;
+  };
   engines.push(engine);
-  return { engine, frames };
+  return { engine, frames, canvas };
 }
 
 function refresh(time: number) {
@@ -43,6 +49,8 @@ function refresh(time: number) {
 
 beforeEach(() => {
   now = 0;
+  drawClock = 0;
+  drawCost = 0;
   document.hidden = false;
 });
 afterEach(() => {
@@ -222,4 +230,47 @@ test('destroy cancels callbacks and prevents later updates from restarting the e
   refresh(10000);
   expect(frames).toEqual([]);
   expect(callbacks.size).toBe(0);
+});
+
+test('sustained expensive draws reduce detail without skipping refreshes, then recover slowly', () => {
+  const { engine, frames, canvas } = createEngine();
+  expect(canvas.width).toBe(224);
+  drawCost = 14;
+  engine.wake();
+  for (let i = 0; i <= 180; i++) refresh((i * 1000) / 60);
+  expect(engine.quality).toBe(2);
+  expect(canvas.width).toBe(157);
+  expect(frames).toHaveLength(181);
+  expect(engine.time).toBeCloseTo(3);
+  drawCost = 1;
+  for (let i = 181; i <= 360; i++) refresh((i * 1000) / 60);
+  expect(engine.quality).toBe(2);
+  for (let i = 361; i <= 1260; i++) refresh((i * 1000) / 60);
+  expect(engine.quality).toBe(0);
+  expect(canvas.width).toBe(224);
+  expect(frames).toHaveLength(1261);
+  expect(engine.time).toBeCloseTo(21);
+});
+
+test('a single cold draw and a long background pause do not lower detail', () => {
+  const { engine } = createEngine();
+  engine.wake();
+  drawCost = 100;
+  refresh(0);
+  drawCost = 1;
+  for (let i = 1; i <= 120; i++) refresh((i * 1000) / 60);
+  engine.setPaused(true);
+  engine.setPaused(false);
+  refresh(120000);
+  expect(engine.quality).toBe(0);
+});
+
+test('high refresh displays use a smaller drawing budget', () => {
+  const { engine, frames } = createEngine();
+  drawCost = 5;
+  engine.wake();
+  for (let i = 0; i <= 300; i++) refresh((i * 1000) / 144);
+  expect(engine.quality).toBe(2);
+  expect(frames).toHaveLength(301);
+  expect(engine.time).toBeCloseTo(300 / 144);
 });

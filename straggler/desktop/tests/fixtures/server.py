@@ -129,10 +129,24 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.close_connection = True
         try:
-            event = 'data: ' + json.dumps({'choices': [{'delta': {'content': 'caffè ☕', 'reasoning_content': 'Thinking'}}], 'timings': {'cache_n': 10, 'prompt_n': 20, 'predicted_n': 2, 'predicted_ms': 100, 'predicted_per_second': 20, 'prompt_ms': 30}}, ensure_ascii=False) + '\r\n\r\n'
-            for byte in event.encode():
-                self.wfile.write(bytes([byte]))
-                self.wfile.flush()
+            if prompt == 'animation-performance':
+                def send_delta(delta):
+                    event = {'choices': [{'delta': delta}]}
+                    self.wfile.write(('data: ' + json.dumps(event, ensure_ascii=False) + '\n\n').encode())
+                    self.wfile.flush()
+
+                time.sleep(0.6)
+                send_delta({'reasoning_content': 'Thinking about a longer Markdown response.'})
+                time.sleep(1.2)
+                content = '## Streamed answer\n\n' + 'A **local** answer with caffè ☕.\n\n' * 80
+                for offset in range(0, len(content), 16):
+                    send_delta({'content': content[offset:offset + 16]})
+                    time.sleep(0.008)
+            else:
+                event = 'data: ' + json.dumps({'choices': [{'delta': {'content': 'caffè ☕', 'reasoning_content': 'Thinking'}}], 'timings': {'cache_n': 10, 'prompt_n': 20, 'predicted_n': 2, 'predicted_ms': 100, 'predicted_per_second': 20, 'prompt_ms': 30}}, ensure_ascii=False) + '\r\n\r\n'
+                for byte in event.encode():
+                    self.wfile.write(bytes([byte]))
+                    self.wfile.flush()
             if prompt == 'memory-warning':
                 print('warning: out of memory, using a smaller allocation; recovered', file=sys.stderr, flush=True)
             if prompt == 'oom-stream':

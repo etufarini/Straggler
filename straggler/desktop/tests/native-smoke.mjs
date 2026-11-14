@@ -1,4 +1,5 @@
 import { measureNativeOrb } from './native-orb-performance.mjs';
+import { installOrbMeasurement } from './orb-performance.mjs';
 // Real Tauri/WebKit window, native services and a test server; no model inference.
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
@@ -792,11 +793,29 @@ try {
     await evaluate(
       `Array.from(document.querySelectorAll('.conversation-row > button')).find(button => button.title === ${JSON.stringify(JSON.parse(originalConversation).title)}).click()`,
     );
+    if (process.env.STRAGGLER_MEASURE_ORB === '1') {
+      await evaluate(`(${installOrbMeasurement.toString()})()`);
+      await sendMessage('animation-performance');
+      await until(
+        () => evaluate('!!document.querySelector(".message.assistant:last-child .markdown h2")'),
+        'long fixture response started',
+      );
+      await until(
+        () => evaluate(`!document.querySelector('[aria-label="Stop response"]')`),
+        'long fixture response completed',
+      );
+      assert.equal(
+        await evaluate(
+          'document.querySelectorAll(".message.assistant:last-child .markdown strong").length',
+        ),
+        80,
+      );
+    }
     await sendMessage('wait');
     await until(
       () =>
         evaluate(
-          'document.querySelectorAll(".assistant .markdown")[2]?.textContent === "caffè ☕"',
+          'Array.from(document.querySelectorAll(".assistant .markdown")).at(-1)?.textContent === "caffè ☕"',
         ),
       'active partial response',
     );
