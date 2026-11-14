@@ -131,6 +131,11 @@ changing the pin or fake server; keep fixtures aligned with native services:
 - [Hub repository API and tree/LFS metadata](https://huggingface.co/docs/hub/api)
 - [FileChooser portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.FileChooser.html)
 - [Tauri native dialogs](https://v2.tauri.app/plugin/dialog/)
+- [GitHub releases by tag](https://docs.github.com/en/rest/releases/releases#get-a-release-by-tag-name)
+  and [Git references](https://docs.github.com/en/rest/git/refs#get-a-reference)
+  define external backend date fixtures. `published_at` supplies the date; resolve
+  the tag (including annotated tags) to verify the reported commit rather than
+  treating `target_commitish` or the build number as proof of a matching release.
 
 Temporary backend fixtures advertise `--slots`, `--cache-ram` and `--log-disable`,
 provide an idle slot with an arbitrary ID, and implement slot erase. Review the

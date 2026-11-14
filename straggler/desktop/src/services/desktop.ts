@@ -2,6 +2,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 import type { Attachment, Conversation } from '../domain/types';
+import type { BackendRelease } from '../domain/backendRelease';
 import { projectTokenEstimateCharacters } from '../domain/projectContext';
 import type {
   Project,
@@ -37,6 +38,7 @@ export type DesktopCommand =
   | 'preferences_read'
   | 'preferences_save'
   | 'configuration'
+  | 'backend_release'
   | 'apply_settings'
   | 'workspace_action'
   | 'choose_models_folder'
@@ -87,6 +89,10 @@ export async function invoke<T = void>(
   if (!nativeAvailable())
     throw new Error('Native desktop services are unavailable in this preview.');
   return nativeInvoke<T>(command, args);
+}
+
+export function getBackendRelease(): Promise<BackendRelease> {
+  return invoke<BackendRelease>('backend_release');
 }
 
 export class Channel<T> {

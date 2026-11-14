@@ -215,6 +215,20 @@ export function createFixture(scenario: Scenario) {
       case 'create_models_folder':
         modelsDir = '/fixture/app-data/io.github.etufarini.straggler/models';
         return configuration();
+      case 'backend_release': {
+        const calls = Number(localStorage.getItem('straggler-fixture-release-requests')) || 0;
+        localStorage.setItem('straggler-fixture-release-requests', String(calls + 1));
+        while (localStorage.getItem('straggler-fixture-release-paused'))
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        if (localStorage.getItem('straggler-fixture-release-error'))
+          throw new Error(
+            'Cannot reach GitHub to read the release date: fixture network unavailable',
+          );
+        const result = localStorage.getItem('straggler-fixture-release-status') || 'verified';
+        return result === 'verified'
+          ? { status: 'verified', date: '2026-10-04', tag: 'b42' }
+          : { status: result };
+      }
       case 'choose_models_folder': {
         const selected = localStorage.getItem('straggler-fixture-models-folder-choice');
         if (selected === 'cancel') return null;
