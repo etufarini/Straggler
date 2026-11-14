@@ -37,6 +37,7 @@ export function installOrbMeasurement(Engine) {
   }
   window.__stragglerOrbMeasurement = {
     frames,
+    draws,
     snapshot() {
       const phases = {};
       for (const state of ['loading', 'reasoning', 'generating', 'ready', 'stopped', 'error']) {

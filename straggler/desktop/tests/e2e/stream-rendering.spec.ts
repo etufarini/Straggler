@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
+import { observeOrb } from './orb';
 
 type FrameGate = {
   callbacks: Map<number, FrameRequestCallback>;
@@ -121,37 +122,13 @@ test('fixture streaming records animation costs across reasoning and generation'
   page,
 }, testInfo) => {
   await page.goto('/?scenario=reasoning-stream');
-  await page.evaluate(async () => {
-    const enginePath = '/src/features/presence/renderers/orb-engine.js';
-    const measurementPath = '/tests/orb-performance.mjs';
-    // Vite can add a version query after an edit. Observe the module actually
-    // used by the app instead of importing a second copy with a different URL.
-    const engineUrl = performance
-      .getEntriesByType('resource')
-      .map((entry) => entry.name)
-      .find((url) => new URL(url).pathname === enginePath);
-    if (!engineUrl) throw new Error('The application orb module was not loaded.');
-    const [{ default: Engine }, { installOrbMeasurement }] = await Promise.all([
-      import(engineUrl),
-      import(measurementPath),
-    ]);
-    installOrbMeasurement(Engine);
-  });
+  await observeOrb(page);
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Think, then answer');
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
   const measurement = await page.evaluate(() => {
-    const observer = (
-      window as unknown as {
-        __stragglerOrbMeasurement: {
-          snapshot(): {
-            phases: Record<string, { frames: number; drawMs: { p95: number | null } }>;
-          };
-          stop(): void;
-        };
-      }
-    ).__stragglerOrbMeasurement;
+    const observer = window.__stragglerOrbMeasurement;
     const result = observer.snapshot();
     observer.stop();
     return result;
