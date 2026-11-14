@@ -40,6 +40,9 @@ impl GitHubFixture {
             while !stopping.load(Ordering::Relaxed) {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
+                        // Accepted sockets can inherit nonblocking mode on macOS.
+                        // Only accept() polls; reading an HTTP request must wait for its bytes.
+                        stream.set_nonblocking(false).unwrap();
                         stream
                             .set_read_timeout(Some(Duration::from_secs(1)))
                             .unwrap();
@@ -103,7 +106,11 @@ impl GitHubFixture {
 impl Drop for GitHubFixture {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
-        self.worker.take().unwrap().join().unwrap();
+        if let Err(error) = self.worker.take().unwrap().join() {
+            if !thread::panicking() {
+                std::panic::resume_unwind(error);
+            }
+        }
     }
 }
 
