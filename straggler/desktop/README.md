@@ -56,7 +56,7 @@ bash straggler/tests/run.sh frontend
 | `common` | Runner boundaries, Bash syntax/ShellCheck and offline archive fixtures | Bash 3.2+, Python; ShellCheck is optional locally |
 | `frontend` | Formatting, lint, types, production assets and unit contracts | Node/npm and `npm ci` |
 | `runtime` | Rust formatting, Clippy, runtime tests and macOS Store boundaries | Rust with rustfmt/Clippy, Python and the host linker; no npm or native GUI libraries |
-| `browser` | Chromium/WebKit flows | Node/npm, `npm ci`, Playwright browsers and their system dependencies |
+| `browser` | WebKit flows on the host platform | Node/npm, `npm ci`, Playwright WebKit and its system dependencies |
 | `desktop` | Frontend, runtime and browser suites | Combined prerequisites for those three suites |
 | `isolation` | Compile the native desktop with only shared and host-platform inputs | Rust, Python and the host Tauri development dependencies |
 | `native` | Isolation, desktop Clippy and the actual native window | Native app setup, Python and a display or headless Linux tools |
@@ -65,7 +65,7 @@ bash straggler/tests/run.sh frontend
 Install browser engines explicitly from `straggler/desktop` before browser checks:
 
 ```bash
-npm exec -- playwright install chromium webkit
+npm exec -- playwright install webkit
 ```
 
 On Linux, Playwright may also need system dependencies. The runner does not
@@ -80,6 +80,8 @@ and local HTTP/SSE fixtures. Native defaults in
 `src-tauri/src/configuration/defaults.json` are shared with frontend fixtures.
 Rust checks cover legacy profiles and migration, literal serialization, process
 identity, cancellation, storage recovery and streaming.
+The runtime suite runs Rust tests serially to isolate native socket probes and
+process fixtures. Tests of concurrent operations still run their own workers.
 
 The native test copies the GUI away from the source tree and rejects Bash,
 Python-helper, curl and OS utility invocations by the app. Python is permitted

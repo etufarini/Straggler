@@ -1,3 +1,5 @@
+mod support;
+
 use socket2::{Domain, Protocol, Socket, Type};
 use std::{
     fs,
@@ -15,40 +17,12 @@ use straggler_desktop::{
 };
 use uuid::Uuid;
 
-static NEXT_SERVER_PORT: AtomicU16 = AtomicU16::new(20000);
-
-fn reserve_server_port(next_port: &AtomicU16) -> TcpListener {
-    // Keep server fixtures outside the default Linux/macOS ephemeral ranges:
-    // concurrent HTTP clients can otherwise claim a released reservation before startup.
-    loop {
-        let port = next_port.fetch_add(1, Ordering::Relaxed);
-        assert!(port < 30000, "No fixture server ports available");
-        // Match native startup: an IPv6 or another assigned-address listener
-        // also blocks launch even when IPv4 loopback can be reserved.
-        if platform::inspect_port(port).unwrap().occupied {
-            continue;
-        }
-        // Do not reuse TIME_WAIT ports: the unrelated-listener fixture uses
-        // an exclusive socket, unlike Rust's TcpListener::bind on Unix.
-        let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
-        let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-        match socket.bind(&address.into()) {
-            Ok(()) => {
-                socket.listen(1).unwrap();
-                return socket.into();
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
-            Err(error) => panic!("Cannot reserve fixture server port {port}: {error}"),
-        }
-    }
-}
-
 #[test]
 fn fixture_port_selection_skips_an_ipv6_listener() {
     // Use a separate range so this test cannot take another fixture's port
     // between releasing its reservation and launching the server.
     let next_port = AtomicU16::new(10000);
-    let reservation = reserve_server_port(&next_port);
+    let reservation = support::reserve_port_from(&next_port);
     let port = reservation.local_addr().unwrap().port();
     drop(reservation);
 
@@ -64,7 +38,7 @@ fn fixture_port_selection_skips_an_ipv6_listener() {
     drop(ipv4);
     assert!(platform::inspect_port(port).unwrap().occupied);
     next_port.store(port, Ordering::Relaxed);
-    let selected = reserve_server_port(&next_port);
+    let selected = support::reserve_port_from(&next_port);
     assert_ne!(selected.local_addr().unwrap().port(), port);
 }
 
@@ -91,7 +65,7 @@ impl Fixture {
         let server = llama.join("build/bin/llama-server");
         fs::write(&server, include_str!("../../tests/fixtures/server.py")).unwrap();
         fs::set_permissions(&server, fs::Permissions::from_mode(0o755)).unwrap();
-        let reservation = reserve_server_port(&NEXT_SERVER_PORT);
+        let reservation = support::reserve_server_port();
         let port = reservation.local_addr().unwrap().port();
         let record = root.join("request.json");
         let variables = std::collections::BTreeMap::from([

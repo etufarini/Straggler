@@ -59,7 +59,9 @@ if [[ "$suite" == runtime || "$suite" == desktop || "$suite" == all ]]; then
     require_tools cargo python3
     cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
     cargo clippy --locked --manifest-path src-tauri/Cargo.toml --no-default-features --all-targets -- -D warnings
-    cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features
+    # Process fixtures inspect and briefly bind native sockets. Isolate their
+    # lifetimes; tests that exercise concurrency still create their own workers.
+    cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features -- --test-threads=1
     if [[ $(uname -s) == Darwin ]]; then
         cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features --features app-store --test store_distribution
     fi
