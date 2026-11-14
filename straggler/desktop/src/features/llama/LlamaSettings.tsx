@@ -1,4 +1,5 @@
 import type { SettingsController } from '../settings/useSettings';
+import ExternalReleaseDate from './ExternalReleaseDate';
 
 export default function LlamaSettings({ controller }: { controller: SettingsController }) {
   const { config, busy, active, native, setFolder, confirm, accept, operation } = controller;
@@ -42,9 +43,16 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
           <div>
             <dt>Release date</dt>
             <dd>
-              {bundled && config.build?.releaseDate
-                ? config.build.releaseDate.split('T')[0]
-                : 'Not reported'}
+              {bundled ? (
+                (config.build?.releaseDate?.split('T')[0] ?? 'Not reported')
+              ) : config.serverAvailable && config.llamaDir ? (
+                <ExternalReleaseDate
+                  key={JSON.stringify([config.llamaDir, config.build])}
+                  native={native}
+                />
+              ) : (
+                'Not reported'
+              )}
             </dd>
           </div>
         </dl>

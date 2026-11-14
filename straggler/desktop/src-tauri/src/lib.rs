@@ -1,4 +1,5 @@
 pub mod attachments;
+pub mod backend_release;
 pub mod bundled_backend;
 mod chat;
 pub mod configuration;
@@ -66,6 +67,7 @@ pub struct Runtime {
     native: configuration::native::NativeConfiguration,
     server: Arc<Mutex<Server>>,
     client: reqwest::Client,
+    backend_releases: backend_release::ReleaseLookup,
     active: Mutex<Generation>,
     model_details: Mutex<Option<model::ServerDetails>>,
     pub history: History,
@@ -147,6 +149,7 @@ impl Runtime {
         }
         let projects = projects::Projects::new(data.join("projects"), &history)?;
         Ok(Self {
+            backend_releases: backend_release::ReleaseLookup::new()?,
             hugging_face,
             native,
             history,
