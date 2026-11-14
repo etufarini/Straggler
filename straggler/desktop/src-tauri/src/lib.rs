@@ -6,6 +6,7 @@ pub mod conversation_import;
 pub mod diagnostics;
 pub mod files;
 pub mod history;
+pub mod huggingface;
 pub mod model;
 pub mod model_access;
 pub mod platform;
@@ -61,6 +62,7 @@ struct Server {
 }
 
 pub struct Runtime {
+    pub hugging_face: huggingface::HuggingFace,
     native: configuration::native::NativeConfiguration,
     server: Arc<Mutex<Server>>,
     client: reqwest::Client,
@@ -117,6 +119,18 @@ impl Runtime {
         environment: configuration::environment::Environment,
         data: PathBuf,
     ) -> Result<Self> {
+        let hugging_face = huggingface::HuggingFace::new(&data.join("huggingface"))?;
+        #[cfg(all(feature = "native-tests", debug_assertions))]
+        let hugging_face = match environment.value("STRAGGLER_TEST_HF_ENDPOINT") {
+            Some(endpoint) => huggingface::HuggingFace::with_hub(
+                &data.join("huggingface"),
+                huggingface::api::HubClient::loopback_fixture(
+                    Arc::new(huggingface::credentials::MemoryTokenStore::default()),
+                    &endpoint,
+                )?,
+            )?,
+            None => hugging_face,
+        };
         let native = configuration::native::NativeConfiguration::new(environment)?;
         let history = History::new(data.join("conversations"))?;
         let instance = OpenOptions::new()
@@ -133,6 +147,7 @@ impl Runtime {
         }
         let projects = projects::Projects::new(data.join("projects"), &history)?;
         Ok(Self {
+            hugging_face,
             native,
             history,
             projects,
@@ -166,8 +181,11 @@ impl Runtime {
 
 impl Runtime {
     pub fn shutdown(&self) -> Result<()> {
+        // Paused .part files and their pinned identities survive the process exit.
+        let downloads = self.hugging_face.downloads.pause_all();
         self.native.cancel_discovery()?;
-        self.stop()
+        self.stop()?;
+        downloads
     }
 }
 

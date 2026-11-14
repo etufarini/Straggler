@@ -1,5 +1,6 @@
 import type { SettingsController } from './useSettings';
 import { Folder } from 'lucide-react';
+import ModelsFolderActions from '../huggingface/ModelsFolderActions';
 
 export default function FolderSettings({ controller }: { controller: SettingsController }) {
   const { config, setSection, busy, setFolder, native, active } = controller;
@@ -19,14 +20,24 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
                 ? 'Bundled with Straggler'
                 : 'Not configured')}
           </code>
-          {!(kind === 'llama' && config.appStore) && (
-            <button
-              disabled={busy || !native || (kind === 'llama' && active)}
-              onClick={() => setFolder(kind as 'llama' | 'models')}
-            >
-              <Folder size={15} />
-              Choose folder
-            </button>
+          {kind === 'models' ? (
+            <ModelsFolderActions
+              path={path}
+              onConfigured={(value) => {
+                controller.accept(value);
+                controller.setDraft({ ...controller.draft, model: value.settings.model });
+              }}
+            />
+          ) : (
+            !config.appStore && (
+              <button
+                disabled={busy || !native || (kind === 'llama' && active)}
+                onClick={() => setFolder(kind as 'llama' | 'models')}
+              >
+                <Folder size={15} />
+                Choose folder
+              </button>
+            )
           )}
         </div>
       ))}

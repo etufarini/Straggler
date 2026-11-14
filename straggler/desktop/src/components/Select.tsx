@@ -257,7 +257,7 @@ export default function Select({ value, options, onChange, ...props }: SelectPro
               </li>
             ))}
           </ul>,
-          document.body,
+          button.current?.closest('[role="dialog"], [role="alertdialog"]') ?? document.body,
         )}
     </span>
   );

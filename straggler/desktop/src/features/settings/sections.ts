@@ -1,6 +1,7 @@
 import type { Settings } from '../../domain/types';
 
-export type Section = 'model' | 'performance' | 'server' | 'profiles' | 'folders' | 'llama';
+export type Section =
+  'model' | 'performance' | 'server' | 'profiles' | 'folders' | 'huggingface' | 'llama';
 
 export function fieldSection(field?: keyof Settings): Section {
   if (field === 'port') return 'server';

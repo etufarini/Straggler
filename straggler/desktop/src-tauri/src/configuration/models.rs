@@ -146,8 +146,8 @@ pub fn discover(root: &Path) -> Result<Vec<Model>> {
         return Ok(Vec::new());
     }
     let mut models = Vec::new();
-    let mut pending = vec![root.to_owned()];
-    while let Some(directory) = pending.pop() {
+    let mut pending = vec![(root.to_owned(), 0)];
+    while let Some((directory, depth)) = pending.pop() {
         let entries = fs::read_dir(&directory).map_err(|error| {
             format!("Cannot read models folder {}: {error}", directory.display())
         })?;
@@ -155,7 +155,9 @@ pub fn discover(root: &Path) -> Result<Vec<Model>> {
             let entry = entry.map_err(|error| error.to_string())?;
             let kind = entry.file_type().map_err(|error| error.to_string())?;
             if kind.is_dir() {
-                pending.push(entry.path());
+                if depth < 2 {
+                    pending.push((entry.path(), depth + 1));
+                }
                 continue;
             }
             let path = entry.path();
@@ -167,6 +169,17 @@ pub fn discover(root: &Path) -> Result<Vec<Model>> {
                 || !path.is_file()
             {
                 continue;
+            }
+            if let Some((prefix, part, total)) = split_file_name(&name) {
+                if part != 1
+                    || !(1..=total).all(|part| {
+                        directory
+                            .join(format!("{prefix}-{part:05}-of-{total:05}.gguf"))
+                            .is_file()
+                    })
+                {
+                    continue;
+                }
             }
             // Inspection failures retain a possibly supported model; tensors are never read.
             if component(&path) == Some(true) {
@@ -187,4 +200,17 @@ pub fn discover(root: &Path) -> Result<Vec<Model>> {
     }
     models.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(models)
+}
+
+/// llama.cpp's split GGUF convention identifies a file group, not model capabilities.
+pub fn split_file_name(name: &str) -> Option<(&str, u32, u32)> {
+    let stem = name.strip_suffix(".gguf")?;
+    let (first, total) = stem.rsplit_once("-of-")?;
+    let (prefix, part) = first.rsplit_once('-')?;
+    if prefix.is_empty() || part.len() != 5 || total.len() != 5 {
+        return None;
+    }
+    let part: u32 = part.parse().ok()?;
+    let total: u32 = total.parse().ok()?;
+    (part > 0 && part <= total).then_some((prefix, part, total))
 }

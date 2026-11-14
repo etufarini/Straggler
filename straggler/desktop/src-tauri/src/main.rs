@@ -82,7 +82,6 @@ async fn workspace_action(
     .map_err(|e| e.to_string())?
 }
 
-#[cfg(feature = "app-store")]
 #[tauri::command]
 async fn choose_models_folder(
     app: tauri::AppHandle,
@@ -90,6 +89,17 @@ async fn choose_models_folder(
 ) -> Result<Option<Configuration>> {
     use tauri_plugin_dialog::DialogExt;
     let runtime = runtime(&state)?;
+    #[cfg(target_os = "linux")]
+    if straggler_desktop::platform::models_picker::requires_portal() {
+        let selected = straggler_desktop::platform::models_picker::choose_folder().await?;
+        return tauri::async_runtime::spawn_blocking(move || {
+            selected
+                .map(|path| runtime.select_model_folder(&path))
+                .transpose()
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let selected = app
             .dialog()
@@ -105,6 +115,137 @@ async fn choose_models_folder(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn create_models_folder(
+    app: tauri::AppHandle,
+    state: State<'_, Application>,
+) -> Result<Configuration> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models");
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.create_models_folder(&directory))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn models_folder_info(
+    app: tauri::AppHandle,
+    state: State<'_, Application>,
+) -> Result<serde_json::Value> {
+    let default = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("models");
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let config = runtime.inspect()?;
+        let (free, error) = if config.models_dir.is_empty() { (None, None) } else {
+            match straggler_desktop::platform::available_disk_bytes(std::path::Path::new(&config.models_dir)) {
+                Ok(free) => (Some(free), None), Err(error) => (None, Some(error)),
+            }
+        };
+        Ok(serde_json::json!({"path": config.models_dir, "defaultPath": default, "freeBytes": free, "error": error}))
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn hf_token_status(
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::huggingface::TokenStatus> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.hugging_face.token_status())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn hf_token_save(
+    token: Option<String>,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::huggingface::TokenStatus> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.hugging_face.save_token(token.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn hf_search(
+    query: String,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::huggingface::api::SearchResults> {
+    runtime(&state)?.hugging_face.search(&query).await
+}
+
+#[tauri::command]
+async fn hf_repository(
+    repository: String,
+    revision: String,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::huggingface::api::Repository> {
+    runtime(&state)?
+        .hugging_face
+        .repository(&repository, &revision)
+        .await
+}
+
+#[tauri::command]
+async fn hf_download_start(
+    repository: String,
+    revision: String,
+    files: Vec<String>,
+    state: State<'_, Application>,
+) -> Result<Uuid> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime.download_hf(&repository, &revision, &files)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn hf_downloads(
+    state: State<'_, Application>,
+) -> Result<Vec<straggler_desktop::huggingface::downloads::Download>> {
+    runtime(&state)?.hugging_face.downloads.list()
+}
+
+#[tauri::command]
+async fn hf_download_control(
+    id: Uuid,
+    action: String,
+    state: State<'_, Application>,
+) -> Result<()> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || match action.as_str() {
+        "pause" => runtime.hugging_face.downloads.control(id, false),
+        "cancel" => runtime.hugging_face.downloads.control(id, true),
+        "resume" => runtime.resume_hf(id),
+        _ => Err("Unknown download action.".into()),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn hf_pause_all(state: State<'_, Application>) -> Result<()> {
+    let runtime = runtime(&state)?;
+    runtime.hugging_face.downloads.pause_all()?;
+    for _ in 0..100 {
+        if !runtime.hugging_face.downloads.is_active()? {
+            return Ok(());
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    Err("Downloads are still pausing. Wait a moment and retry closing.".into())
 }
 
 #[tauri::command]
@@ -519,6 +660,12 @@ fn main() {
                 })
                 .map(Arc::new);
             if let Ok(runtime) = &runtime {
+                if let Ok(directory) = app.path().app_data_dir() {
+                    let directory = directory.join("models");
+                    let _ = runtime.allow_default_models_folder(
+                        &directory.canonicalize().unwrap_or(directory),
+                    );
+                }
                 shutdown_on_signals(app.handle().clone(), runtime.clone());
             }
             app.manage(Application(runtime));
@@ -532,8 +679,17 @@ fn main() {
             configuration,
             apply_settings,
             workspace_action,
-            #[cfg(feature = "app-store")]
             choose_models_folder,
+            create_models_folder,
+            models_folder_info,
+            hf_token_status,
+            hf_token_save,
+            hf_search,
+            hf_repository,
+            hf_download_start,
+            hf_downloads,
+            hf_download_control,
+            hf_pause_all,
             start_server,
             stop_server,
             server_status,

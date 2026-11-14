@@ -41,8 +41,7 @@ impl Scope {
 
     fn bookmark(url: &NSURL) -> Result<Vec<u8>> {
         url.bookmarkDataWithOptions_includingResourceValuesForKeys_relativeToURL_error(
-            NSURLBookmarkCreationOptions::WithSecurityScope
-                | NSURLBookmarkCreationOptions::SecurityScopeAllowOnlyReadAccess,
+            NSURLBookmarkCreationOptions::WithSecurityScope,
             None,
             None,
         )
@@ -67,6 +66,7 @@ struct Grants {
 pub struct ModelAccess {
     path: PathBuf,
     grants: Mutex<Grants>,
+    internal: Mutex<Option<PathBuf>>,
 }
 
 impl ModelAccess {
@@ -126,6 +126,7 @@ impl ModelAccess {
         Self {
             path,
             grants: Mutex::new(grants),
+            internal: Mutex::new(None),
         }
     }
 
@@ -161,9 +162,21 @@ impl ModelAccess {
     }
 
     pub fn permits(&self, path: &Path) -> bool {
+        if self
+            .internal
+            .lock()
+            .is_ok_and(|root| root.as_ref().is_some_and(|root| path.starts_with(root)))
+        {
+            return true;
+        }
         self.grants
             .lock()
             .is_ok_and(|grants| grants.active.keys().any(|folder| path.starts_with(folder)))
+    }
+
+    pub fn allow_internal(&self, path: &Path) -> Result<()> {
+        *self.internal.lock().map_err(|e| e.to_string())? = Some(path.to_owned());
+        Ok(())
     }
 
     pub fn warning(&self) -> String {

@@ -8,6 +8,7 @@ import ServerSettings from './ServerSettings';
 import SavedConfigurations from './SavedConfigurations';
 import FolderSettings from './FolderSettings';
 import LlamaSettings from '../llama/LlamaSettings';
+import HuggingFaceSettings from '../huggingface/HuggingFaceSettings';
 import Feedback from '../../components/Feedback';
 const sections = [
   ['model', 'Model settings'],
@@ -15,6 +16,7 @@ const sections = [
   ['server', 'Server & port'],
   ['profiles', 'Saved configurations'],
   ['folders', 'Folders'],
+  ['huggingface', 'Hugging Face'],
   ['llama', 'llama.cpp'],
 ] as const;
 
@@ -83,7 +85,7 @@ export default function Settings(props: SettingsProps) {
                 Loading…
               </p>
             )}
-            {section !== 'folders' && section !== 'llama' && (
+            {section !== 'folders' && section !== 'llama' && section !== 'huggingface' && (
               <div className="configuration-heading">
                 <span>
                   {config.currentProfile || 'Unsaved configuration'}
@@ -117,6 +119,7 @@ export default function Settings(props: SettingsProps) {
               {section === 'profiles' && <SavedConfigurations controller={controller} />}
               {section === 'folders' && <FolderSettings controller={controller} />}
               {section === 'llama' && <LlamaSettings controller={controller} />}
+              {section === 'huggingface' && <HuggingFaceSettings controller={controller} />}
               <div className="memory-summary">
                 <h3>Memory</h3>
                 <span>

@@ -4,6 +4,8 @@
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(all(target_os = "linux", feature = "desktop"))]
+pub mod models_picker;
 #[cfg(target_os = "linux")]
 pub use linux::{
     available_memory, bundled_server, identity, listeners, rename_directory_exclusive,
@@ -25,6 +27,23 @@ use std::{
 pub struct Port {
     pub occupied: bool,
     pub listeners: Vec<Listener>,
+}
+
+pub fn available_disk_bytes(path: &std::path::Path) -> Result<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let path =
+        std::ffi::CString::new(path.as_os_str().as_bytes()).map_err(|_| "Invalid disk path.")?;
+    let mut info = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    // statvfs initializes the output only on success; f_bavail excludes reserved blocks.
+    if unsafe { libc::statvfs(path.as_ptr(), info.as_mut_ptr()) } != 0 {
+        return Err(format!(
+            "Cannot determine available disk space: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let info = unsafe { info.assume_init() };
+    let bytes = u128::from(info.f_bavail) * u128::from(info.f_frsize);
+    Ok(bytes.min(u128::from(u64::MAX)) as u64)
 }
 
 fn bind_addresses(port: u16) -> Result<BTreeSet<SocketAddr>> {

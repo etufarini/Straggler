@@ -14,6 +14,13 @@ pub struct ModelAccess;
 
 #[cfg(not(feature = "app-store"))]
 impl ModelAccess {
+    pub fn allow_internal(&self, _path: &std::path::Path) -> crate::Result<()> {
+        Ok(())
+    }
+
+    pub fn remember(&self, _path: &std::path::Path) -> crate::Result<()> {
+        Ok(())
+    }
     pub fn restore(_data: &std::path::Path) -> Self {
         Self
     }

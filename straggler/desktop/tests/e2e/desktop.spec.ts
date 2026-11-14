@@ -181,22 +181,22 @@ test('folder selection separates browsing, hidden directories, cancel and confir
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Folders', exact: true }).click();
-  await page.getByRole('button', { name: 'Choose folder', exact: true }).last().click();
+  await page.getByRole('button', { name: 'Choose folder', exact: true }).first().click();
   await expect(page.getByRole('dialog', { name: 'Choose folder' })).toBeVisible();
   await page.getByRole('checkbox', { name: 'Show hidden folders' }).check();
   await expect(page.getByRole('button', { name: '.hidden', exact: true })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Folder path' }).fill('/fixture/new models');
+  await page.getByRole('textbox', { name: 'Folder path' }).fill('/fixture/new backend');
   await page.getByRole('button', { name: 'Open', exact: true }).click();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.locator('.folder-setting').last().locator('code')).toHaveText(
-    '/fixture/models',
+  await expect(page.locator('.folder-setting').first().locator('code')).toHaveText(
+    '/fixture/llama.cpp',
   );
-  await page.getByRole('button', { name: 'Choose folder', exact: true }).last().click();
-  await page.getByRole('textbox', { name: 'Folder path' }).fill('/fixture/new models');
+  await page.getByRole('button', { name: 'Choose folder', exact: true }).first().click();
+  await page.getByRole('textbox', { name: 'Folder path' }).fill('/fixture/new backend');
   await page.getByRole('button', { name: 'Open', exact: true }).click();
   await page.getByRole('button', { name: 'Use this folder', exact: true }).click();
-  await expect(page.locator('.folder-setting').last().locator('code')).toHaveText(
-    '/fixture/new models',
+  await expect(page.locator('.folder-setting').first().locator('code')).toHaveText(
+    '/fixture/new backend',
   );
 });
 

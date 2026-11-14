@@ -134,7 +134,22 @@ pub(crate) struct Workspace {
 }
 
 impl Runtime {
-    #[cfg(all(feature = "app-store", target_os = "macos"))]
+    pub fn allow_default_models_folder(&self, directory: &std::path::Path) -> Result<()> {
+        self.native.model_access.allow_internal(directory)
+    }
+
+    pub fn create_models_folder(&self, directory: &std::path::Path) -> Result<Configuration> {
+        std::fs::create_dir_all(directory)
+            .map_err(|error| format!("Cannot create the models folder: {error}"))?;
+        let directory = directory.canonicalize().map_err(|e| e.to_string())?;
+        self.native.model_access.allow_internal(&directory)?;
+        self.configure_action(
+            "set-path",
+            &["models".into(), directory.to_string_lossy().into_owned()],
+            None,
+        )
+    }
+
     pub fn select_model_folder(&self, path: &std::path::Path) -> Result<Configuration> {
         let path = path.canonicalize().map_err(|error| error.to_string())?;
         self.native.model_access.remember(&path)?;

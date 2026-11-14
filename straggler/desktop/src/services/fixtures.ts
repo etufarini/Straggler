@@ -14,6 +14,7 @@ import type {
 import { emptyServer } from '../domain/types';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 import { createProjectFixture } from './projectFixtures';
+import { createHuggingFaceFixture } from './huggingFaceFixtures';
 
 export type Scenario =
   | 'normal'
@@ -87,6 +88,12 @@ export function createFixture(scenario: Scenario) {
   let memoryFailureSeen = false;
   let generatingConversation: string | null = null;
   let temporary: { id: string; attachments: Map<string, Attachment> } | null = null;
+  const downloadedModels: { path: string; label: string }[] = [];
+  const huggingFace = createHuggingFaceFixture(configuration, (model) => {
+    if (!downloadedModels.some((existing) => existing.path === model.path))
+      downloadedModels.push(model);
+    if (!settings.model) settings.model = model.path;
+  });
   const projectFixture = createProjectFixture(
     `straggler-fixture-projects-${scenario}`,
     history,
@@ -131,7 +138,10 @@ export function createFixture(scenario: Scenario) {
         exploratory: ['1', '0.95', '20', '0', '1', '0', '0'],
         'min-p': ['1', '1', '0', '0.05', '1', '0', '0'],
       },
-      models: scenario === 'empty' ? [] : [{ path: defaultSettings.model, label: 'example.gguf' }],
+      models: [
+        ...(scenario === 'empty' ? [] : [{ path: defaultSettings.model, label: 'example.gguf' }]),
+        ...downloadedModels,
+      ],
       devices,
       listeners: occupied
         ? [{ pid: 12345, identity: 'fixture-process', details: '12345 fixture Example listener' }]
@@ -197,9 +207,20 @@ export function createFixture(scenario: Scenario) {
   }
 
   async function invoke(command: string, args: Record<string, unknown> = {}): Promise<unknown> {
+    if (command.startsWith('hf_') || command === 'models_folder_info')
+      return huggingFace.invoke(command, args);
     if (command === 'projects_list' || command.startsWith('project_'))
       return projectFixture.invoke(command, args);
     switch (command) {
+      case 'create_models_folder':
+        modelsDir = '/fixture/app-data/io.github.etufarini.straggler/models';
+        return configuration();
+      case 'choose_models_folder': {
+        const selected = localStorage.getItem('straggler-fixture-models-folder-choice');
+        if (selected === 'cancel') return null;
+        modelsDir = selected || '/fixture/linked-models';
+        return configuration();
+      }
       case 'preferences_read':
         return JSON.parse(
           localStorage.getItem('straggler-fixture-ui-preferences') ||

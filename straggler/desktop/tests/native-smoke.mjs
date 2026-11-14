@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { createWriteStream } from 'node:fs';
+import { createHash } from 'node:crypto';
 import {
   chmod,
   copyFile,
@@ -77,7 +78,7 @@ async function until(predicate, description) {
   });
 }
 
-let app, driver, session, inspectPage;
+let app, driver, session, inspectPage, hubFixture;
 try {
   if (!process.env.STRAGGLER_TEST_NATIVE) {
     await mkdir(path.dirname(binary));
@@ -115,6 +116,18 @@ try {
   const environment = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !/^(STRAGGLER_|MIR_|SPUTNIK_|LLAMA_)/.test(key)),
   );
+  hubFixture = spawn(python, [path.join(desktop, 'tests/fixtures/huggingface.py')], {
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  let hubEndpoint = '';
+  hubFixture.stdout.setEncoding('utf8');
+  hubFixture.stdout.on('data', (chunk) => {
+    hubEndpoint += chunk;
+  });
+  await until(
+    () => /^http:\/\/127\.0\.0\.1:\d+\/$/.test(hubEndpoint.trim()),
+    'loopback Hub fixture',
+  );
   Object.assign(environment, {
     PATH: guards + path.delimiter + process.env.PATH,
     HOME: stage,
@@ -127,6 +140,7 @@ try {
     STRAGGLER_MODELS_DIR: models,
     STRAGGLER_PORT: String(port),
     TEST_REQUEST: path.join(stage, 'request.json'),
+    STRAGGLER_TEST_HF_ENDPOINT: hubEndpoint.trim(),
     TAURI_WEBDRIVER_PORT: String(automationPort),
   });
   if (process.env.STRAGGLER_CAPTURE_DOCS)
@@ -191,6 +205,10 @@ try {
     await evaluate('document.querySelector(".composer").requestSubmit()');
   }
   if (process.env.STRAGGLER_CAPTURE_DOCS) {
+    const captureVersion = process.env.STRAGGLER_CAPTURE_DOCS;
+    assert.match(captureVersion, /^[a-z0-9-]+$/, 'Use a new screenshot version directory');
+    const captureDirectory = path.join(desktop, '../docs/screenshots', captureVersion);
+    await mkdir(captureDirectory);
     await until(
       () => evaluate('document.querySelector(".settings-heading h1")?.textContent === "Settings"'),
       'first-launch setup',
@@ -199,7 +217,9 @@ try {
     const capture = async (name) => {
       await wait(250);
       const shot = await screenshot();
-      await writeFile(path.join(desktop, '../docs/screenshots', name), Buffer.from(shot, 'base64'));
+      await writeFile(path.join(captureDirectory, name), Buffer.from(shot, 'base64'), {
+        flag: 'wx',
+      });
     };
     await capture('desktop-chat.png');
     await evaluate(
@@ -315,6 +335,57 @@ try {
       evaluate(
         `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)})`,
       );
+    const folderInfo = await invokeNative('models_folder_info', {});
+    assert.ok(
+      folderInfo.defaultPath.startsWith(stage + path.sep),
+      'Tauri app data must use the isolated test user',
+    );
+    const credential = await invokeNative('hf_token_save', { token: 'hf_native_fixture' });
+    assert.deepEqual(Object.keys(credential).sort(), ['available', 'error', 'saved']);
+    assert.equal(credential.saved, true);
+    await evaluate('document.querySelector(".model-switch").click()');
+    await evaluate(
+      'Array.from(document.querySelectorAll("[role=tab]")).find(tab => tab.textContent === "Hugging Face").click()',
+    );
+    await fillField('[aria-label="Search Hugging Face"]', 'publisher/repository');
+    await evaluate('document.querySelector(".hf-search").requestSubmit()');
+    await until(
+      () => evaluate('!!document.querySelector(".hf-variants input")'),
+      'native Hub repository metadata',
+    );
+    await evaluate(
+      'Array.from(document.querySelectorAll(".hf-browser button")).find(button => button.textContent === "Download selected files").click()',
+    );
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".hf-download")?.textContent.includes("SHA-256 verified")',
+        ),
+      'native checksum-verified Hub download',
+    );
+    const downloaded = (await invokeNative('hf_downloads', {}))[0];
+    const downloadedPath = path.join(
+      downloaded.root,
+      downloaded.plan.repository,
+      path.basename(downloaded.plan.files[0].path),
+    );
+    assert.equal(
+      createHash('sha256')
+        .update(await readFile(downloadedPath))
+        .digest('hex'),
+      downloaded.plan.files[0].sha256,
+    );
+    const ledger = await readFile(
+      path.join(path.dirname(history), 'huggingface/downloads.json'),
+      'utf8',
+    );
+    assert.equal(ledger.includes('hf_native_fixture'), false);
+    await writeFile(
+      path.join(desktop, 'test-results/native-hugging-face.png'),
+      Buffer.from(await screenshot(), 'base64'),
+    );
+    await invokeNative('hf_token_save', { token: null });
+    await evaluate('document.querySelector(".panel-heading button").click()');
     await invokeNative('history_create', { conversation: attachmentChat });
     for (const [extension, original, text] of [
       ['txt', Buffer.from('Native attachment text ☕'), 'Native attachment text ☕'],
@@ -782,7 +853,7 @@ try {
     await new Promise((resolve) => released.close(resolve));
     assert.equal(await readFile(forbiddenCommands, 'utf8').catch(() => ''), '');
     console.log(
-      `PASS: native desktop without launcher or utility subprocesses, real Tauri/WebKit window, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.STRAGGLER_TEST_SHUTDOWN === 'signal' || process.env.STRAGGLER_MEASURE_ORB === '1' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
+      `PASS: native desktop without launcher or utility subprocesses, real Tauri/WebKit window, verified local Hub download, temporary chat disposal, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.STRAGGLER_TEST_SHUTDOWN === 'signal' || process.env.STRAGGLER_MEASURE_ORB === '1' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
     );
     console.log(
       'Screenshots: test-results/native-chat.png and test-results/native-project.png (test server; no model inference)',
@@ -797,6 +868,10 @@ try {
   console.error(await readFile(path.join(stage, 'app.log'), 'utf8').catch(() => ''));
   throw error;
 } finally {
+  if (hubFixture && hubFixture.exitCode === null) {
+    hubFixture.kill('SIGTERM');
+    await once(hubFixture, 'exit');
+  }
   if (driver && session && app?.exitCode === null) {
     await fetch(`${driver}/session/${session}`, {
       method: 'DELETE',

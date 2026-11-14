@@ -4,6 +4,7 @@ import { useAttachments } from '../features/attachments/useAttachments';
 import { useContextEstimate } from '../features/chat/useContextEstimate';
 import { useConversation } from '../features/chat/useConversation';
 import { useProjects } from '../features/projects/useProjects';
+import { useHuggingFace } from '../features/huggingface/useHuggingFace';
 import { containTabFocus } from '../components/focus';
 import type { Conversation } from '../domain/types';
 import { newConversation } from '../domain/types';
@@ -152,7 +153,7 @@ export function useWorkspace() {
     }
     setConfirmation({
       title: closing ? 'Quit and erase this temporary chat?' : 'Erase this temporary chat?',
-      text: 'Messages, attachments and the draft will be erased. The temporary backend will be stopped to clear its caches.',
+      text: `Messages, attachments and the draft will be erased. The temporary backend will be stopped to clear its caches.${closing ? ' Active model downloads will be paused.' : ''}`,
       actionLabel: closing ? 'Erase and quit' : 'Erase and leave',
       destructive: true,
       action: async () => {
@@ -351,6 +352,7 @@ export function useWorkspace() {
       if (mounted.current) setError(String(e));
     }
   }, []);
+  const huggingFace = useHuggingFace(() => void loadConfiguration());
 
   useEffect(() => {
     mounted.current = true;
@@ -449,16 +451,18 @@ export function useWorkspace() {
       ? leaveTemporary(async () => {
           await stop();
           await ui.preferenceSaveQueue.current;
+          await invoke('hf_pause_all');
           await getCurrentWindow().destroy();
         }, true)
       : setConfirmation({
           title: 'Close Straggler?',
           destructive: true,
-          text: 'Any active response will be stopped and saved. The server started by this app will be shut down.',
+          text: 'Any active response will be stopped and saved. The server started by this app will be shut down. Active model downloads will be paused.',
           action: async () => {
             await stop();
             await flushSaves();
             await ui.preferenceSaveQueue.current;
+            await invoke('hf_pause_all');
             await getCurrentWindow().destroy();
           },
           actionLabel: 'Close Straggler',
@@ -534,6 +538,7 @@ export function useWorkspace() {
         projects.context(currentProject).level !== 'over'));
 
   return {
+    huggingFace,
     temporary: !!conversation.temporaryId,
     beginTemporary,
     saveTemporary,
