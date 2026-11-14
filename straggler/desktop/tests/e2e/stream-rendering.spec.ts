@@ -70,17 +70,17 @@ test('a burst of deltas paints together and the final snapshot cancels queued pa
   await expect(page.locator('.message.assistant .markdown p').last()).toHaveText(
     'A local answer with caffè ☕.',
   );
-  await page.evaluate(() => {
-    window.streamFrameGate.step();
-  });
+  // React can commit the text before its passive scroll effect is scheduled.
+  // Keep advancing the held clock while waiting, as a visible WebView would.
   await expect
-    .poll(() =>
-      page
+    .poll(async () => {
+      await page.evaluate(() => window.streamFrameGate.step());
+      return page
         .locator('.messages')
         .evaluate((element) =>
           Math.abs(element.scrollHeight - element.clientHeight - element.scrollTop),
-        ),
-    )
+        );
+    })
     .toBeLessThan(2);
   await page.locator('.messages').evaluate((element) => {
     element.scrollTop = 0;
