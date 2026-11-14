@@ -61,6 +61,9 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
     cancel,
     reviewSettings,
   } = controller;
+  useEffect(() => {
+    if (generating) textarea.current?.focus();
+  }, [generating, textarea]);
   const project = controller.currentProject;
   const archived = !!project?.archived;
   return (
@@ -432,7 +435,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   : 'Load a model to start a conversation…'
             }
             value={input}
-            disabled={generating || archived}
+            disabled={archived}
             rows={3}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
@@ -455,7 +458,11 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   type="button"
                   className="send-button stop"
                   aria-label="Stop response"
-                  onClick={() => void cancel().catch((e) => setError(String(e)))}
+                  onClick={(event) => {
+                    // Stop can become Send before this click's default action runs.
+                    event.preventDefault();
+                    void cancel().catch((e) => setError(String(e)));
+                  }}
                 >
                   <Square size={15} fill="currentColor" />
                 </button>
