@@ -4,6 +4,7 @@ import Sources from '../websearch/Sources';
 import ReasoningMenu from './ReasoningMenu';
 import SystemPromptMenu from './SystemPromptMenu';
 import ContextCounter from './ContextCounter';
+import useComposerDensity from './useComposerDensity';
 import Markdown from './Markdown';
 import { ArrowUp, HardDrive, Check, Copy, Square, Pencil, RotateCcw, Folder } from 'lucide-react';
 import { fileName } from '../../domain/types';
@@ -28,17 +29,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
       field?.closest('.message-editor')?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
     } else if (previous && !controller.editor) document.getElementById(`edit-${previous}`)?.focus();
   }, [controller.editor?.messageId, controller.generating]);
-  const composerRef = useRef<HTMLFormElement>(null);
-  const [composerWidth, setComposerWidth] = useState<number | null>(null);
-  useEffect(() => {
-    const element = composerRef.current;
-    if (!element) return;
-    const measure = () => setComposerWidth(element.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+  const composerRef = useComposerDensity();
   const [copyError, setCopyError] = useState<{ messageId: string; detail: string } | null>(null);
   const {
     editor,
@@ -424,7 +415,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
         )}
         <form
           ref={composerRef}
-          className={`composer ${composerWidth !== null && composerWidth <= 900 ? 'is-narrow' : ''} ${composerWidth !== null && composerWidth <= 480 ? 'is-small' : ''}`}
+          className="composer"
           onSubmit={(event) => {
             event.preventDefault();
             if (canSend) {

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { containTabFocus } from './focus';
@@ -38,7 +38,34 @@ export default function Popover({
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  const popover = useRef<HTMLElement>(null);
   const close = () => setOpen(false);
+  useLayoutEffect(() => {
+    const panel = popover.current;
+    const composer = button.current?.closest('.composer');
+    if (!open || !panel || !composer) return;
+    function position() {
+      if (!panel || !composer || !button.current) return;
+      const bounds = composer.getBoundingClientRect();
+      const trigger = button.current.getBoundingClientRect();
+      const left = Math.max(
+        bounds.left + 11,
+        Math.min(trigger.left, bounds.right - 11 - panel.getBoundingClientRect().width),
+      );
+      panel.style.left = `${left - bounds.left - composer.clientLeft}px`;
+      panel.style.bottom = `${bounds.bottom - trigger.top + 10 - composer.clientTop}px`;
+    }
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(composer);
+    observer.observe(panel);
+    observer.observe(button.current!);
+    window.addEventListener('resize', position);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', position);
+    };
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const opener = button.current;
@@ -75,7 +102,7 @@ export default function Popover({
         type="button"
         className="composer-chip"
         aria-pressed={pressed}
-        title={title}
+        title={title ?? (valueLabel ? `${label}: ${valueLabel}` : label)}
         aria-label={label}
         aria-describedby={valueLabel ? `${id}-value` : undefined}
         aria-haspopup="dialog"
@@ -99,6 +126,7 @@ export default function Popover({
       )}
       {open && (
         <section
+          ref={popover}
           className={`composer-popover ${popoverClassName}`}
           id={id}
           role="dialog"
