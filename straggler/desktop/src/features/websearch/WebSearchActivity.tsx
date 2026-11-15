@@ -41,7 +41,7 @@ export default function WebSearchActivity({
           </ul>
           {turn.fallback && (
             <p className="field-help">
-              This model can't call tools, so Straggler ran one search with your message and gave
+              This model can’t call tools, so Straggler ran one search with your message and gave
               the results to the model.
             </p>
           )}

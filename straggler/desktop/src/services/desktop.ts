@@ -190,9 +190,9 @@ export async function saveConversationExport(
   const path = fixture
     ? (await fixture).chooseSavePath(defaultPath)
     : await nativeSave({
-        title: 'Export conversation',
+        title: 'Export chat',
         defaultPath,
-        filters: [{ name: 'JSON conversation', extensions: ['json'] }],
+        filters: [{ name: 'JSON chat', extensions: ['json'] }],
       });
   if (!path) return false;
   await invoke('write_export', { path, contents });
@@ -205,7 +205,7 @@ export async function chooseConversationImport(): Promise<string | null> {
     title: 'Import chat',
     multiple: false,
     directory: false,
-    filters: [{ name: 'JSON conversation', extensions: ['json'] }],
+    filters: [{ name: 'JSON chat', extensions: ['json'] }],
   });
 }
 

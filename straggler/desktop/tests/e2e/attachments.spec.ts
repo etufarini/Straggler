@@ -59,7 +59,10 @@ test('CHAT-10 can attach before the first message; CHAT-15 sorts files and expos
   await page.getByRole('button', { name: 'Remove a.txt' }).click();
   await expect(rows).toHaveCount(5);
   await page.reload();
-  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await page
+    .locator('.conversation-row')
+    .getByRole('button', { name: 'New chat', exact: true })
+    .click();
   await expect(rows).toHaveCount(5);
   await expect(page.locator('.type-pdf .file-name')).toHaveText('report.PDF');
   await page.getByRole('button', { name: 'Remove report.PDF' }).click();
@@ -186,7 +189,10 @@ test('reading rows serialize request options and persist attachment-only chat op
     )
     .toBe('Preserve this attachment chat prompt');
   await page.reload();
-  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await page
+    .locator('.conversation-row')
+    .getByRole('button', { name: 'New chat', exact: true })
+    .click();
   await page.getByRole('button', { name: 'System prompt', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'System prompt instructions' })).toHaveValue(
     'Preserve this attachment chat prompt',

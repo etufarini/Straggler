@@ -35,7 +35,7 @@ export default function StorageFeedback({ controller }: { controller: WorkspaceC
           details={controller.fileError}
           onDismiss={() => controller.setFileError('')}
         >
-          The conversation could not be exported. Choose a writable destination and try again.
+          The chat could not be exported. Choose a writable destination and try again.
         </Feedback>
       )}
       {storageError && (

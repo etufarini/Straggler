@@ -127,7 +127,7 @@ test('only enabled messages search; citations, external links and normalized sou
 
 for (const [scenario, error] of [
   ['web-offline', 'You’re offline'],
-  ['web-invalid', "Mock search didn't accept the API key"],
+  ['web-invalid', 'Mock search didn’t accept the API key'],
   ['web-exhausted', 'This month’s Mock search credits are used up'],
 ]) {
   test(`${scenario}: the local response continues and search resets`, async ({ page }) => {
@@ -147,7 +147,7 @@ test('fallback and quota settings remain explicit and persist only preferences',
   await enable(page);
   await send(page, 'Fallback query');
   await page.locator('.web-search-activity summary').click();
-  await expect(page.locator('.web-search-activity')).toContainText("This model can't call tools");
+  await expect(page.locator('.web-search-activity')).toContainText('This model can’t call tools');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await chip(page).click();
   await page.getByRole('radio', { name: '5', exact: true }).check();
@@ -159,7 +159,7 @@ test('fallback and quota settings remain explicit and persist only preferences',
     .getByRole('textbox', { name: 'Mock search API key', exact: true })
     .fill('rejected-secret');
   await page.getByRole('button', { name: 'Save and verify', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText("didn't accept");
+  await expect(page.getByRole('alert')).toContainText('didn’t accept');
   await expect(
     page.getByText('A key is stored in the system keychain.', { exact: true }),
   ).toBeVisible();

@@ -39,7 +39,7 @@ export function webSearchError(kind: string, provider = 'The search service'): s
     case 'offline':
       return 'You’re offline';
     case 'invalid_credentials':
-      return `${provider} didn't accept the API key`;
+      return `${provider} didn’t accept the API key`;
     case 'quota_exhausted':
       return `This month’s ${provider} credits are used up`;
     case 'not_configured':

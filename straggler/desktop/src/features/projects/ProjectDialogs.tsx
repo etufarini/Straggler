@@ -463,9 +463,7 @@ function ProjectDialogContent({
           />
           <span>
             Also delete its {countLabel(members.length, 'chat')}
-            <small>
-              Otherwise they move to Conversations and use their own system prompt again.
-            </small>
+            <small>Otherwise they move to Chats and use their own system prompt again.</small>
           </span>
         </label>
       )}
@@ -498,7 +496,7 @@ function ProjectDialogContent({
                 controller.setEditor(null);
               }
               projects.setNotice({
-                message: `Deleted “${project.name}”.${members.length ? (alsoChats ? ` Its ${countLabel(members.length, 'chat')} ${members.length === 1 ? 'was' : 'were'} deleted too.` : ` Its ${countLabel(members.length, 'chat')} moved to Conversations.`) : ''}`,
+                message: `Deleted “${project.name}”.${members.length ? (alsoChats ? ` Its ${countLabel(members.length, 'chat')} ${members.length === 1 ? 'was' : 'were'} deleted too.` : ` Its ${countLabel(members.length, 'chat')} moved to Chats.`) : ''}`,
               });
               controller.openProjects();
             })

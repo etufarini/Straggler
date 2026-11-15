@@ -60,8 +60,8 @@ export function ProjectCapacity({
             Instructions and included files, including filenames and delimiters.
           </small>
           <small>
-            Window {number(capacity!)} tokens (n_ctx); {number(reserve!)} kept free for the
-            conversation and replies.{' '}
+            Window {number(capacity!)} tokens (n_ctx); {number(reserve!)} kept free for the chat and
+            replies.{' '}
             {approximate
               ? 'Estimated: exact counts come from the running server.'
               : 'Counted by the running server.'}

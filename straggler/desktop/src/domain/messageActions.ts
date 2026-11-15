@@ -7,7 +7,7 @@ export function replaceMessage(
   updatedAt: number,
 ): Conversation {
   const index = conversation.messages.findIndex((message) => message.id === messageId);
-  if (index < 0) throw new Error('The message is no longer in this conversation.');
+  if (index < 0) throw new Error('The message is no longer in this chat.');
   const message = conversation.messages[index];
   if (message.status === 'streaming' || message.status === 'error')
     throw new Error('This response cannot be edited.');

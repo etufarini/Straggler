@@ -976,13 +976,18 @@ for (const deleteChats of [false, true]) {
       await expect.poll(() => readHistory(page)).toEqual([]);
       await control(page, 'button-new-chat').click();
       await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
-      await expect(control(page, 'button-new-conversation')).toHaveCount(0);
+      await expect(
+        page.locator('.conversation-row').getByRole('button', { name: 'New chat', exact: true }),
+      ).toHaveCount(0);
     } else {
       await expect.poll(async () => (await readHistory(page)).length).toBe(1);
       const kept = (await readHistory(page))[0];
       expect(kept.projectId).toBeNull();
       expect(kept.messages).toEqual([]);
-      await control(page, 'button-new-conversation').click();
+      await page
+        .locator('.conversation-row')
+        .getByRole('button', { name: 'New chat', exact: true })
+        .click();
       await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
         draftText,
       );
