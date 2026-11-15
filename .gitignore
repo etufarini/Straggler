@@ -1,6 +1,6 @@
 # Local design references
 straggler/docs/design/
-straggler/docs/new-design/
+straggler/docs/to-be-implemented-design/
 
 # Local browser downloads and macOS metadata
 /.playwright-browsers/
