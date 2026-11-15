@@ -1,3 +1,4 @@
+import { countLabel } from '../../domain/text';
 import { useState } from 'react';
 import { ChevronDown, FileText } from 'lucide-react';
 import Popover from '../../components/Popover';
@@ -156,7 +157,7 @@ function ProjectInstructionsEditor({
       await controller.projects.update(project.id, { instructions: text });
       controller.projects.setNotice({
         message: text.trim()
-          ? `Saved the project instructions for ${count} chats.`
+          ? `Saved the project instructions for ${countLabel(count, 'chat')}.`
           : 'Cleared the project instructions. This project uses the system prompt from Settings.',
       });
       close();
@@ -172,7 +173,7 @@ function ProjectInstructionsEditor({
         From <strong>{project.name}</strong>.{' '}
         {project.archived
           ? 'The project is archived, so its instructions are read-only.'
-          : `Changes apply to all ${count} chats in this project and replace the system prompt from Settings.`}
+          : `Changes apply to all ${countLabel(count, 'chat')} in this project and replace the system prompt from Settings.`}
       </p>
       {ownSystemPrompt(controller.chat) !== null && (
         <p className="popover-note">

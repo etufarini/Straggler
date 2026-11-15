@@ -1,3 +1,4 @@
+import { countLabel } from '../../domain/text';
 import { useId, useState } from 'react';
 import { Folder, Search, X } from 'lucide-react';
 import type { ProjectDialog, WorkspaceController } from '../../app/useWorkspace';
@@ -148,9 +149,7 @@ function ProjectDialogContent({
               }}
             />
             <FieldError id={`${id}-name-error`} message={errors.name} />
-            <small id={`${id}-name-help`}>
-              Up to 80 characters. Names are unique so projects stay easy to tell apart.
-            </small>
+            <small id={`${id}-name-help`}>Up to 80 characters. Must be unique.</small>
           </label>
           <label className="setting-field">
             <span>
@@ -172,11 +171,7 @@ function ProjectDialogContent({
               Shown on the project card. {Array.from(description).length} / 200
             </small>
           </label>
-          {create && (
-            <p className="field-help">
-              You can add instructions and files after creating the project.
-            </p>
-          )}
+          {create && <p className="field-help">You can add instructions and files later.</p>}
           {chat && ownSystemPrompt(chat) !== null && (
             <Feedback severity="warning" title="This chat has its own system prompt">
               In {name || 'this project'} it uses the project instructions instead. Your prompt is
@@ -282,7 +277,11 @@ function ProjectDialogContent({
                   <small>
                     {value.id === chat.projectId
                       ? 'Current project'
-                      : `${controller.conversations.filter((item) => item.projectId === value.id).length} chats`}
+                      : countLabel(
+                          controller.conversations.filter((item) => item.projectId === value.id)
+                            .length,
+                          'chat',
+                        )}
                   </small>
                 </li>
               ))}
@@ -363,8 +362,7 @@ function ProjectDialogContent({
             </button>
           </div>
           <p className="panel-intro">
-            The system prompt for every chat in {project.name}. It replaces the system prompt from
-            Settings; each chat keeps its own prompt for when it leaves the project.
+            Replaces the Settings system prompt for every chat in this project.
           </p>
           <label className="setting-field">
             <span>Instructions</span>
@@ -379,8 +377,7 @@ function ProjectDialogContent({
               onChange={(event) => setInstructions(event.target.value)}
             />
             <small id={`${id}-count`}>
-              ≈ {estimateProjectTokens(instructions).toLocaleString('en-US')} tokens · estimate
-              while editing · part of the project’s context
+              ≈ {estimateProjectTokens(instructions).toLocaleString('en-US')} tokens (estimate)
             </small>
           </label>
           <p className="field-help">
@@ -400,7 +397,7 @@ function ProjectDialogContent({
                 void perform(async () => {
                   await projects.update(project.id, { instructions });
                   projects.setNotice({
-                    message: `Saved the instructions for ${members.length} chats in ${project.name}.`,
+                    message: `Saved the instructions for ${countLabel(members.length, 'chat')} in ${project.name}.`,
                   });
                 })
               }
@@ -420,7 +417,7 @@ function ProjectDialogContent({
         busy={busy}
         project
         title={`Archive “${project.name}”?`}
-        description={`It leaves the sidebar and the active list. Its ${members.length} chats stay readable in Conversations. While archived, you cannot start chats, edit its instructions or change its files. You can restore it from Projects › Archived.`}
+        description="Its chats stay readable, but you can’t add chats, instructions or files. Restore it anytime from Projects › Archived."
       >
         {feedback}
         {lifecycleBusy && (
@@ -453,7 +450,7 @@ function ProjectDialogContent({
       busy={busy}
       project
       title={`Delete “${project.name}”?`}
-      description={`The project, its instructions and ${project.files.length} files are permanently removed from this device. The original files on your disk are not affected.`}
+      description="The project, its instructions and its files are permanently deleted. Originals on your disk aren’t affected."
     >
       {!!members.length && (
         <label className="project-check">
@@ -465,7 +462,7 @@ function ProjectDialogContent({
             disabled={busy}
           />
           <span>
-            Also delete its {members.length} chats
+            Also delete its {countLabel(members.length, 'chat')}
             <small>
               Otherwise they move to Conversations and use their own system prompt again.
             </small>
@@ -501,14 +498,14 @@ function ProjectDialogContent({
                 controller.setEditor(null);
               }
               projects.setNotice({
-                message: `Deleted “${project.name}”.${members.length ? (alsoChats ? ` Its ${members.length} chats were deleted too.` : ` Its ${members.length} chats moved to Conversations.`) : ''}`,
+                message: `Deleted “${project.name}”.${members.length ? (alsoChats ? ` Its ${countLabel(members.length, 'chat')} ${members.length === 1 ? 'was' : 'were'} deleted too.` : ` Its ${countLabel(members.length, 'chat')} moved to Conversations.`) : ''}`,
               });
               controller.openProjects();
             })
           }
         >
           {alsoChats && members.length
-            ? `Delete project and ${members.length} chats`
+            ? `Delete project and ${countLabel(members.length, 'chat')}`
             : 'Delete project'}
         </button>
       </div>
