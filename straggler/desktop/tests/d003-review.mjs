@@ -36,7 +36,7 @@ const results = [];
 const paletteChecks = [];
 const differences = [
   'Web search is already implemented. Its additional composer chip and Settings navigation entry are preserved; the supplied dossier predates them.',
-  'The live canvas orb replaces the still captured in the dossier. Its size is 224px before messages and 128px afterward, with a 48px compact rail.',
+  'The live canvas orb replaces the still captured in the dossier. Its size stays 224px in the expanded panel, with a 48px compact rail.',
   'At 760px the real app uses its existing compact assistant rail; the disconnected dossier keeps an expanded panel over chat.',
   'Control density follows measured space and may hide values or labels; the dossier contains static controls from before the composer fix.',
   'Project context estimates and relative timestamps come from synthetic fixture records and can differ from captured totals. No inference is run.',

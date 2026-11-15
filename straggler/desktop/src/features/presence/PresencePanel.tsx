@@ -95,11 +95,7 @@ export default function PresencePanel({
           {expanded ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
         </button>
         <div id={id}>
-          <AssistantPresence
-            state={state}
-            metrics={metrics}
-            size={expanded ? (hasMessages ? 128 : 224) : 48}
-          />
+          <AssistantPresence state={state} metrics={metrics} size={expanded ? 224 : 48} />
           <Sources sources={sources} compact />
           <AttachmentSection controller={attachments} />
         </div>

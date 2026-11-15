@@ -1871,12 +1871,6 @@ body[data-area='settings'] .danger-button {
 .presence-stage {
   margin: 18px auto 0;
 }
-.presence.is-expanded.has-messages .presence-stage {
-  margin-top: var(--ui-space-6);
-}
-.presence.is-expanded.has-messages .presence-caption {
-  margin-top: var(--ui-space-2);
-}
 .presence-caption {
   margin-top: -14px;
   text-align: center;

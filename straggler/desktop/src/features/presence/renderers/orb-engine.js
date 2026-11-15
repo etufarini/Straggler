@@ -162,9 +162,9 @@ const HoloOrb = (function (root) {
   // Idle states come to rest (ready after one slow turn: WCAG 2.2.2).
   const RESTING = { offline: 0, stopped: 0, error: 0, ready: 14 };
   const QUALITY = [
-    { resolution: 1, stride: 1, details: true },
-    { resolution: 0.85, stride: 2, details: true },
-    { resolution: 0.7, stride: 3, details: false },
+    { stride: 1, details: true },
+    { stride: 2, details: true },
+    { stride: 3, details: false },
   ];
   const PANEL_LINES = [
     [0.1, 0.65, 0.26],
@@ -183,9 +183,8 @@ const HoloOrb = (function (root) {
       this.loop = this.loop.bind(this);
       this.autostart = options.autostart !== false;
       this.size = options.size || canvas.clientWidth || 240;
-      this.dpr = clamp(options.dpr || root.devicePixelRatio || 1, 1, 2);
+      this.dpr = options.dpr || root.devicePixelRatio || 1;
       this.quality = 0;
-      this.pendingQualityResize = false;
       this.qualityElapsed = 0;
       this.recoveryElapsed = 0;
       this.frameIntervals = [];
@@ -293,8 +292,7 @@ const HoloOrb = (function (root) {
 
     resize(size) {
       if (size) this.size = size;
-      this.pendingQualityResize = false;
-      const px = Math.round(this.size * this.dpr * QUALITY[this.quality].resolution);
+      const px = Math.round(this.size * this.dpr);
       this.canvas.width = px;
       this.canvas.height = px;
       this.canvas.style.width = this.size + 'px';
@@ -383,7 +381,6 @@ const HoloOrb = (function (root) {
         this.stopLoop();
         return;
       }
-      if (this.pendingQualityResize) this.resize();
       if (this.reduce) {
         this.snap();
         this.draw();
@@ -437,12 +434,7 @@ const HoloOrb = (function (root) {
       this.qualityElapsed = 0;
       this.frameIntervals.length = 0;
       this.drawTimes.length = 0;
-      if (nextQuality !== this.quality) {
-        this.quality = nextQuality;
-        // Resizing clears a canvas. Apply it before the next draw so the current
-        // frame is presented intact instead of flashing an empty surface.
-        this.pendingQualityResize = true;
-      }
+      this.quality = nextQuality;
     }
 
     target(key) {
