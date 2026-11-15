@@ -120,12 +120,18 @@ for (const width of [760, 820, 960, 1024, 1100, 1280, 1440]) {
               .getByRole('button', { name: 'Send message', exact: true })
               .click({ trial: true });
             await page.getByRole('button', { name: 'Expand assistant panel', exact: true }).click();
-            await inspectControls(page);
+            if (width > 1100) await inspectControls(page);
             // At <=1100px the existing panel intentionally overlays chat. Close it to send.
             if (width > 1100)
               await page
                 .getByRole('button', { name: 'Send message', exact: true })
                 .click({ trial: true });
+            await page
+              .getByRole('button', { name: 'Collapse assistant panel', exact: true })
+              .click();
+            await page
+              .getByRole('button', { name: 'Send message', exact: true })
+              .click({ trial: true });
             if (
               [760, 1024, 1440].includes(width) &&
               height === 820 &&
@@ -135,9 +141,6 @@ for (const width of [760, 820, 960, 1024, 1100, 1280, 1440]) {
             ) {
               await page.screenshot({ path: testInfo.outputPath(`composer-${width}.png`) });
             }
-            await page
-              .getByRole('button', { name: 'Collapse assistant panel', exact: true })
-              .click();
           }
           for (const label of [
             'System prompt: Project instructions',
@@ -203,3 +206,27 @@ test('all four densities follow measured space with hysteresis and accessible ac
   }, transitionWidth);
   await expect(composer).toHaveAttribute('data-density', 'full');
 });
+
+for (const close of ['Escape', 'button', 'outside']) {
+  test(`overlay protects covered controls and restores focus after ${close}`, async ({ page }) => {
+    await page.setViewportSize({ width: 760, height: 560 });
+    await prepare(page, 'on', true);
+    const message = page.getByRole('textbox', { name: 'Message', exact: true });
+    await message.focus();
+    await page.getByRole('button', { name: 'Expand assistant panel', exact: true }).click();
+    await expect(page.locator('.chat-main')).toHaveJSProperty('inert', true);
+    for (let index = 0; index < 12; index++) {
+      await page.keyboard.press('Tab');
+      expect(await page.evaluate(() => !!document.activeElement?.closest('.chat-main'))).toBe(
+        false,
+      );
+    }
+    if (close === 'Escape') await page.keyboard.press('Escape');
+    else if (close === 'button')
+      await page.getByRole('button', { name: 'Collapse assistant panel', exact: true }).click();
+    else await page.locator('.notice').click();
+    await expect(page.locator('.chat-main')).toHaveJSProperty('inert', false);
+    await expect(message).toBeFocused();
+    await page.getByRole('button', { name: 'Send message', exact: true }).click({ trial: true });
+  });
+}
