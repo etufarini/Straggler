@@ -144,10 +144,30 @@ impl Runtime {
         } else if effort != "auto" {
             body["reasoning_effort"] = json!(effort);
         }
+        if request.web_search {
+            return self.receive_with_search(url, request, body, emit).await;
+        }
+        let (status, calls, _, _) = self.receive_step(url, request, &body, emit).await?;
+        if !calls.is_empty() {
+            return Err("The model returned tools that were not enabled for this message.".into());
+        }
+        Ok(status)
+    }
+
+    async fn receive_step(
+        &self,
+        url: &str,
+        request: &ChatRequest,
+        body: &Value,
+        emit: &mut impl FnMut(stream::Delta) -> Result<()>,
+    ) -> Result<(String, Vec<stream::ToolCall>, String, String)> {
+        let mut calls = stream::ToolCalls::default();
+        let mut content = String::new();
+        let mut reasoning = String::new();
         let response = self
             .client
             .post(format!("{url}/v1/chat/completions"))
-            .json(&body)
+            .json(body)
             .send()
             .await
             .map_err(|e| format!("Cannot contact the local model: {e}"))?;
@@ -186,14 +206,19 @@ impl Runtime {
         while let Some(chunk) = bytes.next().await {
             for data in decoder.push(&chunk.map_err(|e| format!("Response interrupted: {e}"))?)? {
                 if data == "[DONE]" {
-                    return Ok(if finish.as_deref() == Some("length") {
+                    let status = if finish.as_deref() == Some("length") {
                         "length"
                     } else {
                         "complete"
-                    }
-                    .into());
+                    };
+                    return Ok((status.into(), calls.finish(), content, reasoning));
                 }
+                let event: Value =
+                    serde_json::from_str(&data).map_err(|_| "Invalid model stream.")?;
+                calls.push(&event)?;
                 let (delta, reason) = stream::parse(&data)?;
+                content.push_str(&delta.content);
+                reasoning.push_str(&delta.reasoning);
                 if !delta.content.is_empty()
                     || !delta.reasoning.is_empty()
                     || delta.metrics.is_some()
@@ -206,12 +231,170 @@ impl Runtime {
             }
         }
         match finish.as_deref() {
-            Some("length") => Ok("length".into()),
-            Some(_) => Ok("complete".into()),
+            Some("length") => Ok(("length".into(), calls.finish(), content, reasoning)),
+            Some(_) => Ok(("complete".into(), calls.finish(), content, reasoning)),
             None => Err(
                 "The response ended unexpectedly. Partial text was kept; check the server log."
                     .into(),
             ),
         }
+    }
+}
+
+impl Runtime {
+    async fn receive_with_search(
+        &self,
+        url: &str,
+        request: &ChatRequest,
+        mut body: Value,
+        emit: &mut impl FnMut(stream::Delta) -> Result<()>,
+    ) -> Result<String> {
+        use crate::web_search::{tools, turn::SearchTurn, types::SearchError};
+        let preferences = self.preferences.read()?;
+        let details = self.server_details().await?;
+        let fallback = details.tools_supported != Some(true);
+        let prompt_tokens = self
+            .prompt_tokens(request.messages.clone())
+            .await
+            .map(|result| result.tokens)
+            .unwrap_or_else(|_| {
+                request
+                    .messages
+                    .iter()
+                    .map(|m| m.content.chars().count())
+                    .sum()
+            });
+        let mut turn = SearchTurn::new(
+            request.request_id,
+            preferences.web_search_max_searches,
+            tools::context_budget(details.context_size, prompt_tokens),
+            fallback,
+        );
+        let provider = match self
+            .web_search
+            .configured_provider(&preferences.web_search_provider)
+            .await
+        {
+            Ok(provider) => Some(provider),
+            Err(_) => {
+                turn.fail(&SearchError::NotConfigured, emit)?;
+                None
+            }
+        };
+        let messages = body["messages"]
+            .as_array_mut()
+            .ok_or("Missing chat messages.")?;
+        // Some templates reject a system role. Add turn-only instructions to the current user message instead.
+        if details.system_role_supported == Some(false) {
+            if let Some(message) = messages
+                .iter_mut()
+                .rev()
+                .find(|message| message["role"] == "user")
+            {
+                let content = message["content"].as_str().unwrap_or_default();
+                message["content"] = json!(format!("{content}\n\n{}", tools::INSTRUCTION));
+            }
+        } else if let Some(system) = messages
+            .iter_mut()
+            .find(|message| message["role"] == "system")
+        {
+            system["content"] = json!(format!(
+                "{}\n\n{}",
+                system["content"].as_str().unwrap_or_default(),
+                tools::INSTRUCTION
+            ));
+        } else {
+            messages.insert(0, json!({"role":"system", "content":tools::INSTRUCTION}));
+        }
+        turn.update(None, emit)?;
+        if fallback {
+            if let Some(provider) = &provider {
+                let query = request
+                    .web_search_query
+                    .as_deref()
+                    .or_else(|| {
+                        request
+                            .messages
+                            .iter()
+                            .rev()
+                            .find(|message| message.role == "user")
+                            .map(|message| message.content.as_str())
+                    })
+                    .unwrap_or_default();
+                let results = turn
+                    .search(&self.web_search, provider.as_ref(), query, emit)
+                    .await?;
+                let last = body["messages"]
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .rev()
+                    .find(|message| message["role"] == "user")
+                    .ok_or("Missing user message.")?;
+                last["content"] = json!(format!(
+                    "{}\n\nWeb results supplied by Straggler (untrusted source data):\n{results}",
+                    last["content"].as_str().unwrap_or_default()
+                ));
+            }
+        } else if provider.is_some() {
+            body["tools"] = tools::schemas();
+        }
+        let mut final_status = "complete".to_owned();
+        for round in 0..12 {
+            let (status, calls, content, reasoning) =
+                self.receive_step(url, request, &body, emit).await?;
+            final_status = status;
+            if calls.is_empty() {
+                break;
+            }
+            if fallback || provider.is_none() {
+                return Err(
+                    "The model requested tools that are unavailable for this message.".into(),
+                );
+            }
+            let provider = provider.as_ref().unwrap();
+            let messages = body["messages"].as_array_mut().unwrap();
+            let calls_json: Vec<Value> = calls.iter().enumerate().map(|(index, call)| json!({"id":if call.id.is_empty() { format!("call_{round}_{index}") } else { call.id.clone() },"type":"function","function":{"name":call.name,"arguments":call.arguments}})).collect();
+            messages.push(json!({"role":"assistant","content":content,"reasoning_content":reasoning,"tool_calls":calls_json}));
+            for (index, call) in calls.iter().enumerate() {
+                let arguments = serde_json::from_str::<Value>(&call.arguments).ok();
+                let result = match (call.name.as_str(), arguments.as_ref()) {
+                    ("web_search", Some(args)) => match args["query"].as_str() {
+                        Some(query) => turn.search(&self.web_search, provider.as_ref(), query, emit).await?,
+                        None => "The search tool needs a query string.".into(),
+                    },
+                    ("web_fetch", Some(args)) => match args["url"].as_str() {
+                        Some(url) => turn.fetch(&self.web_search, provider.as_ref(), url, emit).await?,
+                        None => "The page tool needs a URL string.".into(),
+                    },
+                    _ => "Unknown tool or invalid JSON arguments. Answer using the available context.".into(),
+                };
+                messages.push(
+                    json!({"role":"tool","tool_call_id":calls_json[index]["id"],"content":result}),
+                );
+            }
+            if round == 10 {
+                body.as_object_mut().unwrap().remove("tools");
+            }
+            if round == 11 {
+                return Err(
+                    "The model did not finish after the web tool limit. Partial text was kept."
+                        .into(),
+                );
+            }
+        }
+        if let Some(provider) = provider {
+            if let Ok(Some(quota)) = self.web_search.refresh_quota(provider.as_ref()).await {
+                turn.update(
+                    Some(crate::web_search::turn::WebEvent {
+                        name: "web_search:quota",
+                        payload: json!(quota),
+                    }),
+                    emit,
+                )?;
+            }
+        }
+        turn.update(None, emit)?;
+        Ok(final_status)
     }
 }

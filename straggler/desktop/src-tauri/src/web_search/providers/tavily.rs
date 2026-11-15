@@ -159,7 +159,8 @@ impl Tavily {
             elapsed_ms,
             cost_units: value["usage"]["credits"]
                 .as_u64()
-                .and_then(|n| u32::try_from(n).ok()),
+                .and_then(|n| u32::try_from(n).ok())
+                .or(Some(1)),
         })
     }
 }
@@ -223,6 +224,9 @@ impl SearchProvider for Tavily {
             markdown: markdown.into(),
             truncated: false,
             source: FetchSource::Provider,
+            cost_units: value["usage"]["credits"]
+                .as_u64()
+                .and_then(|n| u32::try_from(n).ok()),
         })
     }
     async fn quota(&self) -> std::result::Result<Option<QuotaStatus>, SearchError> {

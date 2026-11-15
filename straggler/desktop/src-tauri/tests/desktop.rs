@@ -131,6 +131,8 @@ impl Fixture {
 
 fn request(id: Uuid, content: &str) -> ChatRequest {
     ChatRequest {
+        web_search: false,
+        web_search_query: None,
         temporary_id: None,
         conversation_id: None,
         options: Default::default(),

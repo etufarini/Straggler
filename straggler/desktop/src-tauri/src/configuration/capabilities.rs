@@ -285,6 +285,9 @@ pub fn arguments(
         .into_iter()
         .flat_map(|(flag, value)| [format!("--{flag}"), value])
         .collect();
+    if supports(help, "--jinja") {
+        arguments.push("--jinja".into());
+    }
     arguments.extend(["--host".into(), "127.0.0.1".into()]);
     Ok(arguments)
 }

@@ -108,6 +108,7 @@ pub struct PageContent {
     pub markdown: String,
     pub truncated: bool,
     pub source: FetchSource,
+    pub cost_units: Option<u32>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FetchSource {
@@ -115,7 +116,7 @@ pub enum FetchSource {
     Provider,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct QuotaStatus {
     pub used: u32,
     pub limit: Option<u32>,

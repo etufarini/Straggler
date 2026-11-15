@@ -9,6 +9,7 @@ use uuid::Uuid;
 pub struct ServerDetails {
     pub run_id: Uuid,
     pub context_size: Option<u64>,
+    pub tools_supported: Option<bool>,
     pub reasoning_supported: Option<bool>,
     pub effort_levels: Vec<String>,
     pub system_role_supported: Option<bool>,
@@ -43,6 +44,7 @@ impl Runtime {
         let mut details = ServerDetails {
             run_id: run,
             context_size: None,
+            tools_supported: None,
             reasoning_supported: None,
             effort_levels: Vec::new(),
             system_role_supported: None,
@@ -75,6 +77,10 @@ impl Runtime {
             .as_u64()
             .filter(|&n| n > 0);
         let capabilities = &props["chat_template_caps"];
+        let jinja = self.server.lock().map_err(|e| e.to_string())?.jinja;
+        details.tools_supported = capabilities["supports_tool_calls"]
+            .as_bool()
+            .map(|supported| supported && jinja);
         details.system_role_supported = capabilities["supports_system_role"].as_bool();
         details.effort_levels = capabilities["reasoning_effort_levels"]
             .as_array()

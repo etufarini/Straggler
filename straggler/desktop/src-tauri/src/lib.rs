@@ -62,9 +62,11 @@ struct Server {
     error: Option<String>,
     diagnostics: diagnostics::Diagnostics,
     temporary: bool,
+    jinja: bool,
 }
 
 pub struct Runtime {
+    pub web_search: web_search::WebSearchService,
     pub hugging_face: huggingface::HuggingFace,
     native: configuration::native::NativeConfiguration,
     server: Arc<Mutex<Server>>,
@@ -95,6 +97,10 @@ pub struct ChatRequest {
     pub conversation_id: Option<Uuid>,
     #[serde(default)]
     pub temporary_id: Option<Uuid>,
+    #[serde(default, alias = "web_search")]
+    pub web_search: bool,
+    #[serde(default)]
+    pub web_search_query: Option<String>,
     pub messages: Vec<ChatMessage>,
     #[serde(default)]
     pub options: ChatOptions,
@@ -107,7 +113,7 @@ pub struct ChatOptions {
     pub effort: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
@@ -152,6 +158,7 @@ impl Runtime {
         let projects = projects::Projects::new(data.join("projects"), &history)?;
         Ok(Self {
             backend_releases: backend_release::ReleaseLookup::new()?,
+            web_search: web_search::WebSearchService::default(),
             hugging_face,
             native,
             history,
@@ -171,6 +178,7 @@ impl Runtime {
                 error: None,
                 diagnostics: diagnostics::Diagnostics::default(),
                 temporary: false,
+                jinja: false,
             })),
             active: Mutex::new(Generation::default()),
             model_details: Mutex::new(None),

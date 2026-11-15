@@ -175,6 +175,7 @@ async fn existing_desktop_data_and_session_lock_survive_the_rename() {
     let preferences = UiPreferences {
         sidebar_collapsed: true,
         presence_expanded: Some(false),
+        ..Default::default()
     };
     Preferences::new(legacy.clone()).save(&preferences).unwrap();
     let env = environment(work.path(), &[]);

@@ -58,6 +58,7 @@ impl Runtime {
             error: None,
             diagnostics: crate::diagnostics::Diagnostics::default(),
             temporary,
+            jinja: arguments.iter().any(|argument| argument == "--jinja"),
         };
         drop(state);
         if let Some(chat) = self.temporary.lock().map_err(|e| e.to_string())?.as_mut() {

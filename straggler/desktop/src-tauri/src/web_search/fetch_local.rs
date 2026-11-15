@@ -73,6 +73,7 @@ fn extract(url: Url, html: &str, budget: usize) -> Result<PageContent, SearchErr
         truncated: text.chars().count() > budget,
         markdown: text.chars().take(budget).collect(),
         source: FetchSource::Local,
+        cost_units: Some(0),
     })
 }
 #[cfg(test)]
