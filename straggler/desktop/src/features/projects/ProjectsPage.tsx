@@ -1,3 +1,4 @@
+import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import { Folder, Plus, Search, Star } from 'lucide-react';
 import { useState } from 'react';
 import type { WorkspaceController } from '../../app/useWorkspace';
@@ -44,8 +45,15 @@ export function projectActions(controller: WorkspaceController, project: Project
   };
 }
 
-export default function ProjectsPage({ controller }: { controller: WorkspaceController }) {
+export default function ProjectsPage({
+  controller,
+  onPrimaryActionChange,
+}: {
+  controller: WorkspaceController;
+  onPrimaryActionChange: (active: boolean) => void;
+}) {
   const { projects, openProject, setProjectDialog } = controller;
+  usePagePrimaryAction(projects.ready, onPrimaryActionChange);
   const [tab, setTab] = useState<'active' | 'archived'>('active');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('updated');

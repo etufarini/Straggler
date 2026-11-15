@@ -1,3 +1,4 @@
+import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import Select from '../../components/Select';
 import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
@@ -7,11 +8,19 @@ import { errorDetail } from '../../domain/errors';
 import { webSearchError } from '../../domain/webSearch';
 import type { WebSearchController } from './useWebSearch';
 
-export default function WebSearchSettings({ controller }: { controller: WebSearchController }) {
+export default function WebSearchSettings({
+  controller,
+  onPrimaryActionChange,
+}: {
+  controller: WebSearchController;
+  onPrimaryActionChange: (active: boolean) => void;
+}) {
   const { status, provider, busy, maxSearches, onPreferences, refresh } = controller;
   const [key, setKey] = useState('');
   const [message, setMessage] = useState('');
   const [linkError, setLinkError] = useState('');
+  const canSaveKey = !busy && !!key.trim() && !!provider;
+  usePagePrimaryAction(canSaveKey, onPrimaryActionChange);
   useEffect(() => {
     void refresh(true);
   }, [refresh]);
@@ -92,7 +101,7 @@ export default function WebSearchSettings({ controller }: { controller: WebSearc
         <button
           type="button"
           className="primary-button"
-          disabled={busy || !key.trim() || !provider}
+          disabled={!canSaveKey}
           onClick={() => void save(false)}
         >
           {busy ? 'Verifying…' : 'Save and verify'}
