@@ -80,8 +80,13 @@ export function useWorkspace() {
     projects,
     storageQueue,
   );
-  const webSearch = useWebSearch(ui.preferences, ui.changePreferences, () =>
-    conversation.setWebSearchOn(false),
+  const webSearch = useWebSearch(
+    ui.preferences,
+    (patch) => {
+      ui.changePreferences(patch);
+      return ui.preferenceSaveQueue.current;
+    },
+    () => conversation.setWebSearchOn(false),
   );
   const currentProject = projects.projects.find(
     (project) => project.id === conversation.chat.projectId,

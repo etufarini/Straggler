@@ -129,7 +129,12 @@ export function listen<T>(
   event: string,
   handler: (event: { payload: T }) => void,
 ): Promise<UnlistenFn> {
-  return fixture ? Promise.resolve(() => {}) : nativeListen<T>(event, handler);
+  if (!fixture) return nativeListen<T>(event, handler);
+  const listener = (value: Event) => handler({ payload: (value as CustomEvent<T>).detail });
+  window.addEventListener(`straggler-fixture-event:${event}`, listener);
+  return Promise.resolve(() =>
+    window.removeEventListener(`straggler-fixture-event:${event}`, listener),
+  );
 }
 
 // DOM visibility and native window state are distinct lifecycle contracts.

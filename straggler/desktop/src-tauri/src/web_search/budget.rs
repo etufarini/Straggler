@@ -10,6 +10,7 @@ pub struct Budget {
     cache: HashMap<(ProviderId, SearchRequest), (Instant, SearchResponse)>,
     pub quota: Option<QuotaStatus>,
     quota_reads: VecDeque<Instant>,
+    cooldowns: HashMap<ProviderId, Instant>,
 }
 impl Budget {
     fn key(provider: &ProviderId, request: &SearchRequest) -> (ProviderId, SearchRequest) {
@@ -51,10 +52,29 @@ impl Budget {
             (Instant::now(), response),
         );
     }
+    pub fn retry_after(&mut self, provider: &ProviderId) -> Option<u32> {
+        let until = *self.cooldowns.get(provider)?;
+        let remaining = until.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            self.cooldowns.remove(provider);
+            return None;
+        }
+        Some(remaining.as_secs().saturating_add(1).min(u32::MAX as u64) as u32)
+    }
+    pub fn rate_limited(&mut self, provider: ProviderId, seconds: Option<u32>) {
+        if let Some(until) =
+            Instant::now().checked_add(Duration::from_secs(seconds.unwrap_or(60) as u64))
+        {
+            self.cooldowns.insert(provider, until);
+        }
+    }
     pub fn charge(&mut self, units: u32) {
         if let Some(quota) = &mut self.quota {
             quota.used = quota.used.saturating_add(units);
         }
+    }
+    pub fn clear_cache(&mut self) {
+        self.cache.clear();
     }
     pub fn clear(&mut self) {
         self.cache.clear();
@@ -152,6 +172,12 @@ mod tests {
             .is_none());
         budget.cache.values_mut().next().unwrap().0 = Instant::now() - CACHE_TTL;
         assert!(budget.cached(&id, &same).is_none());
+        budget.rate_limited(id.clone(), Some(60));
+        assert!(budget.retry_after(&id).is_some_and(|seconds| seconds <= 61));
+        budget
+            .cooldowns
+            .insert(id.clone(), Instant::now() - Duration::from_secs(1));
+        assert!(budget.retry_after(&id).is_none());
         for _ in 0..10 {
             assert!(budget.allow_quota_read());
         }

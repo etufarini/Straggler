@@ -1,11 +1,6 @@
 use super::{
-    budget::TurnBudget,
-    citations::{Citations, Source},
-    fetch_local,
-    provider::SearchProvider,
-    tools,
-    types::*,
-    WebSearchService,
+    budget::TurnBudget, citations::Citations, fetch_local, provider::SearchProvider, tools,
+    types::*, WebSearchService,
 };
 use crate::{stream::Delta, Result};
 use serde::{Deserialize, Serialize};
@@ -173,6 +168,7 @@ impl SearchTurn {
         )?;
         let page = match fetch_local::fetch(&url, self.remaining).await {
             Ok(page) => Ok(page),
+            Err(error @ SearchError::InvalidRequest(_)) => Err(error),
             Err(_) if provider.capabilities().fetch => provider.fetch(&url).await,
             Err(error) => Err(error),
         };
@@ -202,8 +198,5 @@ impl SearchTurn {
             emit,
         )?;
         Ok(text)
-    }
-    pub fn sources(&self) -> &[Source] {
-        &self.citations.sources
     }
 }

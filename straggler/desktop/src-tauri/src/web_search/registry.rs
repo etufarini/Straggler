@@ -40,3 +40,17 @@ impl TokenStore for SearchKeyStore {
         }
     }
 }
+
+#[cfg(any(test, all(feature = "native-tests", debug_assertions)))]
+#[derive(Default)]
+pub struct MemoryKeyStore(pub std::sync::Mutex<Option<String>>);
+#[cfg(any(test, all(feature = "native-tests", debug_assertions)))]
+impl TokenStore for MemoryKeyStore {
+    fn read(&self) -> Result<Option<String>> {
+        Ok(self.0.lock().map_err(|e| e.to_string())?.clone())
+    }
+    fn write(&self, key: Option<&str>) -> Result<()> {
+        *self.0.lock().map_err(|e| e.to_string())? = key.map(str::to_owned);
+        Ok(())
+    }
+}

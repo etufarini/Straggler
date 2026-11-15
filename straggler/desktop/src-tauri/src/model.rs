@@ -80,7 +80,9 @@ impl Runtime {
         let jinja = self.server.lock().map_err(|e| e.to_string())?.jinja;
         details.tools_supported = capabilities["supports_tool_calls"]
             .as_bool()
-            .map(|supported| supported && jinja);
+            .map(|supported| {
+                supported && capabilities["supports_tools"].as_bool() == Some(true) && jinja
+            });
         details.system_role_supported = capabilities["supports_system_role"].as_bool();
         details.effort_levels = capabilities["reasoning_effort_levels"]
             .as_array()

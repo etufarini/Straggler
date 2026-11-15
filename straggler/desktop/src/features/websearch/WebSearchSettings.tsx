@@ -1,3 +1,4 @@
+import Select from '../../components/Select';
 import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import Feedback from '../../components/Feedback';
@@ -37,6 +38,18 @@ export default function WebSearchSettings({ controller }: { controller: WebSearc
         on this computer.
       </p>
       <h3>Service</h3>
+      {status && status.providers.length > 1 && (
+        <Select
+          aria-label="Search service"
+          value={status.selected}
+          options={status.providers.map((provider) => ({
+            value: provider.id,
+            label: provider.name,
+          }))}
+          disabled={busy}
+          onChange={(value) => void controller.selectProvider(value)}
+        />
+      )}
       <p>
         {provider?.name ?? 'Loading service…'} <small>{provider?.planDescription}</small>
       </p>
@@ -49,6 +62,7 @@ export default function WebSearchSettings({ controller }: { controller: WebSearc
       <label className="setting-field">
         <span>{provider?.name} API key</span>
         <input
+          aria-label={`${provider?.name ?? 'Web search'} API key`}
           type="password"
           autoComplete="off"
           spellCheck={false}

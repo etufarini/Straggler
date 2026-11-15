@@ -424,7 +424,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
         )}
         <form
           ref={composerRef}
-          className={`composer ${composerWidth !== null && composerWidth <= 700 ? 'is-narrow' : ''} ${composerWidth !== null && composerWidth <= 480 ? 'is-small' : ''}`}
+          className={`composer ${composerWidth !== null && composerWidth <= 900 ? 'is-narrow' : ''} ${composerWidth !== null && composerWidth <= 480 ? 'is-small' : ''}`}
           onSubmit={(event) => {
             event.preventDefault();
             if (canSend) {

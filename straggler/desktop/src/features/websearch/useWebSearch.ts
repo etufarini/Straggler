@@ -6,7 +6,7 @@ import type { WebQuota, WebSearchStatus } from '../../domain/webSearch';
 
 export function useWebSearch(
   preferences: UiPreferences,
-  onPreferences: (patch: Partial<UiPreferences>) => void,
+  onPreferences: (patch: Partial<UiPreferences>) => void | Promise<void>,
   onKeyChanged: () => void,
 ) {
   const [status, setStatus] = useState<WebSearchStatus | null>(null);
@@ -32,6 +32,19 @@ export function useWebSearch(
       void pending.then((unlisten) => unlisten());
     };
   }, []);
+  async function selectProvider(provider: string) {
+    setBusy(true);
+    setError('');
+    try {
+      await onPreferences({ webSearchProvider: provider });
+      onKeyChanged();
+      await refresh(true);
+    } catch (failure) {
+      setError(errorDetail(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function saveKey(key: string | null) {
     setBusy(true);
     setError('');
@@ -53,6 +66,7 @@ export function useWebSearch(
     busy,
     refresh,
     saveKey,
+    selectProvider,
     preferences,
     onPreferences,
     provider: status?.providers.find((provider) => provider.id === status.selected),

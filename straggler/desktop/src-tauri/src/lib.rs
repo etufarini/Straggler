@@ -141,6 +141,13 @@ impl Runtime {
             )?,
             None => hugging_face,
         };
+        #[cfg(not(all(feature = "native-tests", debug_assertions)))]
+        let web_search = web_search::WebSearchService::default();
+        #[cfg(all(feature = "native-tests", debug_assertions))]
+        let web_search = web_search::WebSearchService::with_provider_and_keys(
+            Arc::new(web_search::providers::mock::MockProvider::default()),
+            Arc::new(web_search::registry::MemoryKeyStore::default()),
+        );
         let native = configuration::native::NativeConfiguration::new(environment)?;
         let history = History::new(data.join("conversations"))?;
         let instance = OpenOptions::new()
@@ -158,7 +165,7 @@ impl Runtime {
         let projects = projects::Projects::new(data.join("projects"), &history)?;
         Ok(Self {
             backend_releases: backend_release::ReleaseLookup::new()?,
-            web_search: web_search::WebSearchService::default(),
+            web_search,
             hugging_face,
             native,
             history,

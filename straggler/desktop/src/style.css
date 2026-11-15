@@ -3566,3 +3566,10 @@ input:focus-visible {
 .web-usage::-webkit-meter-optimum-value {
   background: var(--ui-cyan);
 }
+
+.composer.is-small .composer-footer {
+  flex-wrap: wrap;
+}
+.composer.is-small .composer-send {
+  margin-left: auto;
+}

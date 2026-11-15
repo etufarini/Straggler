@@ -276,8 +276,13 @@ impl Runtime {
             .await
         {
             Ok(provider) => Some(provider),
-            Err(_) => {
-                turn.fail(&SearchError::NotConfigured, emit)?;
+            Err(error) => {
+                let error = if error == "not_configured" {
+                    SearchError::NotConfigured
+                } else {
+                    SearchError::ProviderUnavailable
+                };
+                turn.fail(&error, emit)?;
                 None
             }
         };
@@ -285,7 +290,7 @@ impl Runtime {
             .as_array_mut()
             .ok_or("Missing chat messages.")?;
         // Some templates reject a system role. Add turn-only instructions to the current user message instead.
-        if details.system_role_supported == Some(false) {
+        if details.system_role_supported != Some(true) {
             if let Some(message) = messages
                 .iter_mut()
                 .rev()
@@ -383,7 +388,7 @@ impl Runtime {
                 );
             }
         }
-        if let Some(provider) = provider {
+        if let Some(provider) = provider.filter(|_| !turn.summary.queries.is_empty()) {
             if let Ok(Some(quota)) = self.web_search.refresh_quota(provider.as_ref()).await {
                 turn.update(
                     Some(crate::web_search::turn::WebEvent {

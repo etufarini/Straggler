@@ -8,18 +8,59 @@ use url::Url;
 const MAX_PAGE_BYTES: usize = 2 * 1024 * 1024;
 pub async fn fetch(url: &Url, budget: usize) -> Result<PageContent, SearchError> {
     validate_url(url)?;
-    let client = Client::builder()
-        .connect_timeout(Duration::from_secs(5))
-        .timeout(Duration::from_secs(12))
-        .redirect(reqwest::redirect::Policy::limited(3))
-        .user_agent("Straggler desktop")
-        .build()
-        .map_err(|_| SearchError::ProviderUnavailable)?;
-    let response = client
-        .get(url.clone())
-        .send()
+    tokio::time::timeout(Duration::from_secs(15), fetch_page(url, budget))
         .await
-        .map_err(|_| SearchError::FetchFailed { url: url.clone() })?;
+        .map_err(|_| SearchError::Timeout)?
+}
+async fn fetch_page(url: &Url, budget: usize) -> Result<PageContent, SearchError> {
+    let mut target = url.clone();
+    let mut final_response = None;
+    for _ in 0..=3 {
+        validate_url(&target)?;
+        let lookup = target.clone();
+        let addresses = tokio::task::spawn_blocking(move || lookup.socket_addrs(|| None))
+            .await
+            .map_err(|_| SearchError::ProviderUnavailable)?
+            .map_err(|_| SearchError::FetchFailed { url: url.clone() })?;
+        if addresses.is_empty()
+            || addresses
+                .iter()
+                .any(|address| !public_address(address.ip()))
+        {
+            return Err(SearchError::InvalidRequest(
+                "Web pages must use a public Internet address.".into(),
+            ));
+        }
+        // Pin the validated addresses and validate each redirect independently.
+        let client = Client::builder()
+            .no_proxy()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(12))
+            .redirect(reqwest::redirect::Policy::none())
+            .resolve_to_addrs(target.host_str().unwrap_or_default(), &addresses)
+            .user_agent("Straggler desktop")
+            .build()
+            .map_err(|_| SearchError::ProviderUnavailable)?;
+        let response = client
+            .get(target.clone())
+            .send()
+            .await
+            .map_err(|_| SearchError::FetchFailed { url: url.clone() })?;
+        if response.status().is_redirection() {
+            let location = response
+                .headers()
+                .get("location")
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| SearchError::FetchFailed { url: url.clone() })?;
+            target = target
+                .join(location)
+                .map_err(|_| SearchError::FetchFailed { url: url.clone() })?;
+        } else {
+            final_response = Some(response);
+            break;
+        }
+    }
+    let response = final_response.ok_or_else(|| SearchError::FetchFailed { url: url.clone() })?;
     if !response.status().is_success()
         || validate_url(response.url()).is_err()
         || response
@@ -52,6 +93,36 @@ pub async fn fetch(url: &Url, budget: usize) -> Result<PageContent, SearchError>
         .await
         .map_err(|_| SearchError::ProviderUnavailable)?
 }
+fn public_address(address: std::net::IpAddr) -> bool {
+    use std::net::IpAddr;
+    match address {
+        IpAddr::V4(ip) => {
+            let octets = ip.octets();
+            !ip.is_private()
+                && !ip.is_loopback()
+                && !ip.is_link_local()
+                && !ip.is_broadcast()
+                && !ip.is_documentation()
+                && !ip.is_multicast()
+                && octets[0] != 0
+                && octets[0] < 240
+                && !(octets[0] == 100 && (64..=127).contains(&octets[1]))
+                && !(octets[0] == 198 && (18..=19).contains(&octets[1]))
+        }
+        IpAddr::V6(ip) => {
+            if let Some(ipv4) = ip.to_ipv4() {
+                return public_address(IpAddr::V4(ipv4));
+            }
+            !ip.is_loopback()
+                && !ip.is_unspecified()
+                && !ip.is_multicast()
+                && !ip.is_unique_local()
+                && !ip.is_unicast_link_local()
+                && ip.segments()[..2] != [0x2001, 0xdb8]
+        }
+    }
+}
+
 fn extract(url: Url, html: &str, budget: usize) -> Result<PageContent, SearchError> {
     let config = Config {
         text_mode: TextMode::Markdown,
@@ -79,6 +150,25 @@ fn extract(url: Url, html: &str, budget: usize) -> Result<PageContent, SearchErr
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pages_cannot_reach_local_networks_or_metadata_services() {
+        for address in [
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.16.1.1",
+            "192.168.0.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "::1",
+            "::ffff:127.0.0.1",
+            "fc00::1",
+            "fe80::1",
+        ] {
+            assert!(!public_address(address.parse().unwrap()), "{address}");
+        }
+        assert!(public_address("8.8.8.8".parse().unwrap()));
+        assert!(public_address("2606:4700:4700::1111".parse().unwrap()));
+    }
     #[test]
     fn readability_strips_navigation_and_respects_markdown_budget() {
         let html = format!("<html><head><title>Article</title></head><body><nav>Navigation</nav><article><h1>Article</h1><p>{}</p><p><strong>Important</strong> source.</p></article></body></html>", "Readable sentences about the subject. ".repeat(100));

@@ -115,6 +115,7 @@ fixture services are excluded from production transport.
 | Setup and devices | `normal`, `empty`, `cpu`, `multiple`, `unknown-memory`, `occupied` |
 | Storage and backend errors | `save-error`, `history-error`, `model-error`, `backend-error` |
 | Generation and recovery | `interrupted`, `cancel`, `oom`, `oom-startup`, `oom-and-save-error`, `compute-error` |
+| Web search | `web-normal`, `web-no-key`, `web-low`, `web-exhausted`, `web-offline`, `web-invalid`, `web-no-tools` |
 | Reasoning and context | `no-metrics`, `no-reasoning`, `effort-levels`, `context-high`, `context-full`, `reasoning-stream` |
 
 ## Upstream fixture contracts
@@ -153,6 +154,27 @@ The browser Hub fixture uses explicit test controls documented by
 flags; these are development controls, not production preferences.
 Live OS keychain, Flatpak portal grants and signed macOS Store bookmark/child access
 remain platform integration checks; mocks do not establish those permissions.
+
+Web search fixtures follow the provider-neutral types in `src-tauri/src/web_search/`.
+Only `providers/tavily.rs` owns the remote API, billing details and country mapping:
+[Tavily Search](https://docs.tavily.com/documentation/api-reference/endpoint/search),
+[Extract](https://docs.tavily.com/documentation/api-reference/endpoint/extract),
+[Usage](https://docs.tavily.com/documentation/api-reference/endpoint/usage) and
+[rate limits](https://docs.tavily.com/documentation/rate-limits).
+Search requests pin `search_depth: basic`, `auto_parameters: false` and opt out of
+provider-generated answers and raw pages. Usage and favicon metadata require
+explicit opt-in. Usage reports account plan totals and does not document a renewal
+date. Search units are normalized before leaving the adapter.
+
+`tests/fixtures/server.py` advertises `--jinja`. With `TEST_TOOLS`, it exposes both
+`supports_tools` and `supports_tool_calls` and streams fragmented OpenAI tool calls;
+otherwise it exercises the one-search fallback. Rust integration tests inject
+counted providers, and debug `native-tests` builds always use a memory search key
+store and the mock provider. They never access a real search key or remote service.
+Browser web scenarios identify their service as **Mock search** and emit development
+events for assertions, without network calls. The new end-to-end checks run as part
+of the existing WebKit suite; Chromium can also be used for supplemental local
+checks where WebKit runtime dependencies are unavailable.
 
 ## Optional visual diagnostics
 
