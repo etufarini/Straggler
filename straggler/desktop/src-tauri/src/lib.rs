@@ -17,6 +17,7 @@ mod server;
 pub mod stream;
 pub mod temporary;
 pub mod tokens;
+pub mod web_search;
 pub mod workspace;
 pub use workspace::{Configuration, Listener, Settings};
 
