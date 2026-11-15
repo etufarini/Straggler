@@ -69,7 +69,6 @@ export default function Settings({
           Back to chat
         </button>
         <h1>Settings</h1>
-        <p>Choose how the model runs on this computer.</p>
       </div>
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
@@ -156,7 +155,7 @@ export default function Settings({
                     {device.name}: {(device.availableMiB / 1024).toFixed(1)} GiB reported free
                   </span>
                 ))}
-                <small>An estimate. llama.cpp makes the final check when the server starts.</small>
+                <small>Estimate. llama.cpp confirms it at launch.</small>
               </div>
             </div>
           </fieldset>

@@ -30,3 +30,39 @@ test('the single-line brand stays centered and welcome copy follows chat privacy
   );
   await expect(page.locator('.welcome br')).toHaveCount(0);
 });
+
+test('sampling shares its default hint while retaining each field description', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.locator('.settings-heading p')).toHaveCount(0);
+  const gap = await page
+    .locator('.settings-layout')
+    .evaluate(
+      (layout) =>
+        layout.getBoundingClientRect().top -
+        document.querySelector('.settings-heading h1')!.getBoundingClientRect().bottom,
+    );
+  expect(gap).toBeGreaterThanOrEqual(24);
+  expect(gap).toBeLessThanOrEqual(32);
+  await page.getByText('Fine-tune reply style', { exact: true }).click();
+  const group = page.locator('.sampling-details');
+  await expect(group.locator('summary + .field-help')).toHaveText(
+    'Leave a field empty to use the llama.cpp default.',
+  );
+  await expect(
+    group.getByText('Leave a field empty to use the llama.cpp default.', { exact: true }),
+  ).toHaveCount(1);
+  const descriptions = await group.locator('input').evaluateAll((inputs) =>
+    inputs.map((input) => {
+      const ids = input.getAttribute('aria-describedby')?.split(' ') ?? [];
+      return ids.map((id) => document.getElementById(id)?.textContent?.trim() ?? '').join(' ');
+    }),
+  );
+  expect(descriptions).toHaveLength(7);
+  for (const description of descriptions) {
+    expect(description.length).toBeGreaterThan(0);
+    expect(description).not.toContain('llama.cpp default');
+  }
+});
