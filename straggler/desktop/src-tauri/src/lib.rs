@@ -4,6 +4,7 @@ pub mod bundled_backend;
 mod chat;
 pub mod configuration;
 pub mod conversation_import;
+pub mod credentials;
 pub mod diagnostics;
 pub mod files;
 pub mod history;
