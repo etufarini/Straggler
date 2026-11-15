@@ -105,6 +105,9 @@ export default function WebSearchSettings({ controller }: { controller: WebSearc
               {quota.limit !== null && (
                 <meter
                   className={`web-usage ${percentage >= 100 ? 'is-full' : percentage >= 80 ? 'is-high' : ''}`}
+                  low={(quota.limit || 1) * 0.8}
+                  high={(quota.limit || 1) * 0.99}
+                  optimum={0}
                   min={0}
                   max={quota.limit || 1}
                   value={quota.used}

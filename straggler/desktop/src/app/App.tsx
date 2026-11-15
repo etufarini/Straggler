@@ -260,6 +260,7 @@ export default function App() {
               <ChatPanel controller={controller} />
             </div>
             <PresencePanel
+              sources={lastResponse?.sources}
               attachments={controller.attachments}
               state={presence}
               metrics={lastResponse?.metrics}

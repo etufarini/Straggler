@@ -1426,7 +1426,8 @@ textarea:disabled {
   border-color: #5a74c4;
   background: var(--ui-raised-2);
 }
-.reasoning-menu.is-on .composer-chip {
+.reasoning-menu.is-on .composer-chip,
+.web-search-menu.is-on .composer-chip {
   border-color: transparent;
   background:
     linear-gradient(#22306a, #22306a) padding-box,
@@ -3461,4 +3462,107 @@ input:focus-visible {
   width: 100%;
   height: 8px;
   accent-color: var(--ui-cyan);
+}
+
+/* Web search reuses the composer, reasoning and presence surfaces. */
+.web-search-menu.is-unavailable .composer-chip {
+  border-style: dashed;
+  color: var(--ui-subtle);
+}
+.web-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ui-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.web-spinner {
+  flex-shrink: 0;
+  animation: web-search-spin 1s linear infinite;
+}
+@keyframes web-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .web-spinner {
+    animation: none;
+  }
+}
+.web-search-activity {
+  overflow-wrap: anywhere;
+}
+.web-search-activity ul {
+  padding-left: 18px;
+}
+.web-citation {
+  display: inline-flex;
+  padding: 0 6px;
+  margin: 0 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-raised);
+  color: var(--ui-accent-text);
+  font-size: 11px;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+.message-sources {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ui-border);
+}
+.message-sources h2 {
+  font-size: 13px;
+}
+.web-source-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: grid;
+  gap: 10px;
+}
+.web-source-list li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.web-source-list a {
+  color: var(--ui-accent-text);
+  text-decoration: none;
+}
+.web-source-list a:hover {
+  text-decoration: underline;
+}
+.web-source-list small {
+  display: block;
+  color: var(--ui-subtle);
+  font-size: 11px;
+}
+.source-number {
+  color: var(--ui-muted);
+  min-width: 16px;
+}
+.web-sources-panel {
+  border-top: 1px solid var(--ui-border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+.web-sources-panel h2 {
+  font-size: 14px;
+}
+.web-usage {
+  width: 100%;
+  height: 14px;
+}
+.web-usage::-webkit-meter-bar {
+  background: var(--ui-raised);
+  border: none;
+}
+.web-usage::-webkit-meter-optimum-value {
+  background: var(--ui-cyan);
 }
