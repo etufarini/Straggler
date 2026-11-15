@@ -85,7 +85,7 @@ export default function ConversationMenu({
   return (
     <ActionMenu
       label={`Options for ${conversation.title}`}
-      title="Conversation options"
+      title="Chat options"
       controlId={controlId ?? `button-options-for-${controlSlug(conversation.title)}`}
       disabled={disabled}
       items={items}

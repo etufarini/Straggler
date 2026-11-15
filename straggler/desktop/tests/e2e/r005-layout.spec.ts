@@ -61,9 +61,7 @@ for (const width of [960, 1200, 1440]) {
         .evaluate((element) => getComputedStyle(element).outlineStyle),
     ).not.toBe('none');
     await page.keyboard.press('Escape');
-    await expect(
-      page.getByRole('button', { name: 'Import conversation', exact: true }),
-    ).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Import chat', exact: true })).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

@@ -886,7 +886,7 @@ for (const source of ['All projects', 'Project detail'] as const) {
       name: source === 'All projects' ? 'Projects' : 'Thesis research',
       exact: true,
     });
-    const importAction = page.getByRole('button', { name: 'Import conversation', exact: true });
+    const importAction = page.getByRole('button', { name: 'Import chat', exact: true });
     const initialHistory = await readHistory(page);
     await page.evaluate(() => localStorage.setItem('straggler-fixture-import-path', 'cancel'));
     await importAction.click();

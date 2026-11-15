@@ -184,7 +184,7 @@ export default function ProjectDetail({
             </p>
           )}
           {controller.server.phase !== 'ready' && (
-            <p className="field-help">Load a model to start a conversation.</p>
+            <p className="field-help">Load a model to start chatting.</p>
           )}
           <div className="project-section-head">
             <h2 id="project-chats-title">Chats</h2>

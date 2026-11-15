@@ -82,7 +82,7 @@ export default function ProjectsPage({
           <h1 id="projects-title" tabIndex={-1}>
             Projects
           </h1>
-          <p>Group chats that share instructions and files. Everything stays on this device.</p>
+          <p>Group chats that share instructions and files.</p>
         </div>
         {!!projects.projects.length && (
           <button

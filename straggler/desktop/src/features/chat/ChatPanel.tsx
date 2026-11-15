@@ -87,17 +87,9 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
           <div className="welcome">
             <h1>{controller.temporary ? 'Temporary chat' : 'What’s on your mind?'}</h1>
             {controller.temporary ? (
-              <p>
-                Messages, attachments and drafts stay in memory.
-                <br />
-                Save this chat to keep it. Leaving erases it.
-              </p>
+              <p>Not saved. Leaving erases this chat unless you save it.</p>
             ) : (
-              <p>
-                A conversation, a fresh perspective, a place to think.
-                <br />
-                Powered by a model running right here.
-              </p>
+              <p>Powered by a model on this computer.</p>
             )}
             <div className="suggestions">
               {[
@@ -434,7 +426,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                 ? 'Message your local model…'
                 : server.issue
                   ? 'Review settings and restart the server to continue…'
-                  : 'Load a model to start a conversation…'
+                  : 'Load a model to start chatting…'
             }
             value={input}
             disabled={archived}

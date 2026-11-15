@@ -4,7 +4,7 @@ test('Import is reachable with empty history, creates a new top conversation and
   page,
 }) => {
   await page.goto('/?scenario=normal');
-  const action = page.getByRole('button', { name: 'Import conversation', exact: true });
+  const action = page.getByRole('button', { name: 'Import chat', exact: true });
   await expect(action).toBeEnabled();
   await action.click();
   await expect(page.locator('.message.user')).toContainText('Imported question');
@@ -27,7 +27,7 @@ test('CHAT-18 shows the failed filename, explanation, details and Choose another
 }) => {
   await page.goto('/?scenario=normal');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-import-error', 'true'));
-  await page.getByRole('button', { name: 'Import conversation', exact: true }).click();
+  await page.getByRole('button', { name: 'Import chat', exact: true }).click();
   const feedback = page.locator('.composer-wrap').getByRole('alert');
   await expect(feedback).toContainText('Import failed');
   await expect(feedback).toContainText('import.json');
@@ -45,14 +45,14 @@ test('canceling import leaves history empty, and a failed create does not open a
 }) => {
   await page.goto('/?scenario=normal');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-import-path', 'cancel'));
-  await page.getByRole('button', { name: 'Import conversation', exact: true }).click();
+  await page.getByRole('button', { name: 'Import chat', exact: true }).click();
   await expect(page.getByText('What’s on your mind?')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.evaluate(() => {
     localStorage.removeItem('straggler-fixture-import-path');
     localStorage.setItem('straggler-fixture-fail-next-save', 'true');
   });
-  await page.getByRole('button', { name: 'Import conversation', exact: true }).click();
+  await page.getByRole('button', { name: 'Import chat', exact: true }).click();
   await expect(page.getByText('Import failed', { exact: true })).toBeVisible();
   await expect(page.getByText('What’s on your mind?')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-normal'))).toBeNull();
@@ -70,7 +70,7 @@ test('invalid import preserves generation; a valid import stops and saves its pa
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.locator('.message.assistant .markdown')).toContainText('A local answer');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-import-error', 'true'));
-  await page.getByRole('button', { name: 'Import conversation', exact: true }).click();
+  await page.getByRole('button', { name: 'Import chat', exact: true }).click();
   await expect(page.getByText('Import failed', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stop response' })).toBeVisible();
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-import-error'));
@@ -91,7 +91,7 @@ test('a successful import keeps history-loading feedback until history recovers'
 }) => {
   await page.goto('/?scenario=history-error');
   await expect(page.getByText('Conversation history unavailable', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Import conversation', exact: true }).click();
+  await page.getByRole('button', { name: 'Import chat', exact: true }).click();
   await expect(page.locator('.message.user')).toContainText('Imported question');
   await expect(page.getByText('Conversation history unavailable', { exact: true })).toBeVisible();
   await page.evaluate(() => localStorage.setItem('straggler-fixture-history-recovered', 'true'));

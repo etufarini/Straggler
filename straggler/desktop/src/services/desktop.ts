@@ -202,7 +202,7 @@ export async function saveConversationExport(
 export async function chooseConversationImport(): Promise<string | null> {
   if (fixture) return (await fixture).chooseImportPath();
   return nativeOpen({
-    title: 'Import conversation',
+    title: 'Import chat',
     multiple: false,
     directory: false,
     filters: [{ name: 'JSON conversation', extensions: ['json'] }],
