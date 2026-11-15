@@ -1,3 +1,4 @@
+import { createWebSearchFixture } from './webSearchFixtures';
 import nativeDefaults from '../../src-tauri/src/configuration/defaults.json';
 import backendManifest from '../../packaging/llama-runtime.json';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
@@ -17,6 +18,13 @@ import { createProjectFixture } from './projectFixtures';
 import { createHuggingFaceFixture } from './huggingFaceFixtures';
 
 export type Scenario =
+  | 'web-normal'
+  | 'web-low'
+  | 'web-exhausted'
+  | 'web-offline'
+  | 'web-invalid'
+  | 'web-no-tools'
+  | 'web-no-key'
   | 'normal'
   | 'empty'
   | 'cpu'
@@ -48,6 +56,13 @@ export const defaultSettings = {
 } as Settings;
 
 export const scenarios: Scenario[] = [
+  'web-normal',
+  'web-low',
+  'web-exhausted',
+  'web-offline',
+  'web-invalid',
+  'web-no-tools',
+  'web-no-key',
   'normal',
   'empty',
   'cpu',
@@ -74,6 +89,7 @@ export const scenarios: Scenario[] = [
 ];
 
 export function createFixture(scenario: Scenario) {
+  const webSearch = createWebSearchFixture(scenario);
   let settings = { ...defaultSettings, model: scenario === 'empty' ? '' : defaultSettings.model };
   let status: ServerStatus = { ...emptyServer };
   let llamaDir = scenario === 'empty' ? '' : '/fixture/llama.cpp';
@@ -237,6 +253,10 @@ export function createFixture(scenario: Scenario) {
         modelsDir = selected || '/fixture/linked-models';
         return configuration();
       }
+      case 'web_search_status':
+      case 'web_search_key_save':
+      case 'open_web_url':
+        return webSearch.invoke(command, args);
       case 'preferences_read':
         return JSON.parse(
           localStorage.getItem('straggler-fixture-ui-preferences') ||
@@ -494,7 +514,13 @@ export function createFixture(scenario: Scenario) {
         return null;
       }
       case 'generate': {
-        const request = args.request as { conversationId?: string; temporaryId?: string };
+        const request = args.request as {
+          requestId: string;
+          webSearch?: boolean;
+          webSearchQuery?: string;
+          conversationId?: string;
+          temporaryId?: string;
+        };
         if (request.temporaryId) {
           if (temporary?.id !== request.temporaryId || request.conversationId)
             throw new Error('Invalid temporary request');
@@ -535,6 +561,11 @@ export function createFixture(scenario: Scenario) {
           reasoning: 'Example reasoning text.',
         };
         const channel = args.onDelta as { onmessage: (delta: Delta) => void };
+        const webResult = await webSearch.search(request, channel);
+        Object.assign(delta, webResult);
+        if (delta.sources?.length)
+          delta.content =
+            'This simulated local answer cites a source [1], another source [2], and leaves an unknown citation [99] as text.\n\n`Code [1]`';
         if (scenario === 'burst-stream') {
           delta.content =
             '## Streamed answer\n\n' + 'A **local** answer with caffè ☕.\n\n'.repeat(80);

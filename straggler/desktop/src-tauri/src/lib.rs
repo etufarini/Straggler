@@ -4,6 +4,7 @@ pub mod bundled_backend;
 mod chat;
 pub mod configuration;
 pub mod conversation_import;
+pub mod credentials;
 pub mod diagnostics;
 pub mod files;
 pub mod history;
@@ -17,6 +18,7 @@ mod server;
 pub mod stream;
 pub mod temporary;
 pub mod tokens;
+pub mod web_search;
 pub mod workspace;
 pub use workspace::{Configuration, Listener, Settings};
 
@@ -60,9 +62,11 @@ struct Server {
     error: Option<String>,
     diagnostics: diagnostics::Diagnostics,
     temporary: bool,
+    jinja: bool,
 }
 
 pub struct Runtime {
+    pub web_search: web_search::WebSearchService,
     pub hugging_face: huggingface::HuggingFace,
     native: configuration::native::NativeConfiguration,
     server: Arc<Mutex<Server>>,
@@ -93,6 +97,10 @@ pub struct ChatRequest {
     pub conversation_id: Option<Uuid>,
     #[serde(default)]
     pub temporary_id: Option<Uuid>,
+    #[serde(default, alias = "web_search")]
+    pub web_search: bool,
+    #[serde(default)]
+    pub web_search_query: Option<String>,
     pub messages: Vec<ChatMessage>,
     #[serde(default)]
     pub options: ChatOptions,
@@ -105,7 +113,7 @@ pub struct ChatOptions {
     pub effort: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
@@ -133,6 +141,13 @@ impl Runtime {
             )?,
             None => hugging_face,
         };
+        #[cfg(not(all(feature = "native-tests", debug_assertions)))]
+        let web_search = web_search::WebSearchService::default();
+        #[cfg(all(feature = "native-tests", debug_assertions))]
+        let web_search = web_search::WebSearchService::with_provider_and_keys(
+            Arc::new(web_search::providers::mock::MockProvider::default()),
+            Arc::new(web_search::registry::MemoryKeyStore::default()),
+        );
         let native = configuration::native::NativeConfiguration::new(environment)?;
         let history = History::new(data.join("conversations"))?;
         let instance = OpenOptions::new()
@@ -150,6 +165,7 @@ impl Runtime {
         let projects = projects::Projects::new(data.join("projects"), &history)?;
         Ok(Self {
             backend_releases: backend_release::ReleaseLookup::new()?,
+            web_search,
             hugging_face,
             native,
             history,
@@ -169,6 +185,7 @@ impl Runtime {
                 error: None,
                 diagnostics: diagnostics::Diagnostics::default(),
                 temporary: false,
+                jinja: false,
             })),
             active: Mutex::new(Generation::default()),
             model_details: Mutex::new(None),

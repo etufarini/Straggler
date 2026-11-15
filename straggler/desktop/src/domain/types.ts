@@ -1,3 +1,4 @@
+import type { WebSource, WebSearchTurn } from './webSearch';
 export interface Model {
   path: string;
   label: string;
@@ -105,6 +106,8 @@ export interface Message {
   error?: string;
   metrics?: GenerationMetrics;
   serverRunId?: string;
+  sources?: WebSource[];
+  webSearch?: WebSearchTurn;
 }
 export interface Attachment {
   id: string;
@@ -126,6 +129,8 @@ export interface Conversation {
   ownSystemPrompt?: string | null;
 }
 export interface Delta {
+  sources?: WebSource[];
+  webSearch?: WebSearchTurn;
   metrics?: GenerationMetrics;
   content: string;
   reasoning: string;
@@ -201,11 +206,15 @@ export function requestMessages(messages: Message[]) {
 export interface UiPreferences {
   sidebarCollapsed: boolean;
   presenceExpanded: boolean | null;
+  webSearchNoticeSeen?: boolean;
+  webSearchMaxSearches?: number;
+  webSearchProvider?: string;
 }
 
 export interface ServerDetails {
   runId: string;
   contextSize: number | null;
+  toolsSupported?: boolean | null;
   reasoningSupported: boolean | null;
   effortLevels: string[];
   systemRoleSupported: boolean | null;

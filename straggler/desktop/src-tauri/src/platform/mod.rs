@@ -8,13 +8,13 @@ mod macos;
 pub mod models_picker;
 #[cfg(target_os = "linux")]
 pub use linux::{
-    available_memory, bundled_server, identity, listeners, rename_directory_exclusive,
-    signal_listener,
+    available_memory, bundled_server, identity, listeners, open_web_url,
+    rename_directory_exclusive, signal_listener,
 };
 #[cfg(target_os = "macos")]
 pub use macos::{
-    available_memory, bundled_server, identity, listeners, rename_directory_exclusive,
-    signal_listener,
+    available_memory, bundled_server, identity, listeners, open_web_url,
+    rename_directory_exclusive, signal_listener,
 };
 
 use crate::{workspace::Listener, Result};

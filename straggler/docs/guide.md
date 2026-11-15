@@ -487,6 +487,41 @@ Opening settings, switching tabs, startup and local model discovery do not
 contact Hugging Face. Search, opening/retrying a repository, download and resume
 are the network actions. No inference service is contacted by these controls.
 
+### Web search
+
+In **Settings → Web search**, add your API key and choose **Save and verify**.
+The key stays in the operating system's keychain; replacing it requires successful
+verification before the old key is changed. Removing a key does not remove saved sources.
+The service, its signup link and its free plan are shown in Settings.
+
+Turn on **Web search** in the composer before sending a message. It applies to that
+message only, including in temporary chats. It starts off, returns off after sending,
+and resets when opening or switching chats. Saving a key does not enable it. Only
+the first-use acknowledgement and the search limit are saved in preferences.
+Search queries and fallback page addresses go to the selected service. The chat
+history and attachments remain local; a model-generated query can include details
+from the context, so review what you share when enabling web access.
+
+The default limit is three searches per message, adjustable from one to five.
+Identical searches are cached in memory for 15 minutes. Straggler first reads public
+web pages locally with a timeout and size limit; the service is used only if local
+reading fails. Page extraction may incur additional service charges. Local/private
+network addresses and non-HTTP(S) pages are excluded.
+
+Supported backends start with `--jinja` when advertised. Straggler uses the loaded
+template's advertised tool capabilities, never a model filename. If support is
+unknown or absent, it runs one search with your submitted text and adds the results
+to the current request. Template compatibility cannot guarantee that a model will
+choose or use tools correctly. Search failures show a notice and the local answer
+continues without web search.
+
+Search activity, numbered citations and **Sources** appear in the response. Sources
+for the latest response also appear in the right panel. Links open in the default
+browser. Only numbers associated with an existing source become citation links.
+Saved chats contain normalized sources and activity, never provider JSON or keys.
+Monthly usage is refreshed in Settings and after searched responses, subject to
+the service's rate limit. An unknown renewal date is displayed as unavailable.
+
 ### llama.cpp
 
 This section identifies the selected backend and displays available version,

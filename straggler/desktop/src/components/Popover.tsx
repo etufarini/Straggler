@@ -15,6 +15,9 @@ export default function Popover({
   containFocus = false,
   popoverClassName = '',
   heading,
+  pressed,
+  title,
+  onTrigger,
 }: {
   label: string;
   valueLabel?: string;
@@ -27,6 +30,9 @@ export default function Popover({
   containFocus?: boolean;
   popoverClassName?: string;
   heading?: string;
+  pressed?: boolean;
+  title?: string;
+  onTrigger?: () => boolean;
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -68,13 +74,21 @@ export default function Popover({
         data-control-id={controlId}
         type="button"
         className="composer-chip"
+        aria-pressed={pressed}
+        title={title}
         aria-label={label}
         aria-describedby={valueLabel ? `${id}-value` : undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={id}
         disabled={disabled}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (onTrigger && !onTrigger()) {
+            setOpen(false);
+            return;
+          }
+          setOpen(!open);
+        }}
       >
         {trigger}
       </button>

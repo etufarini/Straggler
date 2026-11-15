@@ -1,3 +1,5 @@
+import Sources from '../websearch/Sources';
+import type { WebSource } from '../../domain/webSearch';
 import AttachmentSection from '../attachments/AttachmentSection';
 import type { AttachmentController } from '../attachments/useAttachments';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -8,6 +10,7 @@ import type { GenerationMetrics, UiPreferences } from '../../domain/types';
 
 export default function PresencePanel({
   state,
+  sources = [],
   metrics,
   preferences,
   onPreferences,
@@ -15,6 +18,7 @@ export default function PresencePanel({
   attachments,
 }: {
   state: PresenceState;
+  sources?: WebSource[];
   metrics?: GenerationMetrics;
   preferences: UiPreferences;
   onPreferences: (patch: Partial<UiPreferences>) => void;
@@ -72,6 +76,7 @@ export default function PresencePanel({
         </button>
         <div id={id}>
           <AssistantPresence state={state} metrics={metrics} />
+          <Sources sources={sources} compact />
           <AttachmentSection controller={attachments} />
         </div>
       </aside>

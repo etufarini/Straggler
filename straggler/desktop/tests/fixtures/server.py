@@ -12,7 +12,7 @@ if '--version' in sys.argv:
     print(os.environ.get('TEST_BACKEND_VERSION', 'version: 0.9.0-test (build 42, commit abc1234)'), file=sys.stderr)
     sys.exit()
 if '--help' in sys.argv:
-    print('--slots\n--cache-ram N\n--log-disable')
+    print('--slots\n--cache-ram N\n--log-disable\n--jinja')
     print('--model FNAME\n--port PORT\n--host HOST\n--ctx-size N\n--cache-type-k TYPE\n--cache-type-v TYPE\n--split-mode MODE\n--tensor-split N\n--fit-target N\n--device DEV\n--threads N\n--gpu-layers N\n--batch-size N\n--ubatch-size N\n--temperature N\n--top-p N\n--top-k N\n--min-p N\n--repeat-penalty N\n--presence-penalty N\n--frequency-penalty N\n--seed N\n--n-predict N')
     sys.exit()
 if '--list-devices' in sys.argv:
@@ -23,6 +23,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model')
 parser.add_argument('--port', type=int)
 parser.add_argument('--host')
+parser.add_argument('--jinja', action='store_true')
 parser.add_argument('--slots', action='store_true')
 parser.add_argument('--cache-ram')
 parser.add_argument('--log-disable', action='store_true')
@@ -45,6 +46,8 @@ class Handler(BaseHTTPRequestHandler):
             data = {'default_generation_settings': {'n_ctx': 4096},
                     'chat_template_caps': {'supports_system_role': True, 'supports_reasoning_effort': True,
                                            'reasoning_effort_levels': ['low', 'high']}}
+            if os.environ.get('TEST_TOOLS'):
+                data['chat_template_caps'].update({'supports_tools': True, 'supports_tool_calls': True})
             if os.path.exists(os.environ['TEST_REQUEST'] + '.context-unavailable'):
                 data['default_generation_settings'] = {}
         body = json.dumps(data).encode()
@@ -87,6 +90,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         with open(os.environ['TEST_REQUEST'], 'w') as record:
             json.dump(request, record)
+        with open(os.environ['TEST_REQUEST'] + '.turns', 'a') as record:
+            record.write(json.dumps(request) + '\n')
         # Failed assistant turns are omitted, so consecutive user turns can be
         # merged. Fixture control words belong to the final user paragraph.
         prompt = request['messages'][-1]['content'].split('\n\n')[-1]
@@ -129,6 +134,19 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.close_connection = True
         try:
+            tool_count = sum(message['role'] == 'tool' for message in request['messages'])
+            if request.get('tools') and tool_count < int(os.environ.get('TEST_TOOL_ROUNDS', '1')):
+                fragments = [
+                    {'index': 0, 'id': 'call_fixture', 'type': 'function', 'function': {'name': 'web_', 'arguments': '{"que'}},
+                    {'index': 0, 'function': {'name': 'search', 'arguments': 'ry":"contract query"}'}},
+                ]
+                for fragment in fragments:
+                    event = {'choices': [{'delta': {'tool_calls': [fragment]}}]}
+                    self.wfile.write(('data: ' + json.dumps(event) + '\n\n').encode())
+                    self.wfile.flush()
+                self.wfile.write(b'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n')
+                self.wfile.flush()
+                return
             if prompt == 'animation-performance':
                 def send_delta(delta):
                     event = {'choices': [{'delta': delta}]}

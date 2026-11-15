@@ -72,6 +72,13 @@ fn metrics(event: &Value) -> Option<GenerationMetrics> {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Delta {
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub sources: Option<Vec<crate::web_search::citations::Source>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "webSearch")]
+    pub web_search: Option<crate::web_search::turn::TurnSummary>,
+    #[serde(skip)]
+    pub web_events: Vec<crate::web_search::turn::WebEvent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics: Option<GenerationMetrics>,
     pub content: String,
     pub reasoning: String,
@@ -137,6 +144,7 @@ pub fn parse(data: &str) -> Result<(Delta, Option<String>)> {
                 .or_else(|| delta["reasoning"].as_str())
                 .unwrap_or("")
                 .into(),
+            ..Delta::default()
         },
         choice["finish_reason"].as_str().map(str::to_owned),
     ))
@@ -205,5 +213,44 @@ mod tests {
         );
         let mut decoder = Decoder::default();
         assert!(decoder.push(&vec![b'x'; 2 * 1024 * 1024 + 1]).is_err());
+    }
+}
+
+// OpenAI streams can fragment the tool name, ID and JSON arguments independently.
+#[derive(Default)]
+pub struct ToolCalls(std::collections::BTreeMap<usize, ToolCall>);
+#[derive(Clone, Default)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: String,
+}
+impl ToolCalls {
+    pub fn push(&mut self, event: &Value) -> Result<()> {
+        if let Some(calls) = event["choices"][0]["delta"]["tool_calls"].as_array() {
+            for call in calls {
+                let index = call["index"].as_u64().unwrap_or(0) as usize;
+                if index >= 8 {
+                    return Err("The model requested too many tools at once.".into());
+                }
+                let current = self.0.entry(index).or_default();
+                for (target, value) in [
+                    (&mut current.id, &call["id"]),
+                    (&mut current.name, &call["function"]["name"]),
+                    (&mut current.arguments, &call["function"]["arguments"]),
+                ] {
+                    if let Some(fragment) = value.as_str() {
+                        if target.len() + fragment.len() > 16384 {
+                            return Err("The model tool request is too large.".into());
+                        }
+                        target.push_str(fragment);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    pub fn finish(self) -> Vec<ToolCall> {
+        self.0.into_values().collect()
     }
 }

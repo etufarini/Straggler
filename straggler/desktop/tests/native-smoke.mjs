@@ -336,6 +336,106 @@ try {
       evaluate(
         `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)})`,
       );
+    // Exercise the real window and IPC with a memory keychain and injected search provider.
+    assert.equal((await invokeNative('web_search_status', { refresh: false })).saved, false);
+    await evaluate('document.querySelector(".sidebar-bottom .nav-item").click()');
+    await evaluate(
+      'Array.from(document.querySelectorAll(".settings-nav button")).find(button => button.textContent === "Web search").click()',
+    );
+    await until(
+      () => evaluate(`!!document.querySelector('input[aria-label="Tavily API key"]')`),
+      'web search settings',
+    );
+    await fillField('input[aria-label="Tavily API key"]', 'native-search-secret');
+    await evaluate(
+      'Array.from(document.querySelectorAll(".settings-section button")).find(button => button.textContent === "Save and verify").click()',
+    );
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".success-message")?.textContent === "Key verified and saved in the system keychain."',
+        ),
+      'mock key verification',
+    );
+    await evaluate('document.querySelector(".settings-heading button").click()');
+    assert.equal(
+      await evaluate(
+        'document.querySelector(".web-search-menu button").getAttribute("aria-pressed")',
+      ),
+      'false',
+    );
+    await evaluate('document.querySelector(".new-chat").click()');
+    await evaluate('document.querySelector(".web-search-menu button").click()');
+    await until(
+      () => evaluate('!!document.querySelector(".web-search-menu [role=dialog]")'),
+      'first web search notice',
+    );
+    await evaluate(
+      'Array.from(document.querySelectorAll(".web-search-menu button")).find(button => button.textContent === "Got it").click()',
+    );
+    await sendMessage('Native web question');
+    await until(
+      () =>
+        evaluate(
+          '!!document.querySelector(".message-sources") && !document.querySelector(".send-button.stop")',
+        ),
+      'native web response sources',
+    );
+    assert.equal(
+      await evaluate(
+        'document.querySelector(".web-search-menu button").getAttribute("aria-pressed")',
+      ),
+      'false',
+    );
+    assert.match(
+      await evaluate('document.querySelector(".message-sources").textContent'),
+      /Simulated source/,
+    );
+    const webConversation = (await invokeNative('history_list', {})).find(
+      (chat) => chat.title === 'Native web question',
+    );
+    assert.equal(webConversation.messages[1].sources[0].n, 1);
+    assert.equal(webConversation.messages[1].webSearch.fallback, true);
+    assert.ok(!JSON.stringify(webConversation).includes('native-search-secret'));
+    await writeFile(
+      path.join(desktop, 'test-results/native-web-search.png'),
+      Buffer.from(await screenshot(), 'base64'),
+    );
+    await evaluate('document.querySelector(".sidebar-bottom .nav-item").click()');
+    await evaluate(
+      'Array.from(document.querySelectorAll(".settings-nav button")).find(button => button.textContent === "Web search").click()',
+    );
+    await until(
+      () =>
+        evaluate(
+          '!!Array.from(document.querySelectorAll(".settings-section button")).find(button => button.textContent === "Remove key" && !button.disabled)',
+        ),
+      'remove mock key control',
+    );
+    await evaluate(
+      'Array.from(document.querySelectorAll(".settings-section button")).find(button => button.textContent === "Remove key").click()',
+    );
+    await until(
+      async () => !(await invokeNative('web_search_status', { refresh: false })).saved,
+      'mock key removed',
+    );
+    await evaluate('document.querySelector(".settings-heading button").click()');
+    await evaluate(
+      `document.querySelector('[aria-label="Options for Native web question"]').click()`,
+    );
+    await evaluate(
+      `document.querySelector('[role="menuitem"][aria-label="Delete Native web question"]').click()`,
+    );
+    await until(
+      () => evaluate('!!document.querySelector(".confirmation .danger-button")'),
+      'delete web fixture chat',
+    );
+    await evaluate('document.querySelector(".confirmation .danger-button").click()');
+    await until(
+      () => evaluate('!document.querySelector(".confirmation")'),
+      'web fixture chat removed',
+    );
+    await evaluate(`document.querySelector('[title="Native test question"]').click()`);
     const folderInfo = await invokeNative('models_folder_info', {});
     assert.ok(
       folderInfo.defaultPath.startsWith(stage + path.sep),
@@ -882,10 +982,10 @@ try {
     await new Promise((resolve) => released.close(resolve));
     assert.equal(await readFile(forbiddenCommands, 'utf8').catch(() => ''), '');
     console.log(
-      `PASS: native desktop without launcher or utility subprocesses, real Tauri/WebKit window, verified local Hub download, temporary chat disposal, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.STRAGGLER_TEST_SHUTDOWN === 'signal' || process.env.STRAGGLER_MEASURE_ORB === '1' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
+      `PASS: native desktop without launcher or utility subprocesses, real Tauri/WebKit window, verified local Hub download, mock web search with normalized sources, temporary chat disposal, discovery, readiness, IPC streaming, saved response, fatal OOM recovery, confirmed Stop, restart and server cleanup on ${process.env.STRAGGLER_TEST_SHUTDOWN === 'signal' || process.env.STRAGGLER_MEASURE_ORB === '1' ? 'SIGTERM' : 'confirmed close (including canceled close and saved partial response)'}`,
     );
     console.log(
-      'Screenshots: test-results/native-chat.png and test-results/native-project.png (test server; no model inference)',
+      'Screenshots: test-results/native-chat.png, test-results/native-project.png and test-results/native-web-search.png (test services; no model inference)',
     );
   }
 } catch (error) {

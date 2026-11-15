@@ -20,6 +20,9 @@ struct Response {
     reasoning: String,
     error: Option<String>,
     metrics: Option<straggler_desktop::stream::GenerationMetrics>,
+    sources: Vec<straggler_desktop::web_search::citations::Source>,
+    #[serde(rename = "webSearch")]
+    web_search: Option<straggler_desktop::web_search::turn::TurnSummary>,
 }
 
 fn runtime(state: &State<'_, Application>) -> Result<Arc<Runtime>> {
@@ -160,6 +163,36 @@ async fn models_folder_info(
         };
         Ok(serde_json::json!({"path": config.models_dir, "defaultPath": default, "freeBytes": free, "error": error}))
     }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn web_search_status(
+    refresh: bool,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::web_search::SearchStatus> {
+    let runtime = runtime(&state)?;
+    let provider = runtime.preferences.read()?.web_search_provider;
+    Ok(runtime.web_search.status(&provider, refresh).await)
+}
+#[tauri::command]
+async fn web_search_key_save(
+    key: Option<String>,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::web_search::SearchStatus> {
+    let runtime = runtime(&state)?;
+    let provider = runtime.preferences.read()?.web_search_provider;
+    runtime.web_search.save_key(&provider, key).await
+}
+#[tauri::command]
+async fn open_web_url(url: String) -> Result<()> {
+    let url = reqwest::Url::parse(&url).map_err(|_| "Invalid web URL.")?;
+    straggler_desktop::web_search::types::validate_url(&url)
+        .map_err(|_| "Only HTTP and HTTPS links can be opened.")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        straggler_desktop::platform::open_web_url(url.as_str())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -336,17 +369,30 @@ async fn server_details(
 async fn generate(
     request: ChatRequest,
     on_delta: Channel<straggler_desktop::stream::Delta>,
+    app: tauri::AppHandle,
     state: State<'_, Application>,
 ) -> Result<Response> {
     let mut content = String::new();
     let mut reasoning = String::new();
     let mut metrics = straggler_desktop::stream::GenerationMetrics::default();
     let mut has_metrics = false;
+    let mut sources = Vec::new();
+    let mut web_search = None;
     let result = runtime(&state)?
         .generate(request, |delta| {
             if let Some(value) = &delta.metrics {
                 metrics.merge(value);
                 has_metrics = true;
+            }
+            if let Some(value) = &delta.sources {
+                sources = value.clone();
+            }
+            if let Some(value) = &delta.web_search {
+                web_search = Some(value.clone());
+            }
+            for event in &delta.web_events {
+                app.emit(event.name, &event.payload)
+                    .map_err(|e| e.to_string())?;
             }
             content.push_str(&delta.content);
             reasoning.push_str(&delta.reasoning);
@@ -361,6 +407,8 @@ async fn generate(
     Ok(Response {
         status,
         metrics: has_metrics.then_some(metrics),
+        sources,
+        web_search,
         content,
         reasoning,
         error,
@@ -690,6 +738,9 @@ fn main() {
             choose_models_folder,
             create_models_folder,
             models_folder_info,
+            web_search_status,
+            web_search_key_save,
+            open_web_url,
             hf_token_status,
             hf_token_save,
             hf_search,

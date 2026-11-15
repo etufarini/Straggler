@@ -131,6 +131,8 @@ impl Fixture {
 
 fn request(id: Uuid, content: &str) -> ChatRequest {
     ChatRequest {
+        web_search: false,
+        web_search_query: None,
         temporary_id: None,
         conversation_id: None,
         options: Default::default(),
@@ -1077,4 +1079,239 @@ fn unavailable_project_storage_and_failed_recovery_stay_at_storage_boundaries() 
         assert!(runtime.history.list().is_err());
         assert!(runtime.stop().is_ok());
     }
+}
+
+#[derive(Default)]
+struct CountingSearch {
+    calls: std::sync::atomic::AtomicUsize,
+    offline: bool,
+    slow: bool,
+}
+#[async_trait::async_trait]
+impl straggler_desktop::web_search::provider::SearchProvider for CountingSearch {
+    fn id(&self) -> straggler_desktop::web_search::types::ProviderId {
+        straggler_desktop::web_search::types::ProviderId("test-search".into())
+    }
+    fn capabilities(&self) -> straggler_desktop::web_search::types::Capabilities {
+        Default::default()
+    }
+    async fn verify(
+        &self,
+    ) -> std::result::Result<(), straggler_desktop::web_search::types::SearchError> {
+        Ok(())
+    }
+    async fn search(
+        &self,
+        request: &straggler_desktop::web_search::types::SearchRequest,
+    ) -> std::result::Result<
+        straggler_desktop::web_search::types::SearchResponse,
+        straggler_desktop::web_search::types::SearchError,
+    > {
+        use straggler_desktop::web_search::types::*;
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        if self.slow {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        }
+        if self.offline {
+            return Err(SearchError::Offline);
+        }
+        Ok(SearchResponse {
+            query: request.query.clone(),
+            hits: vec![SearchHit::new(
+                "Recorded source".into(),
+                reqwest::Url::parse("https://example.org/source").unwrap(),
+                "A recorded snippet.",
+            )?],
+            provider: self.id(),
+            elapsed_ms: 0,
+            cost_units: Some(1),
+        })
+    }
+}
+
+#[tokio::test]
+async fn web_search_is_false_when_omitted_and_never_passes_tools_or_calls_the_provider() {
+    let fixture = Fixture::new();
+    let mut runtime = Runtime::new(fixture.environment.clone(), fixture.data.clone()).unwrap();
+    let provider = Arc::new(CountingSearch::default());
+    runtime.web_search =
+        straggler_desktop::web_search::WebSearchService::with_provider(provider.clone());
+    fixture.ready(&runtime).await;
+    let request: ChatRequest = serde_json::from_value(serde_json::json!({"requestId":Uuid::new_v4(), "messages":[{"role":"user","content":"Ordinary local question"}]})).unwrap();
+    assert!(!request.web_search);
+    runtime
+        .generate(request, |delta| {
+            assert!(delta.web_search.is_none());
+            Ok(())
+        })
+        .await
+        .unwrap();
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
+    let body: serde_json::Value =
+        serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
+    assert!(body.get("tools").is_none());
+    assert!(!body.to_string().contains("Web search is enabled"));
+    let launch: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture._directory.path().join("launch.json")).unwrap())
+            .unwrap();
+    assert_eq!(launch["jinja"], true);
+}
+
+#[tokio::test]
+async fn web_tools_stream_fragments_cache_and_limit_searches_without_affecting_normal_requests() {
+    for tools_supported in [false, true] {
+        let mut fixture = Fixture::new();
+        if tools_supported {
+            fixture
+                .environment
+                .variables
+                .insert("TEST_TOOLS".into(), "1".into());
+            fixture
+                .environment
+                .variables
+                .insert("TEST_TOOL_ROUNDS".into(), "5".into());
+        }
+        let mut runtime = Runtime::new(fixture.environment.clone(), fixture.data.clone()).unwrap();
+        let provider = Arc::new(CountingSearch::default());
+        runtime.web_search =
+            straggler_desktop::web_search::WebSearchService::with_provider(provider.clone());
+        fixture.ready(&runtime).await;
+        let mut request = request(
+            Uuid::new_v4(),
+            "Question plus private local attachment context",
+        );
+        request.web_search = true;
+        request.web_search_query = Some("contract query".into());
+        let mut summary = None;
+        let mut sources = vec![];
+        let mut events = vec![];
+        runtime
+            .generate(request, |delta| {
+                if let Some(value) = delta.web_search {
+                    summary = Some(value);
+                }
+                if let Some(value) = delta.sources {
+                    sources = value;
+                }
+                events.extend(delta.web_events.into_iter().map(|event| event.name));
+                Ok(())
+            })
+            .await
+            .unwrap();
+        let summary = summary.unwrap();
+        assert_eq!(summary.fallback, !tools_supported);
+        assert_eq!(summary.queries.len(), if tools_supported { 3 } else { 1 });
+        assert!(summary
+            .queries
+            .iter()
+            .all(|query| query == "contract query"));
+        assert_eq!(summary.credits, 1);
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].n, 1);
+        assert!(events.contains(&"web_search:completed"));
+        let turns: Vec<serde_json::Value> =
+            fs::read_to_string(fixture.record.with_extension("json.turns"))
+                .unwrap()
+                .lines()
+                .map(|line| serde_json::from_str(line).unwrap())
+                .collect();
+        if tools_supported {
+            assert_eq!(turns[0]["tools"][0]["function"]["name"], "web_search");
+            assert_eq!(
+                turns[1]["messages"].as_array().unwrap().last().unwrap()["tool_call_id"],
+                "call_fixture"
+            );
+            assert!(turns
+                .last()
+                .unwrap()
+                .to_string()
+                .contains("Search limit reached"));
+        } else {
+            assert_eq!(turns.len(), 1);
+            assert!(turns[0].get("tools").is_none());
+            assert!(turns[0].to_string().contains("Recorded source"));
+        }
+    }
+}
+
+#[tokio::test]
+async fn offline_web_search_still_generates_and_temporary_search_does_not_persist() {
+    for offline in [false, true] {
+        let fixture = Fixture::new();
+        let mut runtime = Runtime::new(fixture.environment.clone(), fixture.data.clone()).unwrap();
+        let provider = Arc::new(CountingSearch {
+            offline,
+            ..Default::default()
+        });
+        runtime.web_search =
+            straggler_desktop::web_search::WebSearchService::with_provider(provider.clone());
+        fixture.ready(&runtime).await;
+        let temporary_id = Uuid::new_v4();
+        runtime.begin_temporary(temporary_id).unwrap();
+        wait_phase(&runtime, "ready").await;
+        let before = stored_files(&fixture.data);
+        let mut request = request(Uuid::new_v4(), "A temporary question");
+        request.temporary_id = Some(temporary_id);
+        request.web_search = true;
+        let mut content = String::new();
+        let mut errors = vec![];
+        runtime
+            .generate(request, |delta| {
+                content.push_str(&delta.content);
+                if let Some(summary) = delta.web_search {
+                    errors = summary.errors;
+                }
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert!(!content.is_empty());
+        assert_eq!(errors, if offline { vec!["offline"] } else { vec![] });
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(stored_files(&fixture.data), before);
+    }
+}
+
+#[tokio::test]
+async fn cancelling_remote_search_stops_the_turn_and_allows_the_next_local_response() {
+    let fixture = Fixture::new();
+    let mut runtime = Runtime::new(fixture.environment.clone(), fixture.data.clone()).unwrap();
+    let provider = Arc::new(CountingSearch {
+        slow: true,
+        ..Default::default()
+    });
+    runtime.web_search =
+        straggler_desktop::web_search::WebSearchService::with_provider(provider.clone());
+    let runtime = Arc::new(runtime);
+    fixture.ready(&runtime).await;
+    let id = Uuid::new_v4();
+    let mut pending = request(id, "Question");
+    pending.web_search = true;
+    let task_runtime = runtime.clone();
+    let task = tokio::spawn(async move { task_runtime.generate(pending, |_| Ok(())).await });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while provider.calls.load(Ordering::SeqCst) == 0 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    runtime.cancel(id).unwrap();
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(1), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        "stopped"
+    );
+    assert_eq!(
+        runtime
+            .generate(request(Uuid::new_v4(), "Local follow-up"), |_| Ok(()))
+            .await
+            .unwrap(),
+        "complete"
+    );
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
 }

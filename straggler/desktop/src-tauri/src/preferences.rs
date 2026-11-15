@@ -2,14 +2,35 @@ use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::PathBuf, sync::Mutex};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UiPreferences {
     #[serde(default)]
     pub sidebar_collapsed: bool,
+    #[serde(default)]
+    pub web_search_notice_seen: bool,
+    #[serde(default = "default_search_limit")]
+    pub web_search_max_searches: u8,
+    #[serde(default = "crate::web_search::registry::default_provider")]
+    pub web_search_provider: crate::web_search::types::ProviderId,
     // Until the user chooses, the window width determines the initial presence layout.
     #[serde(default)]
     pub presence_expanded: Option<bool>,
+}
+
+fn default_search_limit() -> u8 {
+    3
+}
+impl Default for UiPreferences {
+    fn default() -> Self {
+        Self {
+            sidebar_collapsed: false,
+            presence_expanded: None,
+            web_search_notice_seen: false,
+            web_search_max_searches: 3,
+            web_search_provider: crate::web_search::registry::default_provider(),
+        }
+    }
 }
 
 pub struct Preferences {
@@ -38,6 +59,15 @@ impl Preferences {
     }
 
     pub fn save(&self, preferences: &UiPreferences) -> Result<()> {
+        if !(1..=5).contains(&preferences.web_search_max_searches)
+            || !crate::web_search::registry::providers()
+                .iter()
+                .any(|info| info.id == preferences.web_search_provider)
+        {
+            return Err(
+                "Choose an available search service and a search limit from 1 to 5.".into(),
+            );
+        }
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
         let directory = self
             .path
@@ -66,6 +96,7 @@ mod tests {
         let selected = UiPreferences {
             sidebar_collapsed: true,
             presence_expanded: Some(false),
+            ..Default::default()
         };
         preferences.save(&selected).unwrap();
         assert_eq!(preferences.read().unwrap(), selected);

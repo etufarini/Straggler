@@ -219,6 +219,7 @@ export default function App() {
 
         {panel === 'settings' && config && draft ? (
           <SettingsPage
+            webSearch={controller.webSearch}
             serverDetails={controller.serverDetails}
             config={config}
             draft={draft}
@@ -259,6 +260,7 @@ export default function App() {
               <ChatPanel controller={controller} />
             </div>
             <PresencePanel
+              sources={lastResponse?.sources}
               attachments={controller.attachments}
               state={presence}
               metrics={lastResponse?.metrics}

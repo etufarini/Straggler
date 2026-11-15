@@ -1,3 +1,6 @@
+import WebSearchMenu from '../websearch/WebSearchMenu';
+import WebSearchActivity from '../websearch/WebSearchActivity';
+import Sources from '../websearch/Sources';
 import ReasoningMenu from './ReasoningMenu';
 import SystemPromptMenu from './SystemPromptMenu';
 import ContextCounter from './ContextCounter';
@@ -161,6 +164,13 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                       </span>
                     )}
                   </div>
+                  {message.role === 'assistant' && (
+                    <WebSearchActivity
+                      message={message}
+                      search={controller.webSearch}
+                      onSettings={() => reviewSettings('websearch')}
+                    />
+                  )}
                   {message.reasoning && (
                     <details className="reasoning">
                       <summary>Reasoning</summary>
@@ -226,9 +236,10 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                     </div>
                   ) : (
                     <div className="markdown">
-                      <Markdown>{message.content}</Markdown>
+                      <Markdown sources={message.sources}>{message.content}</Markdown>
                     </div>
                   )}
+                  {!!message.sources?.length && <Sources sources={message.sources} />}
                   {message.status === 'streaming' && (
                     <span className="typing-indicator">
                       {message.content ? 'Generating' : 'Thinking'}
@@ -413,7 +424,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
         )}
         <form
           ref={composerRef}
-          className={`composer ${composerWidth !== null && composerWidth <= 700 ? 'is-narrow' : ''} ${composerWidth !== null && composerWidth <= 480 ? 'is-small' : ''}`}
+          className={`composer ${composerWidth !== null && composerWidth <= 900 ? 'is-narrow' : ''} ${composerWidth !== null && composerWidth <= 480 ? 'is-small' : ''}`}
           onSubmit={(event) => {
             event.preventDefault();
             if (canSend) {
@@ -449,6 +460,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
             <div className="composer-tools" role="group" aria-label="Message options">
               <SystemPromptMenu controller={controller} />
               <ReasoningMenu controller={controller} />
+              <WebSearchMenu controller={controller} />
             </div>
             <div className="composer-send">
               <span className="keyboard-hint">Shift + Enter for a new line</span>

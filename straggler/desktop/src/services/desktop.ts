@@ -35,6 +35,9 @@ export const isTauri = () => !!fixture || nativeAvailable();
 export const isFixture = () => !!fixture;
 
 export type DesktopCommand =
+  | 'web_search_status'
+  | 'web_search_key_save'
+  | 'open_web_url'
   | 'preferences_read'
   | 'preferences_save'
   | 'configuration'
@@ -126,7 +129,12 @@ export function listen<T>(
   event: string,
   handler: (event: { payload: T }) => void,
 ): Promise<UnlistenFn> {
-  return fixture ? Promise.resolve(() => {}) : nativeListen<T>(event, handler);
+  if (!fixture) return nativeListen<T>(event, handler);
+  const listener = (value: Event) => handler({ payload: (value as CustomEvent<T>).detail });
+  window.addEventListener(`straggler-fixture-event:${event}`, listener);
+  return Promise.resolve(() =>
+    window.removeEventListener(`straggler-fixture-event:${event}`, listener),
+  );
 }
 
 // DOM visibility and native window state are distinct lifecycle contracts.
@@ -279,3 +287,7 @@ export const projectService = {
     invoke<ProjectDeletion>('project_delete', { projectId, deleteChats }),
   undo: (token: string) => invoke<ProjectUndo>('project_undo', { token }),
 };
+
+export async function openWebUrl(url: string): Promise<void> {
+  await invoke('open_web_url', { url });
+}
