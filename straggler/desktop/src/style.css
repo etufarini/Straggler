@@ -3483,7 +3483,7 @@ input:focus-visible {
   width: 15px;
   height: 15px;
 }
-.temp-status {
+.header-controls .temp-status[aria-pressed='true'] {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -3494,15 +3494,11 @@ input:focus-visible {
   border: 1px solid #a993ff73;
   color: var(--temp-text);
   white-space: nowrap;
+  cursor: default;
 }
 .temp-status svg {
   width: 14px;
   height: 14px;
-}
-.header-controls .temp-status {
-  font-size: 11.5px;
-  padding: 5px 11px;
-  cursor: default;
 }
 .temp-status[aria-pressed='true']::after {
   content: '';

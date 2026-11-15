@@ -153,6 +153,8 @@ test('compact Temporary keeps its accessible state, tooltip and keyboard focus',
   await expect(temporary).toHaveAttribute('aria-disabled', 'true');
   await expect(temporary).toHaveAttribute('data-density', 'icon');
   await expect(temporary).toHaveAttribute('title', 'Temporary · not saved (Ctrl/⌘ + Shift + N)');
+  await temporary.hover();
+  await expect(temporary).toHaveCSS('background-color', 'rgba(124, 102, 245, 0.2)');
   expect(await temporary.evaluate((node) => getComputedStyle(node, '::after').content)).toBe('""');
   await page.getByRole('button', { name: /^Choose model · / }).focus();
   await page.keyboard.press('Tab');
