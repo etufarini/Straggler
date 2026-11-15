@@ -42,24 +42,25 @@ export default function Popover({
   const close = () => setOpen(false);
   useLayoutEffect(() => {
     const panel = popover.current;
-    const composer = button.current?.closest('.composer');
-    if (!open || !panel || !composer) return;
+    const opener = button.current;
+    const composer = opener?.closest('.composer');
+    if (!open || !panel || !composer || !opener) return;
     function position() {
-      if (!panel || !composer || !button.current) return;
+      if (!panel || !composer || !opener) return;
       const bounds = composer.getBoundingClientRect();
-      const trigger = button.current.getBoundingClientRect();
+      const trigger = opener.getBoundingClientRect();
       const left = Math.max(
         bounds.left + 11,
         Math.min(trigger.left, bounds.right - 11 - panel.getBoundingClientRect().width),
       );
       panel.style.left = `${left - bounds.left - composer.clientLeft}px`;
-      panel.style.bottom = `${bounds.bottom - trigger.top + 10 - composer.clientTop}px`;
+      panel.style.maxHeight = `${Math.max(0, Math.min(440, window.innerHeight * 0.65, bounds.top - 18))}px`;
     }
     position();
     const observer = new ResizeObserver(position);
     observer.observe(composer);
     observer.observe(panel);
-    observer.observe(button.current!);
+    observer.observe(opener);
     window.addEventListener('resize', position);
     return () => {
       observer.disconnect();
