@@ -35,6 +35,9 @@ export const isTauri = () => !!fixture || nativeAvailable();
 export const isFixture = () => !!fixture;
 
 export type DesktopCommand =
+  | 'web_search_status'
+  | 'web_search_key_save'
+  | 'open_web_url'
   | 'preferences_read'
   | 'preferences_save'
   | 'configuration'
@@ -279,3 +282,7 @@ export const projectService = {
     invoke<ProjectDeletion>('project_delete', { projectId, deleteChats }),
   undo: (token: string) => invoke<ProjectUndo>('project_undo', { token }),
 };
+
+export async function openWebUrl(url: string): Promise<void> {
+  await invoke('open_web_url', { url });
+}

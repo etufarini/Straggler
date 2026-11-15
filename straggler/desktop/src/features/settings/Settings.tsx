@@ -1,3 +1,5 @@
+import WebSearchSettings from '../websearch/WebSearchSettings';
+import type { WebSearchController } from '../websearch/useWebSearch';
 import { ArrowLeft, Save } from 'lucide-react';
 import FolderBrowser from '../../components/FolderBrowser';
 import { useSettings } from './useSettings';
@@ -17,10 +19,14 @@ const sections = [
   ['profiles', 'Saved configurations'],
   ['folders', 'Folders'],
   ['huggingface', 'Hugging Face'],
+  ['websearch', 'Web search'],
   ['llama', 'llama.cpp'],
 ] as const;
 
-export default function Settings(props: SettingsProps) {
+export default function Settings({
+  webSearch,
+  ...props
+}: SettingsProps & { webSearch: WebSearchController }) {
   const controller = useSettings(props);
   const {
     config,
@@ -85,28 +91,31 @@ export default function Settings(props: SettingsProps) {
                 Loading…
               </p>
             )}
-            {section !== 'folders' && section !== 'llama' && section !== 'huggingface' && (
-              <div className="configuration-heading">
-                <span>
-                  {config.currentProfile || 'Unsaved configuration'}
-                  {modified && <b>Modified</b>}
-                  {dirty && <b>Unapplied changes</b>}
-                  {active && restart && <b>Restart required</b>}
-                </span>
-                <button
-                  disabled={busy || !native}
-                  onClick={() =>
-                    void run(async () => {
-                      await apply();
-                      setMessage('Settings applied.');
-                    })
-                  }
-                >
-                  <Save size={14} />
-                  Apply changes
-                </button>
-              </div>
-            )}
+            {section !== 'folders' &&
+              section !== 'llama' &&
+              section !== 'huggingface' &&
+              section !== 'websearch' && (
+                <div className="configuration-heading">
+                  <span>
+                    {config.currentProfile || 'Unsaved configuration'}
+                    {modified && <b>Modified</b>}
+                    {dirty && <b>Unapplied changes</b>}
+                    {active && restart && <b>Restart required</b>}
+                  </span>
+                  <button
+                    disabled={busy || !native}
+                    onClick={() =>
+                      void run(async () => {
+                        await apply();
+                        setMessage('Settings applied.');
+                      })
+                    }
+                  >
+                    <Save size={14} />
+                    Apply changes
+                  </button>
+                </div>
+              )}
             <div className="settings-section">
               {message && (
                 <p role="status" className="success-message">
@@ -119,6 +128,7 @@ export default function Settings(props: SettingsProps) {
               {section === 'profiles' && <SavedConfigurations controller={controller} />}
               {section === 'folders' && <FolderSettings controller={controller} />}
               {section === 'llama' && <LlamaSettings controller={controller} />}
+              {section === 'websearch' && <WebSearchSettings controller={webSearch} />}
               {section === 'huggingface' && <HuggingFaceSettings controller={controller} />}
               <div className="memory-summary">
                 <h3>Memory</h3>

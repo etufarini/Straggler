@@ -43,6 +43,7 @@ export function useConversation(
 ) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
+  const [webSearchOn, setWebSearchOn] = useState(false);
   const [input, updateInput] = useState('');
   const inputRevision = useRef(0);
   const [temporaryId, setTemporaryId] = useState<string | null>(null);
@@ -96,6 +97,7 @@ export function useConversation(
       throw new Error(storageError);
   }
   function updateChat(value: Conversation) {
+    if (chatRef.current.id !== value.id) setWebSearchOn(false);
     chatRef.current = value;
     setChat(value);
   }
@@ -185,6 +187,8 @@ export function useConversation(
       setContextError('Restore this project to continue the chat.');
       return;
     }
+    const useWebSearch = webSearchOn;
+    setWebSearchOn(false);
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     setGenerating(true);
@@ -293,6 +297,8 @@ export function useConversation(
       if (requestRef.current !== requestId) return;
       assistant.content += delta.content;
       assistant.reasoning += delta.reasoning;
+      if (delta.sources) assistant.sources = delta.sources;
+      if (delta.webSearch) assistant.webSearch = delta.webSearch;
       if (delta.metrics)
         assistant.metrics = { ...assistant.metrics, ...delta.metrics, runId: server.runId };
       if (delta.content) phase = 'generating';
@@ -319,6 +325,10 @@ export function useConversation(
           : await invoke<Response>('generate', {
               request: {
                 requestId,
+                webSearch: useWebSearch,
+                webSearchQuery: replacement
+                  ? [...replacement].reverse().find((message) => message.role === 'user')?.content
+                  : text,
                 conversationId: temporaryRef.current ? undefined : current.id,
                 temporaryId: temporaryRef.current ?? undefined,
                 messages,
@@ -326,6 +336,8 @@ export function useConversation(
               },
               onDelta,
             });
+      assistant.sources = response.sources ?? assistant.sources;
+      assistant.webSearch = response.webSearch ?? assistant.webSearch;
       assistant.status = response.status;
       assistant.content = response.content;
       assistant.reasoning = response.reasoning;
@@ -501,6 +513,7 @@ export function useConversation(
 
   function openConversation(value: Conversation) {
     if (requestRef.current || mutation.current) return;
+    setWebSearchOn(false);
     setEditor(null);
     updateChat(structuredClone(value));
     setInput('');
@@ -539,6 +552,8 @@ export function useConversation(
   }
 
   return {
+    webSearchOn,
+    setWebSearchOn,
     temporaryId,
     temporaryRef,
     enterTemporary,

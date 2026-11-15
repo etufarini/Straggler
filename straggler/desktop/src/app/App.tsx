@@ -219,6 +219,7 @@ export default function App() {
 
         {panel === 'settings' && config && draft ? (
           <SettingsPage
+            webSearch={controller.webSearch}
             serverDetails={controller.serverDetails}
             config={config}
             draft={draft}

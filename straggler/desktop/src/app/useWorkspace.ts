@@ -1,3 +1,4 @@
+import { useWebSearch } from '../features/websearch/useWebSearch';
 import { useServerDetails } from '../features/server/useServerDetails';
 import { useUiPreferences } from './useUiPreferences';
 import { useAttachments } from '../features/attachments/useAttachments';
@@ -78,6 +79,9 @@ export function useWorkspace() {
     serverDetails?.runId === server.runId ? serverDetails?.contextSize : null,
     projects,
     storageQueue,
+  );
+  const webSearch = useWebSearch(ui.preferences, ui.changePreferences, () =>
+    conversation.setWebSearchOn(false),
   );
   const currentProject = projects.projects.find(
     (project) => project.id === conversation.chat.projectId,
@@ -538,6 +542,9 @@ export function useWorkspace() {
         projects.context(currentProject).level !== 'over'));
 
   return {
+    webSearch,
+    webSearchOn: conversation.webSearchOn,
+    setWebSearchOn: conversation.setWebSearchOn,
     huggingFace,
     temporary: !!conversation.temporaryId,
     beginTemporary,
