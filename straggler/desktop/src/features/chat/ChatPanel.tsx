@@ -265,8 +265,8 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                       }
                     >
                       {message.content
-                        ? 'The response could not be completed. Partial text remains in this conversation.'
-                        : 'The server could not complete this request. Review the details before trying again.'}
+                        ? 'The partial response is kept.'
+                        : 'The server couldn’t complete this request. Check the details and try again.'}
                     </Feedback>
                   )}
                   {editor?.messageId !== message.id &&

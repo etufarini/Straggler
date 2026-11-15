@@ -70,8 +70,8 @@ function ProjectDialogContent({
     }
   }
   const feedback = failure ? (
-    <Feedback title="The action could not be completed" details={failure}>
-      Review the details before trying again. This window remains open.
+    <Feedback title="Couldn’t complete the action" details={failure}>
+      Check the details and try again.
     </Feedback>
   ) : null;
   const cancel = (

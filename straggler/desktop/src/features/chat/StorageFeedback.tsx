@@ -21,10 +21,7 @@ export default function StorageFeedback({ controller }: { controller: WorkspaceC
           onDismiss={() => controller.setImportError(null)}
         >
           <strong>{controller.importError.fileName}</strong>
-          <p>
-            The file could not be imported. Existing conversations have been kept.{' '}
-            {controller.importError.details}
-          </p>
+          <p>Existing chats are unchanged. {controller.importError.details}</p>
         </Feedback>
       )}
       {controller.fileNotice && (
@@ -43,7 +40,7 @@ export default function StorageFeedback({ controller }: { controller: WorkspaceC
       )}
       {storageError && (
         <Feedback
-          title={historyReady ? 'Conversation not saved' : 'Conversation history unavailable'}
+          title={historyReady ? 'Chat not saved' : 'Chat history unavailable'}
           details={storageError}
           actions={
             <button
@@ -57,8 +54,8 @@ export default function StorageFeedback({ controller }: { controller: WorkspaceC
           }
         >
           {historyReady
-            ? 'Your current text remains in this window. Save it before leaving this conversation.'
-            : 'Saved conversations could not be loaded. Your files have been kept.'}
+            ? 'Your text is still here. Save it before leaving this chat.'
+            : 'Saved chats couldn’t be loaded. Your files are untouched.'}
         </Feedback>
       )}
     </>

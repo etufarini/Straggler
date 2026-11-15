@@ -72,7 +72,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
               confirm({
                 title: 'Use the bundled backend?',
                 actionLabel: 'Use bundled backend',
-                text: 'Switch to the llama.cpp version included with Straggler? Model settings and saved configurations will be kept.',
+                text: 'Model settings and saved configurations are kept.',
                 action: async () => {
                   accept(await operation('use-bundled'));
                 },

@@ -86,7 +86,7 @@ export default function SavedConfigurations({ controller }: { controller: Settin
               title: 'Delete configuration?',
               actionLabel: 'Delete configuration',
               destructive: true,
-              text: `Delete “${profile}”? Your current settings and conversations stay as they are.`,
+              text: `Delete “${profile}”? Your current settings and chats won’t change.`,
               action: async () => {
                 const value = await operation('delete-profile', [profile, 'confirm']);
                 accept(value);

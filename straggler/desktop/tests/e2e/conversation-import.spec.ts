@@ -90,12 +90,12 @@ test('a successful import keeps history-loading feedback until history recovers'
   page,
 }) => {
   await page.goto('/?scenario=history-error');
-  await expect(page.getByText('Conversation history unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('Chat history unavailable', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Import chat', exact: true }).click();
   await expect(page.locator('.message.user')).toContainText('Imported question');
-  await expect(page.getByText('Conversation history unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('Chat history unavailable', { exact: true })).toBeVisible();
   await page.evaluate(() => localStorage.setItem('straggler-fixture-history-recovered', 'true'));
   await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
-  await expect(page.getByText('Conversation history unavailable', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Chat history unavailable', { exact: true })).toHaveCount(0);
   await expect(page.locator('.message.user')).toContainText('Imported question');
 });

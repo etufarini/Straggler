@@ -83,9 +83,7 @@ test('generation keeps user copy and disables editing; stopped output gains acti
   await expect(page.getByRole('button', { name: 'Copy message' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Edit message', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Regenerate response' })).toBeDisabled();
-  await expect(
-    page.getByText('Edit and regenerate when the response ends.'),
-  ).toBeVisible();
+  await expect(page.getByText('Edit and regenerate when the response ends.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Copy response' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Stop response' }).click();
   await expect(page.getByRole('button', { name: 'Edit response', exact: true })).toBeEnabled();
@@ -98,7 +96,7 @@ test('failed edit persistence preserves the response and the editor text', async
   await page.getByRole('textbox', { name: 'Edit response', exact: true }).fill('Keep this edit');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-fail-next-save', 'true'));
   await page.getByRole('button', { name: 'Save response' }).click();
-  await expect(page.getByText('Conversation not saved', { exact: true })).toBeVisible();
+  await expect(page.getByText('Chat not saved', { exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Edit response', exact: true })).toHaveValue(
     'Keep this edit',
   );
@@ -117,7 +115,7 @@ test('failed user replacement preserves later turns and the edit without request
   await editor.fill('Keep this proposed edit');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-fail-next-save', 'true'));
   await page.getByRole('button', { name: 'Save and regenerate' }).click();
-  await expect(page.getByText('Conversation not saved', { exact: true })).toBeVisible();
+  await expect(page.getByText('Chat not saved', { exact: true })).toBeVisible();
   await expect(editor).toHaveValue('Keep this proposed edit');
   await expect(page.locator('.message.assistant')).toHaveCount(2);
   const saved = await page.evaluate(

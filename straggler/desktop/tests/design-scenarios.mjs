@@ -295,7 +295,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
       .getByRole('button', { name: 'Use bundled backend', exact: true })
       .click();
     await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText(
-      'The action could not be completed',
+      'Couldn’t complete the action',
     );
   }
   await page.locator('.app-shell').waitFor();
