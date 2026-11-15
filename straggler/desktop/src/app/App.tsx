@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import PresencePanel from '../features/presence/PresencePanel';
 import { assistantState } from '../domain/presence';
 import { Cpu, ChevronDown, Square, Terminal, Eclipse } from 'lucide-react';
@@ -46,6 +46,20 @@ export default function App() {
     setSettingsFailure,
     reportSettingsError,
   } = controller;
+  const area =
+    panel === 'settings' && config && draft
+      ? 'settings'
+      : controller.view !== 'chat'
+        ? 'project'
+        : controller.temporary
+          ? 'temporary'
+          : 'chat';
+  useLayoutEffect(() => {
+    document.body.dataset.area = area;
+    return () => {
+      delete document.body.dataset.area;
+    };
+  }, [area]);
   const restartRequired = !!(
     active &&
     draft &&
@@ -76,7 +90,7 @@ export default function App() {
       </span>
 
       <main
-        className={`workspace${controller.temporary ? ' is-temporary' : ''} ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
+        className={`workspace${area === 'temporary' ? ' is-temporary' : ''} ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
       >
         <header className={`topbar${pageHasPrimaryAction ? ' has-page-primary' : ''}`}>
           <button
