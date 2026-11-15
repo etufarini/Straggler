@@ -10,14 +10,15 @@ test('stellar layers load locally at normal and compact window sizes', async ({ 
       .locator('.sidebar, .workspace, .presence')
       .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundImage));
     expect(layers).toHaveLength(3);
-    for (const background of layers) expect(background).toContain('.svg');
-    expect(layers[0]).toContain('globular-cluster.svg');
+    expect(layers[0]).not.toContain('.svg');
+    expect(layers[1]).toContain('starfield.svg');
+    expect(layers[2]).toContain('starfield.svg');
     expect(layers[1]).toContain('starfield-light.svg');
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
   }
-  for (const asset of ['starfield.svg', 'starfield-light.svg', 'globular-cluster.svg']) {
+  for (const asset of ['starfield.svg', 'starfield-light.svg']) {
     const response = await page.request.get(`/src/assets/${asset}`);
     expect(response.ok()).toBe(true);
     expect(await response.text()).toContain('<svg');

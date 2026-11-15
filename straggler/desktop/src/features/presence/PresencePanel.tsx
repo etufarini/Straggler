@@ -15,6 +15,7 @@ export default function PresencePanel({
   preferences,
   onPreferences,
   ready,
+  hasMessages,
   attachments,
 }: {
   state: PresenceState;
@@ -23,6 +24,7 @@ export default function PresencePanel({
   preferences: UiPreferences;
   onPreferences: (patch: Partial<UiPreferences>) => void;
   ready: boolean;
+  hasMessages: boolean;
   attachments: AttachmentController;
 }) {
   const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 1100px)').matches);
@@ -72,7 +74,7 @@ export default function PresencePanel({
     <div className={`presence-slot ${expanded ? 'is-expanded' : ''} ${narrow ? 'is-narrow' : ''}`}>
       <aside
         ref={panel}
-        className={`presence ${expanded ? 'is-expanded' : 'is-compact'}`}
+        className={`presence ${expanded ? 'is-expanded' : 'is-compact'}${hasMessages ? ' has-messages' : ''}`}
         aria-label="Assistant"
       >
         <button
@@ -93,7 +95,11 @@ export default function PresencePanel({
           {expanded ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
         </button>
         <div id={id}>
-          <AssistantPresence state={state} metrics={metrics} />
+          <AssistantPresence
+            state={state}
+            metrics={metrics}
+            size={expanded ? (hasMessages ? 128 : 224) : 48}
+          />
           <Sources sources={sources} compact />
           <AttachmentSection controller={attachments} />
         </div>

@@ -2,12 +2,7 @@
   /* Static stellar layers from the approved D003 proposal. */
   --stars-field: url('./assets/starfield.svg');
   --stars-field-light: url('./assets/starfield-light.svg');
-  --stars-cluster: url('./assets/globular-cluster.svg');
-  --star-o: #9db4ff;
   --star-a: #cad8ff;
-  --star-f: #f8f7ff;
-  --star-g: #fff4ea;
-  --star-k: #ffd2a1;
   --star-m: #ffcc6f;
   --ui-deep: #080d26;
 
@@ -127,6 +122,7 @@ body[data-area='settings'] {
   --ui-primary-hover: linear-gradient(#1f8079, #1f8079);
   --ui-holo: linear-gradient(115deg, #5fd6c8, #c6f2ec 50%, #5fd6c8);
   --ui-holo-soft: linear-gradient(115deg, #5fd6c855, #c6f2ec66 50%, #5fd6c855);
+  --ui-sidebar-tint: #1fb8a61f;
   --ui-cyan: var(--gnd-accent);
   --ui-control-border: var(--gnd-line);
   --ui-control-hover: var(--gnd-line-strong);
@@ -571,9 +567,7 @@ code {
   width: var(--ui-sidebar-width);
   flex-shrink: 0;
   background:
-    var(--stars-cluster) no-repeat 50% calc(100% - 40px) / 460px 460px,
-    var(--stars-field) 0 0 / 720px 720px,
-    radial-gradient(420px 240px at -10% -8%, #4f86ff33, transparent 70%),
+    radial-gradient(420px 240px at -10% -8%, var(--ui-sidebar-tint, #4f86ff1f), transparent 70%),
     linear-gradient(180deg, var(--ui-surface) 0%, var(--ui-deep) 100%);
   border-right: 1px solid #263464;
   padding: 27px 15px 15px;
@@ -722,6 +716,7 @@ code {
   display: flex;
   flex-direction: column;
   background:
+    var(--stars-field) 0 0 / 720px 720px,
     var(--stars-field-light) 0 0 / 900px 900px,
     radial-gradient(360px 220px at 78% -4%, #cad8ff2e, transparent 70%),
     radial-gradient(760px 520px at 84% -8%, #4f86ff47, transparent 65%),
@@ -871,8 +866,8 @@ h1 {
   border: 1px solid transparent;
   border-radius: 16px;
   box-shadow:
-    0 20px 60px -24px #4f86ffcc,
-    0 0 0 1px #9db4ff14;
+    0 16px 40px -24px #050a1fcc,
+    0 0 0 1px #9db4ff0f;
   position: relative;
   container-type: inline-size;
 }
@@ -960,13 +955,15 @@ textarea:disabled {
   gap: 10px;
   padding: 10px 14px;
   margin: 12px var(--ui-gutter) 0;
-  border: 1px solid #3c4c6d;
+  border: 1px solid var(--ui-line-soft);
   border-radius: 7px;
   font-size: 12px;
-  color: #e3eaff;
+  color: var(--ui-text-3);
   overflow-wrap: anywhere;
-  border-color: var(--ui-panel-border);
   margin-bottom: 4px;
+  background: #ffffff06;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 .notice code {
   margin: 0 3px;
@@ -1494,11 +1491,6 @@ textarea:disabled {
 .sidebar.is-compact {
   width: 68px;
   padding: 22px 14px 15px;
-  background-size:
-    300px 300px,
-    720px 720px,
-    auto,
-    auto;
 }
 .sidebar.is-compact .brand {
   flex-direction: column;
@@ -1867,9 +1859,13 @@ textarea:disabled {
   color: var(--ui-subtle);
 }
 .presence-stage {
-  width: 224px;
-  height: 224px;
   margin: 18px auto 0;
+}
+.presence.is-expanded.has-messages .presence-stage {
+  margin-top: var(--ui-space-6);
+}
+.presence.is-expanded.has-messages .presence-caption {
+  margin-top: var(--ui-space-2);
 }
 .presence-caption {
   margin-top: -14px;
@@ -1940,8 +1936,6 @@ textarea:disabled {
   display: none;
 }
 .presence.is-compact .presence-stage {
-  width: 48px;
-  height: 48px;
   margin-top: 0;
 }
 .presence.is-compact .presence-toggle {
@@ -3219,7 +3213,6 @@ input:focus-visible {
   }
 }
 
-.notice,
 .presence-stats div,
 .build-summary,
 .new-chat,
@@ -3261,10 +3254,6 @@ input:focus-visible {
   ):hover:not(:disabled) {
   background: var(--gnd-3);
   border-color: var(--gnd-line-strong);
-}
-
-.notice {
-  background-color: color-mix(in srgb, #22336e 70%, transparent);
 }
 
 .primary-button,
@@ -3538,10 +3527,6 @@ input:focus-visible {
     linear-gradient(#171d45, #171d45) padding-box,
     linear-gradient(115deg, #a993ffaa, #5fd6ff55 50%, #a993ffaa) border-box;
   box-shadow: 0 20px 60px -24px #7c66f5cc;
-}
-.workspace.is-temporary .notice {
-  border-color: #a993ff55;
-  background: color-mix(in srgb, #2a2466 70%, transparent);
 }
 
 .topbar:has(.temp-toggle, .temp-status) {

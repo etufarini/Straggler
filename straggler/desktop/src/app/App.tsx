@@ -282,6 +282,7 @@ export default function App() {
               <ChatPanel controller={controller} />
             </div>
             <PresencePanel
+              hasMessages={controller.chat.messages.length > 0}
               sources={lastResponse?.sources}
               attachments={controller.attachments}
               state={presence}
