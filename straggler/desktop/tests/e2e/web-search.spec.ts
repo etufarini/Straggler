@@ -128,7 +128,7 @@ test('only enabled messages search; citations, external links and normalized sou
 for (const [scenario, error] of [
   ['web-offline', "You're offline"],
   ['web-invalid', "Mock search didn't accept the API key"],
-  ['web-exhausted', "This month's Mock search credits are used up"],
+  ['web-exhausted', "This month’s Mock search credits are used up"],
 ]) {
   test(`${scenario}: the local response continues and search resets`, async ({ page }) => {
     await ready(page, scenario);
@@ -185,7 +185,7 @@ test('low quota is visible with an accessible usage meter', async ({ page }) => 
     '850',
   );
   await expect(
-    page.getByText('At least 80% of this month’s credits have been used.', { exact: true }),
+    page.getByText('80% of this month’s credits used.', { exact: true }),
   ).toBeVisible();
 });
 

@@ -32,7 +32,7 @@ test('Hub network actions are explicit; pause, resume and verified completion up
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await page.getByRole('button', { name: /fixture-publisher\/example-GGUF/ }).click();
   await expect(page.getByRole('group', { name: 'Model version' })).toBeVisible();
-  await expect(page.getByText('File-size memory estimate:', { exact: false })).toBeVisible();
+  await expect(page.getByText('Estimated memory:', { exact: false })).toBeVisible();
   const projector = page.getByRole('combobox', { name: 'Optional mmproj file', exact: true });
   await projector.click();
   await projector.press('Escape');

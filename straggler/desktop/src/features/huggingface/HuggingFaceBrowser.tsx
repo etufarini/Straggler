@@ -79,8 +79,7 @@ export default function HuggingFaceBrowser({
         </button>
       </form>
       <p className="field-help">
-        Search repositories containing GGUF files, or paste a repository or file link. Requests run
-        when you use these controls.
+        Search GGUF repositories or paste a link. Nothing is sent until you search.
       </p>
       {busy && <p role="status">Loading…</p>}
       {error && (
@@ -210,18 +209,17 @@ export default function HuggingFaceBrowser({
               ]}
             />
             <small>
-              Choose a projector only if the publisher documents it for this model. Downloading it
-              does not enable image input in Straggler.
+              Only if the publisher documents it for this model. Straggler doesn’t support image
+              input.
             </small>
           </label>
           {selected && (
             <p className="field-help">
-              File-size memory estimate: {formatBytes(selected.size)}. Runtime memory varies with
-              context, cache and device placement. Available RAM:{' '}
+              Estimated memory: {formatBytes(selected.size)}
               {config?.memory.availableRamMiB == null
-                ? 'Unavailable'
-                : formatBytes(config.memory.availableRamMiB * 1024 ** 2)}
-              .
+                ? '. Available RAM: unavailable.'
+                : ` of ${formatBytes(config.memory.availableRamMiB * 1024 ** 2)} available.`}{' '}
+              Actual use depends on context and devices.
             </p>
           )}
           <p className="field-help">

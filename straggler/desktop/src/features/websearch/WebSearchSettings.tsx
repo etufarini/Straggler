@@ -42,9 +42,8 @@ export default function WebSearchSettings({
     <>
       <h2>Web search</h2>
       <p className="field-help">
-        When you turn on Web search in a message, the model can look things up on the web. Straggler
-        sends only search queries and page addresses to the search service. Your conversations stay
-        on this computer.
+        Turn on Web search in a message to let the model look things up. Only search queries and
+        page addresses are sent; chats stay on this computer.
       </p>
       <h3>Service</h3>
       {status && status.providers.length > 1 && (
@@ -80,10 +79,7 @@ export default function WebSearchSettings({
           onChange={(event) => setKey(event.target.value)}
           disabled={busy}
         />
-        <small>
-          Stored only in the operating system's keychain. The saved key is never shown again in this
-          form.
-        </small>
+        <small>Stored only in the system keychain and never shown again.</small>
       </label>
       <div className="row-actions">
         <button
@@ -147,7 +143,7 @@ export default function WebSearchSettings({
                 <p role="status" className="field-help">
                   {percentage >= 100
                     ? 'Monthly credits are used up.'
-                    : 'At least 80% of this month’s credits have been used.'}
+                    : '80% of this month’s credits used.'}
                 </p>
               )}
             </>
@@ -157,9 +153,8 @@ export default function WebSearchSettings({
         </>
       )}
       <p className="field-help">
-        Pages are read on this computer, so local page reading is free. Repeating the same search
-        within 15 minutes is free too. The search service may charge for page reading when local
-        reading fails.
+        Free: pages read on this computer and repeated searches within 15 minutes. The service may
+        charge when a page can’t be read locally.
       </p>
       <fieldset className="choice-group">
         <legend>Searches per message</legend>
@@ -181,10 +176,7 @@ export default function WebSearchSettings({
           ))}
         </div>
       </fieldset>
-      <p className="field-help">
-        The model can search up to this many times for one message. Fewer searches use fewer
-        credits.
-      </p>
+      <p className="field-help">Maximum searches per message. Fewer searches use fewer credits.</p>
       <p className="field-help">Changes are saved automatically.</p>
     </>
   );
