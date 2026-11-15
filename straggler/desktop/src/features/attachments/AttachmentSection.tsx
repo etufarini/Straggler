@@ -93,7 +93,7 @@ export default function AttachmentSection({ controller }: { controller: Attachme
         <p className="presence-note" id={`${id}-busy`}>
           {controller.generating
             ? 'Attachments can be changed when the response finishes.'
-            : 'Wait for the current file or conversation operation to finish.'}
+            : 'Wait for the current operation to finish.'}
         </p>
       )}
       {controller.error && (

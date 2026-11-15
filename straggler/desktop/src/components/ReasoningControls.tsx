@@ -74,7 +74,7 @@ export default function ReasoningControls({
             {!levels.length
               ? 'This template does not advertise effort levels.'
               : effort === 'auto'
-                ? 'Using the template default. Available levels depend on the model.'
+                ? 'Using the template default.'
                 : 'Available levels depend on the model. Applies from your next message.'}
           </p>
         </>
@@ -100,7 +100,7 @@ export default function ReasoningControls({
           <small>
             {available && !levels.length
               ? 'This template does not advertise effort levels.'
-              : 'Only levels the model supports are listed. Applies from your next message.'}
+              : 'Applies from your next message.'}
           </small>
         </label>
       )}

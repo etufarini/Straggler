@@ -327,8 +327,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                         )}
                         {generating && (
                           <p className="message-actions-note" id={`actions-busy-${message.id}`}>
-                            Edit and regenerate are available when the response finishes or is
-                            stopped.
+                            Edit and regenerate when the response ends.
                           </p>
                         )}
                       </div>

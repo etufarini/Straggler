@@ -141,7 +141,7 @@ test('context thresholds use response data and missing metrics remain unavailabl
     await expect(counter).toContainText(percent);
     await counter.getByRole('button', { name: 'Context', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Context' })).toContainText(
-      scenario === 'no-metrics' ? 'Usage is unavailable' : '4,096 tokens',
+      scenario === 'no-metrics' ? 'Available once the server is running.' : '4,096 tokens',
     );
     await page.keyboard.press('Escape');
   }

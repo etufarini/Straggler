@@ -118,7 +118,7 @@ test('only enabled messages search; citations, external links and normalized sou
     await page.evaluate(() => (window as unknown as { webCalls: unknown[] }).webCalls),
   ).toHaveLength(1);
   await expect(page.getByRole('region', { name: 'Latest response sources' })).toContainText(
-    'Sources appear here',
+    'Web search sources appear here.',
   );
   await page.reload();
   await page.getByRole('button', { name: 'Local first', exact: true }).click();
