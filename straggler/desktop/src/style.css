@@ -25,21 +25,45 @@
   line-height: 1.55;
   --ui-background: #141d3d;
   --ui-surface: #10182f;
-  --ui-text: #f3f6ff;
-  --ui-muted: #b3c0e6;
+  --ui-text-1: #f3f6ff;
+  --ui-text-2: #b3c0e6;
+  --ui-text-3: #909dc9;
+  --ui-text: var(--ui-text-1);
+  --ui-muted: var(--ui-text-2);
   --ui-accent: #2f63f2;
   --ui-border: #33437a;
   --ui-radius: 8px;
   --ui-sidebar-width: 248px;
   --ui-font-size: 14px;
-  --ui-subtle: #93a3d4;
-  --ui-raised: #1c2750;
+  --ui-subtle: var(--ui-text-3);
+  --ui-elev-0: #0d1534;
+  --ui-elev-1: #141d3d;
+  --ui-elev-2: #1a2450;
+  --ui-elev-3: #222e5c;
+  --ui-line-soft: #ffffff10;
+  --ui-line: #2c3a70;
+  --ui-raised: var(--ui-elev-2);
   --ui-raised-2: #24315f;
   --ui-field: #18224a;
   --ui-code: #0f1733;
   --ui-accent-text: #9cbcff;
   --ui-cyan: #5fd6ff;
   --ui-focus: #7fb0ff;
+  --ui-fs-meta: 12px;
+  --ui-fs-body: 14px;
+  --ui-fs-title-3: 16px;
+  --ui-fs-title-2: 20px;
+  --ui-fs-title-1: 28px;
+  --ui-fw-regular: 400;
+  --ui-fw-medium: 500;
+  --ui-fw-strong: 600;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-6: 24px;
+  --ui-space-8: 32px;
+  --ui-space-12: 48px;
   --ui-gutter: 32px;
   --ui-primary: linear-gradient(180deg, #3568f5 0%, #2b5de8 100%);
   --ui-primary-hover: linear-gradient(180deg, #4174ff 0%, #3166f2 100%);
@@ -105,7 +129,7 @@ input:disabled {
   padding: 24px var(--ui-gutter) 35px;
 }
 .settings-heading {
-  margin-bottom: 24px;
+  margin-bottom: var(--ui-space-8);
 }
 .settings-heading h1 {
   font-size: 27px;
@@ -150,13 +174,13 @@ input:disabled {
 .settings-content h2 {
   font-size: 20px;
   font-weight: 500;
-  margin: 22px 0 8px;
+  margin: var(--ui-space-6) 0 var(--ui-space-1);
   color: #ffffff;
 }
 .settings-content h3 {
   font-size: 14px;
   font-weight: 550;
-  margin: 24px 0 12px;
+  margin: var(--ui-space-8) 0 var(--ui-space-3);
   color: #d3dfff;
 }
 .configuration-heading {
@@ -204,7 +228,7 @@ input:disabled {
   flex-direction: column;
   gap: 7px;
   font-size: 13px;
-  margin: 18px 0;
+  margin: var(--ui-space-6) 0;
   min-width: 0;
 }
 .setting-field > span {
@@ -1465,7 +1489,7 @@ textarea:disabled {
   padding: 16px;
   border-radius: 14px;
   border: 1px solid #3a4c8a;
-  background: #1a2550;
+  background: var(--ui-elev-3);
   box-shadow: 0 28px 70px -20px #050a1fcc;
   color: var(--ui-text);
   font-size: 13px;
@@ -1725,7 +1749,7 @@ textarea:disabled {
 .presence-section {
   margin-top: 0;
   padding-top: 14px;
-  border-top: 1px solid #263464;
+  border-top: 1px solid var(--ui-line-soft);
 }
 .presence-section h2 {
   margin: 0 0 10px;
@@ -2247,7 +2271,7 @@ input:focus-visible {
   min-height: 46px;
   padding: 6px 4px 6px 7px;
   border-radius: var(--ui-radius);
-  background: var(--ui-raised);
+  background: var(--ui-elev-3);
 }
 .file-row.type-md {
   --file-color: #bba4ff;
@@ -2473,7 +2497,7 @@ input:focus-visible {
   gap: 8px;
   min-width: 0;
   padding: 14px 12px 13px 14px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-line-soft);
   border-radius: 12px;
   background: var(--ui-raised);
 }
@@ -2684,6 +2708,9 @@ input:focus-visible {
   font-size: 12px;
   color: var(--ui-subtle);
 }
+.project-detail-main .project-section-head {
+  margin-top: var(--ui-space-8);
+}
 .project-section-head {
   display: flex;
   align-items: baseline;
@@ -2704,12 +2731,12 @@ input:focus-visible {
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid #263464;
+  border-top: 1px solid var(--ui-line-soft);
 }
 .project-chat-list li {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #263464;
+  border-bottom: 1px solid var(--ui-line-soft);
 }
 .project-chat-list li > button:first-child {
   flex: 1;
@@ -2739,13 +2766,14 @@ input:focus-visible {
 .project-side {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--ui-space-4);
 }
 .project-side-section {
   padding: 14px 14px 12px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-line-soft);
   border-radius: 12px;
-  background: var(--ui-surface);
+  background: var(--ui-elev-2);
+  box-shadow: inset 0 1px 0 #ffffff0d;
 }
 .project-side-section .field-help {
   margin: 8px 0 0;
@@ -2754,7 +2782,7 @@ input:focus-visible {
   margin: 0;
   padding: 10px 12px;
   border-radius: var(--ui-radius);
-  background: var(--ui-raised);
+  background: var(--ui-elev-3);
   font-size: 12px;
   line-height: 1.65;
   color: #dbe3fb;
