@@ -25,8 +25,7 @@ export default function SavedConfigurations({ controller }: { controller: Settin
     <>
       <h2>Saved configurations</h2>
       <p className="field-help">
-        A configuration stores your model, reply and server settings. Folders and conversations are
-        not included.
+        Saves model, reply and server settings. Folders and chats aren’t included.
       </p>
       <label className="setting-field">
         <span>Configuration</span>

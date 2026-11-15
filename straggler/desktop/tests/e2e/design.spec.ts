@@ -50,7 +50,7 @@ test('settings keep their save action visible and folders and backend selection 
     'page',
   );
   await page.getByRole('button', { name: 'Folders', exact: true }).click();
-  await expect(page.getByText('Saved automatically once a folder is validated.')).toBeVisible();
+  await expect(page.getByText('Saved once the folder is validated.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);

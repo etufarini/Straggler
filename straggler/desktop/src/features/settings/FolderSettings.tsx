@@ -7,7 +7,7 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
   return (
     <>
       <h2>Folders</h2>
-      <p className="autosave-note">Saved automatically once a folder is validated.</p>
+      <p className="autosave-note">Saved once the folder is validated.</p>
       {[
         ['llama', 'llama.cpp folder', config.llamaDir],
         ['models', 'Models folder', config.modelsDir],
@@ -44,7 +44,7 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
       <p className="field-help">
         {config.appStore
           ? 'Choose a models folder to allow access after restarting the app. The folder can be empty.'
-          : 'The models folder can be empty. The llama.cpp folder must contain llama-server, in bin or build/bin.'}
+          : 'The llama.cpp folder must contain llama-server, in bin or build/bin.'}
       </p>
       <button onClick={() => setSection('llama')}>Backend details</button>
     </>

@@ -133,10 +133,7 @@ export default function FolderBrowser({
             Show hidden folders
           </label>
         </div>
-        <p className="field-help">
-          Open folders to browse. Use this folder picks the one you are in; Cancel keeps the
-          previous one.
-        </p>
+        <p className="field-help">“Use this folder” picks the folder you’re in.</p>
         {error && (
           <Feedback title="Folder unavailable" details={error}>
             Choose a readable folder or enter another path. Your previous setting has been kept.

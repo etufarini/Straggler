@@ -7,10 +7,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
   return (
     <>
       <h2>llama.cpp</h2>
-      <p>
-        The bundled backend is pinned to a version tested with Straggler. Backend updates are
-        delivered with application updates.
-      </p>
+      <p>A version tested with Straggler, updated with the app.</p>
       <div className="build-summary">
         <strong>
           {config.serverAvailable
@@ -89,7 +86,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
       <p className="field-help">
         {config.appStore
           ? 'This edition uses the backend included with the app. Updates arrive through the App Store.'
-          : 'External builds can advertise different capabilities. Stop the server before changing its backend.'}
+          : 'Stop the server before changing the backend. External builds may support different features.'}
       </p>
     </>
   );

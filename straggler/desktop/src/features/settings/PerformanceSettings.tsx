@@ -8,9 +8,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
   return (
     <>
       <h2>Performance</h2>
-      <p className="field-help">
-        Auto lets llama.cpp choose for your hardware. Flash Attention is always automatic.
-      </p>
+      <p className="field-help">Auto lets llama.cpp choose for your hardware.</p>
       <label className="setting-field">
         <span>Device</span>
         <Select
@@ -53,7 +51,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
           hint={
             draft.device === 'none'
               ? 'Ignored: CPU only always disables GPU layers.'
-              : 'How many layers run on the graphics card: Auto, All, or a number. All may not fit in memory.'
+              : 'Layers on the GPU: Auto, All, or a number. All may not fit in memory.'
           }
         />
       </div>
@@ -75,7 +73,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
         />
         <FieldError id="prompt-processing-error" message={fieldError('prompt_processing')} />
         <small>
-          Large batch reads long messages faster but uses more memory. It does not speed up replies.
+          Larger values read long messages faster but use more memory. Replies aren’t faster.
         </small>
       </label>
       {(config.capabilities.multipleDevices ||
