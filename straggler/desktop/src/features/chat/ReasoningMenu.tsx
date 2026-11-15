@@ -21,6 +21,7 @@ export default function ReasoningMenu({ controller }: { controller: WorkspaceCon
     <Popover
       label="Reasoning"
       valueLabel={label}
+      pressed={available && options.reasoning === 'on'}
       className={`reasoning-menu ${available && options.reasoning === 'on' ? 'is-on' : ''}`}
       disabled={chatOptionsDisabled || !available || !!controller.currentProject?.archived}
       trigger={

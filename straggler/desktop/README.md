@@ -38,7 +38,7 @@ for a specific task.
 | `npm run typecheck` | Check TypeScript without building assets |
 | `npm test` | Run frontend/domain unit tests |
 | `npm run test:runtime` | Run Rust unit/integration tests without the desktop feature |
-| `npm run test:e2e` | Run Chromium and WebKit flows |
+| `npm run test:e2e` | Run browser flows with WebKit by default |
 | `npm run test:native` | Build and exercise the actual Tauri window with a fake backend |
 
 ## Test suites
@@ -72,6 +72,28 @@ On Linux, Playwright may also need system dependencies. The runner does not
 install system packages. See the guide for
 [headless Linux behavior and CI coverage](../docs/guide.md#run-the-checks).
 Windows is not a supported native target.
+
+To exercise the same flows with an existing Chromium installation, run from the
+repository root:
+
+```bash
+STRAGGLER_TEST_BROWSER=chromium bash straggler/tests/run.sh browser
+```
+
+CI continues to use WebKit. The composer suite covers measured density, all
+requested viewport sizes, chip states, sidebar/presence layouts and overlay focus.
+The D003 suite checks area transitions, portaled controls, computed colours,
+contrast and star placement. To capture the live fixtures beside the supplied
+D003 dossier, start `npm run dev` in one terminal, then run from
+`straggler/desktop`:
+
+```bash
+node --experimental-strip-types tests/d003-review.mjs [path/to/ui-design.html]
+```
+
+The default reference is `straggler/docs/to-be-implemented-design/ui-design.html`,
+a local design input excluded from Git. Captures, comparisons and JSON results are
+written to `straggler/desktop/test-results/design/d003/`.
 
 ## Test boundaries
 

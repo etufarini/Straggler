@@ -1,3 +1,4 @@
+import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import WebSearchSettings from '../websearch/WebSearchSettings';
 import type { WebSearchController } from '../websearch/useWebSearch';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -25,8 +26,12 @@ const sections = [
 
 export default function Settings({
   webSearch,
+  onPrimaryActionChange,
   ...props
-}: SettingsProps & { webSearch: WebSearchController }) {
+}: SettingsProps & {
+  webSearch: WebSearchController;
+  onPrimaryActionChange: (active: boolean) => void;
+}) {
   const controller = useSettings(props);
   const {
     config,
@@ -51,6 +56,11 @@ export default function Settings({
     operation,
     failure,
   } = controller;
+  const hasApplyAction = ['model', 'performance', 'server', 'profiles'].includes(section);
+  usePagePrimaryAction(
+    hasApplyAction ? !busy && native : section === 'websearch' ? null : false,
+    onPrimaryActionChange,
+  );
   return (
     <section className="settings-page" aria-label="Settings">
       <div className="settings-heading">
@@ -91,31 +101,29 @@ export default function Settings({
                 Loading…
               </p>
             )}
-            {section !== 'folders' &&
-              section !== 'llama' &&
-              section !== 'huggingface' &&
-              section !== 'websearch' && (
-                <div className="configuration-heading">
-                  <span>
-                    {config.currentProfile || 'Unsaved configuration'}
-                    {modified && <b>Modified</b>}
-                    {dirty && <b>Unapplied changes</b>}
-                    {active && restart && <b>Restart required</b>}
-                  </span>
-                  <button
-                    disabled={busy || !native}
-                    onClick={() =>
-                      void run(async () => {
-                        await apply();
-                        setMessage('Settings applied.');
-                      })
-                    }
-                  >
-                    <Save size={14} />
-                    Apply changes
-                  </button>
-                </div>
-              )}
+            {hasApplyAction && (
+              <div className="configuration-heading">
+                <span>
+                  {config.currentProfile || 'Unsaved configuration'}
+                  {modified && <b>Modified</b>}
+                  {dirty && <b>Unapplied changes</b>}
+                  {active && restart && <b>Restart required</b>}
+                </span>
+                <button
+                  className="primary-button"
+                  disabled={busy || !native}
+                  onClick={() =>
+                    void run(async () => {
+                      await apply();
+                      setMessage('Settings applied.');
+                    })
+                  }
+                >
+                  <Save size={14} />
+                  Apply changes
+                </button>
+              </div>
+            )}
             <div className="settings-section">
               {message && (
                 <p role="status" className="success-message">
@@ -128,7 +136,12 @@ export default function Settings({
               {section === 'profiles' && <SavedConfigurations controller={controller} />}
               {section === 'folders' && <FolderSettings controller={controller} />}
               {section === 'llama' && <LlamaSettings controller={controller} />}
-              {section === 'websearch' && <WebSearchSettings controller={webSearch} />}
+              {section === 'websearch' && (
+                <WebSearchSettings
+                  controller={webSearch}
+                  onPrimaryActionChange={onPrimaryActionChange}
+                />
+              )}
               {section === 'huggingface' && <HuggingFaceSettings controller={controller} />}
               <div className="memory-summary">
                 <h3>Memory</h3>

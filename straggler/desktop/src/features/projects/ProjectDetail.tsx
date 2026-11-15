@@ -1,3 +1,4 @@
+import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import { useEffect, useRef } from 'react';
 import { ArrowLeft, ArrowUp, Star, Trash2, FileUp, RotateCcw, Pencil } from 'lucide-react';
 import type { WorkspaceController } from '../../app/useWorkspace';
@@ -15,9 +16,11 @@ import { watchAttachmentDrop } from '../../services/desktop';
 export default function ProjectDetail({
   controller,
   project,
+  onPrimaryActionChange,
 }: {
   controller: WorkspaceController;
   project: Project;
+  onPrimaryActionChange: (active: boolean) => void;
 }) {
   const { projects } = controller;
   const draft = controller.projectDrafts[project.id] ?? '';
@@ -62,6 +65,16 @@ export default function ProjectDetail({
       cleanup?.();
     };
   }, [projects.setError]);
+  const canStartChat =
+    !!draft.trim() &&
+    !project.archived &&
+    context.level !== 'over' &&
+    !controller.generating &&
+    controller.server.phase === 'ready' &&
+    controller.historyReady &&
+    !controller.storageError &&
+    !projects.error;
+  usePagePrimaryAction(canStartChat, onPrimaryActionChange);
   function reviewFiles() {
     filesHeading.current?.focus();
     filesHeading.current?.scrollIntoView({ block: 'start' });
@@ -157,16 +170,7 @@ export default function ProjectDetail({
                   className="send-button"
                   type="submit"
                   data-control-id="button-start-chat"
-                  disabled={
-                    !draft.trim() ||
-                    project.archived ||
-                    context.level === 'over' ||
-                    controller.generating ||
-                    controller.server.phase !== 'ready' ||
-                    !controller.historyReady ||
-                    !!controller.storageError ||
-                    !!projects.error
-                  }
+                  disabled={!canStartChat}
                 >
                   <ArrowUp size={15} />
                   Start chat

@@ -9,9 +9,11 @@ import { watchWindowVisibility } from '../../services/desktop';
 export default function AssistantPresence({
   state,
   metrics,
+  size,
 }: {
   state: PresenceState;
   metrics?: GenerationMetrics;
+  size: number;
 }) {
   const stage = useRef<HTMLDivElement>(null);
   const renderer = useRef<PresenceRenderer | null>(null);
@@ -68,7 +70,12 @@ export default function AssistantPresence({
       : `${(number / scale).toLocaleString('en-US', { maximumFractionDigits: 1 })}${unit}`;
   return (
     <div className="assistant-presence" data-state={state}>
-      <div className="presence-stage" ref={stage} aria-hidden="true" />
+      <div
+        className="presence-stage"
+        ref={stage}
+        aria-hidden="true"
+        style={{ width: size, height: size }}
+      />
       <div className="presence-caption">
         <strong>Straggler</strong>
         <span>{presenceLabels[state].label}</span>

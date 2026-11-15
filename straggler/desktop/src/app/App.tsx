@@ -1,3 +1,4 @@
+import { useLayoutEffect, useState } from 'react';
 import PresencePanel from '../features/presence/PresencePanel';
 import { assistantState } from '../domain/presence';
 import { Cpu, ChevronDown, Square, Terminal, Eclipse } from 'lucide-react';
@@ -18,6 +19,7 @@ import ProjectDetail from '../features/projects/ProjectDetail';
 import ProjectDialogs from '../features/projects/ProjectDialogs';
 export default function App() {
   const controller = useWorkspace();
+  const [pageHasPrimaryAction, setPageHasPrimaryAction] = useState(false);
   const {
     setPanel,
     displayModel,
@@ -44,6 +46,20 @@ export default function App() {
     setSettingsFailure,
     reportSettingsError,
   } = controller;
+  const area =
+    panel === 'settings' && config && draft
+      ? 'settings'
+      : controller.view !== 'chat'
+        ? 'project'
+        : controller.temporary
+          ? 'temporary'
+          : 'chat';
+  useLayoutEffect(() => {
+    document.body.dataset.area = area;
+    return () => {
+      delete document.body.dataset.area;
+    };
+  }, [area]);
   const restartRequired = !!(
     active &&
     draft &&
@@ -74,9 +90,9 @@ export default function App() {
       </span>
 
       <main
-        className={`workspace${controller.temporary ? ' is-temporary' : ''} ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
+        className={`workspace${area === 'temporary' ? ' is-temporary' : ''} ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
       >
-        <header className="topbar">
+        <header className={`topbar${pageHasPrimaryAction ? ' has-page-primary' : ''}`}>
           <button
             className="model-switch"
             aria-label="Choose model"
@@ -219,6 +235,7 @@ export default function App() {
 
         {panel === 'settings' && config && draft ? (
           <SettingsPage
+            onPrimaryActionChange={setPageHasPrimaryAction}
             webSearch={controller.webSearch}
             serverDetails={controller.serverDetails}
             config={config}
@@ -235,14 +252,19 @@ export default function App() {
             onBack={() => setPanel(null)}
           />
         ) : controller.view === 'projects' ? (
-          <ProjectsPage controller={controller} />
+          <ProjectsPage controller={controller} onPrimaryActionChange={setPageHasPrimaryAction} />
         ) : controller.view === 'project' ? (
           (() => {
             const project = controller.projects.projects.find(
               (value) => value.id === controller.projectId,
             );
             return project ? (
-              <ProjectDetail key={project.id} controller={controller} project={project} />
+              <ProjectDetail
+                key={project.id}
+                controller={controller}
+                project={project}
+                onPrimaryActionChange={setPageHasPrimaryAction}
+              />
             ) : (
               <div className="workspace-feedback">
                 <Feedback
@@ -260,6 +282,7 @@ export default function App() {
               <ChatPanel controller={controller} />
             </div>
             <PresencePanel
+              hasMessages={controller.chat.messages.length > 0}
               sources={lastResponse?.sources}
               attachments={controller.attachments}
               state={presence}
