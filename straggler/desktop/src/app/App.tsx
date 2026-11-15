@@ -84,6 +84,7 @@ export default function App() {
     config?.savedSettings &&
     !equalSettings(draft, config.savedSettings)
   );
+  const modelName = displayModel ? fileName(displayModel) : 'Choose a local model';
   return (
     <div className="app-shell">
       <Sidebar controller={controller} />
@@ -97,15 +98,16 @@ export default function App() {
         <header ref={topbar} className={`topbar${pageHasPrimaryAction ? ' has-page-primary' : ''}`}>
           <button
             className="model-switch"
-            aria-label="Choose model"
+            aria-label={`Choose model · ${modelName}`}
+            title={modelName}
             aria-expanded={panel === 'models'}
             onClick={() => setPanel('models')}
           >
             <span className="model-icon">
               <Cpu size={17} />
             </span>
-            <span>
-              {displayModel ? fileName(displayModel) : 'Choose a local model'}
+            <span className="model-label">
+              <span className="model-name">{modelName}</span>
               {panel !== 'settings' && (
                 <small>
                   {config?.currentProfile || 'Unsaved configuration'}

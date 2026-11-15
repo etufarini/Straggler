@@ -62,7 +62,7 @@ test('invalid import preserves generation; a valid import stops and saves its pa
   page,
 }) => {
   await page.goto('/?scenario=cancel');
-  await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+  await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('button', { name: 'Load model', exact: true }).click();
   await page
     .getByRole('textbox', { name: 'Message', exact: true })

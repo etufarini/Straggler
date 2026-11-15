@@ -10,7 +10,7 @@ async function mockDesktop(page: Page, mode = 'normal') {
 }
 
 async function loadModel(page: Page) {
-  await page.getByRole('button', { name: 'Choose model' }).click();
+  await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('button', { name: 'Load model' }).click();
   await expect(page.locator('.local-badge')).toContainText('Ready');
 }
@@ -406,7 +406,7 @@ test('startup OOM is persistent without opening a modal or accepting new request
 }) => {
   await mockDesktop(page, 'oom-startup');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose model' }).click();
+  await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('button', { name: 'Load model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Needs restart');
   await expect(page.getByRole('alert')).toContainText('Not enough memory');

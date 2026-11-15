@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 
 async function ready(page: Page, scenario = 'normal') {
   await page.goto(`/?scenario=${scenario}`);
-  await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+  await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('button', { name: 'Load model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
 }

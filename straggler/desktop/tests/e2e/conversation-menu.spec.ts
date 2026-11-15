@@ -6,7 +6,7 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   browserName,
 }) => {
   await page.goto('/?scenario=normal');
-  await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+  await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('button', { name: 'Load model', exact: true }).click();
   await page.evaluate(() => localStorage.setItem('straggler-fixture-response-paused', 'true'));
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A conversation');

@@ -749,16 +749,19 @@ code {
   min-width: 0;
   gap: 12px;
 }
-.model-switch > span:nth-child(2) {
+.model-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
 }
+.model-name,
 .model-switch small {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-switch small {
   color: var(--ui-subtle);
   font-weight: 400;
   font-size: 11px;
