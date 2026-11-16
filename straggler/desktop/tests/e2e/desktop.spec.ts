@@ -181,7 +181,11 @@ for (const cleared of [false, true]) {
       .poll(() => page.evaluate(() => localStorage.getItem('straggler-fixture-request')))
       .not.toBeNull();
     await composer.fill('A newer draft');
-    if (cleared) await composer.fill('');
+    if (cleared) {
+      await composer.press('ControlOrMeta+a');
+      await composer.press('Backspace');
+      await expect(composer).toHaveText('');
+    }
     await page.evaluate(() => localStorage.removeItem('straggler-fixture-generation-paused'));
     await expect(page.getByText('Response failed', { exact: true })).toBeVisible();
     await expect(composer).toHaveText(cleared ? '' : 'A newer draft');
