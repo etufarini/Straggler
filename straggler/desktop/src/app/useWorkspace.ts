@@ -13,7 +13,7 @@ import { ownSystemPrompt } from '../domain/projects';
 import { serializeStorage } from '../domain/storageQueue';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
-import { equalSettings, emptyServer, serverActive } from '../domain/types';
+import { equalSettings, emptyServer, serverActive, settingsForModel } from '../domain/types';
 import { errorDetail, settingsFailure as describeSettingsFailure } from '../domain/errors';
 import type { SettingsFailure } from '../domain/errors';
 import { fieldSection } from '../features/settings/sections';
@@ -35,7 +35,7 @@ export function useWorkspace() {
   const firstConfiguration = useRef(true);
   const selected = draft?.model || '';
   function setSelected(model: string) {
-    setDraft((current) => (current ? { ...current, model } : current));
+    setDraft((current) => (current ? settingsForModel(current, model) : current));
   }
   function acceptConfiguration(value: Configuration) {
     configRef.current = value;

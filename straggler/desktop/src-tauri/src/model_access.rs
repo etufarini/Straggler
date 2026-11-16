@@ -21,6 +21,9 @@ impl ModelAccess {
     pub fn remember(&self, _path: &std::path::Path) -> crate::Result<()> {
         Ok(())
     }
+    pub fn remember_file(&self, _path: &std::path::Path) -> crate::Result<()> {
+        Ok(())
+    }
     pub fn restore(_data: &std::path::Path) -> Self {
         Self
     }

@@ -1,3 +1,4 @@
+import { settingsForModel } from '../../domain/types';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import WebSearchSettings from '../websearch/WebSearchSettings';
 import type { WebSearchController } from '../websearch/useWebSearch';
@@ -168,7 +169,7 @@ export default function Settings({
           onSelect={async (path) => {
             const value = await operation('set-path', [folder, path]);
             accept(value);
-            setDraft({ ...draft, model: value.settings.model });
+            setDraft(settingsForModel(draft, value.settings.model));
           }}
         />
       )}

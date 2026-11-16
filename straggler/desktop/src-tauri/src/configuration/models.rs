@@ -190,6 +190,7 @@ pub fn discover(root: &Path) -> Result<Vec<Model>> {
             };
             models.push(Model {
                 path: value.into(),
+                template: super::templates::candidate(&path),
                 label: path
                     .strip_prefix(root)
                     .unwrap_or(&path)

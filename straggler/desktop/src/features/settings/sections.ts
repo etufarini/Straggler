@@ -15,6 +15,8 @@ export function fieldSection(field?: keyof Settings): Section {
   if (
     field &&
     [
+      'mtp',
+      'mtp_file',
       'device',
       'threads',
       'gpu_layers',

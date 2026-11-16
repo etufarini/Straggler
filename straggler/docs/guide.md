@@ -325,28 +325,33 @@ in this section. A supported model can still exceed available memory or use a
 chat template unsupported by the backend. Straggler does not infer model support
 from filenames.
 
-If a file named exactly `chat_template.jinja` is beside the selected GGUF,
-Straggler passes it to llama.cpp at launch with `--jinja --chat-template-file`.
-It applies to all GGUF quantizations in that directory. Without that file,
-llama.cpp uses the template embedded in the model. Files such as
-`chat_template.embedded.jinja`, `chat_template.upstream.jinja` and
-`chat_template.unsloth.jinja` are alternatives and are not selected automatically;
-copy the desired compatible template to `chat_template.jinja` to select it.
-Keep models that need different templates in separate directories.
+**Chat template** defaults to the template embedded in the GGUF. Select
+**Custom file…** to choose a local Jinja template with any filename. Selecting
+it enables the override; choose **Default** to stop using it. A
+`chat_template.jinja` beside the selected GGUF is offered as **Use this file**,
+but is never loaded automatically. The selected filename is shown; expand it
+to inspect the full path.
 
-The separate template must be a readable, nonempty UTF-8 file, and the selected
-backend must advertise both options; otherwise launch reports an error instead
-of silently using another template. llama.cpp parses the template and reports
-syntax or compatibility errors. Straggler does not modify the template or GGUF.
-Stop and launch the server after adding, editing or removing a template; file
-changes do not set **Modified** or **Restart required**. Saved configurations
-keep the model path and use the template present at the next launch.
+The custom template must be readable, nonempty UTF-8 text without NUL characters,
+up to 2 MiB. The selected backend must advertise `--jinja` and
+`--chat-template-file`. Straggler passes the selected file without editing it or
+the GGUF; llama.cpp owns Jinja parsing and model compatibility. A missing or
+invalid selected file stops launch instead of silently using another template.
+Reasoning, effort and tool controls still use the loaded template's
+backend-reported capabilities.
 
-Native `LLAMA_ARG_CHAT_TEMPLATE` or `LLAMA_ARG_CHAT_TEMPLATE_FILE` overrides take
-precedence: if either is set, including an empty value, Straggler skips automatic
-template selection and passes the environment through unchanged. Reasoning,
-effort and tool controls still depend on the loaded template's backend-reported
-capabilities; an external template does not add model capabilities.
+Template and MTP selections are saved in configurations and participate in
+**Modified** and **Restart required**. Selecting a different model manually
+resets both to their defaults; loading a saved configuration restores the model
+and its selections together, without launching. Stop and launch the server to
+apply changes. Editing a file's contents outside Straggler also requires a
+restart; content changes are not tracked by these indicators. Saved configurations
+reference external files rather than copying or embedding their contents.
+
+Native `LLAMA_ARG_CHAT_TEMPLATE` or `LLAMA_ARG_CHAT_TEMPLATE_FILE` overrides retain
+precedence, including explicit empty values. The control identifies the override
+variables and is disabled while they are present. Straggler passes the native
+environment through unchanged.
 
 | Control | Meaning and default |
 | --- | --- |
@@ -418,6 +423,32 @@ Memory measurements are optional and approximate. **Unavailable** means a readin
 is missing, not that capacity is zero. Missing measurements never block server
 controls. Device support depends on the backend and drivers; a backend label does
 not establish hardware identity or guarantee a model will fit.
+
+#### Multi-token prediction (MTP)
+
+Under **Performance**, **Multi-token prediction (MTP)** offers:
+
+| Choice | Behavior |
+| --- | --- |
+| **Off** (default) | Disables speculative decoding when the backend advertises `--spec-type`. Does not load an MTP file. |
+| **Use model's MTP** | Enables `--spec-type draft-mtp` using MTP components included in the selected model. |
+| **Use external MTP file…** | Opens the native file picker and enables MTP with the selected compatible GGUF, passed using the advertised `--spec-draft-model` or `--model-draft` option. Canceling preserves the previous selection. |
+
+MTP can improve generation speed, but requires compatible model components and
+can use additional memory. Backend support is detected from its advertised
+`--spec-type` choices; it does not establish support in an individual model.
+llama.cpp validates model compatibility and determines device placement and
+other MTP defaults. No model-name or hardware heuristics are used. Unsupported
+choices are disabled, and launch reports unsupported options or missing files
+explicitly. The filename and expandable path remain visible while external MTP
+is selected; **Change MTP file…** replaces it.
+
+Native speculative type or draft-model overrides, including
+`LLAMA_ARG_SPEC_TYPE` and `LLAMA_ARG_SPEC_DRAFT_MODEL` (and legacy draft-model
+aliases), take precedence even when empty. The MTP control names these variables
+and is disabled while they are present. Custom draft tuning variables continue
+through to llama.cpp unchanged. The application does not download an MTP file
+or template automatically.
 
 ### Server & port
 
@@ -710,8 +741,9 @@ for `reasoning_content`. Invalid imports leave stored history unchanged.
 
 Profiles are literal `key=value` data and are never executed. Only the model field
 is required on load. Missing fields use independent defaults rather than values
-from the current session: port 9931, `q4_0` caches, an empty system prompt and Auto
-for other controls. Auto sampling corresponds to the Default preset.
+from the current session: port 9931, `q4_0` caches, an empty system prompt, no
+custom template, MTP Off with no external file, and Auto for other controls. Auto
+sampling corresponds to the Default preset.
 
 Unknown or removed keys are ignored. Invalid recognized fields, duplicate
 recognized keys or malformed lines reject the entire load, leaving the current
@@ -730,6 +762,9 @@ values are reported rather than replaced. The supervised server stays on loopbac
 | --- | --- |
 | `STRAGGLER_LLAMA_CPP_DIR` | `LLAMA_CPP_DIR` / saved external path or bundled backend |
 | `STRAGGLER_MODELS_DIR` | `LLAMA_MODELS_DIR` / saved path |
+| `STRAGGLER_CHAT_TEMPLATE_FILE` | `LLAMA_CHAT_TEMPLATE_FILE` / empty (model template) |
+| `STRAGGLER_MTP` | `LLAMA_MTP` / off (`off`, `model` or `file`) |
+| `STRAGGLER_MTP_FILE` | `LLAMA_MTP_FILE` / empty |
 | `STRAGGLER_CTX_SIZE` | `LLAMA_CTX_SIZE` / auto |
 | `STRAGGLER_PORT` | `LLAMA_PORT` / 9931 |
 | `STRAGGLER_DEVICE`, `STRAGGLER_THREADS`, `STRAGGLER_GPU_LAYERS` | Corresponding `LLAMA_*` / auto |
@@ -743,9 +778,10 @@ Individual sampling controls use `STRAGGLER_TEMPERATURE`, `STRAGGLER_TOP_P`,
 `STRAGGLER_PRESENCE_PENALTY`, `STRAGGLER_FREQUENCY_PENALTY`, `STRAGGLER_SEED` and
 `STRAGGLER_MAX_TOKENS`, with corresponding legacy `LLAMA_*` aliases.
 
-Native `LLAMA_ARG_*` variables pass through unchanged. Explicit GUI launch
-arguments take precedence according to llama.cpp's parser. Requests can override
-server sampling defaults without changing another client's stored preferences.
+Native `LLAMA_ARG_*` variables pass through unchanged. Template and MTP native
+overrides disable their GUI controls as described above; other explicit GUI
+launch arguments take precedence according to llama.cpp's parser. Requests can
+override server sampling defaults without changing another client's stored preferences.
 
 ### App Store data and permissions
 
@@ -753,12 +789,13 @@ The App Store edition keeps configuration and data beneath its sandbox home and
 ignores external HOME/XDG root overrides. It does not automatically import regular
 edition storage; use its own container when backing up or restoring data.
 
-Choose model folders through the native picker. Persistent security-scoped
-bookmarks restore access after restart; if a grant is missing, select the folder
-again. Scopes remain active before launching the bundled child process. Linked
-folder access by that child must be checked in a signed, sandboxed macOS Store
-build; Linux checks cannot establish this platform permission behavior. Native Save panels grant export and download destinations. This edition
-uses only its included backend.
+Choose model folders, custom templates and external MTP files through the native
+picker. Persistent security-scoped bookmarks restore access after restart; if a
+grant is missing, select the affected file or folder again. Scopes remain active
+before launching the bundled child process. Access by that child must be checked
+in a signed, sandboxed macOS Store build; Linux checks cannot establish this
+platform permission behavior. Native Save panels grant export and download
+destinations. This edition uses only its included backend.
 
 ## Development and architecture
 

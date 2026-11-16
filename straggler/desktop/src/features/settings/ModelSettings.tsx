@@ -1,3 +1,4 @@
+import TemplateSettings from './TemplateSettings';
 import ChatDefaults from './ChatDefaults';
 import type { SettingsController } from './useSettings';
 import NumberField from '../../components/NumberField';
@@ -60,11 +61,6 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
           ]}
         />
         <FieldError id="model-error" message={fieldError('model')} />
-        <small>
-          At launch, uses chat_template.jinja beside the GGUF when present; otherwise uses the
-          embedded template. Native template overrides take precedence. Restart after changing a
-          template file.
-        </small>
       </label>
       {!config.models.length && (
         <div className="setup-callout">
@@ -76,6 +72,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
           </div>
         </div>
       )}
+      <TemplateSettings controller={controller} />
       <div className="field-grid">
         <label className="setting-field">
           <span>Context size</span>

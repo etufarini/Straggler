@@ -3843,3 +3843,23 @@ input:focus-visible {
 .web-usage::-webkit-meter-even-less-good-value {
   background: var(--usage-color);
 }
+
+.model-file-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+.model-file-selection details {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.model-file-selection summary,
+.model-file-selection code {
+  overflow-wrap: anywhere;
+}
+.model-file-selection code {
+  display: block;
+  margin-top: 0.4rem;
+}

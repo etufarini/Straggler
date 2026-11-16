@@ -1,3 +1,4 @@
+import MtpSettings from './MtpSettings';
 import type { SettingsController } from './useSettings';
 import NumberField from '../../components/NumberField';
 import FieldError from '../../components/FieldError';
@@ -76,6 +77,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
           Larger values read long messages faster but use more memory. Replies aren’t faster.
         </small>
       </label>
+      <MtpSettings controller={controller} />
       {(config.capabilities.multipleDevices ||
         fieldError('tensor_split') ||
         fieldError('fit_target') ||

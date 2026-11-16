@@ -2,9 +2,11 @@
 
 pub mod capabilities;
 pub mod environment;
+pub mod model_files;
 pub mod models;
 pub mod native;
 pub mod settings;
+pub mod speculation;
 pub mod storage;
 pub mod templates;
 pub mod version;

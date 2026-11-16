@@ -1,13 +1,18 @@
+import nativeDefaults from '../../src-tauri/src/configuration/defaults.json';
 import type { WebSource, WebSearchTurn } from './webSearch';
 export interface Model {
   path: string;
   label: string;
+  template?: string | null;
 }
 export interface Settings {
   chat_system_prompt: string;
   chat_reasoning: 'auto' | 'on' | 'off';
   chat_reasoning_effort: string;
   model: string;
+  chat_template_file: string;
+  mtp: 'off' | 'model' | 'file';
+  mtp_file: string;
   context: string;
   port: string;
   device: string;
@@ -76,6 +81,11 @@ export interface Configuration {
     cacheTypesV: string[];
     splitModes: string[];
     multipleDevices: boolean;
+    chatTemplateFile: boolean;
+    mtp: boolean;
+    mtpFile: boolean;
+    templateOverride: string;
+    mtpOverride: string;
     buildNote: string;
   };
   profiles: string[];
@@ -151,6 +161,17 @@ export const emptyServer: ServerStatus = {
 export const serverActive = (server: ServerStatus) =>
   ['ready', 'loading', 'stopping', 'needs-restart'].includes(server.phase);
 export const fileName = (path: string) => path.split('/').pop() || path;
+export function settingsForModel(settings: Settings, model: string): Settings {
+  if (settings.model === model) return settings;
+  return {
+    ...settings,
+    model,
+    chat_template_file: nativeDefaults.chat_template_file,
+    mtp: nativeDefaults.mtp as Settings['mtp'],
+    mtp_file: nativeDefaults.mtp_file,
+  };
+}
+
 export const equalSettings = (a: Settings, b: Settings) =>
   Object.keys(a).every((key) => a[key as keyof Settings] === b[key as keyof Settings]);
 export const chatSettingKeys = [

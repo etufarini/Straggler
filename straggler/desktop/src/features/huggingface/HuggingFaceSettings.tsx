@@ -1,3 +1,4 @@
+import { settingsForModel } from '../../domain/types';
 import { useEffect, useState } from 'react';
 import { invoke } from '../../services/desktop';
 import { errorDetail } from '../../domain/errors';
@@ -99,7 +100,7 @@ export default function HuggingFaceSettings({ controller }: { controller: Settin
         path={controller.config.modelsDir}
         onConfigured={(value) => {
           controller.accept(value);
-          controller.setDraft({ ...controller.draft, model: value.settings.model });
+          controller.setDraft(settingsForModel(controller.draft, value.settings.model));
         }}
       />
     </>

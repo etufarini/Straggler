@@ -44,6 +44,7 @@ export type DesktopCommand =
   | 'backend_release'
   | 'apply_settings'
   | 'workspace_action'
+  | 'choose_model_file'
   | 'choose_models_folder'
   | 'create_models_folder'
   | 'models_folder_info'

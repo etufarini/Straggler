@@ -1,3 +1,4 @@
+import { settingsForModel } from '../../domain/types';
 import type { SettingsController } from './useSettings';
 import { Folder } from 'lucide-react';
 import ModelsFolderActions from '../huggingface/ModelsFolderActions';
@@ -25,7 +26,7 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
               path={path}
               onConfigured={(value) => {
                 controller.accept(value);
-                controller.setDraft({ ...controller.draft, model: value.settings.model });
+                controller.setDraft(settingsForModel(controller.draft, value.settings.model));
               }}
             />
           ) : (

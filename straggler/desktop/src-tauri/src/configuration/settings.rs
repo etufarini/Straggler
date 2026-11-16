@@ -5,6 +5,9 @@ use std::collections::BTreeMap;
 
 pub const PROFILE_FIELDS: &[&str] = &[
     "model",
+    "chat_template_file",
+    "mtp",
+    "mtp_file",
     "context",
     "port",
     "device",
@@ -172,7 +175,10 @@ impl Settings {
             fields.insert((*name).into(), value);
         }
         for name in PROFILE_FIELDS {
-            if name.starts_with("chat_") || *name == "model" {
+            if matches!(
+                *name,
+                "chat_system_prompt" | "chat_reasoning" | "chat_reasoning_effort" | "model"
+            ) {
                 continue;
             }
             let control = if *name == "context" {
@@ -211,6 +217,9 @@ impl Settings {
             }
         }
         let checks = [
+            ("chat_template_file", self.chat_template_file.is_empty() || std::path::Path::new(&self.chat_template_file).is_absolute(), "Choose a chat template with an absolute path."),
+            ("mtp", matches!(self.mtp.as_str(), "off" | "model" | "file"), "MTP must be Off, Use model's MTP or Use external MTP file."),
+            ("mtp_file", self.mtp_file.is_empty() || std::path::Path::new(&self.mtp_file).is_absolute(), "Choose an MTP file with an absolute path."),
             ("port", !self.port.is_empty() && self.port.len() <= 5 && self.port.bytes().all(|byte| byte.is_ascii_digit()) && self.port.parse::<u16>().is_ok_and(|port| port != 0), "Port must be an integer between 1 and 65535."),
             ("context", self.context == "auto" || count(&self.context, i32::MAX as u64), "Use Auto or an integer from 0 to 2147483647 for context (0 requests the full model context)."),
             ("device", self.device.split(',').all(|name| token(name, "_.:-", usize::MAX)), "Use Auto, none or a comma-separated list of device names."),
