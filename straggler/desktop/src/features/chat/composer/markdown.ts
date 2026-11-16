@@ -108,7 +108,7 @@ export function parseMarkdown(markdown: string): JSONContent {
               ...(node.ordered ? { attrs: { start: node.start ?? 1 } } : {}),
               content: node.children.map((item) => ({
                 type: 'listItem',
-                content: blocks(item.children),
+                content: item.children.length ? blocks(item.children) : [{ type: 'paragraph' }],
               })),
             },
           ];
@@ -135,8 +135,12 @@ function escapeText(text: string, before = '', after = ''): string {
 }
 
 function escapeLineStart(line: string): string {
+  // Literal headings, dividers and GFM table separators must not acquire block styling.
+  if (/^\s*(?:-+|=+)\s*$/.test(line)) return line.replace(/[-=]/, '\\$&');
+  if (/^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$/.test(line)) return line.replace(/\|/g, '\\|');
   return line
-    .replace(/^(\s*)([#>+-])(?=\s|$)/, '$1\\$2')
+    .replace(/^(\s*)(#)(?=#{0,5}(?:\s|$))/, '$1\\$2')
+    .replace(/^(\s*)([>+-])(?=\s|$)/, '$1\\$2')
     .replace(/^(\s*)(\d+)([.)])(?=\s|$)/, '$1$2\\$3');
 }
 

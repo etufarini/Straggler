@@ -132,6 +132,9 @@ export default function RichComposer(props: Props) {
     editor.view.dom.tabIndex = props.disabled ? -1 : 0;
   }, [editor, props.disabled, props.placeholder]);
   useEffect(() => {
+    if (editor && props.editing) editor.commands.focus('end');
+  }, [editor, props.editing]);
+  useEffect(() => {
     if (!editor || !props.focusRef) return;
     const handle = {
       focus: () => {

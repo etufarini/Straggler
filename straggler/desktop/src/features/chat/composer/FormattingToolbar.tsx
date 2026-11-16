@@ -14,7 +14,6 @@ import type { Editor } from '@tiptap/core';
 import { useEditorState } from '@tiptap/react';
 import Popover from '../../../components/Popover';
 import { applyFormatting, formattingDisabled, isMac } from './commands';
-import type { FormattingAction } from './commands';
 import { normalizeComposerUrl } from './markdown';
 
 const tools = [
@@ -236,7 +235,7 @@ export default function FormattingToolbar({
                 title={title}
                 aria-pressed={state[index].active}
                 disabled={state[index].disabled}
-                onClick={() => applyFormatting(editor, action as FormattingAction, openLink)}
+                onClick={() => applyFormatting(editor, action, openLink)}
               >
                 <Icon size={16} />
               </button>
