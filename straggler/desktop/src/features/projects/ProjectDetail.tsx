@@ -1,3 +1,5 @@
+import RichComposer, { FormattingToggle } from '../chat/composer/RichComposer';
+import useComposerDensity from '../chat/useComposerDensity';
 import { countLabel } from '../../domain/text';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import { useEffect, useRef } from 'react';
@@ -24,6 +26,8 @@ export default function ProjectDetail({
   onPrimaryActionChange: (active: boolean) => void;
 }) {
   const { projects } = controller;
+  const composerRef = useComposerDensity();
+  const toolbarVisible = controller.preferences.formattingToolbarVisible !== false;
   const draft = controller.projectDrafts[project.id] ?? '';
   const setDraft = (text: string) =>
     controller.setProjectDrafts((values) => ({ ...values, [project.id]: text }));
@@ -133,32 +137,36 @@ export default function ProjectDetail({
           )}
           <form
             className="composer project-start"
+            ref={composerRef}
             onSubmit={(event) => {
               event.preventDefault();
-              if (draft.trim()) controller.startProjectChat(project.id, draft);
+              if (canStartChat) controller.startProjectChat(project.id, draft);
             }}
           >
-            <textarea
-              aria-label={`First message for a new chat in ${project.name}`}
+            <RichComposer
+              key={project.id}
+              label="Message"
               placeholder={
                 project.archived
                   ? 'Restore the project to start a chat'
                   : `Start a chat in ${project.name}…`
               }
-              data-control-id="textarea-start-chat"
-              rows={3}
+              controlId="textarea-start-chat"
               value={draft}
-              disabled={project.archived}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
+              disabled={project.archived || controller.server.phase !== 'ready'}
+              toolbarVisible={toolbarVisible}
+              onChange={setDraft}
+              onSubmit={() => composerRef.current?.requestSubmit()}
             />
             <div className="composer-footer">
               <div className="composer-tools">
+                <FormattingToggle
+                  visible={toolbarVisible}
+                  disabled={!controller.preferencesReady}
+                  onChange={(visible) =>
+                    controller.changePreferences({ formattingToolbarVisible: visible })
+                  }
+                />
                 <span className="project-start-note">
                   {project.instructions.trim()
                     ? 'Uses the project instructions'

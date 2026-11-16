@@ -80,7 +80,7 @@ export function useConversation(
   const mounted = useRef(true);
   const messageList = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
-  const textarea = useRef<HTMLTextAreaElement>(null);
+  const composerInput = useRef<{ focus: () => void }>(null);
   useEffect(() => {
     setContextError('');
   }, [input, chat.attachments, contextSize]);
@@ -592,7 +592,7 @@ export function useConversation(
     saveQueue,
     messageList,
     follow,
-    textarea,
+    composerInput,
     updateChat,
     loadHistory,
     save,
