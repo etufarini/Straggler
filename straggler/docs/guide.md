@@ -325,6 +325,29 @@ in this section. A supported model can still exceed available memory or use a
 chat template unsupported by the backend. Straggler does not infer model support
 from filenames.
 
+If a file named exactly `chat_template.jinja` is beside the selected GGUF,
+Straggler passes it to llama.cpp at launch with `--jinja --chat-template-file`.
+It applies to all GGUF quantizations in that directory. Without that file,
+llama.cpp uses the template embedded in the model. Files such as
+`chat_template.embedded.jinja`, `chat_template.upstream.jinja` and
+`chat_template.unsloth.jinja` are alternatives and are not selected automatically;
+copy the desired compatible template to `chat_template.jinja` to select it.
+Keep models that need different templates in separate directories.
+
+The separate template must be a readable, nonempty UTF-8 file, and the selected
+backend must advertise both options; otherwise launch reports an error instead
+of silently using another template. llama.cpp parses the template and reports
+syntax or compatibility errors. Straggler does not modify the template or GGUF.
+Stop and launch the server after adding, editing or removing a template; file
+changes do not set **Modified** or **Restart required**. Saved configurations
+keep the model path and use the template present at the next launch.
+
+Native `LLAMA_ARG_CHAT_TEMPLATE` or `LLAMA_ARG_CHAT_TEMPLATE_FILE` overrides take
+precedence: if either is set, including an empty value, Straggler skips automatic
+template selection and passes the environment through unchanged. Reasoning,
+effort and tool controls still depend on the loaded template's backend-reported
+capabilities; an external template does not add model capabilities.
+
 | Control | Meaning and default |
 | --- | --- |
 | Context size | **Auto** lets llama.cpp choose. **Largest the model supports** stores `0` and requests full model context. A positive token count requests an explicit size. Input and output share the context. |
