@@ -144,6 +144,32 @@ fn request(id: Uuid, content: &str) -> ChatRequest {
     }
 }
 
+#[tokio::test]
+async fn supervised_launch_reads_the_separate_template_selection_on_each_start() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    let template = PathBuf::from(&fixture.model).with_file_name("chat_template.jinja");
+    for separate in [false, true, false] {
+        if separate {
+            fs::write(&template, "{{ messages[0].content }}").unwrap();
+        } else if template.exists() {
+            fs::remove_file(&template).unwrap();
+        }
+        fixture.ready(&runtime).await;
+        let launch: serde_json::Value = serde_json::from_slice(
+            &fs::read(fixture._directory.path().join("launch.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(launch["jinja"], true);
+        if separate {
+            assert_eq!(launch["chat_template_file"], template.to_str().unwrap());
+        } else {
+            assert!(launch["chat_template_file"].is_null());
+        }
+        runtime.stop().unwrap();
+    }
+}
+
 fn stored_files(root: &std::path::Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
     let mut files = std::collections::BTreeMap::new();
     let mut pending = vec![root.to_owned()];

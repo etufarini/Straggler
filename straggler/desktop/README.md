@@ -165,6 +165,12 @@ provide an idle slot with an arbitrary ID, and implement slot erase. Review the
 pinned server context/slot code when changing privacy flags: `cache_prompt: false`
 alone does not disable global RAM cache. Tests need no model or real inference.
 
+Separate-template fixtures also advertise `--jinja` and `--chat-template-file`
+with the pinned server's argument contract. Tests verify selection of the exact
+`chat_template.jinja` filename, native override precedence, file errors and the
+supervised child's arguments. They do not parse Jinja or perform inference;
+llama.cpp owns template rendering and capability discovery.
+
 `src-tauri/src/huggingface/tests.rs` and `tests/fixtures/huggingface.py` serve Hub-shaped
 search, immutable repository/tree metadata with LFS SHA-256, Range responses and
 synthetic file bytes on loopback. Tests cover interruption, ignored/invalid Range,
