@@ -24,7 +24,7 @@ test('keyboard editing, cancel and save regenerate replace an earlier exchange',
   await page.keyboard.press('Enter');
   const editor = page.getByRole('textbox', { name: 'Edit message', exact: true });
   await expect(editor).toBeFocused();
-  await expect(editor).toHaveValue('First question');
+  await expect(editor).toHaveText('First question');
   await expect(
     page.getByText('Saving replaces the response below and removes later messages.'),
   ).toBeVisible();
@@ -116,7 +116,7 @@ test('failed user replacement preserves later turns and the edit without request
   await page.evaluate(() => localStorage.setItem('straggler-fixture-fail-next-save', 'true'));
   await page.getByRole('button', { name: 'Save and regenerate' }).click();
   await expect(page.getByText('Chat not saved', { exact: true })).toBeVisible();
-  await expect(editor).toHaveValue('Keep this proposed edit');
+  await expect(editor).toHaveText('Keep this proposed edit');
   await expect(page.locator('.message.assistant')).toHaveCount(2);
   const saved = await page.evaluate(
     () => JSON.parse(localStorage.getItem('straggler-fixture-normal')!)[0],

@@ -34,7 +34,7 @@ test('temporary messages, attachments and drafts never write browser storage or 
   ).not.toContain('.svg');
   await page.reload();
   await expect(page.locator('.conversation-row')).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveText('');
 });
 
 test('Save chat converts memory to an ordinary chat and retains attachments across reopening', async ({
@@ -62,13 +62,13 @@ test('leaving a draft for Settings or another chat requires confirmation and Can
   const dialog = page.getByRole('alertdialog', { name: 'Erase this temporary chat?' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveText(
     'Private draft',
   );
   await page.getByRole('button', { name: 'New chat', exact: true }).click();
   await dialog.getByRole('button', { name: 'Erase and leave', exact: true }).click();
   await expect(page.locator('.temp-status')).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveText('');
   await expect(page.locator('.conversation-row')).toHaveCount(0);
 });
 

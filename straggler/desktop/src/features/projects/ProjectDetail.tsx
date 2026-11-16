@@ -1,8 +1,9 @@
-import RichComposer, { FormattingToggle } from '../chat/composer/RichComposer';
+import RichComposer, { FormattingToggle, composerHint } from '../chat/composer/RichComposer';
+import type { ComposerContext } from '../chat/composer/commands';
 import useComposerDensity from '../chat/useComposerDensity';
 import { countLabel } from '../../domain/text';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowUp, Star, Trash2, FileUp, RotateCcw, Pencil } from 'lucide-react';
 import type { WorkspaceController } from '../../app/useWorkspace';
 import type { Project } from '../../domain/projects';
@@ -27,6 +28,7 @@ export default function ProjectDetail({
 }) {
   const { projects } = controller;
   const composerRef = useComposerDensity();
+  const [composerMode, setComposerMode] = useState<ComposerContext>('text');
   const toolbarVisible = controller.preferences.formattingToolbarVisible !== false;
   const draft = controller.projectDrafts[project.id] ?? '';
   const setDraft = (text: string) =>
@@ -156,6 +158,7 @@ export default function ProjectDetail({
               disabled={project.archived || controller.server.phase !== 'ready'}
               toolbarVisible={toolbarVisible}
               onChange={setDraft}
+              onContextChange={setComposerMode}
               onSubmit={() => composerRef.current?.requestSubmit()}
             />
             <div className="composer-footer">
@@ -175,6 +178,7 @@ export default function ProjectDetail({
                 </span>
               </div>
               <div className="composer-send">
+                <span className="keyboard-hint">{composerHint(composerMode)}</span>
                 <button
                   className="send-button"
                   type="submit"

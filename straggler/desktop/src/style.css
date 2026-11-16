@@ -2825,9 +2825,6 @@ input:focus-visible {
   position: relative;
   margin-bottom: 22px;
 }
-.project-start textarea {
-  min-height: 74px;
-}
 .project-start .send-button {
   width: auto;
   padding: 0 12px;

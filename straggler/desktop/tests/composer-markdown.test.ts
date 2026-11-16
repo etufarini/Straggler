@@ -41,6 +41,16 @@ describe('composer Markdown contract', () => {
       '[text](https://example.com/a%28b%29)',
     );
   });
+  it('keeps unsupported pasted block markers literal', () => {
+    const text = '## Heading\n---\n===\na | b\n--|--';
+    expect(serializeMarkdown(plainDocument(text))).toBe(
+      '\\## Heading\n\\---\n\\===\na | b\n--\\|--',
+    );
+  });
+  it('imports empty list items with a valid editable paragraph', () => {
+    expect(parseMarkdown('-').content?.[0].content?.[0].content).toEqual([{ type: 'paragraph' }]);
+    expect(serializeMarkdown(parseMarkdown('-'))).toBe('-');
+  });
   it('preserves unsupported Markdown as literal text', () => {
     expect(serializeMarkdown(parseMarkdown('# Heading\n\n<script>alert(1)</script>'))).toBe(
       '\\# Heading\n\\<script>alert(1)\\</script>',

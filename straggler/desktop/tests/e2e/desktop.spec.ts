@@ -69,7 +69,7 @@ test('cancel keeps partial response and permits the next conversation', async ({
   await page.getByRole('button', { name: 'Stop response' }).click();
   await expect(page.getByText('Response stopped', { exact: true })).toBeVisible();
   await expect(page.locator('.markdown strong')).toHaveText('local');
-  await expect(composer).toHaveValue('My next question');
+  await expect(composer).toHaveText('My next question');
   await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled();
   await expect(page.getByRole('button', { name: /New chat/ })).toBeEnabled();
 });
@@ -85,13 +85,13 @@ test('typing during prompt validation preserves the next draft and the submitted
   await page.evaluate(() => localStorage.setItem('straggler-fixture-prompt-tokens-paused', 'true'));
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(composer).toBeFocused();
-  await expect(composer).toHaveValue('');
+  await expect(composer).toHaveText('');
   await composer.fill('Next question');
   await composer.press('Enter');
-  await expect(composer).toHaveValue('Next question');
+  await expect(composer).toHaveText('Next question');
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-prompt-tokens-paused'));
   await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
-  await expect(composer).toHaveValue('Next question');
+  await expect(composer).toHaveText('Next question');
   await expect(page.locator('.message.user')).toHaveCount(1);
   const request = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('straggler-fixture-request')!),
@@ -115,13 +115,16 @@ test('streaming permits multiline drafts without duplicate sends and keeps them 
   await composer.fill('Next question');
   await composer.press('Shift+Enter');
   await composer.press('Enter');
-  await expect(composer).toHaveValue('Next question\n');
-  await composer.evaluate((element: HTMLTextAreaElement) => element.form?.requestSubmit());
+  await expect(composer).toHaveText('Next question\n');
+  await expect(composer.locator(':scope > p')).toHaveCount(2);
+  await expect(composer.locator(':scope > p').last()).toBeEmpty();
+  await composer.evaluate((element) => element.closest('form')?.requestSubmit());
   await expect(page.locator('.message.user')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Stop response' })).toBeVisible();
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-response-paused'));
   await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled();
-  await expect(composer).toHaveValue('Next question\n');
+  await expect(composer).toHaveText('Next question\n');
+  await expect(composer.locator(':scope > p')).toHaveCount(2);
   await composer.press('Enter');
   await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
   await expect(page.locator('.message.user')).toHaveCount(2);
@@ -149,11 +152,11 @@ for (const edited of [false, true]) {
       localStorage.setItem('straggler-fixture-prompt-tokens', '5000');
     });
     await page.getByRole('button', { name: 'Send message' }).click();
-    await expect(composer).toHaveValue('');
+    await expect(composer).toHaveText('');
     if (edited) await composer.fill('A newer draft');
     await page.evaluate(() => localStorage.removeItem('straggler-fixture-prompt-tokens-paused'));
     await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
-    await expect(composer).toHaveValue(edited ? 'A newer draft' : 'Rejected question');
+    await expect(composer).toHaveText(edited ? 'A newer draft' : 'Rejected question');
     await expect(page.getByRole('alert')).toContainText('exceed the 4,096-token context');
     await expect(page.locator('.message.user')).toHaveCount(0);
     expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-request'))).toBeNull();
@@ -181,7 +184,7 @@ for (const cleared of [false, true]) {
     if (cleared) await composer.fill('');
     await page.evaluate(() => localStorage.removeItem('straggler-fixture-generation-paused'));
     await expect(page.getByText('Response failed', { exact: true })).toBeVisible();
-    await expect(composer).toHaveValue(cleared ? '' : 'A newer draft');
+    await expect(composer).toHaveText(cleared ? '' : 'A newer draft');
     await expect(page.locator('.message.user')).toHaveCount(1);
     await expect(page.locator('.message.user')).toContainText('Rejected question');
   });
@@ -346,13 +349,17 @@ test('fatal OOM stays visible through polling, preserves partial text and suppor
   await page.goto('/');
   await loadModel(page);
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this response');
+  await page.evaluate(() => localStorage.setItem('straggler-fixture-response-paused', 'true'));
   await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByRole('button', { name: 'Stop response' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this draft too');
+  await page.evaluate(() => localStorage.removeItem('straggler-fixture-response-paused'));
   const failure = page.locator('.workspace-feedback .feedback');
   await expect(failure).toContainText('Not enough memory');
   await expect(page.locator('.local-badge')).toHaveText('Needs restart');
   await expect(page.getByRole('button', { name: 'Copy response' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Copy message' })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this draft too');
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).not.toBeEditable();
   await expect(page.getByRole('button', { name: 'Send message' })).toBeDisabled();
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await page.evaluate(() => {
@@ -371,7 +378,7 @@ test('fatal OOM stays visible through polling, preserves partial text and suppor
       );
     }),
   ).toBe(true);
-  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveText(
     'Keep this draft too',
   );
   await failure.getByRole('button', { name: 'Stop server', exact: true }).click();
@@ -390,7 +397,7 @@ test('fatal OOM stays visible through polling, preserves partial text and suppor
   await page.getByRole('button', { name: 'Launch server', exact: true }).last().click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await expect(failure).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveText(
     'Keep this draft too',
   );
   await page.getByRole('button', { name: 'Send message' }).click();
