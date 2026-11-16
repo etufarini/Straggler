@@ -283,6 +283,7 @@ export function serializeMarkdown(document: JSONContent, escape = true): string 
       .join('');
   }
   return blocks(document.content ?? [])
+    .replace(/\u200b/g, '')
     .replace(/[ \t]+$/gm, '')
     .replace(/^\n+|\n+$/g, '');
 }

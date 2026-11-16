@@ -51,6 +51,10 @@ describe('composer Markdown contract', () => {
     expect(parseMarkdown('-').content?.[0].content?.[0].content).toEqual([{ type: 'paragraph' }]);
     expect(serializeMarkdown(parseMarkdown('-'))).toBe('-');
   });
+  it('does not send zero-width spacer artifacts, including inside code', () => {
+    expect(serializeMarkdown(plainDocument('a\u200bb'))).toBe('ab');
+    expect(serializeMarkdown(parseMarkdown('`a\u200bb`'))).toBe('`ab`');
+  });
   it('preserves unsupported Markdown as literal text', () => {
     expect(serializeMarkdown(parseMarkdown('# Heading\n\n<script>alert(1)</script>'))).toBe(
       '\\# Heading\n\\<script>alert(1)\\</script>',
