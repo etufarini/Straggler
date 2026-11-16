@@ -65,10 +65,9 @@ async function inspectControls(page: Page) {
   await expect(controls).toHaveCount(5);
   for (const control of await controls.all()) {
     await expect(control).toHaveAccessibleName(/\S/);
-    const box = (await control.boundingBox())!;
-    expect(box.width).toBeGreaterThanOrEqual(24);
-    expect(box.height).toBeGreaterThanOrEqual(24);
   }
+  // Read geometry in one browser snapshot so the resize sweep does not spend
+  // its timeout on a separate protocol round trip for every measurement.
   await expect
     .poll(() =>
       page.locator('.composer').evaluate((form) => {
@@ -94,10 +93,13 @@ async function inspectControls(page: Page) {
                 Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top),
             ),
         );
-        return { outside, overlaps };
+        const tooSmall = boxes
+          .filter((box) => box.width < 24 || box.height < 24)
+          .map((box) => ({ width: box.width, height: box.height }));
+        return { count: boxes.length, tooSmall, outside, overlaps };
       }),
     )
-    .toEqual({ outside: false, overlaps: false });
+    .toEqual({ count: 5, tooSmall: [], outside: false, overlaps: false });
   const send = page.getByRole('button', { name: 'Send message', exact: true });
   await expect(send).toBeEnabled();
   await expect(send).toBeInViewport();
@@ -164,6 +166,37 @@ for (const width of [760, 820, 960, 1024, 1100, 1280, 1440]) {
   }
 }
 
+async function resizeComposer(page: Page, width: number) {
+  const composer = page.locator('.composer');
+  await composer.evaluate((form, width) => {
+    form.style.width = `${width}px`;
+  }, width);
+  await expect
+    .poll(() => composer.evaluate((form) => Math.round(form.getBoundingClientRect().width)))
+    .toBe(width);
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+}
+
+// Keep every width in the sweep, with bounded cases under the default timeout.
+// Density transitions and hysteresis are checked independently below.
+for (const [maximum, minimum] of [
+  [770, 620],
+  [610, 460],
+  [450, 300],
+  [290, 160],
+]) {
+  test(`composer controls remain accessible from ${maximum}px to ${minimum}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 820 });
+    await prepare(page, 'on', true);
+    for (let width = maximum; width >= minimum; width -= 10) {
+      await resizeComposer(page, width);
+      await inspectControls(page);
+    }
+  });
+}
+
 test('all four densities follow measured space with hysteresis and accessible active icons', async ({
   page,
 }) => {
@@ -173,17 +206,10 @@ test('all four densities follow measured space with hysteresis and accessible ac
   const seen = new Set<string>();
   let transitionWidth = 0;
   for (let width = 770; width >= 160; width -= 10) {
-    await composer.evaluate((form, width) => {
-      form.style.width = `${width}px`;
-    }, width);
-    await expect
-      .poll(() => composer.evaluate((form) => Math.round(form.getBoundingClientRect().width)))
-      .toBe(width);
-    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await resizeComposer(page, width);
     const density = (await composer.getAttribute('data-density'))!;
     if (density === 'compact' && !seen.has(density)) transitionWidth = width;
     seen.add(density);
-    await inspectControls(page);
   }
   expect([...seen]).toEqual(['full', 'compact', 'icon', 'wrap']);
   for (const name of ['Reasoning', 'Web search']) {
