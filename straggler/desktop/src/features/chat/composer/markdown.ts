@@ -136,7 +136,7 @@ function escapeText(text: string, before = '', after = ''): string {
 
 function escapeLineStart(line: string): string {
   return line
-    .replace(/^(\s*)([#>+\-])(?=\s|$)/, '$1\\$2')
+    .replace(/^(\s*)([#>+-])(?=\s|$)/, '$1\\$2')
     .replace(/^(\s*)(\d+)([.)])(?=\s|$)/, '$1$2\\$3');
 }
 
