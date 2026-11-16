@@ -128,6 +128,43 @@ async fn choose_models_folder(
 }
 
 #[tauri::command]
+async fn choose_model_file(
+    kind: straggler_desktop::configuration::model_files::ModelFileKind,
+    app: tauri::AppHandle,
+    state: State<'_, Application>,
+) -> Result<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let runtime = runtime(&state)?;
+    #[cfg(target_os = "linux")]
+    if straggler_desktop::platform::models_picker::requires_portal() {
+        let selected =
+            straggler_desktop::platform::models_picker::choose_file(kind.title()).await?;
+        return tauri::async_runtime::spawn_blocking(move || {
+            selected
+                .map(|path| runtime.select_model_file(kind, &path))
+                .transpose()
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_title(kind.title())
+            .add_filter("Model file", &[kind.extension()])
+            .add_filter("All files", &["*"])
+            .blocking_pick_file()
+            .map(|selected| {
+                let path = selected.into_path().map_err(|error| error.to_string())?;
+                runtime.select_model_file(kind, &path)
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn create_models_folder(
     app: tauri::AppHandle,
     state: State<'_, Application>,
@@ -736,6 +773,7 @@ fn main() {
             apply_settings,
             workspace_action,
             choose_models_folder,
+            choose_model_file,
             create_models_folder,
             models_folder_info,
             web_search_status,

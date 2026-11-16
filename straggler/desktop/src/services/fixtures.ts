@@ -160,7 +160,15 @@ export function createFixture(scenario: Scenario) {
         'min-p': ['1', '1', '0', '0.05', '1', '0', '0'],
       },
       models: [
-        ...(initialModel ? [{ path: initialModel, label: fileName(initialModel) }] : []),
+        ...(initialModel
+          ? [
+              {
+                path: initialModel,
+                label: fileName(initialModel),
+                template: localStorage.getItem('straggler-fixture-template-candidate'),
+              },
+            ]
+          : []),
         ...downloadedModels,
       ],
       devices,
@@ -173,6 +181,11 @@ export function createFixture(scenario: Scenario) {
         cacheTypesV: ['q4_0', 'f16'],
         splitModes: ['layer', 'row'],
         multipleDevices: devices.length > 1,
+        chatTemplateFile: !localStorage.getItem('straggler-fixture-unsupported-model-options'),
+        mtp: !localStorage.getItem('straggler-fixture-unsupported-model-options'),
+        mtpFile: !localStorage.getItem('straggler-fixture-unsupported-model-options'),
+        templateOverride: localStorage.getItem('straggler-fixture-template-override') || '',
+        mtpOverride: localStorage.getItem('straggler-fixture-mtp-override') || '',
         buildNote: 'Available features are advertised by the selected llama-server.',
       },
       build:
@@ -249,6 +262,15 @@ export function createFixture(scenario: Scenario) {
         return result === 'verified'
           ? { status: 'verified', date: '2026-10-04', tag: 'b42' }
           : { status: result };
+      }
+      case 'choose_model_file': {
+        const choice = localStorage.getItem(`straggler-fixture-${args.kind}-choice`);
+        if (choice === 'cancel') return null;
+        if (choice === 'error') throw new Error('Cannot read the selected model file.');
+        return (
+          choice ||
+          (args.kind === 'template' ? '/fixture/models/custom.jinja' : '/fixture/models/mtp.gguf')
+        );
       }
       case 'choose_models_folder': {
         const selected = localStorage.getItem('straggler-fixture-models-folder-choice');

@@ -1,3 +1,4 @@
+import { verifyNativeModelOptions } from './native-model-options.mjs';
 import { measureNativeOrb } from './native-orb-performance.mjs';
 import { installOrbMeasurement } from './orb-performance.mjs';
 // Real Tauri/WebKit window, native services and a test server; no model inference.
@@ -112,6 +113,8 @@ try {
   );
   await chmod(path.join(llama, 'build/bin/llama-server'), 0o755);
   await writeFile(path.join(models, 'test-model.gguf'), '');
+  await writeFile(path.join(models, 'chat_template.jinja'), '{{ messages[0].content }}');
+  await writeFile(path.join(stage, 'mtp.gguf'), 'GGUFfake MTP component');
   const port = await freePort(),
     automationPort = await freePort();
   const environment = Object.fromEntries(
@@ -141,6 +144,7 @@ try {
     STRAGGLER_MODELS_DIR: models,
     STRAGGLER_PORT: String(port),
     TEST_REQUEST: path.join(stage, 'request.json'),
+    TEST_LAUNCH: path.join(stage, 'launch.json'),
     STRAGGLER_TEST_HF_ENDPOINT: hubEndpoint.trim(),
     TAURI_WEBDRIVER_PORT: String(automationPort),
   });
@@ -336,6 +340,7 @@ try {
       evaluate(
         `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)})`,
       );
+    await verifyNativeModelOptions({ invoke: invokeNative, stage });
     // Exercise the real window and IPC with a memory keychain and injected search provider.
     assert.equal((await invokeNative('web_search_status', { refresh: false })).saved, false);
     await evaluate('document.querySelector(".sidebar-bottom .nav-item").click()');

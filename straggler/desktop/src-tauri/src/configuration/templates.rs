@@ -1,53 +1,61 @@
-use super::{capabilities::supports, environment::Environment};
+use super::{capabilities::supports, environment::Environment, model_files};
 use crate::Result;
 use std::{
-    fs,
-    io::ErrorKind,
+    io::Read,
     path::{Path, PathBuf},
 };
 
-pub fn launch_file(model: &Path, help: &str, environment: &Environment) -> Result<Option<PathBuf>> {
-    // Native overrides retain precedence, including explicitly empty values.
-    if environment.value("LLAMA_ARG_CHAT_TEMPLATE").is_some()
-        || environment.value("LLAMA_ARG_CHAT_TEMPLATE_FILE").is_some()
-    {
-        return Ok(None);
+const MAX_TEMPLATE_BYTES: u64 = 2 * 1024 * 1024;
+
+pub fn native_override(environment: &Environment) -> String {
+    ["LLAMA_ARG_CHAT_TEMPLATE", "LLAMA_ARG_CHAT_TEMPLATE_FILE"]
+        .into_iter()
+        .filter(|name| environment.value(name).is_some())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub fn candidate(model: &Path) -> Option<String> {
+    let path = model.parent()?.join("chat_template.jinja");
+    if !path.is_file() {
+        return None;
     }
-    let Some(directory) = model.parent() else {
-        return Ok(None);
-    };
-    let path = directory.join("chat_template.jinja");
-    match path.symlink_metadata() {
-        Ok(_) => {}
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(error) => {
-            return Err(format!(
-                "Cannot inspect chat template {}: {error}",
-                path.display()
-            ))
-        }
-    }
-    let metadata = path
-        .metadata()
+    path.to_str().map(str::to_owned)
+}
+
+pub fn validate(path: &Path) -> Result<()> {
+    let file = model_files::readable(path, "Chat template")?;
+    let mut content = String::new();
+    file.take(MAX_TEMPLATE_BYTES + 1)
+        .read_to_string(&mut content)
         .map_err(|error| format!("Cannot read chat template {}: {error}", path.display()))?;
-    if !metadata.is_file() {
-        return Err(format!(
-            "Chat template must be a readable UTF-8 file: {}",
-            path.display()
-        ));
+    if content.len() as u64 > MAX_TEMPLATE_BYTES {
+        return Err("Chat template exceeds the 2 MiB limit.".into());
     }
-    let content = fs::read_to_string(&path)
-        .map_err(|error| format!("Cannot read chat template {}: {error}", path.display()))?;
     if content.trim().is_empty() || content.contains('\0') {
         return Err(format!(
-            "Chat template must contain nonempty text without NUL characters: {}",
+            "Chat template must contain nonempty UTF-8 text without NUL characters: {}",
             path.display()
         ));
     }
+    Ok(())
+}
+
+pub fn launch_file(
+    selected: &str,
+    help: &str,
+    environment: &Environment,
+) -> Result<Option<PathBuf>> {
+    // Native overrides retain precedence, including explicitly empty values.
+    if selected.is_empty() || !native_override(environment).is_empty() {
+        return Ok(None);
+    }
+    let path = Path::new(selected);
+    validate(path)?;
     for flag in ["--jinja", "--chat-template-file"] {
         if !supports(help, flag) {
-            return Err(format!("This llama-server does not advertise {flag}, required for {}. Select a supported build or remove the separate template to use the GGUF template.", path.display()));
+            return Err(format!("This llama-server does not advertise {flag}, required for {}. Select a supported build or choose the default chat template.", path.display()));
         }
     }
-    Ok(Some(path))
+    Ok(Some(path.to_owned()))
 }

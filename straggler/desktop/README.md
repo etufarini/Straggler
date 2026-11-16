@@ -165,11 +165,17 @@ provide an idle slot with an arbitrary ID, and implement slot erase. Review the
 pinned server context/slot code when changing privacy flags: `cache_prompt: false`
 alone does not disable global RAM cache. Tests need no model or real inference.
 
-Separate-template fixtures also advertise `--jinja` and `--chat-template-file`
-with the pinned server's argument contract. Tests verify selection of the exact
-`chat_template.jinja` filename, native override precedence, file errors and the
-supervised child's arguments. They do not parse Jinja or perform inference;
-llama.cpp owns template rendering and capability discovery.
+Model-option fixtures advertise `--jinja`, `--chat-template-file`,
+`--spec-type [none|draft-mtp]` and `--spec-draft-model FNAME`. The contracts are
+pinned to [`common/arg.cpp`](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/common/arg.cpp)
+and [`docs/speculative.md`](https://github.com/ggml-org/llama.cpp/blob/3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8/docs/speculative.md).
+Tests verify explicit template selection, sidecar suggestions without automatic
+loading, native override precedence (including empty values), MTP modes, file
+errors, profile compatibility and supervised-child arguments. Browser fixtures
+return the same nullable path as the native picker: cancel changes no settings.
+Native window checks exercise applied options against local files and the fake
+server. Tests do not render Jinja or infer model compatibility; those remain
+llama.cpp responsibilities. No weights, GPU or inference service are needed.
 
 `src-tauri/src/huggingface/tests.rs` and `tests/fixtures/huggingface.py` serve Hub-shaped
 search, immutable repository/tree metadata with LFS SHA-256, Range responses and

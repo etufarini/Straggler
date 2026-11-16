@@ -1,7 +1,7 @@
 use super::{
     capabilities,
     environment::Environment,
-    models, settings,
+    models, settings, speculation,
     storage::{executable, readable_model, server_path, Paths, Store},
     templates, version,
 };
@@ -238,7 +238,20 @@ impl NativeConfiguration {
             memory: json!({"availableRamMiB": platform::available_memory(), "devices": capabilities::device_memory(&discovery.devices)}),
             build,
             profiles: self.store.profiles()?,
-            capabilities: capabilities::summary(&discovery.help, &discovery.devices),
+            capabilities: {
+                let mut capabilities = capabilities::summary(&discovery.help, &discovery.devices);
+                capabilities["chatTemplateFile"] = json!(
+                    capabilities::supports(&discovery.help, "--jinja")
+                        && capabilities::supports(&discovery.help, "--chat-template-file")
+                );
+                capabilities["mtp"] = json!(speculation::supported(&discovery.help));
+                capabilities["mtpFile"] = json!(speculation::file_flag(&discovery.help).is_some());
+                capabilities["templateOverride"] =
+                    json!(templates::native_override(&self.store.environment));
+                capabilities["mtpOverride"] =
+                    json!(speculation::native_override(&self.store.environment));
+                capabilities
+            },
             presets: settings::presets(),
             current_profile: None,
             modified: false,
@@ -281,7 +294,7 @@ impl NativeConfiguration {
             &self.store.environment,
         )?;
         if let Some(template) = templates::launch_file(
-            Path::new(&settings.model),
+            &settings.chat_template_file,
             &discovery.help,
             &self.store.environment,
         )? {
@@ -292,7 +305,10 @@ impl NativeConfiguration {
                 )
             })?;
             if !self.model_access.permits(&resolved) {
-                return Err("Choose the chat template's folder in Settings to grant access before launching.".into());
+                return Err(
+                    "Choose the chat template again in Settings to grant access before launching."
+                        .into(),
+                );
             }
             args.extend([
                 "--chat-template-file".into(),
@@ -302,6 +318,22 @@ impl NativeConfiguration {
                     .into(),
             ]);
         }
+        let mtp_arguments =
+            speculation::arguments(settings, &discovery.help, &self.store.environment)?;
+        if settings.mtp == "file"
+            && speculation::native_override(&self.store.environment).is_empty()
+        {
+            let path = Path::new(&settings.mtp_file)
+                .canonicalize()
+                .map_err(|error| format!("Cannot resolve MTP file: {error}"))?;
+            if !self.model_access.permits(&path) {
+                return Err(
+                    "Choose the MTP file again in Settings to grant access before launching."
+                        .into(),
+                );
+            }
+        }
+        args.extend(mtp_arguments);
         let inspected = platform::inspect_port(
             settings
                 .port

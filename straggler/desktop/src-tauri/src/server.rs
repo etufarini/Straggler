@@ -15,7 +15,7 @@ impl Runtime {
         let config = self.inspect()?;
         let paths = configuration_paths(&config);
         let mut settings = config.settings;
-        settings.model = model.clone();
+        settings.select_model(model.clone());
         let settings = settings.validated()?;
         let (executable, mut arguments) = self.native.launch(&paths, &settings)?;
         let temporary = self.temporary.lock().map_err(|e| e.to_string())?.is_some();

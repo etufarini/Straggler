@@ -29,11 +29,11 @@ impl Scope {
                 &mut stale,
             )
         }
-        .map_err(|error| format!("Cannot restore model-folder permission: {error}"))?;
+        .map_err(|error| format!("Cannot restore model file or folder permission: {error}"))?;
         // Every successful start is paired with stop by this guard's Drop.
         if !unsafe { url.startAccessingSecurityScopedResource() } {
             return Err(
-                "Model-folder permission has expired. Choose the folder again in Settings.".into(),
+                "Model file or folder permission has expired. Choose it again in Settings.".into(),
             );
         }
         Ok((Self(url), stale.as_bool()))
@@ -46,7 +46,7 @@ impl Scope {
             None,
         )
         .map(|data| data.to_vec())
-        .map_err(|error| format!("Cannot keep model-folder permission: {error}"))
+        .map_err(|error| format!("Cannot keep model file or folder permission: {error}"))
     }
 }
 
@@ -79,7 +79,7 @@ impl ModelAccess {
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
                 Err(error) => {
                     return Err(format!(
-                        "Cannot read saved model-folder permissions: {error}"
+                        "Cannot read saved model file or folder permissions: {error}"
                     ))
                 }
             };
@@ -89,10 +89,11 @@ impl ModelAccess {
                 .read_to_end(&mut bytes)
                 .map_err(|error| error.to_string())?;
             if bytes.len() as u64 > MAX_BOOKMARK_BYTES {
-                return Err("Saved model-folder permissions exceed the size limit.".into());
+                return Err("Saved model file or folder permissions exceed the size limit.".into());
             }
-            grants.bookmarks = serde_json::from_slice(&bytes)
-                .map_err(|error| format!("Cannot read saved model-folder permissions: {error}"))?;
+            grants.bookmarks = serde_json::from_slice(&bytes).map_err(|error| {
+                format!("Cannot read saved model file or folder permissions: {error}")
+            })?;
             let mut refreshed = false;
             for (folder, bytes) in &mut grants.bookmarks {
                 match Scope::resolve(bytes) {
@@ -119,9 +120,9 @@ impl ModelAccess {
             Ok(())
         })();
         if let Err(error) = result {
-            grants
-                .warning
-                .push_str(&format!("{error} Choose your models folder again.\n"));
+            grants.warning.push_str(&format!(
+                "{error} Choose the affected files or folders again.\n"
+            ));
         }
         Self {
             path,
@@ -133,7 +134,7 @@ impl ModelAccess {
     fn persist(path: &Path, bookmarks: &BTreeMap<String, Vec<u8>>) -> Result<()> {
         let bytes = serde_json::to_vec(bookmarks).map_err(|error| error.to_string())?;
         if bytes.len() as u64 > MAX_BOOKMARK_BYTES {
-            return Err("Too many saved model-folder permissions.".into());
+            return Err("Too many saved model file or folder permissions.".into());
         }
         fs::create_dir_all(
             path.parent()
@@ -144,19 +145,33 @@ impl ModelAccess {
     }
 
     pub fn remember(&self, path: &Path) -> Result<()> {
-        let folder = path
+        self.remember_resource(path, true)
+    }
+
+    pub fn remember_file(&self, path: &Path) -> Result<()> {
+        self.remember_resource(path, false)
+    }
+
+    fn remember_resource(&self, path: &Path, directory: bool) -> Result<()> {
+        let resource = path
             .to_str()
-            .ok_or("Choose a folder with a valid UTF-8 path.")?;
-        let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(folder), true);
+            .ok_or("Choose a file or folder with a valid UTF-8 path.")?;
+        let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(resource), directory);
         let bookmark = Scope::bookmark(&url)?;
         let (scope, _) = Scope::resolve(&bookmark)?;
-        fs::read_dir(path).map_err(|error| format!("Cannot read the selected folder: {error}"))?;
+        if directory {
+            fs::read_dir(path)
+                .map_err(|error| format!("Cannot read the selected folder: {error}"))?;
+        } else {
+            fs::File::open(path)
+                .map_err(|error| format!("Cannot read the selected file: {error}"))?;
+        }
         let mut grants = self.grants.lock().map_err(|error| error.to_string())?;
         let mut next = grants.bookmarks.clone();
-        next.insert(folder.into(), bookmark);
+        next.insert(resource.into(), bookmark);
         Self::persist(&self.path, &next)?;
         grants.bookmarks = next;
-        grants.active.insert(folder.into(), scope);
+        grants.active.insert(resource.into(), scope);
         grants.warning.clear();
         Ok(())
     }
@@ -183,6 +198,8 @@ impl ModelAccess {
         self.grants
             .lock()
             .map(|grants| grants.warning.clone())
-            .unwrap_or_else(|error| format!("Cannot inspect model-folder permissions: {error}"))
+            .unwrap_or_else(|error| {
+                format!("Cannot inspect model file or folder permissions: {error}")
+            })
     }
 }

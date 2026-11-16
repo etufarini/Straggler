@@ -14,6 +14,9 @@ pub struct Settings {
     pub chat_reasoning: String,
     pub chat_reasoning_effort: String,
     pub model: String,
+    pub chat_template_file: String,
+    pub mtp: String,
+    pub mtp_file: String,
     pub context: String,
     pub port: String,
     pub device: String,
@@ -37,6 +40,15 @@ pub struct Settings {
 }
 
 impl Settings {
+    pub fn select_model(&mut self, model: String) {
+        if self.model != model {
+            self.chat_template_file.clear();
+            self.mtp = "off".into();
+            self.mtp_file.clear();
+            self.model = model;
+        }
+    }
+
     pub fn same_server_configuration(&self, other: &Self) -> bool {
         let mut candidate = self.clone();
         candidate.chat_system_prompt = other.chat_system_prompt.clone();
@@ -80,6 +92,7 @@ impl From<String> for ConfigurationError {
 pub struct Model {
     pub path: String,
     pub label: String,
+    pub template: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Device {
@@ -134,6 +147,21 @@ pub(crate) struct Workspace {
 }
 
 impl Runtime {
+    pub fn select_model_file(
+        &self,
+        kind: crate::configuration::model_files::ModelFileKind,
+        path: &std::path::Path,
+    ) -> Result<String> {
+        let path = path
+            .canonicalize()
+            .map_err(|error| format!("Cannot resolve selected file: {error}"))?;
+        self.native.model_access.remember_file(&path)?;
+        kind.validate(&path)?;
+        path.to_str()
+            .map(str::to_owned)
+            .ok_or("The selected file path must be valid UTF-8.".into())
+    }
+
     pub fn allow_default_models_folder(&self, directory: &std::path::Path) -> Result<()> {
         self.native.model_access.allow_internal(directory)
     }
@@ -334,10 +362,12 @@ impl Runtime {
                         }
                         let models = crate::configuration::models::discover(&directory)?;
                         if !models.iter().any(|model| model.path == settings.model) {
-                            settings.model = models
-                                .first()
-                                .map(|model| model.path.clone())
-                                .unwrap_or_default();
+                            settings.select_model(
+                                models
+                                    .first()
+                                    .map(|model| model.path.clone())
+                                    .unwrap_or_default(),
+                            );
                         }
                         paths.models = value;
                     }

@@ -144,30 +144,91 @@ fn request(id: Uuid, content: &str) -> ChatRequest {
     }
 }
 
+#[test]
+fn model_file_picker_validates_files_without_applying_settings() {
+    use straggler_desktop::configuration::model_files::ModelFileKind;
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    let original = runtime.inspect().unwrap().settings;
+    let template = fixture._directory.path().join("custom.jinja");
+    fs::write(&template, "{{ messages }}").unwrap();
+    let selected = runtime
+        .select_model_file(ModelFileKind::Template, &template)
+        .unwrap();
+    assert_eq!(selected, template.canonicalize().unwrap().to_str().unwrap());
+    assert!(runtime
+        .select_model_file(ModelFileKind::Mtp, &template)
+        .is_err());
+    assert_eq!(runtime.inspect().unwrap().settings, original);
+}
+
 #[tokio::test]
-async fn supervised_launch_reads_the_separate_template_selection_on_each_start() {
+async fn supervised_launch_uses_saved_template_and_mtp_choices() {
     let fixture = Fixture::new();
     let runtime = fixture.runtime();
     let template = PathBuf::from(&fixture.model).with_file_name("chat_template.jinja");
-    for separate in [false, true, false] {
-        if separate {
-            fs::write(&template, "{{ messages[0].content }}").unwrap();
-        } else if template.exists() {
-            fs::remove_file(&template).unwrap();
+    let mtp = fixture._directory.path().join("external-mtp.gguf");
+    fs::write(&template, "{{ messages[0].content }}").unwrap();
+    fs::write(&mtp, b"GGUFfake MTP fixture").unwrap();
+    let defaults = runtime.inspect().unwrap().settings;
+    for mode in ["off", "model", "file"] {
+        let mut settings = defaults.clone();
+        settings.mtp = mode.into();
+        if mode == "file" {
+            settings.chat_template_file = template.to_str().unwrap().into();
+            settings.mtp_file = mtp.to_str().unwrap().into();
         }
+        runtime.configure(settings.clone()).unwrap();
+        runtime
+            .workspace_action(
+                "save-profile",
+                vec!["model-options".into(), "replace".into()],
+                vec![],
+            )
+            .unwrap();
+        runtime.configure(defaults.clone()).unwrap();
+        let loaded = runtime
+            .workspace_action("load-profile", vec!["model-options".into()], vec![])
+            .unwrap();
+        assert_eq!(loaded["settings"], serde_json::to_value(&settings).unwrap());
+        assert_eq!(runtime.status().await.unwrap().phase, "stopped");
         fixture.ready(&runtime).await;
         let launch: serde_json::Value = serde_json::from_slice(
             &fs::read(fixture._directory.path().join("launch.json")).unwrap(),
         )
         .unwrap();
         assert_eq!(launch["jinja"], true);
-        if separate {
+        assert_eq!(
+            launch["spec_type"],
+            if mode == "off" { "none" } else { "draft-mtp" }
+        );
+        if mode == "file" {
             assert_eq!(launch["chat_template_file"], template.to_str().unwrap());
+            assert_eq!(launch["spec_draft_model"], mtp.to_str().unwrap());
         } else {
             assert!(launch["chat_template_file"].is_null());
+            assert!(launch["spec_draft_model"].is_null());
         }
+        let mut changed = settings.clone();
+        changed.chat_template_file = if mode == "file" {
+            "".into()
+        } else {
+            template.to_str().unwrap().into()
+        };
+        let modified = runtime.configure(changed).unwrap();
+        assert!(modified.modified);
+        assert!(modified.restart_required);
         runtime.stop().unwrap();
     }
+    // A selected file disappearing is an error; the embedded template is never substituted.
+    let mut missing = defaults;
+    missing.chat_template_file = template.to_str().unwrap().into();
+    runtime.configure(missing).unwrap();
+    fs::remove_file(&template).unwrap();
+    assert!(runtime
+        .start(fixture.model.clone())
+        .unwrap_err()
+        .contains("chat_template.jinja"));
 }
 
 fn stored_files(root: &std::path::Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { invoke, isTauri } from '../../services/desktop';
 import {
   equalSettings,
+  settingsForModel,
   sameServerConfiguration,
   samplingPreset,
   serverActive,
@@ -62,7 +63,24 @@ export function useSettings({
   const restart =
     !!server.runningSettings && !sameServerConfiguration(draft, server.runningSettings);
   const preset = samplingPreset(draft, config.presets);
-  const change = (key: keyof Values, value: string) => setDraft({ ...draft, [key]: value });
+  const change = (key: keyof Values, value: string) => {
+    setDraft(key === 'model' ? settingsForModel(draft, value) : { ...draft, [key]: value });
+    if (key === 'model' && draft.model !== value) {
+      setMessage('Chat template and MTP reset for the selected model.');
+    }
+  };
+
+  async function chooseModelFile(kind: 'template' | 'mtp') {
+    await run(async () => {
+      const path = await invoke<string | null>('choose_model_file', { kind });
+      if (path === null) return;
+      setDraft(
+        kind === 'template'
+          ? { ...draft, chat_template_file: path }
+          : { ...draft, mtp: 'file', mtp_file: path },
+      );
+    });
+  }
   const fieldError = (key: keyof Values) =>
     failure?.field === key && failure.value === draft[key] ? failure.message : undefined;
 
@@ -99,7 +117,7 @@ export function useSettings({
       const value = await invoke<Configuration | null>('choose_models_folder');
       if (value) {
         accept(value);
-        setDraft({ ...draft, model: value.settings.model });
+        setDraft(settingsForModel(draft, value.settings.model));
       }
     });
   }
@@ -151,6 +169,7 @@ export function useSettings({
   }
 
   return {
+    chooseModelFile,
     serverDetails,
     config,
     draft,
