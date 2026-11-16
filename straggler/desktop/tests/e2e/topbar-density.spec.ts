@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { tabToNextControl } from './keyboard';
 
 const longModel =
   'example-with-a-long-model-name-and-context-configuration-for-layout-validation.gguf';
@@ -133,6 +134,7 @@ for (const viewport of viewports) {
 
 test('compact Temporary keeps its accessible state, tooltip and keyboard focus', async ({
   page,
+  browserName,
 }) => {
   await page.setViewportSize({ width: 760, height: 620 });
   await prepare(page, 'example.gguf', false);
@@ -144,7 +146,7 @@ test('compact Temporary keeps its accessible state, tooltip and keyboard focus',
   expect(bounds.width).toBeGreaterThanOrEqual(30);
   expect(bounds.height).toBeGreaterThanOrEqual(30);
   await page.getByRole('button', { name: /^Choose model · / }).focus();
-  await page.keyboard.press('Tab');
+  await tabToNextControl(page, browserName);
   await expect(temporary).toBeFocused();
   await expect(temporary).toHaveCSS('outline-style', 'solid');
   await expect(temporary).toHaveCSS('outline-width', '2px');
@@ -157,7 +159,7 @@ test('compact Temporary keeps its accessible state, tooltip and keyboard focus',
   await expect(temporary).toHaveCSS('background-color', 'rgba(124, 102, 245, 0.2)');
   expect(await temporary.evaluate((node) => getComputedStyle(node, '::after').content)).toBe('""');
   await page.getByRole('button', { name: /^Choose model · / }).focus();
-  await page.keyboard.press('Tab');
+  await tabToNextControl(page, browserName);
   await expect(temporary).toBeFocused();
   await expect(temporary).toHaveCSS('outline-width', '2px');
   await page.keyboard.press('Enter');
