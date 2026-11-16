@@ -6,6 +6,7 @@ import type { UiPreferences } from '../domain/types';
 export function useUiPreferences() {
   const [preferences, setPreferences] = useState<UiPreferences>({
     sidebarCollapsed: false,
+    formattingToolbarVisible: true,
     presenceExpanded: null,
   });
   const [preferenceError, setPreferenceError] = useState('');

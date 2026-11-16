@@ -5,6 +5,8 @@ use std::{fs, io::Write, path::PathBuf, sync::Mutex};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UiPreferences {
+    #[serde(default = "default_formatting_toolbar_visible")]
+    pub formatting_toolbar_visible: bool,
     #[serde(default)]
     pub sidebar_collapsed: bool,
     #[serde(default)]
@@ -18,12 +20,17 @@ pub struct UiPreferences {
     pub presence_expanded: Option<bool>,
 }
 
+fn default_formatting_toolbar_visible() -> bool {
+    true
+}
+
 fn default_search_limit() -> u8 {
     3
 }
 impl Default for UiPreferences {
     fn default() -> Self {
         Self {
+            formatting_toolbar_visible: true,
             sidebar_collapsed: false,
             presence_expanded: None,
             web_search_notice_seen: false,
@@ -87,6 +94,25 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn formatting_toolbar_defaults_visible_and_persists_hidden() {
+        let directory = tempfile::tempdir().unwrap();
+        let preferences = Preferences::new(directory.path().to_owned());
+        fs::write(&preferences.path, br#"{"sidebarCollapsed":true}"#).unwrap();
+        let mut loaded = preferences.read().unwrap();
+        assert!(loaded.formatting_toolbar_visible);
+        assert!(loaded.sidebar_collapsed);
+        loaded.formatting_toolbar_visible = false;
+        preferences.save(&loaded).unwrap();
+        assert_eq!(preferences.read().unwrap(), loaded);
+        fs::write(
+            &preferences.path,
+            br#"{"formattingToolbarVisible":"hidden"}"#,
+        )
+        .unwrap();
+        assert!(preferences.read().is_err());
+    }
 
     #[test]
     fn preferences_are_separate_and_invalid_data_is_preserved() {
