@@ -30,7 +30,7 @@ test('pending release lookups do not block settings navigation or server startup
   await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Context size', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Back to chat' }).click();
-  await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+  await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('button', { name: 'Load model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-release-paused'));

@@ -222,7 +222,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
   }
   if (screen === 'SERVER-01') await page.getByRole('button', { name: /Server log/ }).click();
   if (screen === 'DIALOG-02') await button('Stop server').click();
-  if (screen === 'MODEL-01') await button('Choose model').click();
+  if (screen === 'MODEL-01') await page.getByRole('button', { name: /^Choose model · / }).click();
   const sections = {
     'SET-01': 'Model settings',
     'SET-01B': 'Model settings',

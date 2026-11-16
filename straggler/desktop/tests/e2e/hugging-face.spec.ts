@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 import { selectValue } from './select';
 
 async function openHub(page: Page) {
-  await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+  await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('tab', { name: 'Hugging Face', exact: true }).click();
 }
 async function openRepository(page: Page, query = 'fixture-publisher/example-GGUF') {

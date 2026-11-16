@@ -17,8 +17,10 @@ import { useWorkspace } from './useWorkspace';
 import ProjectsPage from '../features/projects/ProjectsPage';
 import ProjectDetail from '../features/projects/ProjectDetail';
 import ProjectDialogs from '../features/projects/ProjectDialogs';
+import useTopbarDensity from './useTopbarDensity';
 export default function App() {
   const controller = useWorkspace();
+  const topbar = useTopbarDensity();
   const [pageHasPrimaryAction, setPageHasPrimaryAction] = useState(false);
   const {
     setPanel,
@@ -82,6 +84,7 @@ export default function App() {
     config?.savedSettings &&
     !equalSettings(draft, config.savedSettings)
   );
+  const modelName = displayModel ? fileName(displayModel) : 'Choose a local model';
   return (
     <div className="app-shell">
       <Sidebar controller={controller} />
@@ -92,18 +95,19 @@ export default function App() {
       <main
         className={`workspace${area === 'temporary' ? ' is-temporary' : ''} ${error || controller.preferenceError || storageError || server.issue || server.error || settingsFailure || lastResponse?.error ? 'has-feedback' : ''}`}
       >
-        <header className={`topbar${pageHasPrimaryAction ? ' has-page-primary' : ''}`}>
+        <header ref={topbar} className={`topbar${pageHasPrimaryAction ? ' has-page-primary' : ''}`}>
           <button
             className="model-switch"
-            aria-label="Choose model"
+            aria-label={`Choose model · ${modelName}`}
+            title={modelName}
             aria-expanded={panel === 'models'}
             onClick={() => setPanel('models')}
           >
             <span className="model-icon">
               <Cpu size={17} />
             </span>
-            <span>
-              {displayModel ? fileName(displayModel) : 'Choose a local model'}
+            <span className="model-label">
+              <span className="model-name">{modelName}</span>
               {panel !== 'settings' && (
                 <small>
                   {config?.currentProfile || 'Unsaved configuration'}
@@ -118,10 +122,16 @@ export default function App() {
               panel !== 'settings' &&
               (controller.temporary ? (
                 <>
-                  <span className="temp-status">
+                  <button
+                    className="temp-status"
+                    aria-label="Temporary"
+                    aria-pressed="true"
+                    aria-disabled="true"
+                    title="Temporary · not saved (Ctrl/⌘ + Shift + N)"
+                  >
                     <Eclipse aria-hidden="true" />
-                    Temporary · not saved
-                  </span>
+                    <span className="temporary-label">Temporary · not saved</span>
+                  </button>
                   <button
                     disabled={busy || controller.chatOptionsDisabled}
                     onClick={() => void controller.saveTemporary()}
@@ -141,7 +151,7 @@ export default function App() {
                   onClick={() => void controller.beginTemporary()}
                 >
                   <Eclipse aria-hidden="true" />
-                  Temporary
+                  <span className="temporary-label">Temporary</span>
                 </button>
               ) : null)}
             <button

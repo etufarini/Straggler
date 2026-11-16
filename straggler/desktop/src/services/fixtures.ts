@@ -12,7 +12,7 @@ import type {
   ServerDetails,
   Attachment,
 } from '../domain/types';
-import { emptyServer } from '../domain/types';
+import { emptyServer, fileName } from '../domain/types';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 import { createProjectFixture } from './projectFixtures';
 import { createHuggingFaceFixture } from './huggingFaceFixtures';
@@ -90,7 +90,10 @@ export const scenarios: Scenario[] = [
 
 export function createFixture(scenario: Scenario) {
   const webSearch = createWebSearchFixture(scenario);
-  let settings = { ...defaultSettings, model: scenario === 'empty' ? '' : defaultSettings.model };
+  const initialModel =
+    localStorage.getItem('straggler-fixture-model') ??
+    (scenario === 'empty' ? '' : defaultSettings.model);
+  let settings = { ...defaultSettings, model: initialModel };
   let status: ServerStatus = { ...emptyServer };
   let llamaDir = scenario === 'empty' ? '' : '/fixture/llama.cpp';
   const bundledAvailable = scenario !== 'empty';
@@ -157,7 +160,7 @@ export function createFixture(scenario: Scenario) {
         'min-p': ['1', '1', '0', '0.05', '1', '0', '0'],
       },
       models: [
-        ...(scenario === 'empty' ? [] : [{ path: defaultSettings.model, label: 'example.gguf' }]),
+        ...(initialModel ? [{ path: initialModel, label: fileName(initialModel) }] : []),
         ...downloadedModels,
       ],
       devices,

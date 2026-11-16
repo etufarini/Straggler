@@ -9,7 +9,7 @@ for (const width of [960, 1200, 1440]) {
     await page.setViewportSize({ width, height: width === 960 ? 720 : width === 1200 ? 820 : 900 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/?scenario=normal');
-    await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+    await page.getByRole('button', { name: /^Choose model · / }).click();
     await page.getByRole('button', { name: 'Load model', exact: true }).click();
     const expand = page.getByRole('button', { name: 'Expand assistant panel' });
     if (await expand.isVisible()) await expand.click();

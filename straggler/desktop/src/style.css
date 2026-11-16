@@ -175,6 +175,7 @@ input:disabled {
 .header-controls {
   display: flex;
   align-items: center;
+  white-space: nowrap;
   gap: 10px;
   flex-shrink: 0;
 }
@@ -748,16 +749,19 @@ code {
   min-width: 0;
   gap: 12px;
 }
-.model-switch > span:nth-child(2) {
+.model-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
 }
+.model-name,
 .model-switch small {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-switch small {
   color: var(--ui-subtle);
   font-weight: 400;
   font-size: 11px;
@@ -3479,7 +3483,7 @@ input:focus-visible {
   width: 15px;
   height: 15px;
 }
-.temp-status {
+.header-controls .temp-status[aria-pressed='true'] {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -3490,10 +3494,34 @@ input:focus-visible {
   border: 1px solid #a993ff73;
   color: var(--temp-text);
   white-space: nowrap;
+  cursor: default;
 }
 .temp-status svg {
   width: 14px;
   height: 14px;
+}
+.temp-status[aria-pressed='true']::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  width: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.temp-toggle,
+.temp-status {
+  position: relative;
+  min-width: 30px;
+  min-height: 30px;
+}
+.header-controls :is(.temp-toggle, .temp-status)[data-density='icon'] {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+:is(.temp-toggle, .temp-status)[data-density='icon'] .temporary-label {
+  display: none;
 }
 /* The sky empties: no stars, no cluster glow, a violet rim marks the whole workspace. */
 .workspace.is-temporary {
@@ -3514,14 +3542,6 @@ input:focus-visible {
     linear-gradient(#171d45, #171d45) padding-box,
     linear-gradient(115deg, #a993ffaa, #5fd6ff55 50%, #a993ffaa) border-box;
   box-shadow: 0 20px 60px -24px #7c66f5cc;
-}
-
-.topbar:has(.temp-toggle, .temp-status) {
-  flex-wrap: wrap;
-  height: auto;
-  min-height: 79px;
-  padding-top: 12px;
-  padding-bottom: 12px;
 }
 
 /* Hugging Face catalogue and download controls. */

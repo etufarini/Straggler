@@ -8,6 +8,8 @@ async function geometry(page: Page) {
       width: rect.width,
       height: rect.height,
       top: rect.top - panelTop,
+      windowTop: rect.top,
+      panelTop,
       captionTop:
         document.querySelector('.presence-caption')!.getBoundingClientRect().top - panelTop,
       pixels: canvas.width,

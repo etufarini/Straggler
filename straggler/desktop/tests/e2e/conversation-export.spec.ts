@@ -4,7 +4,7 @@ test('both exports open save directly, cancellation is silent and write errors u
   page,
 }) => {
   await page.goto('/?scenario=normal');
-  await page.getByRole('button', { name: 'Choose model', exact: true }).click();
+  await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('button', { name: 'Load model', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A chat to export');
   await page.getByRole('button', { name: 'Send message' }).click();
