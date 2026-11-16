@@ -1,3 +1,5 @@
+import RichComposer, { FormattingToggle, composerHint } from './composer/RichComposer';
+import type { ComposerContext } from './composer/commands';
 import WebSearchMenu from '../websearch/WebSearchMenu';
 import WebSearchActivity from '../websearch/WebSearchActivity';
 import Sources from '../websearch/Sources';
@@ -19,6 +21,10 @@ import { ProjectLimitFeedback } from '../projects/ProjectCapacity';
 import brandMark from '../../assets/brand-mark.svg';
 export default function ChatPanel({ controller }: { controller: WorkspaceController }) {
   const [copied, setCopied] = useState('');
+  const [composerMode, setComposerMode] = useState<ComposerContext>('text');
+  const toolbarVisible = controller.preferences.formattingToolbarVisible !== false;
+  const toggleFormatting = (visible: boolean) =>
+    controller.changePreferences({ formattingToolbarVisible: visible });
   const lastEditor = useRef<string | null>(null);
   useEffect(() => {
     const previous = lastEditor.current;
@@ -41,7 +47,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
     follow,
     chat,
     setInput,
-    textarea,
+    composerInput,
     active,
     setPanel,
     setError,
@@ -56,8 +62,8 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
     reviewSettings,
   } = controller;
   useEffect(() => {
-    if (generating) textarea.current?.focus();
-  }, [generating, textarea]);
+    if (generating) composerInput.current?.focus();
+  }, [generating, composerInput]);
   const project = controller.currentProject;
   const archived = !!project?.archived;
   return (
@@ -110,7 +116,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   key={label}
                   onClick={() => {
                     setInput(prompt);
-                    textarea.current?.focus();
+                    composerInput.current?.focus();
                   }}
                 >
                   <span>{label}</span>
@@ -171,17 +177,41 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                         }
                       }}
                     >
-                      <textarea
-                        autoFocus
-                        id={`edit-${message.id}`}
-                        aria-label={message.role === 'user' ? 'Edit message' : 'Edit response'}
-                        aria-describedby={`edit-note-${message.id}`}
-                        rows={message.role === 'user' ? 2 : 10}
-                        value={editor.text}
-                        disabled={editingBusy || generating}
-                        onChange={(event) => setEditor({ ...editor, text: event.target.value })}
-                      />
+                      {message.role === 'user' ? (
+                        <RichComposer
+                          key={message.id}
+                          id={`edit-${message.id}`}
+                          label="Edit message"
+                          describedBy={`edit-note-${message.id}`}
+                          value={editor.text}
+                          disabled={editingBusy || generating}
+                          editing
+                          toolbarVisible={toolbarVisible}
+                          onChange={(text) => setEditor({ ...editor, text })}
+                          onSubmit={() => {
+                            if (!editingBusy && !generating) void saveEdit().catch(() => {});
+                          }}
+                        />
+                      ) : (
+                        <textarea
+                          autoFocus
+                          id={`edit-${message.id}`}
+                          aria-label="Edit response"
+                          aria-describedby={`edit-note-${message.id}`}
+                          rows={10}
+                          value={editor.text}
+                          disabled={editingBusy || generating}
+                          onChange={(event) => setEditor({ ...editor, text: event.target.value })}
+                        />
+                      )}
                       <div className="message-editor-footer">
+                        {message.role === 'user' && (
+                          <FormattingToggle
+                            visible={toolbarVisible}
+                            onChange={toggleFormatting}
+                            disabled={!controller.preferencesReady}
+                          />
+                        )}
                         <p className="message-editor-note" id={`edit-note-${message.id}`}>
                           {message.role === 'user'
                             ? chat.messages.findIndex((value) => value.id === message.id) <
@@ -219,7 +249,9 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                     </div>
                   ) : (
                     <div className="markdown">
-                      <Markdown sources={message.sources}>{message.content}</Markdown>
+                      <Markdown user={message.role === 'user'} sources={message.sources}>
+                        {message.content}
+                      </Markdown>
                     </div>
                   )}
                   {!!message.sources?.length && <Sources sources={message.sources} />}
@@ -416,10 +448,11 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
             }
           }}
         >
-          <textarea
-            ref={textarea}
-            aria-label="Message"
-            data-control-id="textarea-message"
+          <RichComposer
+            key={chat.id}
+            focusRef={composerInput}
+            label="Message"
+            controlId="textarea-message"
             placeholder={
               server.phase === 'ready'
                 ? 'Message your local model…'
@@ -428,24 +461,25 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                   : 'Load a model to start chatting…'
             }
             value={input}
-            disabled={archived}
-            rows={3}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                if (canSend) event.currentTarget.form?.requestSubmit();
-              }
-            }}
+            disabled={archived || server.phase !== 'ready'}
+            toolbarVisible={toolbarVisible}
+            onChange={setInput}
+            onContextChange={setComposerMode}
+            onSubmit={() => composerRef.current?.requestSubmit()}
           />
           <div className="composer-footer">
             <div className="composer-tools" role="group" aria-label="Message options">
+              <FormattingToggle
+                visible={toolbarVisible}
+                onChange={toggleFormatting}
+                disabled={!controller.preferencesReady}
+              />
               <SystemPromptMenu controller={controller} />
               <ReasoningMenu controller={controller} />
               <WebSearchMenu controller={controller} />
             </div>
             <div className="composer-send">
-              <span className="keyboard-hint">Shift + Enter for a new line</span>
+              <span className="keyboard-hint">{composerHint(composerMode)}</span>
               <ContextCounter controller={controller} />
               {generating ? (
                 <button

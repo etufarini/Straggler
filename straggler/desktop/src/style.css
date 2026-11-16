@@ -2825,9 +2825,6 @@ input:focus-visible {
   position: relative;
   margin-bottom: 22px;
 }
-.project-start textarea {
-  min-height: 74px;
-}
 .project-start .send-button {
   width: auto;
   padding: 0 12px;
@@ -3862,4 +3859,129 @@ input:focus-visible {
 .model-file-selection code {
   display: block;
   margin-top: 0.4rem;
+}
+
+/* Message composition shares the rendered Markdown vocabulary and design tokens. */
+.rich-composer-field {
+  min-height: 93px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 18px 20px 6px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ui-text-1);
+  white-space: pre-wrap;
+}
+.has-toolbar .rich-composer-field {
+  min-height: 64px;
+  padding-top: 8px;
+}
+.rich-composer-field:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -3px;
+  border-radius: 8px;
+}
+.rich-composer-field[aria-disabled='true'] {
+  opacity: 0.65;
+}
+.rich-composer-field p {
+  margin: 0;
+  min-height: 1.7em;
+}
+.rich-composer-field .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ui-subtle);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.rich-composer-field :is(ul, ol, blockquote, pre) {
+  margin-block: 6px;
+}
+.rich-composer-field :is(ul, ol) {
+  padding-left: 24px;
+}
+.rich-composer-field pre {
+  padding: 8px 10px;
+}
+.rich-composer-field a,
+.user .markdown a {
+  color: var(--ui-accent-text);
+  text-decoration: underline;
+}
+.formatting-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 10px 0;
+}
+.format-tool {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.format-separator {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--ui-line);
+}
+.format-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text-3);
+}
+.format-button:hover:not(:disabled) {
+  background: var(--ui-raised);
+  color: var(--ui-text-1);
+}
+.format-button[aria-pressed='true'] {
+  background: var(--ui-selected);
+  color: var(--ui-accent-text);
+}
+.format-button:disabled {
+  opacity: 0.38;
+}
+.format-button:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+.formatting-toolbar.is-hidden {
+  height: 0;
+  padding: 0;
+  gap: 0;
+}
+.formatting-toolbar.is-hidden :is(.format-button, .format-separator) {
+  display: none;
+}
+.composer-chip.formatting-toggle {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+}
+.formatting-toggle[aria-pressed='true'] {
+  background: var(--ui-selected);
+  color: var(--ui-accent-text);
+}
+.composer-link-popover label {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+}
+.composer-link-popover input {
+  width: 100%;
+}
+.message-editor {
+  position: relative;
+  container-type: inline-size;
+}
+.message-editor .composer-link-popover {
+  bottom: auto;
+  top: 40px;
+  left: 10px;
 }

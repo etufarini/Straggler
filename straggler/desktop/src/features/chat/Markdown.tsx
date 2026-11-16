@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { memo, useMemo } from 'react';
 import { citationPlugin } from '../../domain/citations';
 import type { WebSource } from '../../domain/webSearch';
@@ -17,14 +18,22 @@ const components: Components = {
   img: ({ alt }) => <span className="image-placeholder">[Image: {alt || 'not loaded'}]</span>,
 };
 const plugins = [remarkGfm];
+const userPlugins = [remarkGfm, remarkBreaks];
+const userComponents: Components = {
+  ...components,
+  a: ({ children, href }) =>
+    href ? <WebLink url={href}>{children}</WebLink> : <span>{children}</span>,
+};
 const emptySources: WebSource[] = [];
 
 export default memo(function Markdown({
   children,
   sources = emptySources,
+  user = false,
 }: {
   children: string;
   sources?: WebSource[];
+  user?: boolean;
 }) {
   const sourcePlugins = useMemo(
     () => (sources.length ? [...plugins, citationPlugin(sources)] : plugins),
@@ -58,7 +67,10 @@ export default memo(function Markdown({
     [sources],
   );
   return (
-    <ReactMarkdown remarkPlugins={sourcePlugins} components={sourceComponents}>
+    <ReactMarkdown
+      remarkPlugins={user ? userPlugins : sourcePlugins}
+      components={user ? userComponents : sourceComponents}
+    >
       {children}
     </ReactMarkdown>
   );

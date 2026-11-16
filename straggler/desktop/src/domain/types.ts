@@ -225,6 +225,7 @@ export function requestMessages(messages: Message[]) {
 }
 
 export interface UiPreferences {
+  formattingToolbarVisible?: boolean;
   sidebarCollapsed: boolean;
   presenceExpanded: boolean | null;
   webSearchNoticeSeen?: boolean;

@@ -196,13 +196,25 @@ try {
   async function fillField(selector, text) {
     await evaluate(`(() => {
       const input = document.querySelector(${JSON.stringify(selector)});
+      if (input.isContentEditable) {
+        input.focus();
+        const range = document.createRange();
+        range.selectNodeContents(input);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const clipboardData = new DataTransfer();
+        clipboardData.setData('text/plain', ${JSON.stringify(text)});
+        input.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+        return;
+      }
       const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
       Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, ${JSON.stringify(text)});
       input.dispatchEvent(new Event('input', {bubbles:true}));
     })()`);
   }
   async function sendMessage(text) {
-    await fillField('textarea', text);
+    await fillField('.rich-composer-field', text);
     await until(
       () => evaluate('!document.querySelector(".send-button").disabled'),
       'enabled composer',
@@ -694,7 +706,9 @@ try {
       'archived native project detail',
     );
     assert.equal(
-      await evaluate(`document.querySelector('[data-control-id="textarea-start-chat"]').disabled`),
+      await evaluate(
+        `document.querySelector('[data-control-id="textarea-start-chat"]').getAttribute('aria-disabled') === 'true'`,
+      ),
       true,
     );
     assert.equal(
@@ -708,7 +722,12 @@ try {
       () => evaluate(`!!document.querySelector('[data-control-id="button-restore-from-chat"]')`),
       'archived native member chat',
     );
-    assert.equal(await evaluate('document.querySelector(".composer textarea").disabled'), true);
+    assert.equal(
+      await evaluate(
+        'document.querySelector(".composer .rich-composer-field").getAttribute("aria-disabled") === "true"',
+      ),
+      true,
+    );
     await clickControl('button-options-for-attachment-contract');
     for (const controlId of ['button-move-to-project', 'button-remove-from-project']) {
       assert.equal(
@@ -721,7 +740,10 @@ try {
     await clickControl('button-options-for-attachment-contract');
     await clickControl('button-restore-from-chat');
     await until(
-      () => evaluate('!document.querySelector(".composer textarea").disabled'),
+      () =>
+        evaluate(
+          'document.querySelector(".composer .rich-composer-field").getAttribute("aria-disabled") === "false"',
+        ),
       'restored native member chat',
     );
     await clickControl('button-crumb-project');
@@ -924,10 +946,15 @@ try {
         ),
       'active partial response',
     );
-    assert.equal(await evaluate('document.querySelector(".composer textarea").disabled'), false);
-    await fillField('.composer textarea', 'Next native question');
     assert.equal(
-      await evaluate('document.querySelector(".composer textarea").value'),
+      await evaluate(
+        'document.querySelector(".composer .rich-composer-field").getAttribute("aria-disabled") === "true"',
+      ),
+      false,
+    );
+    await fillField('.composer .rich-composer-field', 'Next native question');
+    assert.equal(
+      await evaluate('document.querySelector(".composer .rich-composer-field").textContent'),
       'Next native question',
     );
     if (process.env.STRAGGLER_MEASURE_ORB === '1') {
@@ -960,7 +987,7 @@ try {
       );
       assert.equal(app.exitCode, null);
       assert.equal(
-        await evaluate('document.querySelector(".composer textarea").value'),
+        await evaluate('document.querySelector(".composer .rich-composer-field").textContent'),
         'Next native question',
       );
       await evaluate(

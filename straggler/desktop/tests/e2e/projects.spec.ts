@@ -339,7 +339,7 @@ test('PROJ-03 and PROJ-05 include files across thresholds, block without truncat
   expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-request'))).toBeNull();
   await control(page, 'button-review-files').click();
   await expect(page.getByRole('heading', { name: 'Files', exact: true })).toBeFocused();
-  await expect(draft).toHaveValue('Keep this first message through recovery');
+  await expect(draft).toHaveText('Keep this first message through recovery');
   await control(page, 'button-change-context-size').click();
   await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Model settings', exact: true })).toHaveAttribute(
@@ -347,7 +347,7 @@ test('PROJ-03 and PROJ-05 include files across thresholds, block without truncat
     'page',
   );
   await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
-  await expect(draft).toHaveValue('Keep this first message through recovery');
+  await expect(draft).toHaveText('Keep this first message through recovery');
   await control(page, 'switch-include-extra-txt').click();
   await expect(control(page, 'button-start-chat')).toBeEnabled();
   await expect(control(page, 'switch-include-extra-txt')).toHaveAttribute('aria-checked', 'false');
@@ -720,7 +720,7 @@ test('Q1 permits unknown capacity, restores rejected drafts and retries without 
   await expect(control(page, 'button-start-chat')).toBeEnabled();
   await control(page, 'button-start-chat').click();
   const draft = page.getByRole('textbox', { name: 'Message', exact: true });
-  await expect(draft).toHaveValue('Do not lose my rejected draft');
+  await expect(draft).toHaveText('Do not lose my rejected draft');
   await expect(page.getByRole('button', { name: 'Review files', exact: true })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Change context size in Settings', exact: true }),
@@ -760,7 +760,7 @@ test('Q1 learns newly available capacity in the same server run and blocks witho
   ).toBeVisible();
   await expect(control(page, 'button-start-chat')).toBeDisabled();
   await expect(control(page, 'meter-project-context')).toHaveAttribute('aria-valuemax', '768');
-  await expect(draft).toHaveValue('Keep this draft when the context size becomes available');
+  await expect(draft).toHaveText('Keep this draft when the context size becomes available');
   await expect(page.getByRole('button', { name: 'Server log · Ready', exact: true })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-request'))).toBeNull();
 });
@@ -956,9 +956,7 @@ for (const deleteChats of [false, true]) {
     await control(page, 'textarea-start-chat').fill(draftText);
     await expect(control(page, 'button-start-chat')).toBeEnabled();
     await control(page, 'button-start-chat').click();
-    await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
-      draftText,
-    );
+    await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveText(draftText);
     await expect(page.getByRole('alert')).toContainText('exceed the 16,384-token context');
     expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-request'))).toBeNull();
     expect(await readHistory(page)).toEqual([]);
@@ -975,7 +973,7 @@ for (const deleteChats of [false, true]) {
     if (deleteChats) {
       await expect.poll(() => readHistory(page)).toEqual([]);
       await control(page, 'button-new-chat').click();
-      await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
+      await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveText('');
       await expect(
         page.locator('.conversation-row').getByRole('button', { name: 'New chat', exact: true }),
       ).toHaveCount(0);
@@ -988,7 +986,7 @@ for (const deleteChats of [false, true]) {
         .locator('.conversation-row')
         .getByRole('button', { name: 'New chat', exact: true })
         .click();
-      await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
+      await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveText(
         draftText,
       );
       await expect(control(page, 'button-crumb-project')).toHaveCount(0);

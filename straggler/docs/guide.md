@@ -133,6 +133,43 @@ An explicitly empty custom prompt sends no system message. Project chats use
 their project's instructions, as described under
 [Shared instructions](#shared-instructions).
 
+### Format a message
+
+The message field shows formatting as you type, in chats, temporary chats,
+project starts and user-message edits. The **Aa** control shows or hides its
+formatting toolbar; this desktop preference also applies when editing messages.
+The field becomes editable after a model is loaded.
+
+Use the toolbar for bold, italic, strikethrough, links, numbered or bulleted lists,
+quotes, inline code and code blocks. Typing `*bold*` or `**bold**`, `_italic_`,
+`~struck~` or `~~struck~~`, or backtick-delimited code converts the text on the
+closing symbol. At the start of a line, `1. `, `- ` or `* `, `> ` and three
+backticks start their corresponding block. Undo immediately restores the symbols.
+Code and symbols inside words remain literal.
+
+Pasting inserts plain text. Press Ctrl/⌘+Shift+F to apply standard Markdown
+formatting explicitly. Links accept HTTP and HTTPS; a domain without a scheme
+gets `https://`. Email addresses and other protocols show a validation error.
+Pasting a URL over selected text adds a link. Links open outside the application
+only after the message has been sent.
+
+Enter sends, and Ctrl/⌘+Enter sends from any block. Shift+Enter adds a line, or a
+new list item; on an empty list item or quote line it exits that block. Tab and
+Shift+Tab indent and outdent lists; elsewhere Tab moves focus. Inside code blocks,
+Enter adds a line and exits on an empty last line. Arrow Down at the end of the
+last code block creates a paragraph below it. Backspace at the start of a quote
+or code block returns it to ordinary text.
+
+Toolbar tooltips include shortcuts. Ctrl/⌘+B and I toggle bold and italic;
+Ctrl/⌘+Shift+X, U, 7, 8, 9 and C select strikethrough, link, numbered list,
+bulleted list, quote and inline code. Add Alt to the code shortcut for a code block.
+Underline is not supported. In user-message edits Enter still adds a line;
+use **Save and regenerate** or Ctrl/⌘+Enter to save, and Escape to cancel.
+Assistant-response edits remain a Markdown textarea.
+
+Messages are sent and saved as standard Markdown in the existing conversation
+format. User messages preserve single line breaks; assistant rendering is unchanged.
+
 ### Temporary chats
 
 On an empty chat outside a project, choose **Temporary** or press Ctrl/⌘+Shift+N.

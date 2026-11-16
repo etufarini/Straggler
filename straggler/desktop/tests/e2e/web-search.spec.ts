@@ -6,7 +6,7 @@ async function ready(page: Page, scenario = 'web-normal') {
   await page.goto(`/?scenario=${scenario}`);
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveAttribute(
-    'placeholder',
+    'aria-placeholder',
     'Message your local model…',
   );
 }

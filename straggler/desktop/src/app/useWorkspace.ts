@@ -138,7 +138,7 @@ export function useWorkspace() {
     saveQueue,
     messageList,
     follow,
-    textarea,
+    composerInput,
     updateChat,
     loadHistory,
     save,
@@ -199,7 +199,7 @@ export function useWorkspace() {
       setServer(await invoke<ServerStatus>('server_status'));
       updatePanel(null);
       setView('chat');
-      textarea.current?.focus();
+      composerInput.current?.focus();
     } catch (failure) {
       setError(errorDetail(failure).message);
     } finally {
@@ -627,7 +627,7 @@ export function useWorkspace() {
     acceptConfiguration,
     confirm,
     follow,
-    textarea,
+    composerInput,
     messageList,
     canSend,
     send,

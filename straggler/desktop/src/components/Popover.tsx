@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { containTabFocus } from './focus';
 
@@ -18,6 +18,8 @@ export default function Popover({
   pressed,
   title,
   onTrigger,
+  triggerProps,
+  returnFocus,
 }: {
   label: string;
   valueLabel?: string;
@@ -33,6 +35,8 @@ export default function Popover({
   pressed?: boolean;
   title?: string;
   onTrigger?: () => boolean;
+  triggerProps?: ButtonHTMLAttributes<HTMLButtonElement>;
+  returnFocus?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -92,16 +96,18 @@ export default function Popover({
     return () => {
       document.removeEventListener('keydown', keydown, true);
       document.removeEventListener('pointerdown', outside);
-      if (opener?.isConnected) opener.focus({ preventScroll: true });
+      if (returnFocus) returnFocus();
+      else if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [open, containFocus]);
+  }, [open, containFocus, returnFocus]);
   return (
     <div ref={root} className={`composer-menu ${className}`}>
       <button
+        {...triggerProps}
         ref={button}
         data-control-id={controlId}
         type="button"
-        className="composer-chip"
+        className={triggerProps?.className ?? 'composer-chip'}
         aria-pressed={pressed}
         title={title ?? (valueLabel ? `${label}: ${valueLabel}` : label)}
         aria-label={label}
