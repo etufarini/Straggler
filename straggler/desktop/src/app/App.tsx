@@ -199,11 +199,11 @@ export default function App() {
         {error && (
           <div className="workspace-feedback">
             <Feedback
-              title="Could not complete the action"
+              title="Couldn’t complete the action"
               details={error}
               onDismiss={() => setError('')}
             >
-              Review the details before trying again.
+              Check the details and try again.
             </Feedback>
           </div>
         )}
@@ -282,7 +282,6 @@ export default function App() {
               <ChatPanel controller={controller} />
             </div>
             <PresencePanel
-              hasMessages={controller.chat.messages.length > 0}
               sources={lastResponse?.sources}
               attachments={controller.attachments}
               state={presence}

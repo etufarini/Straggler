@@ -198,11 +198,6 @@ input:disabled {
   font-weight: var(--ui-fw-strong);
   line-height: 1.2;
 }
-.settings-heading p {
-  margin: 0;
-  color: var(--ui-muted);
-  font-size: var(--ui-fs-body);
-}
 .settings-layout {
   display: grid;
   grid-template-columns: 158px minmax(0, 1fr);
@@ -604,14 +599,6 @@ code {
   height: 32px;
   flex: 0 0 32px;
   filter: drop-shadow(0 0 10px #9db4ffaa);
-}
-.brand small {
-  display: block;
-  font-size: 11px;
-  color: var(--ui-subtle);
-  letter-spacing: 1.2px;
-  font-weight: 500;
-  margin-top: 3px;
 }
 .new-chat {
   justify-content: flex-start;
@@ -1871,12 +1858,6 @@ body[data-area='settings'] .danger-button {
 .presence-stage {
   margin: 18px auto 0;
 }
-.presence.is-expanded.has-messages .presence-stage {
-  margin-top: var(--ui-space-6);
-}
-.presence.is-expanded.has-messages .presence-caption {
-  margin-top: var(--ui-space-2);
-}
 .presence-caption {
   margin-top: -14px;
   text-align: center;
@@ -2062,9 +2043,6 @@ body[data-area='settings'] .danger-button {
   }
 }
 @media (max-width: 960px) {
-  .brand small {
-    display: none;
-  }
   .header-controls {
     gap: 6px;
   }

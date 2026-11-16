@@ -376,7 +376,7 @@ export function useConversation(
 
   async function runConversationMutation(operation: () => Promise<void>) {
     if (requestRef.current || mutation.current)
-      throw new Error('Wait for the current conversation operation to finish.');
+      throw new Error('Wait for the current chat operation to finish.');
     mutation.current = true;
     setEditingBusy(true);
     try {
@@ -439,7 +439,7 @@ export function useConversation(
         projects?.current.current.find((project) => project.id === snapshot.projectId),
       );
       if (await saveConversationExport(exportFileName(snapshot.title), contents))
-        setFileNotice('Conversation exported.');
+        setFileNotice('Chat exported.');
     } catch (error) {
       setFileError(errorDetail(error).message);
     }

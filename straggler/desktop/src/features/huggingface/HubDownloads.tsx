@@ -1,3 +1,4 @@
+import { countLabel } from '../../domain/text';
 import { formatBytes } from '../../domain/huggingFace';
 import type { HuggingFaceController } from './useHuggingFace';
 
@@ -23,7 +24,7 @@ export default function HubDownloads({ controller }: { controller: HuggingFaceCo
           />
           <p className="hf-path-hint">
             {formatBytes(download.downloaded)} of {formatBytes(download.total)} ·{' '}
-            {download.plan.files.length} files
+            {countLabel(download.plan.files.length, 'file')}
           </p>
           <p className="hf-path-hint">{download.root}</p>
           {download.error && (

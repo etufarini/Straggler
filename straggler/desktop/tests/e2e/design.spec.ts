@@ -50,7 +50,7 @@ test('settings keep their save action visible and folders and backend selection 
     'page',
   );
   await page.getByRole('button', { name: 'Folders', exact: true }).click();
-  await expect(page.getByText('Saved automatically once a folder is validated.')).toBeVisible();
+  await expect(page.getByText('Saved once the folder is validated.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
@@ -141,7 +141,7 @@ test('context thresholds use response data and missing metrics remain unavailabl
     await expect(counter).toContainText(percent);
     await counter.getByRole('button', { name: 'Context', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Context' })).toContainText(
-      scenario === 'no-metrics' ? 'Usage is unavailable' : '4,096 tokens',
+      scenario === 'no-metrics' ? 'Available once the server is running.' : '4,096 tokens',
     );
     await page.keyboard.press('Escape');
   }

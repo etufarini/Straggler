@@ -217,7 +217,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
   if (screen === 'CHAT-17') await button('Options for Explain how local chat works.').click();
   if (screen === 'CHAT-18') {
     await page.evaluate(() => localStorage.setItem('straggler-fixture-import-error', 'true'));
-    await button('Import conversation').click();
+    await button('Import chat').click();
     await expect(page.getByText('Import failed', { exact: true })).toBeVisible();
   }
   if (screen === 'SERVER-01') await page.getByRole('button', { name: /Server log/ }).click();
@@ -295,7 +295,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
       .getByRole('button', { name: 'Use bundled backend', exact: true })
       .click();
     await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText(
-      'The action could not be completed',
+      'Couldn’t complete the action',
     );
   }
   await page.locator('.app-shell').waitFor();

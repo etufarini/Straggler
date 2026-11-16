@@ -25,8 +25,7 @@ export default function SavedConfigurations({ controller }: { controller: Settin
     <>
       <h2>Saved configurations</h2>
       <p className="field-help">
-        A configuration stores your model, reply and server settings. Folders and conversations are
-        not included.
+        Saves model, reply and server settings. Folders and chats aren’t included.
       </p>
       <label className="setting-field">
         <span>Configuration</span>
@@ -87,7 +86,7 @@ export default function SavedConfigurations({ controller }: { controller: Settin
               title: 'Delete configuration?',
               actionLabel: 'Delete configuration',
               destructive: true,
-              text: `Delete “${profile}”? Your current settings and conversations stay as they are.`,
+              text: `Delete “${profile}”? Your current settings and chats won’t change.`,
               action: async () => {
                 const value = await operation('delete-profile', [profile, 'confirm']);
                 accept(value);

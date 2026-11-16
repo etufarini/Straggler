@@ -37,11 +37,11 @@ export interface WebSearchStatus {
 export function webSearchError(kind: string, provider = 'The search service'): string {
   switch (kind) {
     case 'offline':
-      return "You're offline";
+      return 'You’re offline';
     case 'invalid_credentials':
-      return `${provider} didn't accept the API key`;
+      return `${provider} didn’t accept the API key`;
     case 'quota_exhausted':
-      return `This month's ${provider} credits are used up`;
+      return `This month’s ${provider} credits are used up`;
     case 'not_configured':
       return 'Web search needs an API key';
     case 'rate_limited':

@@ -69,7 +69,7 @@ export function resolveProjectSystemPrompt(
 ): string {
   if (conversation.projectId) {
     if (project?.id !== conversation.projectId)
-      throw new Error('This conversation’s project is unavailable. Reload projects to continue.');
+      throw new Error('This chat’s project is unavailable. Reload projects to continue.');
     return projectInstructions(project, settings);
   }
   return ownSystemPrompt(conversation) ?? settings?.chat_system_prompt ?? '';

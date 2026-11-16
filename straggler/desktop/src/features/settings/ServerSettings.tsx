@@ -25,7 +25,7 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
         value={draft.port}
         error={fieldError('port')}
         onChange={(value) => change('port', value)}
-        hint="A number from 1 to 65535. Only this computer can connect (127.0.0.1)."
+        hint="1–65535. Only this computer (127.0.0.1) can connect."
       />
       <button
         className="text-button"
@@ -62,8 +62,8 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
         </button>
       </div>
       <p className="field-help">
-        Straggler checks again before stopping anything and asks before forcing a quit. A program it
-        can’t identify still blocks the launch.
+        Straggler asks before stopping or force-quitting anything. Unidentified programs still block
+        the launch.
       </p>
     </>
   );

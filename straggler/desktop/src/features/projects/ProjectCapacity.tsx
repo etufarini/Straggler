@@ -5,10 +5,10 @@ import type { ProjectContextState } from '../../domain/projectContext';
 const number = (value: number) => value.toLocaleString('en-US');
 export function ProjectCapacity({
   context,
-  unavailableReason,
+  serverRunning,
 }: {
   context: ProjectContextState;
-  unavailableReason: string;
+  serverRunning: boolean;
 }) {
   const { used, available, capacity, reserve, ratio, level, approximate } = context;
   const state =
@@ -25,10 +25,19 @@ export function ProjectCapacity({
       </div>
       {available === null ? (
         <small>
-          <strong>Capacity unavailable</strong>: {unavailableReason}.{' '}
-          {approximate
-            ? 'Estimated: exact counts come from the running server.'
-            : 'Counted by the running server.'}
+          {serverRunning ? (
+            <>
+              <strong>Capacity unavailable</strong>: the running server has not reported its context
+              size.{' '}
+              {approximate
+                ? 'Estimated: exact counts come from the running server.'
+                : 'Counted by the running server.'}
+            </>
+          ) : (
+            <>
+              <strong>Estimate.</strong> Start the server for exact counts.
+            </>
+          )}
         </small>
       ) : (
         <>
@@ -51,8 +60,8 @@ export function ProjectCapacity({
             Instructions and included files, including filenames and delimiters.
           </small>
           <small>
-            Window {number(capacity!)} tokens (n_ctx); {number(reserve!)} kept free for the
-            conversation and replies.{' '}
+            Window {number(capacity!)} tokens (n_ctx); {number(reserve!)} kept free for the chat and
+            replies.{' '}
             {approximate
               ? 'Estimated: exact counts come from the running server.'
               : 'Counted by the running server.'}

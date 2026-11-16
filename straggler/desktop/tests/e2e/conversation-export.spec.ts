@@ -12,9 +12,7 @@ test('both exports open save directly, cancellation is silent and write errors u
   await expect(menu).toBeEnabled();
   await menu.click();
   await page.getByRole('menuitem', { name: 'Export chat…', exact: true }).click();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Conversation exported.' }),
-  ).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Chat exported.' })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-save-name'))).toBe(
     'A chat to export.json',
   );
@@ -75,7 +73,5 @@ test('reasoning export stays focusable but unavailable with an explanation when 
   await page.getByRole('button', { name: 'Options for Without reasoning' }).click();
   const item = page.getByRole('menuitem', { name: 'Export with reasoning…' });
   await expect(item).toHaveAttribute('aria-disabled', 'true');
-  await expect(
-    page.getByText('This conversation contains no reasoning.', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('This chat contains no reasoning.', { exact: true })).toBeVisible();
 });

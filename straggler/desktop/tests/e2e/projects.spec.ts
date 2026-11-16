@@ -145,6 +145,27 @@ async function openResearch(page: Page) {
   await expect(page.getByRole('heading', { name: 'Thesis research', exact: true })).toBeVisible();
 }
 
+test('single-file projects use singular file and chat counts, including included totals', async ({
+  page,
+}) => {
+  const project = projects()[0];
+  project.files = project.files.slice(0, 1);
+  await seed(page, {
+    projects: [project],
+    history: [chat(ids.memberChat, 'One chat', project.id)],
+  });
+  await control(page, 'button-all-projects').click();
+  const metadata = page.locator('.project-card .project-meta');
+  await expect(metadata).toContainText('1 chat');
+  await expect(metadata).toContainText('1 file');
+  await expect(metadata).not.toContainText('1 chats');
+  await expect(metadata).not.toContainText('1 files');
+  await openResearch(page);
+  await expect(page.locator('.project-start-note')).toContainText('1 of 1 file');
+  await expect(page.locator('.project-start-note')).not.toContainText('1 of 1 files');
+  await expect(page.locator('.project-capacity strong').last()).toHaveText('Estimate.');
+});
+
 async function openOwnChat(page: Page) {
   await control(page, 'button-a-chat-with-its-own-prompt').click();
   await expect(page.getByText('Earlier answer', { exact: true })).toBeVisible();
@@ -517,7 +538,7 @@ test('DIALOG-08 archives read-only projects, restores them and offers Undo', asy
   await openResearch(page);
   await control(page, 'button-options-for-current-project').click();
   await control(page, 'button-archive-project-menu').click();
-  await expect(page.getByRole('alertdialog')).toContainText('Its 2 chats stay readable');
+  await expect(page.getByRole('alertdialog')).toContainText('Its chats stay readable');
   await control(page, 'button-archive-project').click();
   await expect(page.getByText('This project is archived', { exact: true })).toBeVisible();
   await expect(control(page, 'button-project-thesis-research')).toHaveCount(0);
@@ -886,7 +907,7 @@ for (const source of ['All projects', 'Project detail'] as const) {
       name: source === 'All projects' ? 'Projects' : 'Thesis research',
       exact: true,
     });
-    const importAction = page.getByRole('button', { name: 'Import conversation', exact: true });
+    const importAction = page.getByRole('button', { name: 'Import chat', exact: true });
     const initialHistory = await readHistory(page);
     await page.evaluate(() => localStorage.setItem('straggler-fixture-import-path', 'cancel'));
     await importAction.click();
@@ -945,7 +966,7 @@ for (const deleteChats of [false, true]) {
     await control(page, 'button-options-for-current-project').click();
     await control(page, 'button-delete-project-menu').click();
     await expect(control(page, 'checkbox-also-delete-chats')).not.toBeChecked();
-    await expect(page.getByRole('alertdialog')).toContainText('Also delete its 1 chats');
+    await expect(page.getByRole('alertdialog')).toContainText('Also delete its 1 chat');
     if (deleteChats) await control(page, 'checkbox-also-delete-chats').check();
     await control(page, 'button-delete-project').click();
     await expect
@@ -955,13 +976,18 @@ for (const deleteChats of [false, true]) {
       await expect.poll(() => readHistory(page)).toEqual([]);
       await control(page, 'button-new-chat').click();
       await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
-      await expect(control(page, 'button-new-conversation')).toHaveCount(0);
+      await expect(
+        page.locator('.conversation-row').getByRole('button', { name: 'New chat', exact: true }),
+      ).toHaveCount(0);
     } else {
       await expect.poll(async () => (await readHistory(page)).length).toBe(1);
       const kept = (await readHistory(page))[0];
       expect(kept.projectId).toBeNull();
       expect(kept.messages).toEqual([]);
-      await control(page, 'button-new-conversation').click();
+      await page
+        .locator('.conversation-row')
+        .getByRole('button', { name: 'New chat', exact: true })
+        .click();
       await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(
         draftText,
       );

@@ -18,13 +18,13 @@ const labels: Record<string, string> = {
 };
 
 const samplingHints = {
-  temperature: 'Higher is more varied, lower more predictable. Empty uses the llama.cpp default.',
-  top_p: 'Keeps the most likely words that add up to this share. Empty uses the llama.cpp default.',
-  top_k: 'Keeps only this many of the most likely words. Empty uses the llama.cpp default.',
-  min_p: 'Drops words far less likely than the best one. Empty uses the llama.cpp default.',
-  repeat_penalty: 'Discourages repeating recent words. Empty uses the llama.cpp default.',
-  presence_penalty: 'Encourages words not used yet. Empty uses the llama.cpp default.',
-  frequency_penalty: 'Discourages words that appear often. Empty uses the llama.cpp default.',
+  temperature: 'Higher is more varied, lower more predictable.',
+  top_p: 'Keeps the most likely words that add up to this share.',
+  top_k: 'Keeps only this many of the most likely words.',
+  min_p: 'Drops words far less likely than the best one.',
+  repeat_penalty: 'Discourages repeating recent words.',
+  presence_penalty: 'Encourages words not used yet.',
+  frequency_penalty: 'Discourages words that appear often.',
 };
 
 export default function ModelSettings({ controller }: { controller: SettingsController }) {
@@ -42,7 +42,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
   return (
     <>
       <h2>Model settings</h2>
-      <p className="field-help">What you can use depends on the model and on your memory.</p>
+      <p className="field-help">Options depend on the model and available memory.</p>
       <label className="setting-field">
         <span>Model</span>
         <Select
@@ -110,15 +110,15 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
           value={draft.context}
           error={fieldError('context')}
           onChange={(value) => change('context', value)}
-          hint="How much of the chat the model keeps in mind. Auto, a number of tokens, or 0 for the largest it supports."
+          hint="How much of the chat the model remembers. Auto, a token count, or 0 for the maximum."
         />
       </div>
       <h3>
         Memory format <code className="tech-term">KV cache</code>
       </h3>
       <p className="field-help">
-        Smaller formats save memory with a small loss of quality. Compressed values (V) may need
-        Flash Attention; llama.cpp reports what your model allows.
+        Smaller formats save memory at a slight cost in quality. Compressed values may need Flash
+        Attention.
       </p>
       <div className="field-grid">
         {(['k', 'v'] as const).map((kind) => {
@@ -174,8 +174,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
           ].map(([value, label]) => ({ value, label }))}
         />
         <small>
-          Starting points you can fine-tune. They keep your seed, reply length, context and
-          performance settings.
+          Presets for the values below. Seed, reply length, context and performance don’t change.
         </small>
       </label>
       <details
@@ -187,6 +186,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
         }
       >
         <summary>Fine-tune reply style</summary>
+        <p className="field-help">Leave a field empty to use the llama.cpp default.</p>
         <div className="field-grid">
           {samplingKeys.map((key) => (
             <NumberField
@@ -206,14 +206,14 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
           value={draft.seed}
           error={fieldError('seed')}
           onChange={(value) => change('seed', value)}
-          hint="The same number repeats a result; -1 is random. Results can still differ between computers."
+          hint="The same seed repeats a result on this computer; -1 is random."
         />
         <NumberField
           label="Longest reply (tokens)"
           value={draft.max_tokens}
           error={fieldError('max_tokens')}
           onChange={(value) => change('max_tokens', value)}
-          hint="Auto, a number, or -1 for no limit. 0 reads your message without replying."
+          hint="Auto, a number, or -1 for no limit."
         />
       </div>
       <ChatDefaults controller={controller} />

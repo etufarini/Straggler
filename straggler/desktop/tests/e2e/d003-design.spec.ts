@@ -146,7 +146,7 @@ test('tertiary text, teal primary, links and focus meet AA on the actual theme s
   );
 });
 
-test('stars stay out of both sidebars in every area and the orb shrinks after a message', async ({
+test('stars stay out of both sidebars in every area and the orb keeps its expanded size after a message', async ({
   page,
 }) => {
   await page.goto('/?scenario=web-normal');
@@ -174,8 +174,8 @@ test('stars stay out of both sidebars in every area and the orb shrinks after a 
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Resize the presence');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
-  await expect(page.locator('.presence-stage')).toHaveCSS('width', '128px');
-  await expect(page.locator('.presence-stage canvas')).toHaveCSS('width', '128px');
+  await expect(page.locator('.presence-stage')).toHaveCSS('width', '224px');
+  await expect(page.locator('.presence-stage canvas')).toHaveCSS('width', '224px');
   await page.getByRole('button', { name: 'Collapse assistant panel', exact: true }).click();
   await expect(page.locator('.presence-stage')).toHaveCSS('width', '48px');
 });

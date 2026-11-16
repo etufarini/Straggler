@@ -1,3 +1,4 @@
+import { countLabel } from '../../domain/text';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import { Folder, Plus, Search, Star } from 'lucide-react';
 import { useState } from 'react';
@@ -82,7 +83,7 @@ export default function ProjectsPage({
           <h1 id="projects-title" tabIndex={-1}>
             Projects
           </h1>
-          <p>Group chats that share instructions and files. Everything stays on this device.</p>
+          <p>Group chats that share instructions and files.</p>
         </div>
         {!!projects.projects.length && (
           <button
@@ -104,10 +105,7 @@ export default function ProjectsPage({
             <Folder size={22} />
           </span>
           <h2>No projects yet</h2>
-          <p>
-            A project keeps related chats together. Its instructions become the system prompt of
-            every chat in it, and its files are read into each chat’s context.
-          </p>
+          <p>Group related chats. Instructions and files apply to every chat in the project.</p>
           <button
             className="primary-button"
             data-control-id="button-create-first-project"
@@ -239,13 +237,13 @@ export default function ProjectsPage({
                       </p>
                       <p className="project-meta" id={`project-meta-${project.id}`}>
                         <span>
-                          {
+                          {countLabel(
                             controller.conversations.filter((chat) => chat.projectId === project.id)
-                              .length
-                          }{' '}
-                          chats
+                              .length,
+                            'chat',
+                          )}
                         </span>
-                        <span>{project.files.length} files</span>
+                        <span>{countLabel(project.files.length, 'file')}</span>
                         <span>
                           Updated{' '}
                           {relativeTime(projectUpdatedAt(project, controller.conversations))}

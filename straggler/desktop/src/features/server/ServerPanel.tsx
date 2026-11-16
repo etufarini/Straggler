@@ -150,8 +150,8 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                     ))}
                   </div>
                   <p className="capability-note">
-                    What a model can do depends on the model and your llama.cpp version. Larger
-                    models need more memory.
+                    Features depend on the model and the llama.cpp version. Larger models need more
+                    memory.
                   </p>
                   <div className="panel-actions">
                     {active ? (

@@ -7,8 +7,7 @@ export default function ServerFeedback({ controller }: { controller: WorkspaceCo
   const memory = server.issue?.kind === 'memory';
   const stopped = !active;
   let title = 'The local server stopped unexpectedly';
-  let description =
-    'Your conversation remains available. Review the server log before trying again.';
+  let description = 'Your chat remains available. Review the server log before trying again.';
   if (server.issue && stopped) {
     title = memory ? 'Server stopped after a memory error' : 'Server stopped after a backend error';
     description = memory
@@ -16,7 +15,7 @@ export default function ServerFeedback({ controller }: { controller: WorkspaceCo
       : 'Review the server log before starting again.';
   } else if (server.issue) {
     title = memory ? 'Not enough memory' : 'The inference backend cannot continue';
-    description = 'Stop the local server, then review its settings before restarting.';
+    description = 'Stop the server and review its settings before restarting.';
   }
   return (
     <div className="workspace-feedback">

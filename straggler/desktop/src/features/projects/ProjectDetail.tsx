@@ -1,3 +1,4 @@
+import { countLabel } from '../../domain/text';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import { useEffect, useRef } from 'react';
 import { ArrowLeft, ArrowUp, Star, Trash2, FileUp, RotateCcw, Pencil } from 'lucide-react';
@@ -162,7 +163,7 @@ export default function ProjectDetail({
                   {project.instructions.trim()
                     ? 'Uses the project instructions'
                     : 'No instructions yet · uses the system prompt from Settings'}{' '}
-                  and {included} of {project.files.length} files
+                  and {included} of {countLabel(project.files.length, 'file')}
                 </span>
               </div>
               <div className="composer-send">
@@ -184,11 +185,11 @@ export default function ProjectDetail({
             </p>
           )}
           {controller.server.phase !== 'ready' && (
-            <p className="field-help">Load a model to start a conversation.</p>
+            <p className="field-help">Load a model to start chatting.</p>
           )}
           <div className="project-section-head">
             <h2 id="project-chats-title">Chats</h2>
-            <span className="project-meta">{chats.length} chats</span>
+            <span className="project-meta">{countLabel(chats.length, 'chat')}</span>
           </div>
           {chats.length ? (
             <ul className="project-chat-list" aria-labelledby="project-chats-title">
@@ -226,7 +227,7 @@ export default function ProjectDetail({
             </ul>
           ) : (
             <p className="project-no-results">
-              No chats yet. Start one above, or move an existing conversation here from its menu.
+              No chats yet. Start one above or move one here from its menu.
             </p>
           )}
         </div>
@@ -256,7 +257,7 @@ export default function ProjectDetail({
             </p>
             <p className="field-help">
               {project.instructions.trim()
-                ? `The system prompt for all ${chats.length} chats in this project. Chats keep their own prompt for when they leave the project.`
+                ? 'The system prompt for every chat in this project.'
                 : 'Instructions you add become the system prompt for every chat in this project.'}
             </p>
             {generatingHere && <p className="field-help">Changes apply from the next message.</p>}
@@ -279,11 +280,7 @@ export default function ProjectDetail({
             </div>
             <ProjectCapacity
               context={context}
-              unavailableReason={
-                controller.server.phase === 'ready'
-                  ? 'the running server has not reported its context size'
-                  : 'the server is not running'
-              }
+              serverRunning={controller.server.phase === 'ready'}
             />
             {context.level === 'high' && !project.archived && (
               <Feedback severity="warning" title="Close to the limit">

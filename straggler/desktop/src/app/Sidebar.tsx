@@ -59,9 +59,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
     <aside id="sidebar" className={`sidebar ${preferences.sidebarCollapsed ? 'is-compact' : ''}`}>
       <div className="brand">
         <img className="brand-symbol" src={brandMark} width={32} height={32} alt="" />
-        <span className="brand-name">
-          Straggler<small>YOUR LOCAL SPACE</small>
-        </span>
+        <span className="brand-name">Straggler</span>
         <button
           className="sidebar-toggle"
           aria-expanded={!preferences.sidebarCollapsed}
@@ -150,12 +148,12 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         </div>
       </div>
       <div className="section-label has-action">
-        <span>CONVERSATIONS</span>
+        <span>CHATS</span>
         <button
           type="button"
           className="section-action"
-          aria-label="Import conversation"
-          title="Import a conversation from a .json export"
+          aria-label="Import chat"
+          title="Import a chat from a .json export"
           data-control-id="button-import-conversation"
           disabled={!controller.native || controller.importBusy || editingBusy}
           onClick={() => {
@@ -170,7 +168,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
       <div className="conversation-list">
         {conversations.length === 0 && (
           <p className="history-empty">
-            Your conversations stay
+            Your chats stay
             <br />
             on this device.
           </p>

@@ -63,8 +63,7 @@ export default function ModelsFolderActions({
         </button>
       </div>
       <p className="field-help">
-        Create a folder in Straggler's application data directory, or link a folder you already use.
-        Existing GGUF files stay in place.
+        Create a new folder or use one you already have. GGUF files aren’t moved.
       </p>
       {info && (
         <small className="hf-path-hint">

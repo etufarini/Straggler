@@ -43,7 +43,7 @@ export default function ConversationMenu({
       icon: <Download size={15} />,
       disabled: !onExport || !hasReasoning,
       disabledReason: !hasReasoning
-        ? 'This conversation contains no reasoning.'
+        ? 'This chat contains no reasoning.'
         : !onExport
           ? 'Export is unavailable.'
           : undefined,
@@ -85,7 +85,7 @@ export default function ConversationMenu({
   return (
     <ActionMenu
       label={`Options for ${conversation.title}`}
-      title="Conversation options"
+      title="Chat options"
       controlId={controlId ?? `button-options-for-${controlSlug(conversation.title)}`}
       disabled={disabled}
       items={items}

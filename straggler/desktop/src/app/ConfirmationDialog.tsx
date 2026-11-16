@@ -44,8 +44,8 @@ export default function ConfirmationDialog({ controller }: { controller: Workspa
   return (
     <ConfirmationFrame title={confirmation.title} description={confirmation.text}>
       {confirmError && (
-        <Feedback title="The action could not be completed" details={confirmError}>
-          Review the details before trying again. This window remains open.
+        <Feedback title="Couldn’t complete the action" details={confirmError}>
+          Check the details and try again.
         </Feedback>
       )}
       <div className="panel-actions">

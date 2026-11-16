@@ -24,7 +24,7 @@ export function materializeImport(imported: ImportedConversation, updatedAt: num
     .join('');
   return {
     ...newConversation(),
-    title: imported.title?.trim() || derivedTitle || 'Imported conversation',
+    title: imported.title?.trim() || derivedTitle || 'Imported chat',
     createdAt: Number.isFinite(createdAt) && createdAt >= 0 ? createdAt : updatedAt,
     updatedAt,
     model: imported.model,

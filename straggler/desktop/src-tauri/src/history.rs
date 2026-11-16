@@ -85,7 +85,7 @@ impl History {
             .recursive(true)
             .mode(0o700)
             .create(&directory)
-            .map_err(|e| format!("Cannot create conversation storage: {e}"))?;
+            .map_err(|e| format!("Cannot create chat storage: {e}"))?;
         Ok(Self {
             directory,
             writer: Arc::new(Mutex::new(())),
@@ -115,7 +115,7 @@ impl History {
                 != Some(conversation.id.to_string().as_str())
             {
                 return Err(format!(
-                    "Conversation identifier does not match {}. The file was kept.",
+                    "Chat identifier does not match {}. The file was kept.",
                     path.display()
                 ));
             }
@@ -164,7 +164,7 @@ impl History {
                 .join(format!("{}.json", conversation.id))
                 .exists()
         {
-            return Err("A conversation with this identifier already exists.".into());
+            return Err("A chat with this identifier already exists.".into());
         }
         let stage = tempfile::tempdir_in(&self.directory).map_err(|e| e.to_string())?;
         let files = stage.path().join("attachments");
@@ -200,7 +200,7 @@ impl History {
 
     pub(crate) fn write(&self, conversation: &Conversation, create: bool) -> Result<()> {
         let mut file = tempfile::NamedTempFile::new_in(&self.directory)
-            .map_err(|e| format!("Cannot create a conversation file: {e}"))?;
+            .map_err(|e| format!("Cannot create a chat file: {e}"))?;
         serde_json::to_writer(&mut file, conversation).map_err(|e| e.to_string())?;
         file.write_all(b"\n").map_err(|e| e.to_string())?;
         file.as_file().sync_all().map_err(|e| e.to_string())?;
@@ -210,17 +210,17 @@ impl History {
         } else {
             file.persist(path)
         };
-        result.map_err(|e| format!("Cannot save conversation. Previous data was kept: {e}"))?;
+        result.map_err(|e| format!("Cannot save chat. Previous data was kept: {e}"))?;
         Ok(())
     }
 
     pub(crate) fn read_one(&self, id: Uuid) -> Result<Conversation> {
         let bytes = fs::read(self.directory.join(format!("{id}.json")))
-            .map_err(|e| format!("Cannot read conversation: {e}"))?;
+            .map_err(|e| format!("Cannot read chat: {e}"))?;
         let conversation: Conversation =
-            serde_json::from_slice(&bytes).map_err(|e| format!("Cannot read conversation: {e}"))?;
+            serde_json::from_slice(&bytes).map_err(|e| format!("Cannot read chat: {e}"))?;
         if conversation.id != id {
-            return Err("The conversation identifier does not match its file.".into());
+            return Err("The chat identifier does not match its file.".into());
         }
         validate(&conversation)?;
         Ok(conversation)
@@ -277,7 +277,7 @@ impl History {
             .attachments
             .iter()
             .position(|item| item.id == attachment_id)
-            .ok_or("This attachment is no longer in the conversation.")?;
+            .ok_or("This attachment is no longer in the chat.")?;
         let attachment = conversation.attachments.remove(index);
         conversation.updated_at = timestamp();
         self.write(&conversation, false)?;
@@ -306,7 +306,7 @@ impl History {
             .attachments
             .iter()
             .find(|item| item.id == attachment_id)
-            .ok_or("This attachment is no longer in the conversation.")?;
+            .ok_or("This attachment is no longer in the chat.")?;
         let original = fs::read(self.original_path(id, attachment))
             .map_err(|e| format!("Cannot read the stored original attachment: {e}"))?;
         crate::files::write_atomic(destination, &original)
@@ -337,9 +337,7 @@ impl History {
                 crate::projects::ensure_active_at(&self.project_directory()?, id)?;
             }
             if previous.project_id != conversation.project_id {
-                return Err(
-                    "Move the conversation through the project action before saving.".into(),
-                );
+                return Err("Move the chat through the project action before saving.".into());
             }
         }
         Ok(())
@@ -352,10 +350,10 @@ impl History {
         let attachments = self.directory.join(id.to_string());
         if attachments.exists() {
             fs::remove_dir_all(attachments)
-                .map_err(|e| format!("Cannot delete conversation attachments: {e}"))?;
+                .map_err(|e| format!("Cannot delete chat attachments: {e}"))?;
         }
         fs::remove_file(self.directory.join(format!("{id}.json")))
-            .map_err(|e| format!("Cannot delete conversation: {e}"))
+            .map_err(|e| format!("Cannot delete chat: {e}"))
     }
 }
 
@@ -368,7 +366,7 @@ fn timestamp() -> u64 {
 
 fn validate(conversation: &Conversation) -> Result<()> {
     if conversation.title.trim().is_empty() || conversation.title.len() > 1024 {
-        return Err("Conversation title must contain between 1 and 1024 bytes.".into());
+        return Err("Chat title must contain between 1 and 1024 bytes.".into());
     }
     if conversation
         .own_system_prompt
@@ -376,7 +374,7 @@ fn validate(conversation: &Conversation) -> Result<()> {
         .and_then(Option::as_ref)
         .is_some_and(|value| value.len() > 65536 || value.contains('\0'))
     {
-        return Err("Invalid conversation system prompt.".into());
+        return Err("Invalid chat system prompt.".into());
     }
     if let Some(options) = &conversation.options {
         if options
@@ -392,7 +390,7 @@ fn validate(conversation: &Conversation) -> Result<()> {
                 .as_deref()
                 .is_some_and(|value| !crate::model::valid_effort(value))
         {
-            return Err("Invalid conversation options.".into());
+            return Err("Invalid chat options.".into());
         }
     }
     let mut identifiers = std::collections::HashSet::new();
@@ -402,7 +400,7 @@ fn validate(conversation: &Conversation) -> Result<()> {
             || attachment.name.is_empty()
             || !identifiers.insert(attachment.id)
         {
-            return Err("Invalid conversation attachment.".into());
+            return Err("Invalid chat attachment.".into());
         }
     }
     for message in &conversation.messages {
@@ -413,7 +411,7 @@ fn validate(conversation: &Conversation) -> Result<()> {
                 "complete" | "streaming" | "stopped" | "interrupted" | "error" | "length"
             )
         {
-            return Err("Invalid conversation message.".into());
+            return Err("Invalid chat message.".into());
         }
     }
     Ok(())

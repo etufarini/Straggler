@@ -220,7 +220,7 @@ test('storage failure preserves input in conversation and can be retried', async
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Keep this question');
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.locator('.message.user')).toContainText('Keep this question');
-  await expect(page.getByRole('alert').filter({ hasText: 'Conversation not saved' })).toContainText(
+  await expect(page.getByRole('alert').filter({ hasText: 'Chat not saved' })).toContainText(
     'Disk is full',
   );
   await page.getByRole('button', { name: 'Retry saving' }).click();
@@ -426,7 +426,7 @@ test('memory and storage failures remain independently actionable in a small win
     .fill('Preserve despite both failures');
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'Not enough memory' })).toBeVisible();
-  await expect(page.getByRole('alert').filter({ hasText: 'Conversation not saved' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'Chat not saved' })).toBeVisible();
   await expect(page.getByRole('button', { name: /New chat/ })).toBeDisabled();
   const retry = page.getByRole('button', { name: 'Retry saving' });
   await retry.scrollIntoViewIfNeeded();
@@ -458,7 +458,7 @@ test('history and backend errors use their own context and recovery actions', as
   await mockDesktop(page, 'history-error');
   await page.goto('/');
   await expect(page.locator('.composer-wrap').getByRole('alert')).toContainText(
-    'Conversation history unavailable',
+    'Chat history unavailable',
   );
   await page.evaluate(() => localStorage.setItem('straggler-fixture-history-recovered', 'true'));
   await page.getByRole('button', { name: 'Retry loading' }).click();
@@ -472,7 +472,7 @@ test('history and backend errors use their own context and recovery actions', as
     .getByRole('button', { name: 'Use bundled backend', exact: true })
     .click();
   const confirmation = page.getByRole('alertdialog');
-  await expect(confirmation.getByRole('alert')).toContainText('The action could not be completed');
+  await expect(confirmation.getByRole('alert')).toContainText('Couldn’t complete the action');
   await confirmation.getByText('Technical details', { exact: true }).click();
   await expect(confirmation.getByRole('alert')).toContainText(
     'The bundled backend could not be selected.',

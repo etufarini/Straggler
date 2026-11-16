@@ -63,13 +63,10 @@ export default function WebSearchMenu({ controller }: { controller: WorkspaceCon
           </>
         ) : (
           <>
+            <p>Only search queries are sent to {provider?.name ?? 'the search service'}.</p>
             <p>
-              Straggler sends your search queries to {provider?.name ?? 'the search service'}. The
-              conversation itself stays on this computer.
-            </p>
-            <p>
-              The model can search up to {maxSearches} times, {provider?.searchCostDescription}. Web
-              search turns off again after you send.
+              Up to {maxSearches} searches, {provider?.searchCostDescription}. Turns off after you
+              send.
             </p>
             <button
               type="button"

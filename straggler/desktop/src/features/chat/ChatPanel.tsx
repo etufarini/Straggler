@@ -87,17 +87,9 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
           <div className="welcome">
             <h1>{controller.temporary ? 'Temporary chat' : 'What’s on your mind?'}</h1>
             {controller.temporary ? (
-              <p>
-                Messages, attachments and drafts stay in memory.
-                <br />
-                Save this chat to keep it. Leaving erases it.
-              </p>
+              <p>Not saved. Leaving erases this chat unless you save it.</p>
             ) : (
-              <p>
-                A conversation, a fresh perspective, a place to think.
-                <br />
-                Powered by a model running right here.
-              </p>
+              <p>Powered by a model on this computer.</p>
             )}
             <div className="suggestions">
               {[
@@ -273,8 +265,8 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                       }
                     >
                       {message.content
-                        ? 'The response could not be completed. Partial text remains in this conversation.'
-                        : 'The server could not complete this request. Review the details before trying again.'}
+                        ? 'The partial response is kept.'
+                        : 'The server couldn’t complete this request. Check the details and try again.'}
                     </Feedback>
                   )}
                   {editor?.messageId !== message.id &&
@@ -335,8 +327,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                         )}
                         {generating && (
                           <p className="message-actions-note" id={`actions-busy-${message.id}`}>
-                            Edit and regenerate are available when the response finishes or is
-                            stopped.
+                            Edit and regenerate when the response ends.
                           </p>
                         )}
                       </div>
@@ -434,7 +425,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                 ? 'Message your local model…'
                 : server.issue
                   ? 'Review settings and restart the server to continue…'
-                  : 'Load a model to start a conversation…'
+                  : 'Load a model to start chatting…'
             }
             value={input}
             disabled={archived}

@@ -9,8 +9,7 @@ export default function ChatDefaults({ controller }: { controller: SettingsContr
     <section className="chat-defaults" aria-labelledby={`${id}-title`}>
       <h3 id={`${id}-title`}>Chat defaults</h3>
       <p className="field-help">
-        New chats start with these. You can change them for one chat from the message box, without
-        restarting the server.
+        New chats start with these. Change them for one chat from the message box.
       </p>
       <label className="setting-field">
         <span>Default system prompt</span>
@@ -21,10 +20,7 @@ export default function ChatDefaults({ controller }: { controller: SettingsContr
           value={draft.chat_system_prompt}
           onChange={(event) => change('chat_system_prompt', event.target.value)}
         />
-        <small>
-          Instructions the assistant follows in every new chat. Leave empty to use the model’s
-          default.
-        </small>
+        <small>Used in every new chat. Leave empty for the model’s default.</small>
         {fieldError('chat_system_prompt') && (
           <span className="field-error" role="alert">
             {fieldError('chat_system_prompt')}

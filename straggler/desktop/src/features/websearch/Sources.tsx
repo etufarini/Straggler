@@ -33,7 +33,7 @@ export default function Sources({
           ))}
         </ol>
       ) : (
-        <p className="presence-empty">Sources appear here when a response uses web search.</p>
+        <p className="presence-empty">Web search sources appear here.</p>
       )}
     </section>
   );

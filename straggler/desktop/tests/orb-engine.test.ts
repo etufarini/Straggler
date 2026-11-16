@@ -28,7 +28,8 @@ const { default: Orb } = await import('../src/features/presence/renderers/orb-en
 type ObservedOrb = HoloOrb & { time: number; yaw: number; quality: number; draw(): void };
 const engines: ObservedOrb[] = [];
 
-function createEngine(state: PresenceState = 'generating') {
+function createEngine(state: PresenceState = 'generating', dpr = 1) {
+  window.devicePixelRatio = dpr;
   const canvas = { style: {}, getContext: () => ({}) } as unknown as HTMLCanvasElement;
   const engine = new Orb(canvas, { size: 224, state, autostart: false }) as ObservedOrb;
   const frames: number[] = [];
@@ -232,14 +233,14 @@ test('destroy cancels callbacks and prevents later updates from restarting the e
   expect(callbacks.size).toBe(0);
 });
 
-test('sustained expensive draws reduce detail without skipping refreshes, then recover slowly', () => {
-  const { engine, frames, canvas } = createEngine();
-  expect(canvas.width).toBe(224);
+test.each([1, 2, 3])('expensive draws reduce detail but preserve resolution at DPR %i', (dpr) => {
+  const { engine, frames, canvas } = createEngine('generating', dpr);
+  expect(canvas.width).toBe(224 * dpr);
   drawCost = 14;
   engine.wake();
   for (let i = 0; i <= 180; i++) refresh((i * 1000) / 60);
   expect(engine.quality).toBe(2);
-  expect(canvas.width).toBe(157);
+  expect(canvas.width).toBe(224 * dpr);
   expect(frames).toHaveLength(181);
   expect(engine.time).toBeCloseTo(3);
   drawCost = 1;
@@ -247,7 +248,7 @@ test('sustained expensive draws reduce detail without skipping refreshes, then r
   expect(engine.quality).toBe(2);
   for (let i = 361; i <= 1260; i++) refresh((i * 1000) / 60);
   expect(engine.quality).toBe(0);
-  expect(canvas.width).toBe(224);
+  expect(canvas.width).toBe(224 * dpr);
   expect(frames).toHaveLength(1261);
   expect(engine.time).toBeCloseTo(21);
 });

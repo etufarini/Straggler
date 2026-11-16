@@ -60,7 +60,7 @@ pub fn validate_sources(sources: &[Source]) -> crate::Result<()> {
             || source.url.host_str() != Some(source.domain.as_str())
             || source.title.chars().count() > 4096
         {
-            return Err("Invalid web source in conversation.".into());
+            return Err("Invalid web source in chat.".into());
         }
     }
     Ok(())

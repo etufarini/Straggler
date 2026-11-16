@@ -44,15 +44,14 @@ export default function HuggingFaceSettings({ controller }: { controller: Settin
     <>
       <h2>Hugging Face</h2>
       <p className="field-help">
-        Search and download GGUF model files from the Models panel. Network requests run only when
-        you search, open a repository, download or resume.
+        Search and download GGUF models from the Models panel. Nothing is sent until you search or
+        download.
       </p>
       <h3>
         Access token <small>Optional</small>
       </h3>
       <p className="field-help">
-        Public models do not need a token. A read token can access gated or private repositories
-        after their publisher grants access.
+        Only needed for gated or private repositories you’ve been granted access to.
       </p>
       <p role="status">
         {status?.available === false
@@ -71,10 +70,7 @@ export default function HuggingFaceSettings({ controller }: { controller: Settin
           onChange={(event) => setToken(event.target.value)}
           placeholder="hf_…"
         />
-        <small>
-          Stored only in the operating system's keychain. The saved token is never returned to this
-          form.
-        </small>
+        <small>Stored only in the system keychain and never shown again.</small>
       </label>
       <div className="row-actions">
         <button disabled={busy || !token.trim()} onClick={() => void save(false)}>

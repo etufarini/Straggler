@@ -162,7 +162,7 @@ export function useWorkspace() {
     }
     setConfirmation({
       title: closing ? 'Quit and erase this temporary chat?' : 'Erase this temporary chat?',
-      text: `Messages, attachments and the draft will be erased. The temporary backend will be stopped to clear its caches.${closing ? ' Active model downloads will be paused.' : ''}`,
+      text: `Messages, attachments and the draft will be erased.${closing ? ' Active model downloads will be paused.' : ''}`,
       actionLabel: closing ? 'Erase and quit' : 'Erase and leave',
       destructive: true,
       action: async () => {
@@ -449,7 +449,7 @@ export function useWorkspace() {
     setConfirmation({
       title: 'Stop server?',
       destructive: true,
-      text: 'Shut down the local server? Conversations are kept.',
+      text: 'Your chats are kept.',
       actionLabel: 'Stop server',
       action: stop,
     });

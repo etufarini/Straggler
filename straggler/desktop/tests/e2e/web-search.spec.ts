@@ -118,7 +118,7 @@ test('only enabled messages search; citations, external links and normalized sou
     await page.evaluate(() => (window as unknown as { webCalls: unknown[] }).webCalls),
   ).toHaveLength(1);
   await expect(page.getByRole('region', { name: 'Latest response sources' })).toContainText(
-    'Sources appear here',
+    'Web search sources appear here.',
   );
   await page.reload();
   await page.getByRole('button', { name: 'Local first', exact: true }).click();
@@ -126,9 +126,9 @@ test('only enabled messages search; citations, external links and normalized sou
 });
 
 for (const [scenario, error] of [
-  ['web-offline', "You're offline"],
-  ['web-invalid', "Mock search didn't accept the API key"],
-  ['web-exhausted', "This month's Mock search credits are used up"],
+  ['web-offline', 'You’re offline'],
+  ['web-invalid', 'Mock search didn’t accept the API key'],
+  ['web-exhausted', 'This month’s Mock search credits are used up'],
 ]) {
   test(`${scenario}: the local response continues and search resets`, async ({ page }) => {
     await ready(page, scenario);
@@ -147,7 +147,7 @@ test('fallback and quota settings remain explicit and persist only preferences',
   await enable(page);
   await send(page, 'Fallback query');
   await page.locator('.web-search-activity summary').click();
-  await expect(page.locator('.web-search-activity')).toContainText("This model can't call tools");
+  await expect(page.locator('.web-search-activity')).toContainText('This model can’t call tools');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await chip(page).click();
   await page.getByRole('radio', { name: '5', exact: true }).check();
@@ -159,7 +159,7 @@ test('fallback and quota settings remain explicit and persist only preferences',
     .getByRole('textbox', { name: 'Mock search API key', exact: true })
     .fill('rejected-secret');
   await page.getByRole('button', { name: 'Save and verify', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText("didn't accept");
+  await expect(page.getByRole('alert')).toContainText('didn’t accept');
   await expect(
     page.getByText('A key is stored in the system keychain.', { exact: true }),
   ).toBeVisible();
@@ -184,9 +184,7 @@ test('low quota is visible with an accessible usage meter', async ({ page }) => 
     'value',
     '850',
   );
-  await expect(
-    page.getByText('At least 80% of this month’s credits have been used.', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('80% of this month’s credits used.', { exact: true })).toBeVisible();
 });
 
 test('web search and send controls remain inside a small desktop composer', async ({ page }) => {

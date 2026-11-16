@@ -88,7 +88,7 @@ export default function AssistantPresence({
           <dl className="presence-stats">
             <div>
               <dt>Speed</dt>
-              <dd title="Generation tokens per second reported by llama-server">
+              <dd title="Tokens per second, reported by llama-server">
                 {value(metrics?.tokensPerSecond, ' t/s')}
               </dd>
             </div>
@@ -98,7 +98,7 @@ export default function AssistantPresence({
             </div>
             <div>
               <dt>Time</dt>
-              <dd title="Generation duration reported by llama-server">
+              <dd title="Generation time, reported by llama-server">
                 {value(metrics?.generationMs, ' s', 1000)}
               </dd>
             </div>

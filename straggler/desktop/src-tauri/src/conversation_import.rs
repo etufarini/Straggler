@@ -42,7 +42,7 @@ pub fn parse(contents: &str) -> Result<ImportedConversation> {
             );
         }
         if root.get("version").and_then(Value::as_u64) != Some(1) {
-            return Err("This conversation version is not supported. Use version 1.".into());
+            return Err("This chat version is not supported. Use version 1.".into());
         }
         let conversation = root
             .get("conversation")
@@ -51,12 +51,12 @@ pub fn parse(contents: &str) -> Result<ImportedConversation> {
         let messages = conversation
             .get("messages")
             .and_then(Value::as_array)
-            .ok_or("The conversation must contain an array of messages.")?;
+            .ok_or("The chat must contain an array of messages.")?;
         (conversation, messages)
     };
     let title = optional_string(conversation, "title")?;
     if title.as_ref().is_some_and(|text| text.len() > 1024) {
-        return Err("The conversation title exceeds 1024 UTF-8 bytes.".into());
+        return Err("The chat title exceeds 1024 UTF-8 bytes.".into());
     }
     let mut imported = ImportedConversation {
         title,

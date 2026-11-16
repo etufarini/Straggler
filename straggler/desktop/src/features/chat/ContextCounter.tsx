@@ -88,8 +88,7 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
             </>
           ) : (
             <p className="popover-note">
-              {controller.serverDetails?.error ||
-                'Usage is unavailable until the running server reports this chat.'}
+              {controller.serverDetails?.error || 'Available once the server is running.'}
             </p>
           )}
           <p className="ctx-tech">

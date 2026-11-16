@@ -183,7 +183,7 @@ export function samplingPreset(settings: Settings, presets: Record<string, strin
 export function newConversation(): Conversation {
   return {
     id: crypto.randomUUID(),
-    title: 'New conversation',
+    title: 'New chat',
     createdAt: Date.now(),
     updatedAt: Date.now(),
     model: null,

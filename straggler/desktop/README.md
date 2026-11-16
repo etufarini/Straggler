@@ -206,6 +206,13 @@ Run these commands from `straggler/desktop` with Vite running:
 | --- | --- |
 | `node tests/design-review.mjs final` | Browser fixture captures under `test-results/design/` |
 | `node tests/design-review.mjs r001` | Captures including project scenarios; reference views need the separately supplied design dossier |
+| `node tests/r001-copy-review.mjs [path/to/ui-design.html]` | D004/D005: 18 Compare proposals and live fixture views at 1200×820 and 760×620, plus the expanded compact overlay |
+
+The copy/presence review reads the local, Git-excluded
+`straggler/docs/to-be-implemented-design/ui-design.html` by default and writes
+screenshots, `comparison.html` and `checks.json` to `test-results/design/r001-copy/`.
+The input dossier stays unchanged. `STRAGGLER_REVIEW_URL` selects an existing
+fixture server; the default is `http://127.0.0.1:1420`.
 
 For real first-use native screenshots, set `STRAGGLER_CAPTURE_DOCS` to a new
 version directory when running the native suite, for example:

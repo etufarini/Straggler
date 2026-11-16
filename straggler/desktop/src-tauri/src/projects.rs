@@ -134,9 +134,7 @@ impl Projects {
             .get()
             .is_some_and(|current| *current != directory)
         {
-            return Err(
-                "Conversation storage already belongs to a different project store.".into(),
-            );
+            return Err("Chat storage already belongs to a different project store.".into());
         }
         let _ = history.project_storage.set(directory.clone());
         Ok(Self {
@@ -466,7 +464,7 @@ impl Projects {
         }
         let previous = conversation.project_id;
         if previous == project_id {
-            return Err("The conversation is already in that location.".into());
+            return Err("The chat is already in that location.".into());
         }
         change_membership(&mut conversation, project_id);
         history.write(&conversation, false)?;
@@ -520,7 +518,7 @@ impl Projects {
         private_directory(&backups)?;
         for chat in &members {
             let bytes = fs::read(history.directory.join(format!("{}.json", chat.id)))
-                .map_err(|error| format!("Cannot back up conversation: {error}"))?;
+                .map_err(|error| format!("Cannot back up chat: {error}"))?;
             crate::files::write_atomic(&backups.join(format!("{}.json", chat.id)), &bytes)?;
         }
         let mut journal = DeleteJournal {
@@ -541,16 +539,14 @@ impl Projects {
                             .join("removed")
                             .join(format!("{}.json", chat.id)),
                     )
-                    .map_err(|error| format!("Cannot stage conversation deletion: {error}"))?;
+                    .map_err(|error| format!("Cannot stage chat deletion: {error}"))?;
                     let attachments = history.directory.join(chat.id.to_string());
                     if attachments.exists() {
                         fs::rename(
                             attachments,
                             transaction.join("removed").join(chat.id.to_string()),
                         )
-                        .map_err(|error| {
-                            format!("Cannot stage conversation attachments: {error}")
-                        })?;
+                        .map_err(|error| format!("Cannot stage chat attachments: {error}"))?;
                     }
                 } else {
                     let mut detached = chat.clone();
@@ -645,7 +641,7 @@ impl Projects {
                 ensure_chat_idle(*conversation_id, generating)?;
                 let mut chat = history.read_one(*conversation_id)?;
                 if chat.project_id != *expected {
-                    return Err("The conversation moved again. Undo is unavailable.".into());
+                    return Err("The chat moved again. Undo is unavailable.".into());
                 }
                 if let Some(id) = expected {
                     ensure_active_at(&self.directory, *id)?;
@@ -781,9 +777,8 @@ pub(crate) fn ensure_active_at(directory: &Path, id: Uuid) -> Result<()> {
 }
 
 fn read_project(directory: &Path, id: Uuid) -> Result<Project> {
-    let bytes = fs::read(directory.join(id.to_string()).join("project.json")).map_err(|error| {
-        format!("Cannot read project {id}. Its conversations were kept: {error}")
-    })?;
+    let bytes = fs::read(directory.join(id.to_string()).join("project.json"))
+        .map_err(|error| format!("Cannot read project {id}. Its chats were kept: {error}"))?;
     let project: Project = serde_json::from_slice(&bytes)
         .map_err(|error| format!("Cannot read project {id}. Its data was kept: {error}"))?;
     if project.id != id {
@@ -916,12 +911,12 @@ fn rollback(
     }
     for id in &journal.conversations {
         let bytes = fs::read(transaction.join("backups").join(format!("{id}.json")))
-            .map_err(|error| format!("Cannot read conversation recovery copy: {error}"))?;
+            .map_err(|error| format!("Cannot read chat recovery copy: {error}"))?;
         crate::files::write_atomic(&history.join(format!("{id}.json")), &bytes)?;
         let attachments = transaction.join("removed").join(id.to_string());
         if attachments.exists() {
             fs::rename(attachments, history.join(id.to_string()))
-                .map_err(|error| format!("Cannot restore conversation attachments: {error}"))?;
+                .map_err(|error| format!("Cannot restore chat attachments: {error}"))?;
         }
     }
     // Cleanup can fail after removing a backup. Mark restoration complete first,
