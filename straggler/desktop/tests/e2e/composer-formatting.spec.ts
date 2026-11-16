@@ -1,9 +1,23 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import type { Editor } from '@tiptap/core';
 import { tabToNextControl } from './keyboard';
 
 const message = (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true });
 const toolbar = (page: Page) => page.getByRole('toolbar', { name: 'Formatting' }).last();
+
+async function moveToBlockStart(page: Page, text: string) {
+  for (let index = 0; index < text.length; index++) await message(page).press('ArrowLeft');
+  // Native selectionchange is asynchronous; wait until the editor sees the caret.
+  await expect
+    .poll(() =>
+      message(page).evaluate(
+        (field) =>
+          (field as HTMLElement & { editor: Editor }).editor.state.selection.$from.parentOffset,
+      ),
+    )
+    .toBe(0);
+}
 
 async function start(page: Page) {
   await page.goto('/?scenario=normal');
@@ -130,11 +144,7 @@ test('quote exits on an empty line or Backspace at its start', async ({ page }) 
   await expect(message(page).locator(':scope > p')).toHaveText('outside');
   await start(page);
   await message(page).pressSequentially('> quote');
-  await message(page).evaluate((field) => {
-    const block = field.querySelector('blockquote p, pre code')!;
-    const selection = window.getSelection()!;
-    selection.collapse(block.firstChild, 0);
-  });
+  await moveToBlockStart(page, 'quote');
   await page.keyboard.press('Backspace');
   await expect(message(page).locator('blockquote')).toHaveCount(0);
 });
@@ -172,11 +182,7 @@ test('ArrowDown exits the last code block; Backspace converts its start to text'
   await expect(message(page).locator(':scope > p')).toHaveText('below');
   await start(page);
   await message(page).pressSequentially('```code');
-  await message(page).evaluate((field) => {
-    const block = field.querySelector('blockquote p, pre code')!;
-    const selection = window.getSelection()!;
-    selection.collapse(block.firstChild, 0);
-  });
+  await moveToBlockStart(page, 'code');
   await page.keyboard.press('Backspace');
   await expect(message(page).locator('pre')).toHaveCount(0);
   await expect(message(page)).toHaveText('code');
@@ -220,6 +226,16 @@ test('link popover validates email and protocols, edits and removes links', asyn
   await dialog.getByRole('textbox', { name: 'Link', exact: true }).fill('example.com/a(b)');
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(message(page).locator('a')).toHaveAttribute('href', 'https://example.com/a(b)');
+  await expect(message(page)).toBeFocused();
+  expect(
+    await message(page).evaluate((field) => {
+      const selection = window.getSelection()!;
+      const beforeCaret = document.createRange();
+      beforeCaret.selectNodeContents(field);
+      beforeCaret.setEnd(selection.focusNode!, selection.focusOffset);
+      return { collapsed: selection.isCollapsed, textBefore: beforeCaret.toString() };
+    }),
+  ).toEqual({ collapsed: true, textBefore: 'example' });
   await message(page).press('ArrowLeft');
   await toolbar(page).getByRole('button', { name: 'Link', exact: true }).click();
   await expect(dialog.getByText('Edit link', { exact: true })).toBeVisible();
@@ -512,4 +528,35 @@ test('capture the visible and hidden toolbar, sent message, edit and narrow comp
   await message(page).pressSequentially('*A compact composer*');
   await expect(toolbar(page).getByRole('button')).toHaveCount(9);
   await page.screenshot({ path: testInfo.outputPath('composer-760x620.png') });
+});
+
+test.describe('Safari focus restoration', () => {
+  test.use({
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+  });
+
+  test('Escape does not steal the following Tab when the next frame arrives', async ({
+    page,
+    browserName,
+  }) => {
+    await start(page);
+    // Exercise TipTap's Safari branch even in Chromium, with a deterministic
+    // frame boundary between the immediate focus and any delayed refocus.
+    await page.evaluate(() => {
+      const state = window as Window & { focusFrames?: FrameRequestCallback[] };
+      state.focusFrames = [];
+      window.requestAnimationFrame = (callback) => state.focusFrames!.push(callback);
+    });
+    await toolbar(page).getByRole('button', { name: 'Bold', exact: true }).focus();
+    await page.keyboard.press('Escape');
+    await expect(message(page)).toBeFocused();
+    await tabToNextControl(page, browserName);
+    await expect(page.getByRole('button', { name: 'Hide formatting' })).toBeFocused();
+    await page.evaluate(() => {
+      const state = window as Window & { focusFrames?: FrameRequestCallback[] };
+      for (const callback of state.focusFrames!.splice(0)) callback(performance.now());
+    });
+    await expect(page.getByRole('button', { name: 'Hide formatting' })).toBeFocused();
+  });
 });

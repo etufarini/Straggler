@@ -11,9 +11,10 @@ import {
   SquareCode,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
+import { TextSelection } from '@tiptap/pm/state';
 import { useEditorState } from '@tiptap/react';
 import Popover from '../../../components/Popover';
-import { applyFormatting, formattingDisabled, isMac } from './commands';
+import { applyFormatting, focusComposer, formattingDisabled, isMac } from './commands';
 import { normalizeComposerUrl } from './markdown';
 
 const tools = [
@@ -51,7 +52,7 @@ export default function FormattingToolbar({
   const [error, setError] = useState('');
   const errorId = useId();
   const returnFocus = useCallback(() => {
-    editor.commands.focus();
+    focusComposer(editor);
   }, [editor]);
   const state = useEditorState({
     editor,
@@ -90,9 +91,14 @@ export default function FormattingToolbar({
     }
     const text = link.text || href;
     const chain = editor.chain().setTextSelection({ from: link.from, to: link.to });
-    if (text === editor.state.doc.textBetween(link.from, link.to)) chain.setLink({ href }).run();
-    else
-      chain.insertContent({ type: 'text', text, marks: [{ type: 'link', attrs: { href } }] }).run();
+    if (text === editor.state.doc.textBetween(link.from, link.to)) chain.setLink({ href });
+    else chain.insertContent({ type: 'text', text, marks: [{ type: 'link', attrs: { href } }] });
+    chain
+      .command(({ tr }) => {
+        tr.setSelection(TextSelection.near(tr.doc.resolve(tr.selection.to)));
+        return true;
+      })
+      .run();
     close();
   }
   return (
@@ -107,7 +113,7 @@ export default function FormattingToolbar({
         if (event.key === 'Escape') {
           event.preventDefault();
           event.stopPropagation();
-          editor.commands.focus();
+          focusComposer(editor);
           return;
         }
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))

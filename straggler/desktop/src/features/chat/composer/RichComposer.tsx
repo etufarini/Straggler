@@ -4,7 +4,13 @@ import type { Editor } from '@tiptap/core';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { ALargeSmall } from 'lucide-react';
 import { composerExtensions } from './extensions';
-import { composerContext, handleComposerKey, pastePlainText, modifierLabel } from './commands';
+import {
+  composerContext,
+  focusComposer,
+  handleComposerKey,
+  pastePlainText,
+  modifierLabel,
+} from './commands';
 import type { ComposerContext } from './commands';
 import FormattingToolbar from './FormattingToolbar';
 import { normalizeComposerUrl, parseMarkdown, serializeMarkdown } from './markdown';
@@ -132,13 +138,13 @@ export default function RichComposer(props: Props) {
     editor.view.dom.tabIndex = props.disabled ? -1 : 0;
   }, [editor, props.disabled, props.placeholder]);
   useEffect(() => {
-    if (editor && props.editing) editor.commands.focus('end');
+    if (editor && props.editing) focusComposer(editor, true);
   }, [editor, props.editing]);
   useEffect(() => {
     if (!editor || !props.focusRef) return;
     const handle = {
       focus: () => {
-        editor.commands.focus();
+        focusComposer(editor);
       },
     };
     if (typeof props.focusRef === 'function') return props.focusRef(handle);

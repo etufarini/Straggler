@@ -16,6 +16,15 @@ export type ComposerContext = 'text' | 'list' | 'code';
 export const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform);
 export const modifierLabel = () => (isMac() ? '⌘' : 'Ctrl');
 
+export function focusComposer(editor: Editor, atEnd = false) {
+  if (editor.isDestroyed) return;
+  if (atEnd)
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.atEnd(editor.state.doc)));
+  // TipTap's Safari focus command focuses twice. Its delayed second focus can
+  // steal the next Tab after toolbar Escape or a popover closes.
+  editor.view.focus();
+}
+
 export function composerContext(editor: Editor): ComposerContext {
   return editor.isActive('codeBlock') ? 'code' : editor.isActive('listItem') ? 'list' : 'text';
 }
@@ -30,7 +39,8 @@ export function formattingDisabled(editor: Editor, action: FormattingAction): bo
 
 export function applyFormatting(editor: Editor, action: FormattingAction, openLink: () => void) {
   if (formattingDisabled(editor, action)) return;
-  const chain = editor.chain().focus();
+  focusComposer(editor);
+  const chain = editor.chain();
   switch (action) {
     case 'bold':
       chain.toggleBold().run();
@@ -120,7 +130,7 @@ export function handleComposerKey(
       event.preventDefault();
       if (context !== 'code') {
         editor.commands.setContent(parseMarkdown(serializeMarkdown(editor.getJSON(), false)));
-        editor.commands.focus('end');
+        focusComposer(editor, true);
       }
       return true;
     }
