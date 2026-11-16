@@ -95,6 +95,25 @@ The default reference is `straggler/docs/to-be-implemented-design/ui-design.html
 a local design input excluded from Git. Captures, comparisons and JSON results are
 written to `straggler/desktop/test-results/design/d003/`.
 
+## Composer contracts
+
+The rich composer uses MIT-licensed TipTap/ProseMirror 3.34.0, pinned in the npm
+lockfile. Editor behavior and serialization are separate: `features/chat/composer`
+contains the editor, keyboard policy, link validation and CommonMark/GFM codec.
+`tests/composer-markdown.test.ts` checks escapes, nested marks/lists, code fences
+and round trips. `tests/e2e/composer-formatting.spec.ts` exercises actual editing,
+undo, paste, shortcuts, focus and viewport geometry. The native smoke test fills
+the field through the same plain-text paste event handled by the editor.
+
+The codec fixtures were checked against the F001 prototype serializer dated
+2026-11-16. Keep them aligned with [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/),
+[GFM](https://github.github.com/gfm/), and the pinned upstream
+[TipTap input-rule implementation](https://github.com/ueberdosis/tiptap/blob/v3.34.0/packages/core/src/InputRule.ts).
+In particular, typing a single star means bold, whereas importing standard
+Markdown parses single-star emphasis as italic. Unknown constructs remain visible
+as literal text; unchanged message edits retain their original Markdown string.
+No CDN, remote editor service, inference backend or model weights are used.
+
 ## Test boundaries
 
 Tests use temporary user directories, tiny generated documents, fake executables
