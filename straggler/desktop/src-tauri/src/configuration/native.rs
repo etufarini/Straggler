@@ -3,7 +3,7 @@ use super::{
     environment::Environment,
     models, settings,
     storage::{executable, readable_model, server_path, Paths, Store},
-    version,
+    templates, version,
 };
 use crate::{
     platform,
@@ -272,7 +272,7 @@ impl NativeConfiguration {
         if !discovery.valid {
             return Err(discovery.warning.clone());
         }
-        let args = capabilities::arguments(
+        let mut args = capabilities::arguments(
             settings,
             &discovery.help,
             discovery
@@ -280,6 +280,28 @@ impl NativeConfiguration {
                 .then_some(discovery.devices.as_slice()),
             &self.store.environment,
         )?;
+        if let Some(template) = templates::launch_file(
+            Path::new(&settings.model),
+            &discovery.help,
+            &self.store.environment,
+        )? {
+            let resolved = template.canonicalize().map_err(|error| {
+                format!(
+                    "Cannot resolve chat template {}: {error}",
+                    template.display()
+                )
+            })?;
+            if !self.model_access.permits(&resolved) {
+                return Err("Choose the chat template's folder in Settings to grant access before launching.".into());
+            }
+            args.extend([
+                "--chat-template-file".into(),
+                template
+                    .to_str()
+                    .ok_or("The chat template path must be valid UTF-8.")?
+                    .into(),
+            ]);
+        }
         let inspected = platform::inspect_port(
             settings
                 .port
