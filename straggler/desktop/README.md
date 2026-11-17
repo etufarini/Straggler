@@ -32,6 +32,7 @@ for a specific task.
 | `npm run desktop` | Start Vite and the native development window |
 | `npm run dev` | Serve the browser preview on 127.0.0.1:1420 |
 | `npm run build` | Check TypeScript and build production frontend assets |
+| `npm run clean` | Remove local Rust build artifacts from `src-tauri/target` |
 | `npm run format` | Format frontend and JavaScript test/configuration files |
 | `npm run format:check` | Check formatting without writing files |
 | `npm run lint` | Check frontend and TypeScript tests with ESLint |
@@ -40,6 +41,19 @@ for a specific task.
 | `npm run test:runtime` | Run Rust unit/integration tests without the desktop feature |
 | `npm run test:e2e` | Run browser flows with WebKit by default |
 | `npm run test:native` | Build and exercise the actual Tauri window with a fake backend |
+
+## Build artifacts
+
+After final native validation, close development sessions and run from the
+repository root:
+
+```bash
+npm --prefix straggler/desktop run clean
+```
+
+The command removes only `src-tauri/target`, deliberately ignoring an external
+`CARGO_TARGET_DIR`. See the [disk-usage guide](../docs/guide.md#development-disk-usage)
+for profile settings, preserved resources and packaging build directories.
 
 ## Test suites
 

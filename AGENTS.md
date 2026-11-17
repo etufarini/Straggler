@@ -62,6 +62,8 @@ Use representative cases and meaningful boundaries instead of Cartesian products
 
 Run Bash syntax/ShellCheck for shell changes, frontend type/lint/format checks and affected suites first. Complete the required checks before merge; repeat them only after changes or unresolved failures justify it. Cache dependencies/builds by platform and toolchain. Aim for roughly ten minutes of required execution with warm caches, measuring runner queues separately; this target never permits skipping failures.
 
+Keep development/test builds on limited debug information with incremental compilation disabled. After final local native validation, close development processes and run `npm --prefix straggler/desktop run clean`; do not immediately rebuild after cleanup. This cleans only the repository's `src-tauri/target`, ignoring external target-directory overrides. Preserve test evidence, prepared backends and packaging candidates still under review; never clean application data, models or global tool caches. Keep CI build caches and avoid cleanup between dependent checks.
+
 Treat GitHub Actions as a merge gate: require successful frontend and Linux/macOS checks for the exact PR head and current base. Inspect and resolve failures, including existing main failures; never bypass checks, weaken behavioral assertions or retry until green. After merging, verify main succeeds and summarize failures and fixes in the PR. Retain successful and failed runs under normal GitHub retention rather than deleting runs as routine cleanup.
 
 ## Documentation and releases
