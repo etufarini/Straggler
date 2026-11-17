@@ -9,7 +9,7 @@ import { settingsColorViolations, contrastRatio } from './designColors.ts';
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dossierPath = path.resolve(
-  process.argv[2] || path.join(desktop, '../docs/to-be-implemented-design/ui-design.html'),
+  process.argv[2] || path.join(desktop, '../docs/design/to-be-implemented/ui-design.html'),
 );
 const output = path.join(desktop, 'test-results/design/d003');
 await mkdir(output, { recursive: true });

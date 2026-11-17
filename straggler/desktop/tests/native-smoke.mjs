@@ -233,7 +233,8 @@ try {
   if (process.env.STRAGGLER_CAPTURE_DOCS) {
     const captureVersion = process.env.STRAGGLER_CAPTURE_DOCS;
     assert.match(captureVersion, /^[a-z0-9-]+$/, 'Use a new screenshot version directory');
-    const captureDirectory = path.join(desktop, '../docs/screenshots', captureVersion);
+    const captureDirectory = path.join(desktop, 'test-results/docs', captureVersion);
+    await mkdir(path.dirname(captureDirectory), { recursive: true });
     await mkdir(captureDirectory);
     await until(
       () => evaluate('document.querySelector(".settings-heading h1")?.textContent === "Settings"'),
