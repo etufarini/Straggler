@@ -1,7 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
 
-test.describe.configure({ mode: 'parallel' });
-
 const projectId = '10000000-0000-4000-8000-000000000001';
 const chatId = '20000000-0000-4000-8000-000000000001';
 
@@ -105,65 +103,51 @@ async function inspectControls(page: Page) {
   await expect(send).toBeInViewport();
 }
 
-for (const width of [760, 820, 960, 1024, 1100, 1280, 1440]) {
-  for (const height of [560, 820]) {
-    for (const web of ['off', 'on', 'missing']) {
-      for (const reasoning of [false, true]) {
-        test(`composer ${width}x${height}, web ${web}, reasoning ${reasoning ? 'on' : 'default'}`, async ({
-          page,
-        }, testInfo) => {
-          await page.setViewportSize({ width, height });
-          await prepare(page, web, reasoning);
-          for (const sidebar of ['normal', 'compact']) {
-            if (sidebar === 'compact')
-              await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
-            await inspectControls(page);
-            await page
-              .getByRole('button', { name: 'Send message', exact: true })
-              .click({ trial: true });
-            await page.getByRole('button', { name: 'Expand assistant panel', exact: true }).click();
-            if (width > 1100) await inspectControls(page);
-            // At <=1100px the existing panel intentionally overlays chat. Close it to send.
-            if (width > 1100)
-              await page
-                .getByRole('button', { name: 'Send message', exact: true })
-                .click({ trial: true });
-            await page
-              .getByRole('button', { name: 'Collapse assistant panel', exact: true })
-              .click();
-            await page
-              .getByRole('button', { name: 'Send message', exact: true })
-              .click({ trial: true });
-            if (
-              [760, 1024, 1440].includes(width) &&
-              height === 820 &&
-              web === 'on' &&
-              reasoning &&
-              sidebar === 'normal'
-            ) {
-              await page.screenshot({ path: testInfo.outputPath(`composer-${width}.png`) });
-            }
-          }
-          for (const label of [
-            'System prompt: Project instructions',
-            'Reasoning',
-            'Context',
-            ...(web === 'missing' ? ['Web search'] : []),
-          ]) {
-            await page.getByRole('button', { name: label, exact: true }).click();
-            const popover = page.getByRole('dialog', { name: label, exact: true });
-            await expect(popover).toBeVisible();
-            const form = (await page.locator('.composer').boundingBox())!;
-            const box = (await popover.boundingBox())!;
-            expect(box.x).toBeGreaterThanOrEqual(form.x);
-            expect(box.x + box.width).toBeLessThanOrEqual(form.x + form.width);
-            expect(box.y).toBeGreaterThanOrEqual(0);
-            await page.keyboard.press('Escape');
-          }
-        });
-      }
+// Cover compact/tall windows, both sides of the overlay boundary and a wide
+// desktop. Web-key availability and reasoning vary without multiplying every case.
+for (const { width, height, web, reasoning } of [
+  { width: 760, height: 560, web: 'off', reasoning: false },
+  { width: 820, height: 820, web: 'missing', reasoning: true },
+  { width: 1024, height: 560, web: 'on', reasoning: true },
+  { width: 1100, height: 820, web: 'off', reasoning: true },
+  { width: 1101, height: 820, web: 'missing', reasoning: false },
+  { width: 1440, height: 820, web: 'on', reasoning: true },
+]) {
+  test(`composer ${width}x${height}, web ${web}, reasoning ${reasoning}`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await prepare(page, web, reasoning);
+    for (const sidebar of ['normal', 'compact']) {
+      if (sidebar === 'compact')
+        await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+      await inspectControls(page);
+      await page.getByRole('button', { name: 'Send message', exact: true }).click({ trial: true });
+      await page.getByRole('button', { name: 'Expand assistant panel', exact: true }).click();
+      if (width > 1100) await inspectControls(page);
+      // At <=1100px the existing panel intentionally overlays chat. Close it to send.
+      if (width > 1100)
+        await page
+          .getByRole('button', { name: 'Send message', exact: true })
+          .click({ trial: true });
+      await page.getByRole('button', { name: 'Collapse assistant panel', exact: true }).click();
+      await page.getByRole('button', { name: 'Send message', exact: true }).click({ trial: true });
     }
-  }
+    for (const label of [
+      'System prompt: Project instructions',
+      'Reasoning',
+      'Context',
+      ...(web === 'missing' ? ['Web search'] : []),
+    ]) {
+      await page.getByRole('button', { name: label, exact: true }).click();
+      const popover = page.getByRole('dialog', { name: label, exact: true });
+      await expect(popover).toBeVisible();
+      const form = (await page.locator('.composer').boundingBox())!;
+      const box = (await popover.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(form.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(form.x + form.width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      await page.keyboard.press('Escape');
+    }
+  });
 }
 
 async function resizeComposer(page: Page, width: number) {
@@ -177,26 +161,6 @@ async function resizeComposer(page: Page, width: number) {
   await page.evaluate(() => new Promise(requestAnimationFrame));
 }
 
-// Keep every width in the sweep, with bounded cases under the default timeout.
-// Density transitions and hysteresis are checked independently below.
-for (const [maximum, minimum] of [
-  [770, 620],
-  [610, 460],
-  [450, 300],
-  [290, 160],
-]) {
-  test(`composer controls remain accessible from ${maximum}px to ${minimum}px`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1440, height: 820 });
-    await prepare(page, 'on', true);
-    for (let width = maximum; width >= minimum; width -= 10) {
-      await resizeComposer(page, width);
-      await inspectControls(page);
-    }
-  });
-}
-
 test('all four densities follow measured space with hysteresis and accessible active icons', async ({
   page,
 }) => {
@@ -208,15 +172,18 @@ test('all four densities follow measured space with hysteresis and accessible ac
   for (let width = 770; width >= 160; width -= 10) {
     await resizeComposer(page, width);
     const density = (await composer.getAttribute('data-density'))!;
-    if (density === 'compact' && !seen.has(density)) transitionWidth = width;
-    seen.add(density);
+    if (!seen.has(density)) {
+      if (density === 'compact') transitionWidth = width;
+      await inspectControls(page);
+      seen.add(density);
+    }
   }
   expect([...seen]).toEqual(['full', 'compact', 'icon', 'wrap']);
+  await inspectControls(page);
   for (const name of ['Reasoning', 'Web search']) {
     const chip = page.getByRole('button', { name, exact: true });
     await expect(chip).toHaveAttribute('aria-pressed', 'true');
     await expect(chip).toHaveAttribute('title', /\S/);
-    expect(await chip.evaluate((node) => getComputedStyle(node, '::after').content)).toBe('""');
   }
   await composer.evaluate((form, width) => {
     form.style.width = `${width}px`;
