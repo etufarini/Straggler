@@ -208,12 +208,23 @@ try {
         input.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
         return;
       }
+      if (!(input instanceof HTMLInputElement) && !(input instanceof HTMLTextAreaElement)) {
+        throw new Error('Field is not an editable text control: ' + ${JSON.stringify(selector)});
+      }
       const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
       Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, ${JSON.stringify(text)});
       input.dispatchEvent(new Event('input', {bubbles:true}));
     })()`);
   }
   async function sendMessage(text) {
+    // Native fixture restarts can finish before the UI's next server-status poll.
+    await until(
+      () =>
+        evaluate(
+          'document.querySelector(".local-badge")?.textContent === "Ready" && document.querySelector(".rich-composer-field")?.isContentEditable',
+        ),
+      'ready server and editable composer',
+    );
     await fillField('.rich-composer-field', text);
     await until(
       () => evaluate('!document.querySelector(".send-button").disabled'),
