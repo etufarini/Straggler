@@ -32,6 +32,7 @@ for a specific task.
 | `npm run desktop` | Start Vite and the native development window |
 | `npm run dev` | Serve the browser preview on 127.0.0.1:1420 |
 | `npm run build` | Check TypeScript and build production frontend assets |
+| `npm run clean` | Remove local Rust build artifacts from `src-tauri/target` |
 | `npm run format` | Format frontend and JavaScript test/configuration files |
 | `npm run format:check` | Check formatting without writing files |
 | `npm run lint` | Check frontend and TypeScript tests with ESLint |
@@ -40,6 +41,19 @@ for a specific task.
 | `npm run test:runtime` | Run Rust unit/integration tests without the desktop feature |
 | `npm run test:e2e` | Run browser flows with WebKit by default |
 | `npm run test:native` | Build and exercise the actual Tauri window with a fake backend |
+
+## Build artifacts
+
+After final native validation, close development sessions and run from the
+repository root:
+
+```bash
+npm --prefix straggler/desktop run clean
+```
+
+The command removes only `src-tauri/target`, deliberately ignoring an external
+`CARGO_TARGET_DIR`. See the [disk-usage guide](../docs/guide.md#development-disk-usage)
+for profile settings, preserved resources and packaging build directories.
 
 ## Test suites
 
@@ -100,7 +114,7 @@ beside the supplied D003 dossier, start `npm run dev` in one terminal, then run 
 node --experimental-strip-types tests/d003-review.mjs [path/to/ui-design.html]
 ```
 
-The default reference is `straggler/docs/to-be-implemented-design/ui-design.html`,
+The default reference is `straggler/docs/design/to-be-implemented/ui-design.html`,
 a local design input excluded from Git. Captures, comparisons and JSON results are
 written to `straggler/desktop/test-results/design/d003/`.
 
@@ -251,7 +265,7 @@ Run these commands from `straggler/desktop` with Vite running:
 | `node tests/d006-review.mjs` | D006: empty/message pairs at 760×620 and 1200×820, compact active Temporary, long model and geometry in `test-results/design/d006/` |
 
 The copy/presence review reads the local, Git-excluded
-`straggler/docs/to-be-implemented-design/ui-design.html` by default and writes
+`straggler/docs/design/to-be-implemented/ui-design.html` by default and writes
 screenshots, `comparison.html` and `checks.json` to `test-results/design/r001-copy/`.
 The input dossier stays unchanged. `STRAGGLER_REVIEW_URL` selects an existing
 fixture server; the default is `http://127.0.0.1:1420`.
@@ -260,14 +274,17 @@ For real first-use native screenshots, set `STRAGGLER_CAPTURE_DOCS` to a new
 version directory when running the native suite, for example:
 
 ```bash
-STRAGGLER_CAPTURE_DOCS=d009 bash straggler/tests/run.sh native
+STRAGGLER_CAPTURE_DOCS=review-001 bash straggler/tests/run.sh native
 ```
 
 Run that command from the repository root. It creates
-`straggler/docs/screenshots/d009/` exclusively and refuses to overwrite an existing
-version. It opens the real app without a configured backend or model, captures
-chat and settings, then closes the window. Keep the original dossier baseline
-immutable; append evidence in a new dossier revision without using its builder.
+`straggler/desktop/test-results/docs/review-001/` exclusively and refuses to overwrite
+an existing version. It opens the real app without a configured backend or model,
+captures chat and settings, then closes the window. Review captures there before
+replacing the two current README images, `desktop-chat.png` and
+`desktop-settings.png`. Keep `straggler/docs/screenshots/` flat with only those two
+files; temporary captures and historical design views stay under ignored test
+results. Keep the original dossier baseline immutable.
 
 Browser captures document simulated UI states, not inference results. From the
 repository root on Linux or macOS, run the optional animation measurement with:

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
+    "clean": "cargo clean --offline --locked --manifest-path src-tauri/Cargo.toml --target-dir src-tauri/target",
     "desktop": "tauri dev",
     "bundle": "tauri build",
     "test": "vitest run tests/*.test.ts",

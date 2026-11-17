@@ -1,7 +1,12 @@
 # Local design references
 straggler/docs/design/
-straggler/docs/to-be-implemented-design/
+straggler/docs/design/to-be-implemented/
 
 # Local browser downloads and macOS metadata
 /.playwright-browsers/
 .DS_Store
+
+# Keep only the two current README screenshots in version control.
+straggler/docs/screenshots/*
+!straggler/docs/screenshots/desktop-chat.png
+!straggler/docs/screenshots/desktop-settings.png

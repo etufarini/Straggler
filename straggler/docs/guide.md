@@ -865,6 +865,30 @@ simulated services and responses. A plain browser preview reports that native
 services are unavailable; production assets exclude the fixture service. The
 [desktop README](../desktop/README.md#browser-fixtures) lists available scenarios.
 
+### Development disk usage
+
+Native development and tests use limited debug information without incremental
+compilation, retaining source locations in backtraces. Debugger type/variable
+inspection is reduced, and recompilation can take longer. Release builds keep
+their existing profile. See the
+[Cargo profile reference](https://doc.rust-lang.org/cargo/reference/profiles.html).
+
+After finishing native validation and closing development sessions, run from
+the repository root:
+
+```bash
+npm --prefix straggler/desktop run clean
+```
+
+This deletes generated Rust artifacts under `straggler/desktop/src-tauri/target`,
+including binaries and any packages built there. It preserves application data,
+models, dependencies, test evidence and `packaging/generated`. The next native
+build recompiles dependencies. See the [artifact boundaries](../desktop/README.md#build-artifacts)
+for the command reference. External `CARGO_TARGET_DIR` overrides are ignored.
+Packaging build directories are separate; inspect them and preserve candidates
+still under review before any manual cleanup. Cleanup is explicit, not run
+between CI checks that reuse compilation results.
+
 ### Run the checks
 
 Use the repository's test runner as the development entry point. Install browser

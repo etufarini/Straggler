@@ -57,3 +57,8 @@ objc2-foundation = { version = "0.3.2", optional = true, default-features = fals
 
 [build-dependencies]
 tauri-build = { version = "2", optional = true , features = [] }
+
+# Tests inherit dev; retain useful backtraces without large incremental caches.
+[profile.dev]
+debug = "limited"
+incremental = false

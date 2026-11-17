@@ -8,7 +8,7 @@ import { prepareDesignScreen } from './design-scenarios.mjs';
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dossierPath = path.resolve(
-  process.argv[2] || path.join(desktop, '../docs/to-be-implemented-design/ui-design.html'),
+  process.argv[2] || path.join(desktop, '../docs/design/to-be-implemented/ui-design.html'),
 );
 const output = path.join(desktop, 'test-results/design/r001-copy');
 const baseURL = process.env.STRAGGLER_REVIEW_URL || 'http://127.0.0.1:1420';
