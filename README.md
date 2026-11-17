@@ -10,9 +10,7 @@ computer. Projects let you share instructions and documents across chats.
 
 Straggler is written for humans to read, maintain, and improve.
 
-[<img src="straggler/docs/screenshots/desktop-chat.png" alt="Straggler chat with the illuminated assistant orb in a labelled development simulation" width="960">](straggler/docs/screenshots/desktop-chat.png)
-
-*Chat with the assistant orb. Development simulation with simulated services; no model inference.*
+[<img src="straggler/docs/screenshots/desktop-chat.png" alt="Straggler chat with the illuminated assistant orb" width="960">](straggler/docs/screenshots/desktop-chat.png)
 
 ## Availability and requirements
 
@@ -67,7 +65,7 @@ app asks you to confirm saving and server shutdown. On a new chat, **Temporary**
 (or Ctrl/⌘+Shift+N) keeps messages and attachments in memory until you choose
 **Save chat**; leaving asks before erasing them.
 
-[<img src="straggler/docs/screenshots/desktop-settings.png" alt="Straggler native model settings before choosing a GGUF" width="640">](straggler/docs/screenshots/desktop-settings.png)
+[<img src="straggler/docs/screenshots/desktop-settings.png" alt="Straggler native model settings before choosing a GGUF" width="960">](straggler/docs/screenshots/desktop-settings.png)
 
 See the [user and developer guide](straggler/docs/guide.md) for chat, files,
 projects, settings, backups, troubleshooting, development and packaging.
