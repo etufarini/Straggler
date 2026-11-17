@@ -5,39 +5,41 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
 });
 
-test('keyboard navigation keeps focus, cancels with Escape and commits with Enter or Tab', async ({
-  page,
-}) => {
-  const context = page.getByRole('combobox', { name: 'Context size', exact: true });
-  const original = await context.textContent();
-  await context.focus();
-  await context.press('End');
-  await expect(page.getByRole('listbox')).toBeVisible();
-  await expect(context).toBeFocused();
-  let activeId = await context.getAttribute('aria-activedescendant');
-  await expect(page.locator(`[id=${JSON.stringify(activeId)}]`)).toHaveText('Custom');
-  await context.press('Escape');
-  await expect(context).toHaveText(original!);
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-  await context.press('Home');
-  await context.press('ArrowDown');
-  await context.press('Enter');
-  await expect(context).toHaveText('Largest the model supports');
-  await expect(
-    page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }),
-  ).toHaveValue('0');
-  await context.press('Home');
-  await context.press('PageDown');
-  activeId = await context.getAttribute('aria-activedescendant');
-  await expect(page.locator(`[id=${JSON.stringify(activeId)}]`)).toHaveText('256K');
-  await context.press('PageUp');
-  await context.press('ArrowDown');
-  await context.press('ArrowDown');
-  await context.press('Tab');
-  await expect(context).toHaveText('4K');
-  await expect(context).not.toBeFocused();
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-});
+test(
+  'keyboard navigation keeps focus, cancels with Escape and commits with Enter or Tab',
+  { tag: '@platform' },
+  async ({ page }) => {
+    const context = page.getByRole('combobox', { name: 'Context size', exact: true });
+    const original = await context.textContent();
+    await context.focus();
+    await context.press('End');
+    await expect(page.getByRole('listbox')).toBeVisible();
+    await expect(context).toBeFocused();
+    let activeId = await context.getAttribute('aria-activedescendant');
+    await expect(page.locator(`[id=${JSON.stringify(activeId)}]`)).toHaveText('Custom');
+    await context.press('Escape');
+    await expect(context).toHaveText(original!);
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    await context.press('Home');
+    await context.press('ArrowDown');
+    await context.press('Enter');
+    await expect(context).toHaveText('Largest the model supports');
+    await expect(
+      page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }),
+    ).toHaveValue('0');
+    await context.press('Home');
+    await context.press('PageDown');
+    activeId = await context.getAttribute('aria-activedescendant');
+    await expect(page.locator(`[id=${JSON.stringify(activeId)}]`)).toHaveText('256K');
+    await context.press('PageUp');
+    await context.press('ArrowDown');
+    await context.press('ArrowDown');
+    await context.press('Tab');
+    await expect(context).toHaveText('4K');
+    await expect(context).not.toBeFocused();
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+  },
+);
 
 test('typeahead cycles repeated initials and selects a full prefix', async ({ page }) => {
   const style = page.getByRole('combobox', { name: 'Reply style', exact: true });

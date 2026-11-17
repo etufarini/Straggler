@@ -56,7 +56,8 @@ bash straggler/tests/run.sh frontend
 | `common` | Runner boundaries, Bash syntax/ShellCheck and offline archive fixtures | Bash 3.2+, Python; ShellCheck is optional locally |
 | `frontend` | Formatting, lint, types, production assets and unit contracts | Node/npm and `npm ci` |
 | `runtime` | Rust formatting, Clippy, runtime tests and macOS Store boundaries | Rust with rustfmt/Clippy, Python and the host linker; no npm or native GUI libraries |
-| `browser` | WebKit flows on the host platform | Node/npm, `npm ci`, Playwright WebKit and its system dependencies |
+| `browser` | Shared renderer interactions with WebKit | Node/npm, `npm ci`, Playwright WebKit and its system dependencies |
+| `browser-platform` | Keyboard, IME and focus regressions tagged `@platform` | Same setup as `browser`; repeated on macOS in CI |
 | `desktop` | Frontend, runtime and browser suites | Combined prerequisites for those three suites |
 | `isolation` | Compile the native desktop with only shared and host-platform inputs | Rust, Python and the host Tauri development dependencies |
 | `native` | Isolation, desktop Clippy and the actual native window | Native app setup, Python and a display or headless Linux tools |
@@ -80,11 +81,19 @@ repository root:
 STRAGGLER_TEST_BROWSER=chromium bash straggler/tests/run.sh browser
 ```
 
-CI continues to use WebKit. The composer suite covers measured density, all
-requested viewport sizes, chip states, sidebar/presence layouts and overlay focus.
-The D003 suite checks area transitions, portaled controls, computed colours,
-contrast and star placement. To capture the live fixtures beside the supplied
-D003 dossier, start `npm run dev` in one terminal, then run from
+CI uses three jobs: shared checks, frontend and browser interactions on Linux;
+Rust/runtime and native-window checks on Linux; and the equivalent native checks
+plus `browser-platform` on macOS. The latter repeats only the interactions that
+need host keyboard/focus coverage. Use `bash straggler/tests/run.sh browser-platform`
+to run that subset locally. Browser failures retain screenshots, traces and a JSON
+report in `test-results/browser/`; no automatic test retries are used.
+
+Keep shared behavior at its cheapest effective level. Composer/top-bar checks use
+representative layouts and measured density boundaries instead of multiplying
+viewport, feature and chat-state combinations. Functional accessibility, contrast,
+reduced motion, overlay protection and focus remain automated. Decorative colors,
+spacing and assets belong to explicit visual review. To capture the live fixtures
+beside the supplied D003 dossier, start `npm run dev` in one terminal, then run from
 `straggler/desktop`:
 
 ```bash
@@ -128,7 +137,8 @@ The native test copies the GUI away from the source tree and rejects Bash,
 Python-helper, curl and OS utility invocations by the app. Python is permitted
 only for the fake backend and the loopback Hub development fixture. The test
 exercises the actual window, IPC, fatal error recovery, partial response persistence, confirmed Stop/restart and shutdown
-cleanup. It also checks temporary chat disposal and a synthetic Hub download
+cleanup. It also checks temporary chat disposal, one project/file persistence and membership
+round trip, and a synthetic Hub download
 through real IPC, native filesystem writes and SHA-256 verification; the keychain
 provider is replaced by an in-memory store. WebDriver is enabled only by
 `native-tests` in debug builds; production compilation rejects it.
@@ -274,8 +284,8 @@ proof that each frame reached the display, and include GUI and fixture overhead
 rather than inference performance. Results are in `test-results/native-orb-cpu.json`.
 For a controlled desktop benchmark, set `STRAGGLER_ORB_MAX_FRAME_P95_MS` to a
 positive interval limit in milliseconds. This optional limit is not a hardware
-requirement for the standard suite. Browser streaming checks also attach
-`orb-performance.json` with draw costs and detail levels.
+requirement for the standard suite. Standard browser tests check streaming
+correctness; timing measurements belong to this explicit diagnostic.
 
 ## Dependency maintenance
 

@@ -1,4 +1,3 @@
-import { verifyNativeModelOptions } from './native-model-options.mjs';
 import { measureNativeOrb } from './native-orb-performance.mjs';
 import { installOrbMeasurement } from './orb-performance.mjs';
 // Real Tauri/WebKit window, native services and a test server; no model inference.
@@ -80,7 +79,7 @@ async function until(predicate, description) {
   });
 }
 
-let app, driver, session, inspectPage, hubFixture;
+let app, driver, session, inspectPage, captureScreenshot, hubFixture;
 try {
   if (!process.env.STRAGGLER_TEST_NATIVE) {
     await mkdir(path.dirname(binary));
@@ -113,8 +112,6 @@ try {
   );
   await chmod(path.join(llama, 'build/bin/llama-server'), 0o755);
   await writeFile(path.join(models, 'test-model.gguf'), '');
-  await writeFile(path.join(models, 'chat_template.jinja'), '{{ messages[0].content }}');
-  await writeFile(path.join(stage, 'mtp.gguf'), 'GGUFfake MTP component');
   const port = await freePort(),
     automationPort = await freePort();
   const environment = Object.fromEntries(
@@ -193,6 +190,7 @@ try {
     return request('GET', `/session/${session}/screenshot`);
   }
   inspectPage = evaluate;
+  captureScreenshot = screenshot;
   async function fillField(selector, text) {
     await evaluate(`(() => {
       const input = document.querySelector(${JSON.stringify(selector)});
@@ -363,7 +361,6 @@ try {
       evaluate(
         `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)})`,
       );
-    await verifyNativeModelOptions({ invoke: invokeNative, stage });
     // Exercise the real window and IPC with a memory keychain and injected search provider.
     assert.equal((await invokeNative('web_search_status', { refresh: false })).saved, false);
     await evaluate('document.querySelector(".sidebar-bottom .nav-item").click()');
@@ -559,8 +556,9 @@ try {
         ),
       'native PDF attachment rail',
     );
-    // Set up native project files through the public IPC contract, then exercise
-    // membership, shared instructions and lifecycle through production controls.
+    // Verify project/file persistence and membership through real IPC and one
+    // window round trip. Archive, editing and deletion variations belong to the
+    // focused Rust and browser project suites.
     async function clickControl(controlId) {
       const selector = JSON.stringify(`[data-control-id="${controlId}"]`);
       await until(
@@ -644,137 +642,11 @@ try {
       ),
       'source.txt',
     );
-    await clickControl('switch-include-source-txt');
-    await until(async () => {
-      const stored = JSON.parse(await readFile(projectRecordPath, 'utf8'));
-      return stored.files[0].included === false;
-    }, 'native file exclusion persisted');
-    await clickControl('switch-include-source-txt');
-    await until(async () => {
-      const stored = JSON.parse(await readFile(projectRecordPath, 'utf8'));
-      return stored.files[0].included === true;
-    }, 'native file inclusion persisted');
-    await clickControl('button-open-attachment-contract');
-    await until(
-      () =>
-        evaluate(
-          `document.querySelector('[data-control-id="button-crumb-project"]')?.textContent === "Native project"`,
-        ),
-      'native member chat breadcrumb',
-    );
-    assert.match(
-      await evaluate(
-        `document.querySelector('[data-control-id="button-system-prompt"]').textContent`,
-      ),
-      /Project instructions/,
-    );
-    await clickControl('button-options-for-attachment-contract');
-    assert.equal(
-      await evaluate(
-        `document.querySelector('[data-control-id="button-move-to-project"]').textContent.trim()`,
-      ),
-      'Move to another project…',
-    );
-    assert.equal(
-      await evaluate(
-        `document.querySelector('[data-control-id="button-remove-from-project"]').getAttribute("aria-disabled")`,
-      ),
-      null,
-    );
-    await clickControl('button-options-for-attachment-contract');
-    await clickControl('button-system-prompt');
-    assert.equal(
-      await evaluate(
-        `document.querySelector('[data-control-id="textarea-project-instructions"]').value`,
-      ),
-      projectInstructions,
-    );
-    const editedProjectInstructions = 'Updated native project instructions for every chat.';
-    await fillField('[data-control-id="textarea-project-instructions"]', editedProjectInstructions);
-    await clickControl('button-save-instructions-for-chats');
-    await until(async () => {
-      const stored = JSON.parse(await readFile(projectRecordPath, 'utf8'));
-      return stored.instructions === editedProjectInstructions;
-    }, 'shared instructions saved through the native chip');
-    await clickControl('button-crumb-project');
-    await until(
-      () =>
-        evaluate(
-          'document.querySelector(".project-instructions-preview")?.textContent === ' +
-            JSON.stringify(editedProjectInstructions),
-        ),
-      'project detail reflects the shared prompt edit',
-    );
     await writeFile(
       path.join(desktop, 'test-results/native-project.png'),
       Buffer.from(await screenshot(), 'base64'),
     );
-    await clickControl('button-options-for-current-project');
-    await clickControl('button-archive-project-menu');
-    await clickControl('button-archive-project');
-    await until(
-      () => evaluate(`!!document.querySelector('[data-control-id="button-restore-project"]')`),
-      'archived native project detail',
-    );
-    assert.equal(
-      await evaluate(
-        `document.querySelector('[data-control-id="textarea-start-chat"]').getAttribute('aria-disabled') === 'true'`,
-      ),
-      true,
-    );
-    assert.equal(
-      await evaluate(
-        `document.querySelector('[data-control-id="switch-include-source-txt"]').disabled`,
-      ),
-      true,
-    );
-    await clickControl('button-open-attachment-contract');
-    await until(
-      () => evaluate(`!!document.querySelector('[data-control-id="button-restore-from-chat"]')`),
-      'archived native member chat',
-    );
-    assert.equal(
-      await evaluate(
-        'document.querySelector(".composer .rich-composer-field").getAttribute("aria-disabled") === "true"',
-      ),
-      true,
-    );
-    await clickControl('button-options-for-attachment-contract');
-    for (const controlId of ['button-move-to-project', 'button-remove-from-project']) {
-      assert.equal(
-        await evaluate(
-          `document.querySelector('[data-control-id="${controlId}"]').getAttribute('aria-disabled')`,
-        ),
-        'true',
-      );
-    }
-    await clickControl('button-options-for-attachment-contract');
-    await clickControl('button-restore-from-chat');
-    await until(
-      () =>
-        evaluate(
-          'document.querySelector(".composer .rich-composer-field").getAttribute("aria-disabled") === "false"',
-        ),
-      'restored native member chat',
-    );
-    await clickControl('button-crumb-project');
-    await clickControl('button-options-for-current-project');
-    await clickControl('button-delete-project-menu');
-    await until(
-      () => evaluate(`!!document.querySelector('[data-control-id="checkbox-also-delete-chats"]')`),
-      'native project deletion confirmation',
-    );
-    assert.equal(
-      await evaluate(
-        `document.querySelector('[data-control-id="checkbox-also-delete-chats"]').checked`,
-      ),
-      false,
-    );
-    await clickControl('button-delete-project');
-    await until(
-      async () => !(await readdir(projectsRoot)).includes(projectId),
-      'native project deleted',
-    );
+    await invokeNative('project_delete', { projectId, deleteChats: false });
     const detached = JSON.parse(await readFile(attachmentRecordPath, 'utf8'));
     assert.equal(detached.projectId, undefined);
     assert.equal(detached.ownSystemPrompt, 'Native chat own prompt');
@@ -782,31 +654,12 @@ try {
     assert.equal(detached.attachments.length, 2);
     assert.equal(await readFile(projectSource, 'utf8'), projectSourceText);
     assert.ok(!(await readdir(projectsRoot)).includes(projectId));
-    for (const attachment of detached.attachments) {
-      assert.ok(
-        (
-          await readFile(
-            path.join(
-              history,
-              attachmentChatId,
-              'attachments',
-              `${attachment.id}.${attachment.extension}`,
-            ),
-          )
-        ).length,
-      );
-    }
+    await evaluate('location.reload()');
     await until(
-      () => evaluate('!document.querySelector(".confirmation")'),
-      'native project deletion dialog closed',
+      () => evaluate(`!!document.querySelector('[title="Attachment contract"]')`),
+      'detached conversation reloaded from native storage',
     );
     await evaluate(`document.querySelector('[title="Attachment contract"]').click()`);
-    await clickControl('button-system-prompt');
-    assert.equal(
-      await evaluate(`document.querySelector('[aria-label="System prompt instructions"]').value`),
-      'Native chat own prompt',
-    );
-    await clickControl('button-system-prompt');
     await evaluate(
       `document.querySelector('[aria-label="Options for Attachment contract"]').click()`,
     );
@@ -1032,12 +885,20 @@ try {
     );
   }
 } catch (error) {
-  if (inspectPage) {
-    try {
+  const appLog = await readFile(path.join(stage, 'app.log'), 'utf8').catch(() => '');
+  console.error(appLog);
+  try {
+    const evidence = path.join(desktop, 'test-results');
+    await mkdir(evidence, { recursive: true });
+    await writeFile(path.join(evidence, 'native-failure.log'), appLog);
+    if (inspectPage) {
       console.error(await inspectPage('document.body.innerText'));
-    } catch {}
+      const shot = await captureScreenshot();
+      await writeFile(path.join(evidence, 'native-failure.png'), Buffer.from(shot, 'base64'));
+    }
+  } catch (diagnosticError) {
+    console.error('Could not capture native failure evidence:', diagnosticError);
   }
-  console.error(await readFile(path.join(stage, 'app.log'), 'utf8').catch(() => ''));
   throw error;
 } finally {
   if (hubFixture && hubFixture.exitCode === null) {

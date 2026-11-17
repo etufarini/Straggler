@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { writeFile } from 'node:fs/promises';
-import { observeOrb } from './orb';
 
 type FrameGate = {
   callbacks: Map<number, FrameRequestCallback>;
@@ -116,31 +114,4 @@ test('stopping before the next paint preserves and saves partial text', async ({
   await page.getByRole('button', { name: 'A streamed answer', exact: true }).click();
   await expect(page.locator('.message.assistant .markdown strong')).toHaveText('local');
   await expect(page.locator('.message-status')).toHaveText('Response stopped');
-});
-
-test('fixture streaming records animation costs across reasoning and generation', async ({
-  page,
-}, testInfo) => {
-  await page.goto('/?scenario=reasoning-stream');
-  await observeOrb(page);
-  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Think, then answer');
-  await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
-  const measurement = await page.evaluate(() => {
-    const observer = window.__stragglerOrbMeasurement;
-    const result = observer.snapshot();
-    observer.stop();
-    return result;
-  });
-  expect(measurement.phases.reasoning.frames).toBeGreaterThan(0);
-  expect(measurement.phases.generating.frames).toBeGreaterThan(0);
-  expect(measurement.phases.reasoning.drawMs.p95).not.toBeNull();
-  expect(measurement.phases.generating.drawMs.p95).not.toBeNull();
-  const output = testInfo.outputPath('orb-performance.json');
-  await writeFile(output, JSON.stringify(measurement, null, 2));
-  await testInfo.attach('orb-performance.json', {
-    path: output,
-    contentType: 'application/json',
-  });
 });

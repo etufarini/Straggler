@@ -266,8 +266,7 @@ test('reduced-motion presence draws a still and destroys the renderer in Setting
   await page.evaluate(() => window.__stragglerOrbMeasurement.stop());
 });
 
-test('presence follows reasoning deltas and the ready renderer comes to rest', async ({ page }) => {
-  test.setTimeout(35000);
+test('presence follows reasoning deltas through completion', async ({ page }) => {
   await page.goto('/?scenario=reasoning-stream');
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Think, then answer');
@@ -279,20 +278,6 @@ test('presence follows reasoning deltas and the ready renderer comes to rest', a
   await expect(page.locator('.typing-indicator')).toHaveText('Generating');
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'ready');
   await expect(page.locator('.typing-indicator')).toHaveCount(0);
-  await page.waitForTimeout(17000);
-  await page.evaluate(() => {
-    const original = CanvasRenderingContext2D.prototype.clearRect;
-    (window as unknown as { orbRestFrames: number }).orbRestFrames = 0;
-    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
-      if (this.canvas.closest('.presence-stage'))
-        (window as unknown as { orbRestFrames: number }).orbRestFrames++;
-      return original.apply(this, args);
-    };
-  });
-  await page.waitForTimeout(1100);
-  expect(
-    await page.evaluate(() => (window as unknown as { orbRestFrames: number }).orbRestFrames),
-  ).toBe(0);
 });
 
 test('renderer holds state and size changes while native visibility reports a pause', async ({

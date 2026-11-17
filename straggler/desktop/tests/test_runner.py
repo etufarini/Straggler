@@ -26,7 +26,12 @@ printf '%s\n' "$*" >> "$TEST_TOOL_LOG"
                    if not key.startswith(('STRAGGLER_', 'MIR_', 'LLAMA_', 'XDG_'))}
     environment.update(HOME=str(work), PATH=str(commands),
                        TEST_TOOL_LOG=str(work/'commands'))
-    for suite, forbidden in (('frontend', 'cargo'), ('browser', 'cargo'), ('runtime', 'npm')):
+    for suite, forbidden in (
+        ('frontend', 'cargo'),
+        ('browser', 'cargo'),
+        ('browser-platform', 'cargo'),
+        ('runtime', 'npm'),
+    ):
         (commands/forbidden).rename(work/forbidden)
         result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), suite],
                                 env=environment, cwd=work,
@@ -34,6 +39,8 @@ printf '%s\n' "$*" >> "$TEST_TOOL_LOG"
         assert result.returncode == 0, (suite, result.stdout, result.stderr)
         assert (work/'commands').is_file(), f'{suite} did not run checks'
         assert (work/'commands').read_text().strip(), f'{suite} did not run checks'
+        if suite == 'browser-platform':
+            assert (work/'commands').read_text().strip() == 'run test:e2e -- --grep @platform'
         (work/'commands').unlink()
         (work/forbidden).rename(commands/forbidden)
     result = subprocess.run([str(interpreter), str(root/'tests/run.sh'), 'unknown-suite'],

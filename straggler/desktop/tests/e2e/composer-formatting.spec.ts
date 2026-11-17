@@ -206,48 +206,52 @@ test('paste is plain text, explicit Markdown conversion is undoable, and URLs li
   await expect(message(page).locator('a')).toHaveAttribute('href', 'https://example.com');
 });
 
-test('link popover validates email and protocols, edits and removes links', async ({ page }) => {
-  await start(page);
-  await message(page).fill('example');
-  await message(page).press('ControlOrMeta+a');
-  await message(page).press('ControlOrMeta+Shift+KeyU');
-  const dialog = page.getByRole('dialog', { name: 'Link', exact: true });
-  await expect(dialog.getByText('Add link', { exact: true })).toBeVisible();
-  await expect(dialog.getByRole('textbox', { name: 'Text', exact: true })).toHaveValue('example');
-  for (const invalid of ['name@example.com', 'mailto:name@example.com', 'javascript:alert(1)']) {
-    await dialog.getByRole('textbox', { name: 'Link', exact: true }).fill(invalid);
+test(
+  'link popover validates email and protocols, edits and removes links',
+  { tag: '@platform' },
+  async ({ page }) => {
+    await start(page);
+    await message(page).fill('example');
+    await message(page).press('ControlOrMeta+a');
+    await message(page).press('ControlOrMeta+Shift+KeyU');
+    const dialog = page.getByRole('dialog', { name: 'Link', exact: true });
+    await expect(dialog.getByText('Add link', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('textbox', { name: 'Text', exact: true })).toHaveValue('example');
+    for (const invalid of ['name@example.com', 'mailto:name@example.com', 'javascript:alert(1)']) {
+      await dialog.getByRole('textbox', { name: 'Link', exact: true }).fill(invalid);
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(dialog.getByText('Enter a link like https://example.com')).toBeVisible();
+      await expect(dialog.getByRole('textbox', { name: 'Link', exact: true })).toHaveAttribute(
+        'aria-invalid',
+        'true',
+      );
+    }
+    await dialog.getByRole('textbox', { name: 'Link', exact: true }).fill('example.com/a(b)');
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(dialog.getByText('Enter a link like https://example.com')).toBeVisible();
-    await expect(dialog.getByRole('textbox', { name: 'Link', exact: true })).toHaveAttribute(
-      'aria-invalid',
-      'true',
-    );
-  }
-  await dialog.getByRole('textbox', { name: 'Link', exact: true }).fill('example.com/a(b)');
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(message(page).locator('a')).toHaveAttribute('href', 'https://example.com/a(b)');
-  await expect(message(page)).toBeFocused();
-  expect(
-    await message(page).evaluate((field) => {
-      const selection = window.getSelection()!;
-      const beforeCaret = document.createRange();
-      beforeCaret.selectNodeContents(field);
-      beforeCaret.setEnd(selection.focusNode!, selection.focusOffset);
-      return { collapsed: selection.isCollapsed, textBefore: beforeCaret.toString() };
-    }),
-  ).toEqual({ collapsed: true, textBefore: 'example' });
-  await message(page).press('ArrowLeft');
-  await toolbar(page).getByRole('button', { name: 'Link', exact: true }).click();
-  await expect(dialog.getByText('Edit link', { exact: true })).toBeVisible();
-  await dialog.getByRole('textbox', { name: 'Text', exact: true }).fill('renamed');
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(message(page).locator('a')).toHaveText('renamed');
-  await message(page).press('ArrowLeft');
-  await toolbar(page).getByRole('button', { name: 'Link', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Remove link', exact: true }).click();
-  await expect(message(page).locator('a')).toHaveCount(0);
-  await expect(message(page)).toHaveText('renamed');
-});
+    await expect(message(page).locator('a')).toHaveAttribute('href', 'https://example.com/a(b)');
+    await expect(message(page)).toBeFocused();
+    expect(
+      await message(page).evaluate((field) => {
+        const selection = window.getSelection()!;
+        const beforeCaret = document.createRange();
+        beforeCaret.selectNodeContents(field);
+        beforeCaret.setEnd(selection.focusNode!, selection.focusOffset);
+        return { collapsed: selection.isCollapsed, textBefore: beforeCaret.toString() };
+      }),
+    ).toEqual({ collapsed: true, textBefore: 'example' });
+    await message(page).press('ArrowLeft');
+    await toolbar(page).getByRole('button', { name: 'Link', exact: true }).click();
+    await expect(dialog.getByText('Edit link', { exact: true })).toBeVisible();
+    await dialog.getByRole('textbox', { name: 'Text', exact: true }).fill('renamed');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(message(page).locator('a')).toHaveText('renamed');
+    await message(page).press('ArrowLeft');
+    await toolbar(page).getByRole('button', { name: 'Link', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Remove link', exact: true }).click();
+    await expect(message(page).locator('a')).toHaveCount(0);
+    await expect(message(page)).toHaveText('renamed');
+  },
+);
 
 test('toolbar preference survives reload, applies to editing, and Enter still adds a line', async ({
   page,
@@ -274,44 +278,51 @@ test('toolbar preference survives reload, applies to editing, and Enter still ad
   await expect(page.locator('.message.user .markdown')).toHaveText('bold');
 });
 
-test('IME Enter does not send; intraword symbols and inline code remain literal', async ({
-  page,
-}) => {
-  await start(page);
-  await message(page).pressSequentially('2*3*4 snake_case_name ');
-  await expect(message(page).locator('strong, em')).toHaveCount(0);
-  await message(page).dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true });
-  await expect(page.locator('.message.user')).toHaveCount(0);
-  await message(page).fill('code');
-  await message(page).press('ControlOrMeta+a');
-  await message(page).press('ControlOrMeta+Shift+KeyC');
-  for (const name of ['Bold', 'Italic', 'Strikethrough', 'Link'])
-    await expect(toolbar(page).getByRole('button', { name, exact: true })).toBeDisabled();
-  await message(page).press('ControlOrMeta+u');
-  await expect(message(page).locator('u')).toHaveCount(0);
-});
+test(
+  'IME Enter does not send; intraword symbols and inline code remain literal',
+  { tag: '@platform' },
+  async ({ page }) => {
+    await start(page);
+    await message(page).pressSequentially('2*3*4 snake_case_name ');
+    await expect(message(page).locator('strong, em')).toHaveCount(0);
+    await message(page).dispatchEvent('keydown', {
+      key: 'Enter',
+      code: 'Enter',
+      isComposing: true,
+    });
+    await expect(page.locator('.message.user')).toHaveCount(0);
+    await message(page).fill('code');
+    await message(page).press('ControlOrMeta+a');
+    await message(page).press('ControlOrMeta+Shift+KeyC');
+    for (const name of ['Bold', 'Italic', 'Strikethrough', 'Link'])
+      await expect(toolbar(page).getByRole('button', { name, exact: true })).toBeDisabled();
+    await message(page).press('ControlOrMeta+u');
+    await expect(message(page).locator('u')).toHaveCount(0);
+  },
+);
 
-test('toolbar has one tab stop, arrow navigation, Home, End and Escape; text does not trap Tab', async ({
-  page,
-  browserName,
-}) => {
-  await start(page);
-  await expect(toolbar(page).locator('button[tabindex="0"]')).toHaveCount(1);
-  const bold = toolbar(page).getByRole('button', { name: 'Bold', exact: true });
-  await bold.focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(toolbar(page).getByRole('button', { name: 'Italic', exact: true })).toBeFocused();
-  await page.keyboard.press('End');
-  await expect(
-    toolbar(page).getByRole('button', { name: 'Code block', exact: true }),
-  ).toBeFocused();
-  await page.keyboard.press('Home');
-  await expect(bold).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(message(page)).toBeFocused();
-  await tabToNextControl(page, browserName);
-  await expect(page.getByRole('button', { name: 'Hide formatting' })).toBeFocused();
-});
+test(
+  'toolbar has one tab stop, arrow navigation, Home, End and Escape; text does not trap Tab',
+  { tag: '@platform' },
+  async ({ page, browserName }) => {
+    await start(page);
+    await expect(toolbar(page).locator('button[tabindex="0"]')).toHaveCount(1);
+    const bold = toolbar(page).getByRole('button', { name: 'Bold', exact: true });
+    await bold.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(toolbar(page).getByRole('button', { name: 'Italic', exact: true })).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(
+      toolbar(page).getByRole('button', { name: 'Code block', exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press('Home');
+    await expect(bold).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(message(page)).toBeFocused();
+    await tabToNextControl(page, browserName);
+    await expect(page.getByRole('button', { name: 'Hide formatting' })).toBeFocused();
+  },
+);
 
 for (const [width, height] of [
   [760, 620],
@@ -377,27 +388,29 @@ test('no loaded model disables the editor and toolbar and keeps its placeholder'
   );
 });
 
-test('physical key codes work on non-English layouts and preserve the temporary shortcut', async ({
-  page,
-}) => {
-  await start(page);
-  await message(page).fill('item');
-  const mac = await page.evaluate(() => /Mac/.test(navigator.platform));
-  await message(page).dispatchEvent('keydown', {
-    key: '/',
-    code: 'Digit7',
-    shiftKey: true,
-    ctrlKey: !mac,
-    metaKey: mac,
-  });
-  await expect(message(page).locator('ol')).toHaveText('item');
-  await page.getByRole('button', { name: 'New chat', exact: true }).click();
-  await message(page).press('ControlOrMeta+Shift+KeyN');
-  await expect(page.locator('.temp-status')).toBeVisible();
-  await expect(page.locator('.workspace')).toHaveClass(/is-temporary/);
-  await message(page).pressSequentially('_temporary_');
-  await expect(message(page).locator('em')).toHaveText('temporary');
-});
+test(
+  'physical key codes work on non-English layouts and preserve the temporary shortcut',
+  { tag: '@platform' },
+  async ({ page }) => {
+    await start(page);
+    await message(page).fill('item');
+    const mac = await page.evaluate(() => /Mac/.test(navigator.platform));
+    await message(page).dispatchEvent('keydown', {
+      key: '/',
+      code: 'Digit7',
+      shiftKey: true,
+      ctrlKey: !mac,
+      metaKey: mac,
+    });
+    await expect(message(page).locator('ol')).toHaveText('item');
+    await page.getByRole('button', { name: 'New chat', exact: true }).click();
+    await message(page).press('ControlOrMeta+Shift+KeyN');
+    await expect(page.locator('.temp-status')).toBeVisible();
+    await expect(page.locator('.workspace')).toHaveClass(/is-temporary/);
+    await message(page).pressSequentially('_temporary_');
+    await expect(message(page).locator('em')).toHaveText('temporary');
+  },
+);
 
 test('composition events prevent automatic formatting while the IME is active', async ({
   page,
@@ -411,22 +424,24 @@ test('composition events prevent automatic formatting while the IME is active', 
   await message(page).dispatchEvent('compositionend', { data: '*composing*' });
 });
 
-test('hidden toolbar supports the link shortcut and cancellation restores focus', async ({
-  page,
-}) => {
-  await start(page);
-  await page.getByRole('button', { name: 'Hide formatting' }).click();
-  await message(page).fill('link');
-  await message(page).press('ControlOrMeta+a');
-  await message(page).press('ControlOrMeta+Shift+KeyU');
-  const dialog = page.getByRole('dialog', { name: 'Link', exact: true });
-  await expect(dialog).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
-  await expect(message(page)).toBeFocused();
-  await expect(message(page)).toHaveText('link');
-  await expect(page.getByRole('button', { name: 'Show formatting' })).toBeVisible();
-});
+test(
+  'hidden toolbar supports the link shortcut and cancellation restores focus',
+  { tag: '@platform' },
+  async ({ page }) => {
+    await start(page);
+    await page.getByRole('button', { name: 'Hide formatting' }).click();
+    await message(page).fill('link');
+    await message(page).press('ControlOrMeta+a');
+    await message(page).press('ControlOrMeta+Shift+KeyU');
+    const dialog = page.getByRole('dialog', { name: 'Link', exact: true });
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(message(page)).toBeFocused();
+    await expect(message(page)).toHaveText('link');
+    await expect(page.getByRole('button', { name: 'Show formatting' })).toBeVisible();
+  },
+);
 
 test('email and code paste stay literal; only sent HTTP links open externally', async ({
   page,
@@ -503,34 +518,7 @@ test('project start sends rich Markdown and retains attachment controls', async 
   await expect(page.getByRole('button', { name: 'Choose files', exact: true })).toBeVisible();
 });
 
-test('capture the visible and hidden toolbar, sent message, edit and narrow composer', async ({
-  page,
-}, testInfo) => {
-  await page.setViewportSize({ width: 1200, height: 820 });
-  await start(page);
-  await paste(
-    page,
-    '**Plan for today**\nReview the _proposal_ and [project notes](https://example.com/notes).\n\n- Check the details\n- Share the next steps',
-  );
-  await message(page).press('ControlOrMeta+Shift+KeyF');
-  await page.screenshot({ path: testInfo.outputPath('composer-visible-1200x820.png') });
-  await page.getByRole('button', { name: 'Hide formatting' }).click();
-  await page.screenshot({ path: testInfo.outputPath('composer-hidden-1200x820.png') });
-  await page.getByRole('button', { name: 'Show formatting' }).click();
-  await message(page).press('ControlOrMeta+Enter');
-  await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('message-sent-1200x820.png') });
-  await page.getByRole('button', { name: 'Edit message', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Edit message', exact: true })).toBeFocused();
-  await page.screenshot({ path: testInfo.outputPath('message-edit-1200x820.png') });
-  await page.keyboard.press('Escape');
-  await page.setViewportSize({ width: 760, height: 620 });
-  await message(page).pressSequentially('*A compact composer*');
-  await expect(toolbar(page).getByRole('button')).toHaveCount(9);
-  await page.screenshot({ path: testInfo.outputPath('composer-760x620.png') });
-});
-
-test.describe('Safari focus restoration', () => {
+test.describe('Safari focus restoration', { tag: '@platform' }, () => {
   test.use({
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',

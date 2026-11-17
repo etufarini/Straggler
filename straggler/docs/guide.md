@@ -908,8 +908,27 @@ rendering when available. An explicitly requested `native` suite fails without
 a display or those tools; the default suite reports the native check as skipped.
 
 CI runs on pull requests and pushes to main, avoiding duplicate branch-push runs.
-It runs frontend checks once and common, runtime, WebKit browser and real native-window
-checks on Linux/macOS CPU runners. Chromium is not a required desktop target.
+The required workflow has three jobs:
+
+- Linux frontend: common checks, formatting/lint/types/build, domain tests and
+  shared browser interactions using WebKit.
+- Linux desktop: Rust runtime contracts and the actual native window, resources,
+  IPC, storage and supervised-process lifecycle.
+- macOS desktop: the equivalent native checks and a small `browser-platform`
+  subset covering host-sensitive keyboard, IME and focus regressions.
+
+Shared browser behavior is checked once. Rust build dependencies are cached by
+platform and toolchain. Representative layouts replace exhaustive combinations;
+accessibility, contrast, reduced motion and known behavioral regressions remain
+covered. Decorative styling is reviewed with the explicit screenshot tools in the
+[desktop README](../desktop/README.md#optional-visual-diagnostics).
+Aim for roughly ten minutes of required execution with warm caches, measuring
+runner queues separately; the target does not permit skipping failures. Browser
+failures retain screenshots, traces and a JSON report, with no automatic retries.
+Keep workflow history under normal GitHub retention so failures remain available
+for diagnosis. Packaging and performance diagnostics remain explicit checks,
+required when the change affects those boundaries.
+
 The runtime suite runs Rust tests serially to isolate native socket probes and
 process fixtures; tests of concurrent operations still run their own workers.
 The isolation check compiles the actual desktop

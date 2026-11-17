@@ -9,8 +9,8 @@ if (( $# > 1 )); then
     exit 1
 fi
 case "$suite" in
-    common|frontend|runtime|browser|desktop|isolation|native|packaging|all) ;;
-    *) printf 'Usage: bash straggler/tests/run.sh [common|frontend|runtime|browser|desktop|isolation|native|packaging|all]\n' >&2; exit 1 ;;
+    common|frontend|runtime|browser|browser-platform|desktop|isolation|native|packaging|all) ;;
+    *) printf 'Usage: bash straggler/tests/run.sh [common|frontend|runtime|browser|browser-platform|desktop|isolation|native|packaging|all]\n' >&2; exit 1 ;;
 esac
 cd -- "$desktop"
 
@@ -69,6 +69,10 @@ fi
 if [[ "$suite" == browser || "$suite" == desktop || "$suite" == all ]]; then
     require_tools npm
     npm run test:e2e
+fi
+if [[ "$suite" == browser-platform ]]; then
+    require_tools npm
+    npm run test:e2e -- --grep @platform
 fi
 if [[ "$suite" == isolation ]]; then
     require_tools cargo python3
