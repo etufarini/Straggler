@@ -48,6 +48,15 @@ Source development has no bundled backend: in **Settings → llama.cpp**, select
 existing llama.cpp folder containing `build/bin/llama-server` or `bin/llama-server`.
 You can open and develop the app without model weights or an inference service.
 
+After development, close the app and reclaim disk space by removing generated
+Rust build files:
+
+```bash
+npm --prefix straggler/desktop run clean
+```
+
+The next native startup recompiles these files.
+
 ## First launch
 
 1. In **Settings → Folders**, use **Choose existing folder** for your GGUF files,
