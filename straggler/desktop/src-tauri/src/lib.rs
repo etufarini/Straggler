@@ -10,6 +10,7 @@ pub mod external_links;
 pub mod files;
 pub mod history;
 pub mod huggingface;
+pub mod image_attachments;
 pub mod model;
 pub mod model_access;
 pub mod platform;
@@ -103,6 +104,8 @@ pub struct ChatRequest {
     #[serde(default)]
     pub web_search_query: Option<String>,
     pub messages: Vec<ChatMessage>,
+    #[serde(default)]
+    pub image_ids: Vec<Uuid>,
     #[serde(default)]
     pub options: ChatOptions,
 }

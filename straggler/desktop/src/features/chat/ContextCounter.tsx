@@ -9,7 +9,10 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
     controller.server,
   );
   const estimate = controller.contextEstimate;
-  const estimated = !!controller.chat.attachments?.length && !!estimate.capacity;
+  const estimated =
+    !!controller.chat.attachments?.length &&
+    !!estimate.capacity &&
+    (!estimate.includesImages || !!controller.input || !reported);
   const usage = estimated
     ? {
         tokens: estimate.tokens,
@@ -59,6 +62,11 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
     >
       {() => (
         <>
+          {estimate.includesImages && estimated && (
+            <p className="popover-note" role="status">
+              Includes images · estimate. Image tokens are reported after the response.
+            </p>
+          )}
           <p className="popover-note">How much of the model’s working memory this chat uses.</p>
           {usage ? (
             <>

@@ -43,6 +43,15 @@ export function serializeConversation(
         : {}),
     });
   }
+  const images = conversation.attachments?.filter((attachment) => attachment.image) ?? [];
+  if (images.length) {
+    const placeholders = images
+      .map((image) => `[Image: ${image.name} — image data not included in this export]`)
+      .join('\n');
+    const firstUser = messages.find((message) => message.role === 'user');
+    if (firstUser) firstUser.content = `${placeholders}\n\n${firstUser.content}`;
+    else messages.push({ role: 'user', content: placeholders });
+  }
   return (
     JSON.stringify(
       {

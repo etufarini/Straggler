@@ -212,3 +212,47 @@ test('context overflow blocks Send, keeps input and never sends generation', asy
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A shorter question');
   await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled();
 });
+
+test('Attach exposes image previews and explicitly excludes images without vision', async ({
+  page,
+}) => {
+  await ready(page);
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'straggler-fixture-attachment-paths',
+      JSON.stringify(['/fixture/diagram.png']),
+    ),
+  );
+  await page.getByRole('button', { name: 'Attach files', exact: true }).click();
+  await expect(page.locator('.file-thumb')).toHaveAttribute('width', '30');
+  await expect(page.locator('.feedback.warning')).toContainText(
+    'This model can’t read images. It won’t be sent.',
+  );
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A text-only request');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.locator('.assistant .markdown')).toContainText('local answer');
+  const request = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('straggler-fixture-request')!),
+  );
+  expect(request.imageIds).toEqual([]);
+  expect(JSON.stringify(request.messages)).not.toContain('[Image:');
+  await page.getByRole('button', { name: 'Remove image', exact: true }).click();
+  await expect(page.locator('.file-thumb')).toHaveCount(0);
+});
+
+test('a vision-capable server receives owned image identifiers with the message', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('straggler-fixture-vision', 'true'));
+  await ready(page);
+  await choose(page, ['/fixture/diagram.webp']);
+  await expect(page.locator('.file-row')).toContainText('Resized to 2,048 px');
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Describe the image');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.locator('.assistant .markdown')).toContainText('local answer');
+  const request = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('straggler-fixture-request')!),
+  );
+  expect(request.imageIds).toHaveLength(1);
+  expect(request.conversationId).toBeTruthy();
+});

@@ -10,6 +10,7 @@ struct Metadata {
     limit: u64,
     operations: usize,
     big_endian: bool,
+    projector: bool,
 }
 
 impl Metadata {
@@ -83,6 +84,9 @@ impl Metadata {
         }
         if kind == 8 {
             let value = self.string(key == "general.type")?;
+            if key == "general.type" && value == "mmproj" {
+                self.projector = true;
+            }
             return Some(key == "general.type" && matches!(value.as_str(), "mmproj" | "adapter"));
         }
         if kind != 9 {
@@ -103,7 +107,7 @@ impl Metadata {
     }
 }
 
-fn component(path: &Path) -> Option<bool> {
+fn component(path: &Path) -> Option<(bool, bool)> {
     let file = File::open(path).ok()?;
     let limit = file.metadata().ok()?.len().min(32 * 1024 * 1024);
     let mut metadata = Metadata {
@@ -111,6 +115,7 @@ fn component(path: &Path) -> Option<bool> {
         limit,
         operations: 0,
         big_endian: false,
+        projector: false,
     };
     if metadata.read(4)? != b"GGUF" {
         return None;
@@ -138,7 +143,7 @@ fn component(path: &Path) -> Option<bool> {
         let kind = metadata.number(4)?;
         excluded |= metadata.value(kind, &key)?;
     }
-    Some(excluded)
+    Some((excluded, metadata.projector))
 }
 
 pub fn discover(root: &Path) -> Result<Vec<Model>> {
@@ -182,7 +187,7 @@ pub fn discover(root: &Path) -> Result<Vec<Model>> {
                 }
             }
             // Inspection failures retain a possibly supported model; tensors are never read.
-            if component(&path) == Some(true) {
+            if component(&path).is_some_and(|(excluded, _)| excluded) {
                 continue;
             }
             let Some(value) = path.to_str() else {
@@ -191,6 +196,7 @@ pub fn discover(root: &Path) -> Result<Vec<Model>> {
             models.push(Model {
                 path: value.into(),
                 template: super::templates::candidate(&path),
+                projector: projector_candidate(&path),
                 label: path
                     .strip_prefix(root)
                     .unwrap_or(&path)
@@ -214,4 +220,44 @@ pub fn split_file_name(name: &str) -> Option<(&str, u32, u32)> {
     let part: u32 = part.parse().ok()?;
     let total: u32 = total.parse().ok()?;
     (part > 0 && part <= total).then_some((prefix, part, total))
+}
+
+/// Pair adjacent projector components by filename prefix only; capability comes from /props.
+pub fn projector_candidate(model: &Path) -> Option<String> {
+    let mut candidates = Vec::new();
+    for entry in fs::read_dir(model.parent()?).ok()?.flatten() {
+        let path = entry.path();
+        if path != model
+            && path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("gguf"))
+            && component(&path).is_some_and(|(_, projector)| projector)
+        {
+            candidates.push(path);
+        }
+    }
+    if candidates.len() == 1 {
+        return candidates[0].to_str().map(str::to_owned);
+    }
+    let model_name = model.file_stem()?.to_str()?.to_ascii_lowercase();
+    let mut matches = candidates
+        .iter()
+        .filter_map(|candidate| {
+            let name = candidate.file_stem()?.to_str()?.to_ascii_lowercase();
+            let name = name.strip_prefix("mmproj-").unwrap_or(&name);
+            let prefix: usize = model_name
+                .split('-')
+                .zip(name.split('-'))
+                .take_while(|(left, right)| !left.is_empty() && left == right)
+                .map(|(part, _)| part.len() + 1)
+                .sum();
+            (prefix > 0).then_some((prefix, candidate))
+        })
+        .collect::<Vec<_>>();
+    matches.sort_by_key(|(prefix, _)| std::cmp::Reverse(*prefix));
+    let (prefix, candidate) = matches.first()?;
+    if matches.get(1).is_some_and(|(next, _)| next == prefix) {
+        return None;
+    }
+    candidate.to_str().map(str::to_owned)
 }

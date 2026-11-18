@@ -230,7 +230,7 @@ impl History {
         Ok(conversation)
     }
 
-    fn original_path(&self, conversation: Uuid, attachment: &Attachment) -> PathBuf {
+    pub(crate) fn original_path(&self, conversation: Uuid, attachment: &Attachment) -> PathBuf {
         self.directory
             .join(conversation.to_string())
             .join("attachments")
@@ -402,6 +402,18 @@ fn validate(conversation: &Conversation) -> Result<()> {
     }
     let mut identifiers = std::collections::HashSet::new();
     for attachment in &conversation.attachments {
+        if let Some(image) = &attachment.image {
+            if !crate::image_attachments::supported(&attachment.extension)
+                || image.width == 0
+                || image.height == 0
+                || image.width > 2048
+                || image.height > 2048
+                || image.thumbnail.len() > 32768
+                || !image.thumbnail.starts_with("data:image/png;base64,")
+            {
+                return Err("Invalid image attachment metadata.".into());
+            }
+        }
         if !attachments::supported(&attachment.extension)
             || attachment.size > attachments::MAX_FILE_BYTES
             || attachment.name.is_empty()

@@ -1,3 +1,4 @@
+import { documentTypes } from '../domain/attachments';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
@@ -226,13 +227,18 @@ export async function downloadAttachment(id: string, attachment: Attachment): Pr
 }
 
 export type { DragDropEvent };
-export async function chooseAttachmentFiles(): Promise<string[]> {
+export async function chooseAttachmentFiles(project = false): Promise<string[]> {
   if (fixture) return (await fixture).chooseAttachmentFiles();
   const paths = await nativeOpen({
     title: 'Attach files',
     multiple: true,
     directory: false,
-    filters: [{ name: 'Documents', extensions: [...attachmentTypes] }],
+    filters: [
+      {
+        name: project ? 'Documents' : 'Documents and images',
+        extensions: [...(project ? documentTypes : attachmentTypes)],
+      },
+    ],
   });
   return paths || [];
 }

@@ -1,7 +1,40 @@
 import { fileName, requestMessages } from './types';
 import type { Attachment, Message } from './types';
 
-export const attachmentTypes = ['txt', 'md', 'docx', 'xlsx', 'pptx', 'pdf'] as const;
+export const documentTypes = [
+  'txt',
+  'md',
+  'csv',
+  'tsv',
+  'json',
+  'jsonl',
+  'yaml',
+  'yml',
+  'xml',
+  'html',
+  'log',
+  'toml',
+  'ini',
+  'sql',
+  'py',
+  'js',
+  'ts',
+  'rs',
+  'go',
+  'java',
+  'c',
+  'cpp',
+  'h',
+  'sh',
+  'docx',
+  'xlsx',
+  'pptx',
+  'pdf',
+] as const;
+export const imageTypes = ['png', 'jpg', 'jpeg', 'webp', 'gif'] as const;
+export const attachmentTypes = [...documentTypes, ...imageTypes] as const;
+export const documentTypesLabel = '.txt · .md · .csv · .json · code · .docx · .xlsx · .pptx · .pdf';
+export const attachmentTypesLabel = `${documentTypesLabel} · images`;
 export type AttachmentRow = {
   id: string;
   name: string;
@@ -51,8 +84,9 @@ export function composeRequest(
 ) {
   const turns: { role: 'system' | 'user' | 'assistant'; content: string }[] =
     requestMessages(messages);
-  if (attachments.length) {
-    const blocks = attachmentBlocks(attachments);
+  const documents = attachments.filter((attachment) => !attachment.image);
+  if (documents.length) {
+    const blocks = attachmentBlocks(documents);
     const firstUser = turns.find((message) => message.role === 'user');
     if (firstUser) firstUser.content = `${blocks}\n\n${firstUser.content}`;
     else turns.unshift({ role: 'user', content: blocks });

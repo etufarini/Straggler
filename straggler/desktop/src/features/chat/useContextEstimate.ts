@@ -62,6 +62,24 @@ export function useContextEstimate(
           tokens: approximatePromptTokens(messages),
           source: 'approximate' as const,
         };
+  const includesImages = !!chat.attachments?.some((attachment) => attachment.image);
+  // A coarse patch estimate is descriptive only; native usage replaces it after generation.
+  const imageTokens = (chat.attachments ?? []).reduce(
+    (total, attachment) =>
+      total +
+      (attachment.image
+        ? Math.ceil(attachment.image.width / 32) * Math.ceil(attachment.image.height / 32)
+        : 0),
+    0,
+  );
   const capacity = details?.runId === server.runId ? details?.contextSize : null;
-  return { ...estimate, capacity, overflow: !!capacity && estimate.tokens > capacity, unavailable };
+  return {
+    ...estimate,
+    tokens: estimate.tokens + imageTokens,
+    source: includesImages ? ('approximate' as const) : estimate.source,
+    includesImages,
+    capacity,
+    overflow: !!capacity && estimate.tokens > capacity,
+    unavailable,
+  };
 }

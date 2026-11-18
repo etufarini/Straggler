@@ -209,8 +209,7 @@ export default function HuggingFaceBrowser({
               ]}
             />
             <small>
-              Only if the publisher documents it for this model. Straggler doesn’t support image
-              input.
+              Lets this model read images in chat. Saved next to the model and loaded with it.
             </small>
           </label>
           {selected && (

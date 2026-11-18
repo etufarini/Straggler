@@ -132,6 +132,7 @@ impl Fixture {
 fn request(id: Uuid, content: &str) -> ChatRequest {
     ChatRequest {
         web_search: false,
+        image_ids: Vec::new(),
         web_search_query: None,
         temporary_id: None,
         conversation_id: None,
@@ -1401,4 +1402,72 @@ async fn cancelling_remote_search_stops_the_turn_and_allows_the_next_local_respo
         "complete"
     );
     assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn owned_images_use_the_existing_server_and_require_advertised_vision() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    let chat = stored_chat(&runtime);
+    let source = fixture._directory.path().join("picture.png");
+    image::DynamicImage::new_rgb8(64, 32).save(&source).unwrap();
+    let chat = runtime.history.add_attachment(chat.id, &source).unwrap();
+    fixture.ready(&runtime).await;
+    let mut turn = request(Uuid::new_v4(), "Describe this image");
+    turn.conversation_id = Some(chat.id);
+    turn.image_ids = vec![chat.attachments[0].id];
+    assert!(runtime
+        .generate(turn, |_| Ok(()))
+        .await
+        .unwrap_err()
+        .contains("can’t read images"));
+    assert!(!fixture.record.exists());
+    runtime.stop().unwrap();
+    fs::write(fixture.record.with_extension("json.vision"), "true").unwrap();
+    fixture.ready(&runtime).await;
+    let mut turn = request(Uuid::new_v4(), "Describe this image");
+    turn.conversation_id = Some(chat.id);
+    turn.image_ids = vec![chat.attachments[0].id];
+    runtime.generate(turn, |_| Ok(())).await.unwrap();
+    let body: serde_json::Value =
+        serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
+    assert_eq!(body["messages"][0]["content"][0]["type"], "text");
+    assert!(body["messages"][0]["content"][1]["image_url"]["url"]
+        .as_str()
+        .unwrap()
+        .starts_with("data:image/png;base64,"));
+    let mut forged = request(Uuid::new_v4(), "Unauthorized image");
+    forged.conversation_id = Some(chat.id);
+    forged.image_ids = vec![Uuid::new_v4()];
+    assert!(runtime
+        .generate(forged, |_| Ok(()))
+        .await
+        .unwrap_err()
+        .contains("no longer in the chat"));
+    runtime.stop().unwrap();
+}
+
+#[tokio::test]
+async fn adjacent_projector_is_passed_to_the_supervised_server() {
+    let fixture = Fixture::new();
+    let projector = PathBuf::from(&fixture.model).with_file_name("projector.gguf");
+    let mut bytes = b"GGUF".to_vec();
+    bytes.extend(3u32.to_le_bytes());
+    bytes.extend(0u64.to_le_bytes());
+    bytes.extend(1u64.to_le_bytes());
+    bytes.extend(12u64.to_le_bytes());
+    bytes.extend(b"general.type");
+    bytes.extend(8u32.to_le_bytes());
+    bytes.extend(6u64.to_le_bytes());
+    bytes.extend(b"mmproj");
+    fs::write(&projector, bytes).unwrap();
+    let runtime = fixture.runtime();
+    fixture.ready(&runtime).await;
+    let launch: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture._directory.path().join("launch.json")).unwrap())
+            .unwrap();
+    assert_eq!(launch["mmproj"], projector.to_str().unwrap());
+    assert!(launch["ctx_size"].is_null());
+    assert!(launch["gpu_layers"].is_null());
+    runtime.stop().unwrap();
 }

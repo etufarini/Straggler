@@ -341,3 +341,32 @@ fn malformed_and_bounded_gguf_metadata_remains_selectable_without_reading_tensor
         assert_eq!(labels, expected);
     }
 }
+
+#[test]
+fn projector_pairing_requires_identified_components_and_an_unambiguous_prefix() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let model = root.join("sample-chat-q4.gguf");
+    fs::write(&model, gguf("model", 0, false)).unwrap();
+    let first = root.join("mmproj-other-f16.gguf");
+    fs::write(&first, gguf("mmproj", 0, false)).unwrap();
+    assert_eq!(
+        models::projector_candidate(&model),
+        first.to_str().map(str::to_owned)
+    );
+    let second = root.join("mmproj-unrelated-f16.gguf");
+    fs::write(&second, gguf("mmproj", 0, false)).unwrap();
+    assert!(models::projector_candidate(&model).is_none());
+    let matched = root.join("mmproj-sample-chat-f16.gguf");
+    fs::write(&matched, gguf("mmproj", 0, false)).unwrap();
+    assert_eq!(
+        models::projector_candidate(&model),
+        matched.to_str().map(str::to_owned)
+    );
+    fs::write(
+        root.join("mmproj-sample-chat-q8.gguf"),
+        gguf("mmproj", 0, false),
+    )
+    .unwrap();
+    assert!(models::projector_candidate(&model).is_none());
+}

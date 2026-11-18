@@ -144,6 +144,12 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                         <span>
                           {fileName(model.path)}
                           <small>{model.label}</small>
+                          {controller.server.model === model.path &&
+                          controller.serverDetails?.visionSupported ? (
+                            <small>Vision</small>
+                          ) : model.projector ? (
+                            <small>Vision · restart to enable</small>
+                          ) : null}
                         </span>
                         {selected === model.path && <Check size={17} />}
                       </button>

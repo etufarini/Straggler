@@ -22,6 +22,10 @@ packaging-probe = []
 app-store = ["dep:objc2", "dep:objc2-foundation"]
 
 [dependencies]
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+chardetng = "=0.1.17"
+encoding_rs = "0.8"
+base64 = "0.22"
 async-trait = "0.1"
 url = { version = "2", features = ["serde"] }
 dom_smoothie = "0.19"

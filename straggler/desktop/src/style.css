@@ -4025,3 +4025,24 @@ input:focus-visible {
 .chat-search button {
   padding: 4px;
 }
+
+.composer-chip.attach-chip {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
+  flex: 0 0 30px;
+  justify-content: center;
+}
+.file-thumb {
+  object-fit: cover;
+  border-radius: 4px;
+}
+.vision-badge {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--ui-accent-text);
+  padding: 3px 7px;
+  border: 1px solid var(--ui-control-border);
+  border-radius: 12px;
+}

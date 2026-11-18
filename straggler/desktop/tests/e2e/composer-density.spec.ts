@@ -60,7 +60,7 @@ async function prepare(page: Page, web: string, reasoning: boolean) {
 
 async function inspectControls(page: Page) {
   const controls = page.locator('.composer-footer .composer-chip, .composer-footer .send-button');
-  await expect(controls).toHaveCount(6);
+  await expect(controls).toHaveCount(7);
   for (const control of await controls.all()) {
     await expect(control).toHaveAccessibleName(/\S/);
   }
@@ -97,7 +97,7 @@ async function inspectControls(page: Page) {
         return { count: boxes.length, tooSmall, outside, overlaps };
       }),
     )
-    .toEqual({ count: 6, tooSmall: [], outside: false, overlaps: false });
+    .toEqual({ count: 7, tooSmall: [], outside: false, overlaps: false });
   const send = page.getByRole('button', { name: 'Send message', exact: true });
   await expect(send).toBeEnabled();
   await expect(send).toBeInViewport();

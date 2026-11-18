@@ -93,6 +93,8 @@ pub struct Model {
     pub path: String,
     pub label: String,
     pub template: Option<String>,
+    #[serde(default)]
+    pub projector: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Device {
