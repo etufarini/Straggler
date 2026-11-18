@@ -1466,7 +1466,10 @@ async fn adjacent_projector_is_passed_to_the_supervised_server() {
     let launch: serde_json::Value =
         serde_json::from_slice(&fs::read(fixture._directory.path().join("launch.json")).unwrap())
             .unwrap();
-    assert_eq!(launch["mmproj"], projector.to_str().unwrap());
+    assert_eq!(
+        launch["mmproj"],
+        projector.canonicalize().unwrap().to_str().unwrap()
+    );
     assert!(launch["ctx_size"].is_null());
     assert!(launch["gpu_layers"].is_null());
     runtime.stop().unwrap();
