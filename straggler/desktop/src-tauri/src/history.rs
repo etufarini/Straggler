@@ -40,6 +40,8 @@ pub struct Message {
 pub struct Conversation {
     pub id: Uuid,
     pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starred: Option<bool>,
     pub created_at: u64,
     pub updated_at: u64,
     pub model: Option<String>,
@@ -425,6 +427,7 @@ mod tests {
         Conversation {
             id: Uuid::new_v4(),
             title: "A local chat".into(),
+            starred: None,
             created_at: 1,
             updated_at: 2,
             model: None,
@@ -446,6 +449,25 @@ mod tests {
                 server_run_id: None,
             }],
         }
+    }
+
+    #[test]
+    fn chat_stars_are_optional_and_round_trip_with_custom_titles() {
+        let directory = tempfile::tempdir().unwrap();
+        let history = History::new(directory.path().to_owned()).unwrap();
+        let mut chat = conversation();
+        let legacy = serde_json::to_value(&chat).unwrap();
+        assert!(legacy.get("starred").is_none());
+        assert!(serde_json::from_value::<Conversation>(legacy)
+            .unwrap()
+            .starred
+            .is_none());
+        chat.title = "A custom title".into();
+        chat.starred = Some(true);
+        history.save(&chat).unwrap();
+        let loaded = history.list().unwrap();
+        assert_eq!(loaded[0].title, chat.title);
+        assert_eq!(loaded[0].starred, Some(true));
     }
 
     #[test]

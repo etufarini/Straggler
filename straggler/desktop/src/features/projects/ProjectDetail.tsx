@@ -1,10 +1,22 @@
 import RichComposer, { FormattingToggle, composerHint } from '../chat/composer/RichComposer';
 import type { ComposerContext } from '../chat/composer/commands';
 import useComposerDensity from '../chat/useComposerDensity';
+import Select from '../../components/Select';
+import { searchText } from '../../domain/chatSearch';
 import { countLabel } from '../../domain/text';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUp, Star, Trash2, FileUp, RotateCcw, Pencil } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowUp,
+  Star,
+  Trash2,
+  FileUp,
+  RotateCcw,
+  Pencil,
+  Search,
+  RefreshCw,
+} from 'lucide-react';
 import type { WorkspaceController } from '../../app/useWorkspace';
 import type { Project } from '../../domain/projects';
 import { attachmentTypes } from '../../domain/attachments';
@@ -27,6 +39,8 @@ export default function ProjectDetail({
   onPrimaryActionChange: (active: boolean) => void;
 }) {
   const { projects } = controller;
+  const [chatQuery, setChatQuery] = useState('');
+  const [chatSort, setChatSort] = useState('recent');
   const composerRef = useComposerDensity();
   const [composerMode, setComposerMode] = useState<ComposerContext>('text');
   const toolbarVisible = controller.preferences.formattingToolbarVisible !== false;
@@ -37,8 +51,16 @@ export default function ProjectDetail({
   const pageHeading = useRef<HTMLHeadingElement>(null);
   const context = projects.context(project);
   const chats = controller.conversations
-    .filter((chat) => chat.projectId === project.id)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+    .filter(
+      (chat) =>
+        chat.projectId === project.id &&
+        searchText(chat.title).includes(searchText(chatQuery.trim())),
+    )
+    .sort(
+      chatSort === 'name'
+        ? (a, b) => a.title.localeCompare(b.title)
+        : (a, b) => b.updatedAt - a.updatedAt,
+    );
   const actions = projectActions(controller, project);
   const generatingHere = controller.generating && controller.chat.projectId === project.id;
   const included = project.files.filter((file) => file.included).length;
@@ -203,6 +225,30 @@ export default function ProjectDetail({
             <h2 id="project-chats-title">Chats</h2>
             <span className="project-meta">{countLabel(chats.length, 'chat')}</span>
           </div>
+          <div className="project-toolbar">
+            <label className="project-search">
+              <Search size={15} />
+              <input
+                type="search"
+                aria-label="Search project chats"
+                placeholder="Search chats"
+                value={chatQuery}
+                onChange={(event) => setChatQuery(event.target.value)}
+              />
+            </label>
+            <label className="project-sort">
+              <span>Sort</span>
+              <Select
+                aria-label="Sort chats"
+                value={chatSort}
+                onChange={setChatSort}
+                options={[
+                  { value: 'recent', label: 'Recent' },
+                  { value: 'name', label: 'Name' },
+                ]}
+              />
+            </label>
+          </div>
           {chats.length ? (
             <ul className="project-chat-list" aria-labelledby="project-chats-title">
               {chats.map((chat) => (
@@ -220,6 +266,17 @@ export default function ProjectDetail({
                   </button>
                   <ConversationMenu
                     conversation={chat}
+                    metadataBusyReason={
+                      controller.generating || controller.editingBusy
+                        ? 'Available when the current response finishes or is stopped'
+                        : undefined
+                    }
+                    onStar={() =>
+                      void controller
+                        .updateChatMetadata(chat, { starred: !chat.starred })
+                        .catch(() => {})
+                    }
+                    onRename={() => controller.renameChat(chat.id)}
                     controlId={`button-options-in-project-${controlSlug(chat.title)}`}
                     readOnly={project.archived}
                     actionBusyReason={
@@ -239,7 +296,9 @@ export default function ProjectDetail({
             </ul>
           ) : (
             <p className="project-no-results">
-              No chats yet. Start one above or move one here from its menu.
+              {chatQuery.trim()
+                ? `No chats match ‘${chatQuery}’`
+                : 'No chats yet. Start one above or move one here from its menu.'}
             </p>
           )}
         </div>
@@ -332,6 +391,15 @@ export default function ProjectDetail({
                           .catch(() => {})
                       }
                     />
+                    <button
+                      className="project-icon-button"
+                      aria-label={`Replace ${file.name} with newer version…`}
+                      title="Replace with newer version…"
+                      disabled={project.archived || projects.busy}
+                      onClick={() => void projects.replaceFile(project.id, file.id).catch(() => {})}
+                    >
+                      <RefreshCw size={14} />
+                    </button>
                     <button
                       className="project-icon-button"
                       aria-label={`Remove ${file.name} from the project`}

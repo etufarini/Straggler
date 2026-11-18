@@ -1,4 +1,4 @@
-import { Download, FolderInput, FolderOutput, Trash2 } from 'lucide-react';
+import { Download, FolderInput, FolderOutput, Trash2, Star, Pencil } from 'lucide-react';
 import ActionMenu, { controlSlug } from '../components/ActionMenu';
 import type { ActionMenuItem } from '../components/ActionMenu';
 import type { Conversation } from '../domain/types';
@@ -8,7 +8,10 @@ export default function ConversationMenu({
   disabled = false,
   readOnly = false,
   actionBusyReason,
+  metadataBusyReason,
   controlId,
+  onStar,
+  onRename,
   onDelete,
   onExport,
   onMove,
@@ -18,7 +21,10 @@ export default function ConversationMenu({
   disabled?: boolean;
   readOnly?: boolean;
   actionBusyReason?: string;
+  metadataBusyReason?: string;
   controlId?: string;
+  onStar?: () => void;
+  onRename?: () => void;
   onDelete: () => void;
   onExport?: (includesReasoning: boolean) => void;
   onMove?: () => void;
@@ -29,8 +35,33 @@ export default function ConversationMenu({
   );
   const mutationReason = readOnly ? 'Restore the project to change this chat.' : actionBusyReason;
   const items: ActionMenuItem[] = [
+    ...(onStar
+      ? [
+          {
+            label: conversation.starred ? 'Unstar' : 'Star',
+            controlId: 'button-star-chat',
+            icon: <Star size={15} />,
+            disabled: !!(mutationReason || metadataBusyReason),
+            disabledReason: mutationReason || metadataBusyReason,
+            onSelect: onStar,
+          },
+        ]
+      : []),
+    ...(onRename
+      ? [
+          {
+            label: 'Rename',
+            controlId: 'button-rename-chat',
+            icon: <Pencil size={15} />,
+            disabled: !!(mutationReason || metadataBusyReason),
+            disabledReason: mutationReason || metadataBusyReason,
+            onSelect: onRename,
+          },
+        ]
+      : []),
     {
       label: 'Export chat…',
+      separatorBefore: !!onStar || !!onRename,
       controlId: 'button-export-chat',
       icon: <Download size={15} />,
       disabled: !onExport,

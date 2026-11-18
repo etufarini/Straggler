@@ -274,9 +274,10 @@ export async function estimatePromptTokens(
 export const projectService = {
   list: () => invoke<Project[]>('projects_list'),
   save: (project: Project) => invoke<ProjectMutation>('project_save', { project }),
-  addFile: (projectId: string, path: string) =>
+  addFile: (projectId: string, path: string, replaceFileId?: string) =>
     invoke<ProjectMutation>('project_file_add', {
       projectId,
+      replaceFileId,
       path,
       charactersPerToken: projectTokenEstimateCharacters,
     }),

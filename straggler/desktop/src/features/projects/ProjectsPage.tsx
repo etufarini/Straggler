@@ -270,6 +270,12 @@ export default function ProjectsPage({
   );
 }
 export function relativeTime(timestamp: number) {
+  if (
+    !Number.isFinite(timestamp) ||
+    timestamp <= 0 ||
+    !Number.isFinite(new Date(timestamp).getTime())
+  )
+    return '—';
   const minutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes} min ago`;

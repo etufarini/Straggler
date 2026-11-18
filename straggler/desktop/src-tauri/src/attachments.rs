@@ -361,6 +361,7 @@ mod tests {
         let chat = Conversation {
             id: Uuid::new_v4(),
             title: "PDF attachments".into(),
+            starred: None,
             created_at: 1,
             updated_at: 1,
             model: None,

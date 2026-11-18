@@ -993,3 +993,30 @@ for (const deleteChats of [false, true]) {
     }
   });
 }
+
+test('project chats filter and sort; replacing a file preserves its exclusion', async ({
+  page,
+}) => {
+  await seed(page);
+  await openResearch(page);
+  const search = page.getByRole('searchbox', { name: 'Search project chats' });
+  await search.fill('existing');
+  await expect(page.locator('.project-chat-list li')).toHaveCount(1);
+  await search.fill('');
+  await selectValue(page.getByRole('combobox', { name: 'Sort chats' }), 'name');
+  await expect(page.locator('.project-chat-list li').first()).toContainText(
+    'Another research chat',
+  );
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'straggler-fixture-attachment-paths',
+      JSON.stringify(['/fixture/new-version.md']),
+    ),
+  );
+  await page.getByRole('button', { name: 'Replace excluded.txt with newer version…' }).click();
+  const files = page.getByRole('list', { name: 'Project files' });
+  await expect(files).not.toContainText('excluded.txt');
+  const replacement = files.locator('li').filter({ hasText: 'new-version.md' });
+  await expect(replacement).toContainText('Excluded');
+  await expect(files.locator('li')).toHaveCount(2);
+});

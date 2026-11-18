@@ -2700,7 +2700,8 @@ input:focus-visible {
 .project-icon-button:hover:not(:disabled) {
   color: var(--ui-text);
 }
-.project-star[aria-pressed='true'] {
+.project-star[aria-pressed='true'],
+.conversation-row .chat-star {
   color: #f5d37a;
 }
 .project-star[aria-pressed='true'] svg {
@@ -3984,4 +3985,43 @@ input:focus-visible {
   bottom: auto;
   top: 40px;
   left: 10px;
+}
+
+.chat-search,
+.chat-rename {
+  min-width: 0;
+  padding: 6px;
+}
+.chat-search input,
+.chat-rename input {
+  width: 100%;
+  min-width: 0;
+}
+.chat-search p,
+.chat-rename .field-help {
+  font-size: 11px;
+  color: var(--ui-muted);
+}
+.conversation-row mark {
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.chat-search {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px;
+}
+.chat-search input {
+  grid-column: 1 / -1;
+  padding: 7px;
+}
+.chat-search p {
+  margin: 0;
+  align-self: center;
+}
+.chat-search button {
+  padding: 4px;
 }

@@ -220,7 +220,10 @@ export function useConversation(
       ...chatRef.current,
       updatedAt: Date.now(),
       model: server.model,
-      title: chatRef.current.messages.length ? chatRef.current.title : text.slice(0, 80),
+      title:
+        chatRef.current.messages.length || chatRef.current.title !== 'New chat'
+          ? chatRef.current.title
+          : text.slice(0, 80),
       messages: [
         ...(replacement ?? [
           ...(rejectedDraft.current?.chatId === chatRef.current.id
@@ -369,19 +372,52 @@ export function useConversation(
     }
   }
 
+  async function updateChatMetadata(
+    value: Conversation,
+    patch: Partial<Pick<Conversation, 'title' | 'starred'>>,
+  ) {
+    if (
+      patch.title !== undefined &&
+      (!patch.title.trim() || Array.from(patch.title.trim()).length > 80)
+    ) {
+      throw new Error('Chat titles must contain between 1 and 80 characters.');
+    }
+    if (
+      storageError &&
+      chatRef.current.id !== value.id &&
+      (chatRef.current.messages.length || chatRef.current.attachments?.length)
+    ) {
+      throw new Error('Save the current chat before changing another chat.');
+    }
+    await runConversationMutation(async () => {
+      const current =
+        chatRef.current.id === value.id
+          ? chatRef.current
+          : conversations.find((chat) => chat.id === value.id);
+      if (!current) throw new Error('This chat no longer exists.');
+      const updated = { ...current, ...patch };
+      await save(updated);
+      acceptStoredConversation(updated);
+    }, false).catch((failure) => {
+      setStorageError(errorDetail(failure).message);
+      throw failure;
+    });
+  }
+
   function acceptStoredConversation(value: Conversation) {
     if (chatRef.current.id === value.id) updateChat(value);
     updateConversations(value);
   }
 
-  async function runConversationMutation(operation: () => Promise<void>) {
+  async function runConversationMutation(operation: () => Promise<void>, persistCurrent = true) {
     if (requestRef.current || mutation.current)
       throw new Error('Wait for the current chat operation to finish.');
     mutation.current = true;
     setEditingBusy(true);
     try {
-      await saveQueue.current;
-      await save(chatRef.current);
+      if (persistCurrent) await saveQueue.current;
+      else await saveQueue.current.catch(() => {});
+      if (persistCurrent) await save(chatRef.current);
       const pending = operation();
       saveQueue.current = pending;
       await pending;
@@ -562,6 +598,7 @@ export function useConversation(
     flushSaves,
     runConversationMutation,
     acceptStoredConversation,
+    updateChatMetadata,
     contextError,
     importChat,
     importBusy,

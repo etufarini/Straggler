@@ -589,15 +589,20 @@ async fn project_save(
 #[tauri::command]
 async fn project_file_add(
     project_id: Uuid,
+    replace_file_id: Option<Uuid>,
     path: PathBuf,
     characters_per_token: usize,
     state: State<'_, Application>,
 ) -> Result<straggler_desktop::projects::ProjectMutation> {
     let runtime = runtime(&state)?;
     tauri::async_runtime::spawn_blocking(move || {
-        runtime
-            .projects
-            .add_file(&runtime.history, project_id, &path, characters_per_token)
+        runtime.projects.add_or_replace_file(
+            &runtime.history,
+            project_id,
+            &path,
+            characters_per_token,
+            replace_file_id,
+        )
     })
     .await
     .map_err(|error| error.to_string())?
