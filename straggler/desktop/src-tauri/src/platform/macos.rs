@@ -124,10 +124,10 @@ pub fn open_web_url(url: &str) -> crate::Result<()> {
     let status = std::process::Command::new("open")
         .arg(url)
         .status()
-        .map_err(|_| "The default browser could not be opened.")?;
+        .map_err(|_| "The default app could not be opened.")?;
     if status.success() {
         Ok(())
     } else {
-        Err("The default browser could not open this link.".into())
+        Err("The default app could not open this link.".into())
     }
 }

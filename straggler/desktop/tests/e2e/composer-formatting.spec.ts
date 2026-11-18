@@ -217,10 +217,14 @@ test(
     const dialog = page.getByRole('dialog', { name: 'Link', exact: true });
     await expect(dialog.getByText('Add link', { exact: true })).toBeVisible();
     await expect(dialog.getByRole('textbox', { name: 'Text', exact: true })).toHaveValue('example');
-    for (const invalid of ['name@example.com', 'mailto:name@example.com', 'javascript:alert(1)']) {
+    for (const invalid of [
+      'mailto:a@example.com,b@example.com',
+      'mailto:a%0a@example.com',
+      'javascript:alert(1)',
+    ]) {
       await dialog.getByRole('textbox', { name: 'Link', exact: true }).fill(invalid);
       await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-      await expect(dialog.getByText('Enter a link like https://example.com')).toBeVisible();
+      await expect(dialog.getByText('Enter a web link or an email address')).toBeVisible();
       await expect(dialog.getByRole('textbox', { name: 'Link', exact: true })).toHaveAttribute(
         'aria-invalid',
         'true',
@@ -443,15 +447,15 @@ test(
   },
 );
 
-test('email and code paste stay literal; only sent HTTP links open externally', async ({
+test('email paste links selections, code stays literal and sent HTTP links open externally', async ({
   page,
 }) => {
   await start(page);
   await message(page).fill('replace');
   await message(page).press('ControlOrMeta+a');
   await paste(page, 'person@example.com');
-  await expect(message(page).locator('a')).toHaveCount(0);
-  await expect(message(page)).toHaveText('person@example.com');
+  await expect(message(page).locator('a')).toHaveAttribute('href', 'mailto:person@example.com');
+  await expect(message(page)).toHaveText('replace');
   await start(page);
   await message(page).pressSequentially('```');
   await paste(page, '**literal**\n- text');
@@ -547,4 +551,31 @@ test.describe('Safari focus restoration', { tag: '@platform' }, () => {
     });
     await expect(page.getByRole('button', { name: 'Hide formatting' })).toBeFocused();
   });
+});
+
+test('email popover discloses removed headers and opens only the recipient', async ({ page }) => {
+  await start(page);
+  await message(page).fill('Email');
+  await message(page).press('ControlOrMeta+a');
+  await message(page).press('ControlOrMeta+Shift+KeyU');
+  const dialog = page.getByRole('dialog', { name: 'Link', exact: true });
+  await dialog
+    .getByRole('textbox', { name: 'Link', exact: true })
+    .fill('mailto:person@example.com?subject=Hello&body=Hi&bcc=hidden@example.com');
+  await expect(dialog.getByText('Subject and body aren’t kept.')).toBeVisible();
+  await expect(
+    dialog.getByText('Email link · opens your email app, addressed to person@example.com'),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(message(page).locator('a')).toHaveAttribute('href', 'mailto:person@example.com');
+  await page.evaluate(() =>
+    window.addEventListener('straggler-fixture-external-url', (event) => {
+      Object.assign(window, { openedEmail: (event as CustomEvent).detail });
+    }),
+  );
+  await message(page).press('ControlOrMeta+Enter');
+  await page.locator('.message.user .markdown a').click();
+  await expect
+    .poll(() => page.evaluate(() => (window as Window & { openedEmail?: string }).openedEmail))
+    .toBe('mailto:person@example.com');
 });

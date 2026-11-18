@@ -92,7 +92,7 @@ export function composerExtensions(placeholder: () => string) {
       openOnClick: false,
       autolink: false,
       linkOnPaste: false,
-      protocols: ['http', 'https'],
+      protocols: ['http', 'https', 'mailto'],
       isAllowedUri: (url) => normalizeComposerUrl(url) !== null,
     }),
     UndoRedo.extend({ addKeyboardShortcuts: () => ({}) }),

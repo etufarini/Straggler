@@ -1,5 +1,6 @@
 import { useCallback, useId, useRef, useState } from 'react';
 import {
+  Mail,
   Bold,
   Italic,
   Strikethrough,
@@ -15,6 +16,7 @@ import { TextSelection } from '@tiptap/pm/state';
 import { useEditorState } from '@tiptap/react';
 import Popover from '../../../components/Popover';
 import { applyFormatting, focusComposer, formattingDisabled, isMac } from './commands';
+import { emailLink } from '../../../domain/emailLinks';
 import { normalizeComposerUrl } from './markdown';
 
 const tools = [
@@ -51,6 +53,7 @@ export default function FormattingToolbar({
   const [link, setLink] = useState({ text: '', url: '', existing: false, from: 0, to: 0 });
   const [error, setError] = useState('');
   const errorId = useId();
+  const email = emailLink(link.url);
   const returnFocus = useCallback(() => {
     focusComposer(editor);
   }, [editor]);
@@ -86,10 +89,10 @@ export default function FormattingToolbar({
   function saveLink(close: () => void) {
     const href = normalizeComposerUrl(link.url);
     if (!href) {
-      setError('Enter a link like https://example.com');
+      setError('Enter a web link or an email address');
       return;
     }
-    const text = link.text || href;
+    const text = link.text || email?.address || href;
     const chain = editor.chain().setTextSelection({ from: link.from, to: link.to });
     if (text === editor.state.doc.textBetween(link.from, link.to)) chain.setLink({ href });
     else chain.insertContent({ type: 'text', text, marks: [{ type: 'link', attrs: { href } }] });
@@ -198,6 +201,17 @@ export default function FormattingToolbar({
                         }}
                       />
                     </label>
+                    {email && (
+                      <p className="field-help" role="status">
+                        <Mail size={14} aria-hidden="true" /> Email link · opens your email app,
+                        addressed to {email.address}
+                      </p>
+                    )}
+                    {email?.stripped && (
+                      <p className="field-help" role="status">
+                        Subject and body aren’t kept.
+                      </p>
+                    )}
                     {error && (
                       <p id={errorId} className="field-error" role="alert">
                         {error}
