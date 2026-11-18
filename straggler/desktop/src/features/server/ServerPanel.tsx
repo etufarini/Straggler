@@ -1,3 +1,6 @@
+import MemoryBadge from '../../components/MemoryBadge';
+import { memoryEstimateNote } from '../../domain/memory';
+import ServerMemory from './ServerMemory';
 import {
   X,
   RefreshCw,
@@ -144,6 +147,11 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                         <span>
                           {fileName(model.path)}
                           <small>{model.label}</small>
+                          <MemoryBadge
+                            bytes={model.sizeBytes}
+                            memory={config.memory}
+                            context={controller.draft?.context}
+                          />
                           {controller.server.model === model.path &&
                           controller.serverDetails?.visionSupported ? (
                             <small>Vision</small>
@@ -155,10 +163,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                       </button>
                     ))}
                   </div>
-                  <p className="capability-note">
-                    Features depend on the model and the llama.cpp version. Larger models need more
-                    memory.
-                  </p>
+                  <p className="capability-note">{memoryEstimateNote}</p>
                   <div className="panel-actions">
                     {active ? (
                       <button
@@ -193,6 +198,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
               {statusLabel[server.phase]}
               <code>{server.url || 'No active endpoint'}</code>
             </div>
+            <ServerMemory controller={controller} />
             <pre className="server-log" tabIndex={0}>
               {server.issue && `${server.issue.details}\n\n`}
               {server.logs.join('\n') || 'Server output will appear here when a model is loaded.'}

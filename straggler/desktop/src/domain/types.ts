@@ -5,6 +5,7 @@ export interface Model {
   label: string;
   template?: string | null;
   projector?: string | null;
+  sizeBytes?: number | null;
 }
 export interface Settings {
   chat_system_prompt: string;
@@ -41,6 +42,7 @@ export interface Listener {
   details: string;
 }
 export interface Memory {
+  unified?: boolean;
   availableRamMiB: number | null;
   devices: { name: string; availableMiB: number }[];
 }

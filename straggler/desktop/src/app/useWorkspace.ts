@@ -330,9 +330,10 @@ export function useWorkspace() {
     });
   }
 
-  function reviewSettings(section: Section) {
+  function reviewSettings(section: Section, field?: string) {
     setSettingsSection(section);
     setPanel('settings');
+    if (field) requestAnimationFrame(() => document.getElementById(field)?.focus());
   }
 
   function reportSettingsError(error: unknown) {

@@ -235,7 +235,7 @@ impl NativeConfiguration {
             models: discovered_models,
             devices: discovery.devices.clone(),
             listeners: inspected.listeners,
-            memory: json!({"availableRamMiB": platform::available_memory(), "devices": capabilities::device_memory(&discovery.devices)}),
+            memory: json!({"availableRamMiB": platform::available_memory(), "unified": cfg!(all(target_os = "macos", target_arch = "aarch64")), "devices": capabilities::device_memory(&discovery.devices)}),
             build,
             profiles: self.store.profiles()?,
             capabilities: {

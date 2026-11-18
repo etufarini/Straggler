@@ -4046,3 +4046,32 @@ input:focus-visible {
   border: 1px solid var(--ui-control-border);
   border-radius: 12px;
 }
+
+.memory-badge {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.server-memory {
+  padding: 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+  margin: 12px 0;
+}
+.server-memory h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.server-memory dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  font-size: 12px;
+}
+.server-memory dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

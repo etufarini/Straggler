@@ -77,6 +77,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
         <label className="setting-field">
           <span>Context size</span>
           <Select
+            id="context-size"
             aria-label="Context size"
             value={
               [

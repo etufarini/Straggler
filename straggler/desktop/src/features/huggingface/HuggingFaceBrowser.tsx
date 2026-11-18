@@ -1,3 +1,5 @@
+import MemoryBadge from '../../components/MemoryBadge';
+import { memoryEstimateNote } from '../../domain/memory';
 import { useEffect, useId, useState } from 'react';
 import Select from '../../components/Select';
 import Feedback from '../../components/Feedback';
@@ -213,14 +215,13 @@ export default function HuggingFaceBrowser({
             </small>
           </label>
           {selected && (
-            <p className="field-help">
-              Estimated memory: {formatBytes(selected.size)}
-              {config?.memory.availableRamMiB == null
-                ? '. Available RAM: unavailable.'
-                : ` of ${formatBytes(config.memory.availableRamMiB * 1024 ** 2)} available.`}{' '}
-              Actual use depends on context and devices.
-            </p>
+            <MemoryBadge
+              bytes={selected.size}
+              memory={config?.memory}
+              context={config?.settings.context}
+            />
           )}
+          <p className="field-help">{memoryEstimateNote}</p>
           <p className="field-help">
             Download: {formatBytes(bytes)}. Free disk space:{' '}
             {info?.freeBytes == null ? 'Unavailable' : formatBytes(info.freeBytes)}.
