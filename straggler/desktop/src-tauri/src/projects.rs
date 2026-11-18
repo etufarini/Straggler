@@ -1034,6 +1034,7 @@ mod tests {
                 id: Uuid::new_v4(),
                 title: "A conversation".into(),
                 starred: None,
+                title_customized: None,
                 created_at: 1,
                 updated_at: 2,
                 model: None,

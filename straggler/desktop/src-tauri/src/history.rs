@@ -42,6 +42,8 @@ pub struct Conversation {
     pub title: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub starred: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_customized: Option<bool>,
     pub created_at: u64,
     pub updated_at: u64,
     pub model: Option<String>,
@@ -367,6 +369,9 @@ fn timestamp() -> u64 {
 }
 
 fn validate(conversation: &Conversation) -> Result<()> {
+    if conversation.title_customized == Some(true) && conversation.title.chars().count() > 80 {
+        return Err("Custom chat titles must contain at most 80 characters.".into());
+    }
     if conversation.title.trim().is_empty() || conversation.title.len() > 1024 {
         return Err("Chat title must contain between 1 and 1024 bytes.".into());
     }
@@ -428,6 +433,7 @@ mod tests {
             id: Uuid::new_v4(),
             title: "A local chat".into(),
             starred: None,
+            title_customized: None,
             created_at: 1,
             updated_at: 2,
             model: None,
@@ -463,11 +469,15 @@ mod tests {
             .starred
             .is_none());
         chat.title = "A custom title".into();
+        chat.title_customized = Some(true);
         chat.starred = Some(true);
         history.save(&chat).unwrap();
         let loaded = history.list().unwrap();
         assert_eq!(loaded[0].title, chat.title);
         assert_eq!(loaded[0].starred, Some(true));
+        chat.title = "a".repeat(81);
+        assert!(history.save(&chat).is_err());
+        assert_eq!(history.list().unwrap()[0].title, "A custom title");
     }
 
     #[test]

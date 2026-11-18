@@ -221,7 +221,7 @@ export function useConversation(
       updatedAt: Date.now(),
       model: server.model,
       title:
-        chatRef.current.messages.length || chatRef.current.title !== 'New chat'
+        chatRef.current.messages.length || chatRef.current.titleCustomized
           ? chatRef.current.title
           : text.slice(0, 80),
       messages: [
@@ -395,7 +395,11 @@ export function useConversation(
           ? chatRef.current
           : conversations.find((chat) => chat.id === value.id);
       if (!current) throw new Error('This chat no longer exists.');
-      const updated = { ...current, ...patch };
+      const updated = {
+        ...current,
+        ...patch,
+        ...(patch.title !== undefined ? { titleCustomized: true } : {}),
+      };
       await save(updated);
       acceptStoredConversation(updated);
     }, false).catch((failure) => {
