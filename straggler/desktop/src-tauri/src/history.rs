@@ -92,6 +92,7 @@ pub struct History {
     pub(crate) directory: PathBuf,
     pub(crate) writer: Arc<Mutex<()>>,
     pub(crate) project_storage: OnceLock<PathBuf>,
+    text_index: Mutex<crate::project_search::ChatTextIndex>,
 }
 
 impl History {
@@ -105,6 +106,7 @@ impl History {
             directory,
             writer: Arc::new(Mutex::new(())),
             project_storage: OnceLock::new(),
+            text_index: Mutex::default(),
         })
     }
 
@@ -112,6 +114,15 @@ impl History {
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
         self.recover()?;
         self.list_unlocked()
+    }
+
+    pub fn search_text(&self, query: &str) -> Result<Vec<Uuid>> {
+        if query.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut index = self.text_index.lock().map_err(|error| error.to_string())?;
+        let chats = self.list()?;
+        index.matches(chats, query)
     }
 
     pub(crate) fn list_unlocked(&self) -> Result<Vec<Conversation>> {
@@ -624,6 +635,32 @@ mod tests {
             .branch(loaded.id, response)
             .unwrap_err()
             .contains("Restore"));
+    }
+
+    #[test]
+    fn search_uses_saved_message_text_and_refreshes_after_edits_and_deletion() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::new(dir.path().join("conversations")).unwrap();
+        let mut chat = conversation();
+        chat.title = "Unrelated title".into();
+        chat.messages[0].content = "The local project studies migrations of seabirds.".repeat(100);
+        chat.messages[0].reasoning = "Excluded from the message index.".into();
+        chat.messages[0].status = "complete".into();
+        history.create(&chat).unwrap();
+
+        assert_eq!(
+            history.search_text("migrations seabirds").unwrap(),
+            [chat.id]
+        );
+        assert!(history.search_text("unrelated").unwrap().is_empty());
+        assert!(history.search_text("excluded").unwrap().is_empty());
+        chat.messages[0].content = "The local project studies migrating whales.".into();
+        history.save(&chat).unwrap();
+        assert!(history.search_text("seabirds").unwrap().is_empty());
+        assert_eq!(history.search_text("whales").unwrap(), [chat.id]);
+        history.delete(chat.id).unwrap();
+        assert!(history.search_text("whales").unwrap().is_empty());
+        assert_eq!(fs::read_dir(&history.directory).unwrap().count(), 0);
     }
 
     #[test]

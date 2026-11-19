@@ -11,11 +11,13 @@ export default function ChatHistoryRow({
   controller,
   value,
   query,
+  messageMatch = false,
   navigationDisabled,
 }: {
   controller: WorkspaceController;
   value: Conversation;
   query: string;
+  messageMatch?: boolean;
   navigationDisabled: boolean;
 }) {
   const { projects, chat, panel, view } = controller;
@@ -124,6 +126,9 @@ export default function ChatHistoryRow({
                 value.title
               )}
             </span>
+            {messageMatch && !match && (
+              <span className="project-row-project">Match in messages</span>
+            )}
             {project && (
               <span className="project-row-project">
                 in {project.name}

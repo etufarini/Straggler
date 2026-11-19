@@ -558,6 +558,14 @@ async fn history_create(conversation: Conversation, state: State<'_, Application
 }
 
 #[tauri::command]
+async fn history_search_text(query: String, state: State<'_, Application>) -> Result<Vec<Uuid>> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.history.search_text(&query))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn history_branch(
     id: Uuid,
     message_id: Uuid,
@@ -851,6 +859,7 @@ fn main() {
             history_delete,
             history_create,
             history_branch,
+            history_search_text,
             tokenize_text,
             prompt_tokens,
             attachment_add,
