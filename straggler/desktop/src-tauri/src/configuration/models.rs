@@ -193,7 +193,21 @@ pub fn discover(root: &Path) -> Result<Vec<Model>> {
             let Some(value) = path.to_str() else {
                 continue;
             };
+            let size_bytes = if let Some((prefix, _, total)) = split_file_name(&name) {
+                (1..=total).try_fold(0u64, |sum, part| {
+                    sum.checked_add(
+                        fs::metadata(
+                            directory.join(format!("{prefix}-{part:05}-of-{total:05}.gguf")),
+                        )
+                        .ok()?
+                        .len(),
+                    )
+                })
+            } else {
+                fs::metadata(&path).ok().map(|metadata| metadata.len())
+            };
             models.push(Model {
+                size_bytes,
                 path: value.into(),
                 template: super::templates::candidate(&path),
                 projector: projector_candidate(&path),

@@ -90,6 +90,8 @@ impl From<String> for ConfigurationError {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Model {
+    #[serde(default, rename = "sizeBytes")]
+    pub size_bytes: Option<u64>,
     pub path: String,
     pub label: String,
     pub template: Option<String>,
