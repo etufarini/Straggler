@@ -73,8 +73,10 @@ describe('composer Markdown contract', () => {
 describe('composer link validation', () => {
   it.each([
     'javascript:alert(1)',
-    'mailto:a@example.com',
-    'a@example.com',
+    'mailto:a@example.com,b@example.com',
+    'mailto:a@example.com?body=%0aBad',
+    'mailto:a%00@example.com',
+    'a..b@example.com',
     'ftp://example.com',
     'file:///tmp/a',
     'https://a:b@example.com',
@@ -84,6 +86,8 @@ describe('composer link validation', () => {
     expect(normalizeComposerUrl(url)).toBeNull();
   });
   it.each([
+    ['a@example.com', 'mailto:a@example.com'],
+    ['mailto:a@example.com?body=Hi&cc=b@example.com#part', 'mailto:a@example.com'],
     ['example.com/a', 'https://example.com/a'],
     ['https://example.com', 'https://example.com'],
     ['http://localhost:1420/', 'http://localhost:1420/'],
@@ -91,3 +95,10 @@ describe('composer link validation', () => {
     expect(normalizeComposerUrl(url)).toBe(expected);
   });
 });
+
+it.each(['<a@example.com>', '[Email](mailto:a@example.com)'])(
+  'preserves email Markdown %s',
+  (source) => {
+    expect(serializeMarkdown(parseMarkdown(source))).toBe(source);
+  },
+);

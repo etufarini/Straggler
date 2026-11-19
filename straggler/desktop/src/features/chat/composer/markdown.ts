@@ -1,3 +1,4 @@
+import { emailLink } from '../../../domain/emailLinks';
 import type { JSONContent } from '@tiptap/core';
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
@@ -9,6 +10,8 @@ type Mark = NonNullable<JSONContent['marks']>[number];
 const alphanumeric = (text: string) => /[\p{L}\p{N}]/u.test(text);
 
 export function normalizeComposerUrl(value: string): string | null {
+  const email = emailLink(value);
+  if (email) return email.href;
   const input = value.trim();
   if (!input || /\s/.test(input) || (!/^https?:\/\//i.test(input) && input.includes('@')))
     return null;
@@ -207,7 +210,14 @@ function inlineMarkdown(nodes: JSONContent[], escape: boolean): string {
         case 'link': {
           const href = normalizeComposerUrl(String(mark.attrs?.href ?? ''));
           const url = href?.replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
-          output += !url ? inner : raw === href ? `<${href}>` : `[${inner}](${url})`;
+          const email = href && emailLink(href);
+          output += !url
+            ? inner
+            : email && raw === email.address
+              ? `<${raw}>`
+              : raw === href
+                ? `<${href}>`
+                : `[${inner}](${url})`;
           break;
         }
         default:

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { openWebUrl } from '../../services/desktop';
+import { emailLink } from '../../domain/emailLinks';
 import { sourceUrl } from '../../domain/webSearch';
 import { errorDetail } from '../../domain/errors';
 
@@ -18,7 +19,7 @@ export default function WebLink({
   title?: string;
 }) {
   const [error, setError] = useState('');
-  const href = sourceUrl(url);
+  const href = /^mailto:/i.test(url) ? emailLink(url)?.href : sourceUrl(url);
   if (!href) return <span>{children}</span>;
   return (
     <>
@@ -30,7 +31,11 @@ export default function WebLink({
         rel="noreferrer noopener"
         onClick={(event) => {
           event.preventDefault();
-          void openWebUrl(href).catch((failure) => setError(errorDetail(failure).message));
+          void openWebUrl(href).catch((failure) =>
+            setError(
+              `Couldn’t complete the action. Check the details and try again. ${errorDetail(failure).message}`,
+            ),
+          );
         }}
       >
         {children}

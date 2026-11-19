@@ -222,9 +222,7 @@ async fn web_search_key_save(
 }
 #[tauri::command]
 async fn open_web_url(url: String) -> Result<()> {
-    let url = reqwest::Url::parse(&url).map_err(|_| "Invalid web URL.")?;
-    straggler_desktop::web_search::types::validate_url(&url)
-        .map_err(|_| "Only HTTP and HTTPS links can be opened.")?;
+    let url = straggler_desktop::external_links::sanitize(&url)?;
     tauri::async_runtime::spawn_blocking(move || {
         straggler_desktop::platform::open_web_url(url.as_str())
     })

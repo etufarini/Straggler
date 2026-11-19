@@ -6,6 +6,7 @@ pub mod configuration;
 pub mod conversation_import;
 pub mod credentials;
 pub mod diagnostics;
+pub mod external_links;
 pub mod files;
 pub mod history;
 pub mod huggingface;
