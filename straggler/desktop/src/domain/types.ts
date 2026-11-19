@@ -144,6 +144,7 @@ export interface Conversation {
   title: string;
   starred?: boolean;
   titleCustomized?: boolean;
+  branchedFrom?: { conversationId: string; messageId: string };
   createdAt: number;
   updatedAt: number;
   model: string | null;

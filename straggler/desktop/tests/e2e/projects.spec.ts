@@ -1061,3 +1061,88 @@ test('project chats filter and sort; replacing a file preserves its exclusion', 
   await expect(replacement).toContainText('Excluded');
   await expect(files.locator('li')).toHaveCount(2);
 });
+
+test('D009 creates a branch at the selected response and keeps its draft and provenance', async ({
+  page,
+}) => {
+  const values = history();
+  const original = values[1];
+  original.ownSystemPrompt = 'Preserve the chat prompt for later.';
+  original.attachments = [
+    {
+      id: '30000000-0000-4000-8000-000000000003',
+      name: 'local.txt',
+      text: 'Retained attached text.',
+      extension: 'txt',
+      size: 22,
+    },
+  ];
+  original.messages.push({
+    id: '20000000-0000-4000-8000-000000000009',
+    role: 'user',
+    status: 'complete',
+    content: 'Later question that belongs to the original',
+    reasoning: '',
+  });
+  await seed(page, {
+    history: values,
+    flags: { 'straggler-fixture-fail-next-branch': 'true' },
+  });
+  await loadModel(page);
+  await control(page, 'button-chat-existing-research-chat').click();
+  const draft = page.getByRole('textbox', { name: 'Message', exact: true });
+  await draft.fill('Keep my unsent draft');
+  const branchButton = page.getByRole('button', { name: 'Branch in new chat', exact: true });
+  await branchButton.click();
+  await expect(page.getByRole('alert')).toContainText('Couldn’t create the branch');
+  await expect(page.getByText('Later question that belongs to the original')).toBeVisible();
+  expect(await readHistory(page)).toHaveLength(values.length);
+  await branchButton.click();
+  const divider = page.getByRole('complementary', { name: 'Branch origin' });
+  await expect(divider).toContainText('Branched from ‘Existing research chat’');
+  await expect(divider).toBeFocused();
+  await expect(draft).toHaveText('Keep my unsent draft');
+  await expect(page.getByText('Later question that belongs to the original')).toHaveCount(0);
+  const saved = (await readHistory(page)).find((value) => value.branchedFrom);
+  expect(saved).toMatchObject({
+    title: 'Existing research chat (branch)',
+    projectId: ids.research,
+    ownSystemPrompt: original.ownSystemPrompt,
+    attachments: original.attachments,
+    messages: original.messages.slice(0, 2),
+    branchedFrom: { conversationId: original.id, messageId: original.messages[1].id },
+  });
+  await divider.getByRole('button', { name: 'Open original', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Edit response', exact: true })).toBeFocused();
+  await expect(draft).toHaveText('Keep my unsent draft');
+  await expect(page.getByText('Later question that belongs to the original')).toBeVisible();
+  await page.evaluate((id) => {
+    const key = 'straggler-fixture-normal';
+    const chats = JSON.parse(localStorage.getItem(key)!);
+    localStorage.setItem(key, JSON.stringify(chats.filter((chat: Conversation) => chat.id !== id)));
+  }, original.id);
+  await page.reload();
+  await control(page, 'button-chat-existing-research-chat-branch').click();
+  await expect(divider).toContainText('Original chat deleted');
+  await expect(divider.getByRole('button', { name: 'Open original' })).toHaveCount(0);
+});
+
+test('D009 explains why branching is unavailable for archived and temporary chats', async ({
+  page,
+}) => {
+  const archived = chat(ids.ownChat, 'Archived project chat', ids.archived);
+  await seed(page, { history: [archived] });
+  await loadModel(page);
+  await control(page, 'button-chat-archived-project-chat').click();
+  const branch = page.getByRole('button', { name: 'Branch in new chat', exact: true });
+  await expect(branch).toBeDisabled();
+  await expect(branch).toHaveAttribute('title', 'Restore this project to branch its chats.');
+  await control(page, 'button-new-chat').click();
+  await page.getByRole('button', { name: 'Temporary', exact: true }).click();
+  await expect(page.locator('.workspace')).toHaveClass(/is-temporary/);
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Temporary response');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(branch).toBeDisabled();
+  await expect(branch).toHaveAttribute('title', 'Branching is unavailable in temporary chats.');
+  expect(await readHistory(page)).toHaveLength(1);
+});

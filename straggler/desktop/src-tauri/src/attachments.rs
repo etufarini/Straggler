@@ -442,6 +442,7 @@ mod tests {
             title: "PDF attachments".into(),
             starred: None,
             title_customized: None,
+            branched_from: None,
             created_at: 1,
             updated_at: 1,
             model: None,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageSquare, Star } from 'lucide-react';
+import { GitBranch, MessageSquare, Star } from 'lucide-react';
 import type { Conversation } from '../domain/types';
 import type { WorkspaceController } from './useWorkspace';
 import { titleMatch } from '../domain/chatSearch';
@@ -107,6 +107,8 @@ export default function ChatHistoryRow({
         >
           {value.starred ? (
             <Star size={15} className="chat-star" fill="currentColor" aria-label="Starred" />
+          ) : value.branchedFrom ? (
+            <GitBranch size={15} aria-hidden="true" />
           ) : (
             <MessageSquare size={15} />
           )}

@@ -558,6 +558,18 @@ async fn history_create(conversation: Conversation, state: State<'_, Application
 }
 
 #[tauri::command]
+async fn history_branch(
+    id: Uuid,
+    message_id: Uuid,
+    state: State<'_, Application>,
+) -> Result<Conversation> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.branch_conversation(id, message_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn history_delete(id: Uuid, state: State<'_, Application>) -> Result<()> {
     let runtime = runtime(&state)?;
     tauri::async_runtime::spawn_blocking(move || runtime.delete_conversation(id))
@@ -838,6 +850,7 @@ fn main() {
             history_save,
             history_delete,
             history_create,
+            history_branch,
             tokenize_text,
             prompt_tokens,
             attachment_add,
