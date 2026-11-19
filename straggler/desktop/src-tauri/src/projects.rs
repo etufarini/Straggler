@@ -1022,6 +1022,13 @@ impl Runtime {
             .undo(&self.history, token, active.conversation_id)
     }
 
+    pub fn branch_conversation(&self, id: Uuid, message_id: Uuid) -> Result<Conversation> {
+        self.ensure_persistent(id)?;
+        let active = self.active.lock().map_err(|error| error.to_string())?;
+        ensure_chat_idle(id, active.conversation_id)?;
+        self.history.branch(id, message_id)
+    }
+
     pub fn delete_conversation(&self, id: Uuid) -> Result<()> {
         let active = self.active.lock().map_err(|error| error.to_string())?;
         ensure_chat_idle(id, active.conversation_id)?;
@@ -1067,6 +1074,7 @@ mod tests {
                 title: "A conversation".into(),
                 starred: None,
                 title_customized: None,
+                branched_from: None,
                 created_at: 1,
                 updated_at: 2,
                 model: None,

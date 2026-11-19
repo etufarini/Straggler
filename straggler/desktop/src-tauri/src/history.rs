@@ -46,6 +46,8 @@ pub struct Conversation {
     pub starred: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title_customized: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branched_from: Option<BranchOrigin>,
     pub created_at: u64,
     pub updated_at: u64,
     pub model: Option<String>,
@@ -62,6 +64,13 @@ pub struct Conversation {
         skip_serializing_if = "Option::is_none"
     )]
     pub own_system_prompt: Option<Option<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BranchOrigin {
+    pub conversation_id: Uuid,
+    pub message_id: Uuid,
 }
 
 // Absence means a legacy record; explicit null preserves Settings inheritance.
@@ -163,6 +172,62 @@ impl History {
         let _guard = self.writer.lock().map_err(|e| e.to_string())?;
         self.recover()?;
         self.ensure_writable(conversation)?;
+        self.create_with_attachments(conversation, |attachment, target| {
+            let original = originals
+                .get(&attachment.id)
+                .ok_or("The original temporary attachment is unavailable.")?;
+            if serde_json::to_value(&original.attachment).map_err(|e| e.to_string())?
+                != serde_json::to_value(attachment).map_err(|e| e.to_string())?
+            {
+                return Err("The temporary attachment no longer matches its original.".into());
+            }
+            crate::files::write_atomic(target, &original.original)
+        })
+    }
+
+    pub(crate) fn branch(&self, id: Uuid, message_id: Uuid) -> Result<Conversation> {
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.recover()?;
+        let mut branch = self.read_one(id)?;
+        self.ensure_writable(&branch)?;
+        let response = branch.messages.iter().position(|message| {
+            message.id == message_id
+                && message.role == "assistant"
+                && !matches!(message.status.as_str(), "streaming" | "error")
+        });
+        let response = response.ok_or("Choose a saved response to branch from.")?;
+        branch.messages.truncate(response + 1);
+        branch.id = Uuid::new_v4();
+        let suffix = " (branch)";
+        let title: String = branch
+            .title
+            .trim()
+            .chars()
+            .take(80 - suffix.len())
+            .collect();
+        branch.title = format!("{}{suffix}", title.trim_end());
+        branch.title_customized = Some(true);
+        branch.starred = None;
+        branch.branched_from = Some(BranchOrigin {
+            conversation_id: id,
+            message_id,
+        });
+        branch.created_at = timestamp();
+        branch.updated_at = branch.created_at;
+        self.create_with_attachments(&branch, |attachment, target| {
+            let bytes = fs::read(self.original_path(id, attachment))
+                .map_err(|error| format!("Cannot copy {}: {error}", attachment.name))?;
+            crate::files::write_atomic(target, &bytes)
+        })?;
+        Ok(branch)
+    }
+
+    // The caller holds the history writer lock and has checked project access.
+    fn create_with_attachments(
+        &self,
+        conversation: &Conversation,
+        write_attachment: impl Fn(&Attachment, &std::path::Path) -> Result<()>,
+    ) -> Result<()> {
         let destination = self.directory.join(conversation.id.to_string());
         if destination.exists()
             || self
@@ -176,17 +241,9 @@ impl History {
         let files = stage.path().join("attachments");
         fs::create_dir(&files).map_err(|e| e.to_string())?;
         for attachment in &conversation.attachments {
-            let original = originals
-                .get(&attachment.id)
-                .ok_or("The original temporary attachment is unavailable.")?;
-            if serde_json::to_value(&original.attachment).map_err(|e| e.to_string())?
-                != serde_json::to_value(attachment).map_err(|e| e.to_string())?
-            {
-                return Err("The temporary attachment no longer matches its original.".into());
-            }
-            crate::files::write_atomic(
+            write_attachment(
+                attachment,
                 &files.join(format!("{}.{}", attachment.id, attachment.extension)),
-                &original.original,
             )?;
         }
         if !conversation.attachments.is_empty() {
@@ -451,6 +508,7 @@ mod tests {
             title: "A local chat".into(),
             starred: None,
             title_customized: None,
+            branched_from: None,
             created_at: 1,
             updated_at: 2,
             model: None,
@@ -496,6 +554,76 @@ mod tests {
         chat.title = "a".repeat(81);
         assert!(history.save(&chat).is_err());
         assert_eq!(history.list().unwrap()[0].title, "A custom title");
+    }
+
+    #[test]
+    fn branch_copies_only_the_chosen_history_and_owns_independent_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::new(dir.path().join("conversations")).unwrap();
+        let projects =
+            crate::projects::Projects::new(dir.path().join("projects"), &history).unwrap();
+        let project = crate::projects::Project {
+            id: Uuid::new_v4(),
+            name: "Research".into(),
+            description: String::new(),
+            instructions: String::new(),
+            archived: false,
+            starred: false,
+            created_at: 1,
+            updated_at: 1,
+            files: vec![],
+        };
+        projects.save(&history, project.clone(), None).unwrap();
+        let mut chat = conversation();
+        chat.title = "😀".repeat(80);
+        chat.starred = Some(true);
+        chat.project_id = Some(project.id);
+        chat.own_system_prompt = Some(Some("Stored prompt".into()));
+        chat.messages[0].status = "complete".into();
+        chat.messages[0].reasoning = "Retained reasoning".into();
+        let response = chat.messages[0].id;
+        let later = Message {
+            id: Uuid::new_v4(),
+            role: "user".into(),
+            content: "A later turn".into(),
+            reasoning: String::new(),
+            ..chat.messages[0].clone()
+        };
+        chat.messages.push(later);
+        history.create(&chat).unwrap();
+        let file = dir.path().join("notes.txt");
+        fs::write(&file, "Original attachment").unwrap();
+        chat = history.add_attachment(chat.id, &file).unwrap();
+        let old = history.original_path(chat.id, &chat.attachments[0]);
+
+        let branch = history.branch(chat.id, response).unwrap();
+        assert_eq!(branch.title.chars().count(), 80);
+        assert!(branch.title.ends_with(" (branch)"));
+        assert_eq!(branch.project_id, chat.project_id);
+        assert_eq!(branch.own_system_prompt, chat.own_system_prompt);
+        assert_eq!(branch.starred, None);
+        assert_eq!(branch.messages.len(), 1);
+        assert_eq!(branch.messages[0].reasoning, "Retained reasoning");
+        assert!(history.branch(chat.id, chat.messages[1].id).is_err());
+
+        let new = history.original_path(branch.id, &branch.attachments[0]);
+        assert_ne!(old, new);
+        fs::remove_file(&old).unwrap();
+        assert!(history.branch(chat.id, response).is_err());
+        assert_eq!(history.list().unwrap().len(), 2);
+        history.delete(chat.id).unwrap();
+        assert_eq!(fs::read_to_string(new).unwrap(), "Original attachment");
+        let loaded = history.read_one(branch.id).unwrap();
+        let origin = loaded.branched_from.unwrap();
+        assert_eq!(origin.conversation_id, chat.id);
+        assert_eq!(origin.message_id, response);
+        let mut archived = project;
+        archived.archived = true;
+        projects.save(&history, archived, None).unwrap();
+        assert!(history
+            .branch(loaded.id, response)
+            .unwrap_err()
+            .contains("Restore"));
     }
 
     #[test]

@@ -52,6 +52,11 @@ export function useConversation(
   const [temporaryId, setTemporaryId] = useState<string | null>(null);
   const temporaryRef = useRef<string | null>(null);
   const [contextError, setContextError] = useState('');
+  const [branchError, setBranchError] = useState<{
+    chatId: string;
+    messageId: string;
+    detail: string;
+  } | null>(null);
   const [editor, setEditor] = useState<{ messageId: string; text: string } | null>(null);
   const [editingBusy, setEditingBusy] = useState(false);
   const mutation = useRef(false);
@@ -487,6 +492,27 @@ export function useConversation(
     }
   }
 
+  async function branchChat(messageId: string) {
+    const id = chatRef.current.id;
+    if (!historyReady || storageError || temporaryRef.current) return;
+    setBranchError(null);
+    try {
+      await runConversationMutation(async () => {
+        try {
+          const branch = await invoke<Conversation>('history_branch', { id, messageId });
+          follow.current = false;
+          updateConversations(branch);
+          updateChat(branch);
+          setEditor(null);
+        } catch (e) {
+          setBranchError({ chatId: id, messageId, detail: errorDetail(e).message });
+        }
+      }, false);
+    } catch (e) {
+      setBranchError({ chatId: id, messageId, detail: errorDetail(e).message });
+    }
+  }
+
   async function importChat() {
     if (mutation.current || importBusy) return;
     let path: string | null = null;
@@ -660,6 +686,8 @@ export function useConversation(
     acceptStoredConversation,
     updateChatMetadata,
     contextError,
+    branchChat,
+    branchError,
     importChat,
     importBusy,
     importError,

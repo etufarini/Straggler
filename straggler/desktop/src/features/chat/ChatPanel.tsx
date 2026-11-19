@@ -10,7 +10,17 @@ import SystemPromptMenu from './SystemPromptMenu';
 import ContextCounter from './ContextCounter';
 import useComposerDensity from './useComposerDensity';
 import Markdown from './Markdown';
-import { ArrowUp, HardDrive, Check, Copy, Square, Pencil, RotateCcw, Folder } from 'lucide-react';
+import {
+  ArrowUp,
+  HardDrive,
+  Check,
+  Copy,
+  Square,
+  Pencil,
+  RotateCcw,
+  Folder,
+  GitBranch,
+} from 'lucide-react';
 import { fileName } from '../../domain/types';
 import type { ProjectPassage } from '../../domain/types';
 import { messageStatusLabel } from '../../components/statusLabels';
@@ -76,6 +86,52 @@ export default function ChatPanel({
   const project = controller.currentProject;
   const archived = !!project?.archived;
   const projectContext = project && controller.projects.context(project);
+  const branchDisabledReason = controller.temporary
+    ? 'Branching is unavailable in temporary chats.'
+    : archived
+      ? 'Restore this project to branch its chats.'
+      : !controller.historyReady || !!controller.storageError
+        ? 'Chat storage must be available to create a branch.'
+        : generating || editingBusy || controller.importBusy
+          ? 'Wait for the current chat operation to finish.'
+          : '';
+  const branchOrigin = chat.branchedFrom;
+  const original =
+    branchOrigin &&
+    controller.conversations.find((value) => value.id === branchOrigin.conversationId);
+  const branchDivider = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!branchOrigin) return;
+    const divider = branchDivider.current;
+    divider?.focus({ preventScroll: true });
+    divider?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+  }, [chat.id, branchOrigin?.messageId]);
+  const divider = branchOrigin ? (
+    <aside className="branch-divider" aria-label="Branch origin" tabIndex={-1} ref={branchDivider}>
+      <GitBranch size={15} aria-hidden="true" />
+      <span role="status">
+        {original ? `Branched from ‘${original.title}’` : 'Original chat deleted'}
+      </span>
+      {original && (
+        <button
+          type="button"
+          className="text-button"
+          disabled={generating || editingBusy || controller.importBusy}
+          onClick={() => {
+            controller.openChat(original, true);
+            follow.current = false;
+            requestAnimationFrame(() => {
+              document.getElementById(`edit-${branchOrigin.messageId}`)?.focus();
+            });
+          }}
+        >
+          Open original
+        </button>
+      )}
+    </aside>
+  ) : null;
+  const hasBranchPoint =
+    branchOrigin && chat.messages.some((message) => message.id === branchOrigin.messageId);
   return (
     <>
       {project && (
@@ -143,6 +199,7 @@ export default function ChatPanel({
           </div>
         ) : (
           <div className="message-column">
+            {!hasBranchPoint && divider}
             {chat.messages.map((message) => (
               <article className={`message ${message.role}`} key={message.id}>
                 <div className="message-avatar">
@@ -362,6 +419,20 @@ export default function ChatPanel({
                         >
                           <Pencil size={14} />
                         </button>
+                        {message.role === 'assistant' && (
+                          <span title={branchDisabledReason || undefined}>
+                            <button
+                              type="button"
+                              className="message-action"
+                              aria-label="Branch in new chat"
+                              title={branchDisabledReason || 'Branch in new chat'}
+                              disabled={!!branchDisabledReason}
+                              onClick={() => void controller.branchChat(message.id)}
+                            >
+                              <GitBranch size={14} />
+                            </button>
+                          </span>
+                        )}
                         {message.role === 'user' && (
                           <button
                             type="button"
@@ -388,6 +459,15 @@ export default function ChatPanel({
                         )}
                       </div>
                     )}
+                  {controller.branchError?.chatId === chat.id &&
+                    controller.branchError.messageId === message.id && (
+                      <Feedback
+                        title="Couldn’t create the branch"
+                        details={controller.branchError.detail}
+                      >
+                        Try branching from this response again.
+                      </Feedback>
+                    )}
                   {copyError?.messageId === message.id && (
                     <Feedback
                       title="Text could not be copied"
@@ -397,6 +477,7 @@ export default function ChatPanel({
                       Select the text and copy it manually.
                     </Feedback>
                   )}
+                  {message.id === branchOrigin?.messageId && divider}
                 </div>
               </article>
             ))}

@@ -269,7 +269,7 @@ export function useWorkspace() {
     setView('projects');
     setPanel(null);
   }
-  function openChat(value: Conversation) {
+  function openChat(value: Conversation, preserveDraft = false) {
     if (conversation.temporaryRef.current && value.id !== conversation.temporaryRef.current) {
       leaveTemporary(() => openChat(value));
       return;
@@ -280,6 +280,7 @@ export function useWorkspace() {
       return;
     }
     openConversation(value);
+    if (preserveDraft && chatRef.current.id === value.id) setInput(conversation.input);
     if (!generating && !editingBusy) {
       setView('chat');
       setPanel(null);
@@ -592,6 +593,8 @@ export function useWorkspace() {
     attachments,
     contextEstimate,
     contextError,
+    branchChat: conversation.branchChat,
+    branchError: conversation.branchError,
     importChat,
     importBusy,
     importError,

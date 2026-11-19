@@ -4116,3 +4116,16 @@ input:focus-visible {
   color: var(--ui-muted);
   font-size: var(--ui-fs-meta);
 }
+
+.branch-divider {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin: var(--ui-space-4) 0;
+  padding-top: var(--ui-space-3);
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  font-size: var(--ui-fs-meta);
+  overflow-wrap: anywhere;
+}

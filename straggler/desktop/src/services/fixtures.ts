@@ -516,6 +516,35 @@ export function createFixture(scenario: Scenario) {
         persistHistory();
         return;
       }
+      case 'history_branch': {
+        const source = history.find((chat) => chat.id === args.id);
+        if (!source) throw new Error('Chat is unavailable.');
+        projectFixture.assertChatWritable(source);
+        if (localStorage.getItem('straggler-fixture-fail-next-branch') === 'true') {
+          localStorage.removeItem('straggler-fixture-fail-next-branch');
+          throw new Error('Disk is full');
+        }
+        const index = source.messages.findIndex(
+          (message) =>
+            message.id === args.messageId &&
+            message.role === 'assistant' &&
+            message.status !== 'streaming' &&
+            message.status !== 'error',
+        );
+        if (index < 0) throw new Error('Choose a saved response to branch from.');
+        const branch = structuredClone(source);
+        branch.id = crypto.randomUUID();
+        branch.title =
+          Array.from(source.title.trim()).slice(0, 71).join('').trimEnd() + ' (branch)';
+        branch.titleCustomized = true;
+        delete branch.starred;
+        branch.messages = branch.messages.slice(0, index + 1);
+        branch.branchedFrom = { conversationId: source.id, messageId: branch.messages[index].id };
+        branch.createdAt = branch.updatedAt = Date.now();
+        history.push(branch);
+        persistHistory();
+        return branch;
+      }
       case 'history_delete':
         projectFixture.assertChatWritable(history.find((value) => value.id === args.id)!);
         history.splice(

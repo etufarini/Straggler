@@ -74,6 +74,7 @@ export type DesktopCommand =
   | 'attachment_download'
   | 'read_conversation_import'
   | 'history_create'
+  | 'history_branch'
   | 'write_export'
   | 'history_list'
   | 'history_save'
