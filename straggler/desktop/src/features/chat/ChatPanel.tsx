@@ -12,6 +12,7 @@ import useComposerDensity from './useComposerDensity';
 import Markdown from './Markdown';
 import { ArrowUp, HardDrive, Check, Copy, Square, Pencil, RotateCcw, Folder } from 'lucide-react';
 import { fileName } from '../../domain/types';
+import type { ProjectPassage } from '../../domain/types';
 import { messageStatusLabel } from '../../components/statusLabels';
 import Feedback from '../../components/Feedback';
 import StorageFeedback from './StorageFeedback';
@@ -21,7 +22,13 @@ import { errorDetail } from '../../domain/errors';
 import { isContextRejection } from '../../domain/errors';
 import { ProjectLimitFeedback } from '../projects/ProjectCapacity';
 import brandMark from '../../assets/brand-mark.svg';
-export default function ChatPanel({ controller }: { controller: WorkspaceController }) {
+export default function ChatPanel({
+  controller,
+  onProjectSource,
+}: {
+  controller: WorkspaceController;
+  onProjectSource: (source: ProjectPassage) => void;
+}) {
   const [copied, setCopied] = useState('');
   const [composerMode, setComposerMode] = useState<ComposerContext>('text');
   const toolbarVisible = controller.preferences.formattingToolbarVisible !== false;
@@ -68,6 +75,7 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
   }, [generating, composerInput]);
   const project = controller.currentProject;
   const archived = !!project?.archived;
+  const projectContext = project && controller.projects.context(project);
   return (
     <>
       {project && (
@@ -162,6 +170,9 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                       onSettings={() => reviewSettings('websearch')}
                     />
                   )}
+                  {message.projectSources && (
+                    <ProjectSearchActivity sources={message.projectSources} />
+                  )}
                   {message.reasoning && (
                     <details className="reasoning">
                       <summary>Reasoning</summary>
@@ -251,12 +262,23 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                     </div>
                   ) : (
                     <div className="markdown">
-                      <Markdown user={message.role === 'user'} sources={message.sources}>
+                      <Markdown
+                        user={message.role === 'user'}
+                        sources={message.sources}
+                        projectSources={message.projectSources}
+                        onProjectSource={onProjectSource}
+                      >
                         {message.content}
                       </Markdown>
                     </div>
                   )}
-                  {!!message.sources?.length && <Sources sources={message.sources} />}
+                  {!!(message.sources?.length || message.projectSources?.length) && (
+                    <Sources
+                      sources={message.sources}
+                      projectSources={message.projectSources}
+                      onProjectSource={onProjectSource}
+                    />
+                  )}
                   {message.status === 'streaming' && (
                     <span className="typing-indicator">
                       {message.content ? 'Generating' : 'Thinking'}
@@ -423,13 +445,26 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
             >
               You can read this chat. Restore the project to continue it.
             </Feedback>
+          ) : projectContext?.search ? (
+            <p className="project-search-status" role="status">
+              Search mode · Project files
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => controller.openProject(project.id, true)}
+              >
+                Review files
+              </button>
+            </p>
           ) : (
-            <ProjectLimitFeedback
-              chat
-              context={controller.projects.context(project)}
-              onReviewFiles={() => controller.openProject(project.id, true)}
-              onChangeContext={() => reviewSettings('model')}
-            />
+            projectContext && (
+              <ProjectLimitFeedback
+                chat
+                context={projectContext}
+                onReviewFiles={() => controller.openProject(project.id, true)}
+                onChangeContext={() => reviewSettings('model')}
+              />
+            )
           ))}
         {(controller.contextEstimate.overflow || controller.contextError) && (
           <p role="alert" className="context-overflow">
@@ -546,5 +581,16 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
         <p className="composer-note">Models can make mistakes. Check important information.</p>
       </div>
     </>
+  );
+}
+
+function ProjectSearchActivity({ sources }: { sources: ProjectPassage[] }) {
+  const files = new Set(sources.map((source) => source.fileId)).size;
+  return (
+    <p className="web-search-activity reasoning" role="status">
+      {sources.length
+        ? `Searched project files · ${sources.length} ${sources.length === 1 ? 'passage' : 'passages'} from ${files} ${files === 1 ? 'file' : 'files'}`
+        : 'Searched project files · No passages fit or matched this message.'}
+    </p>
   );
 }

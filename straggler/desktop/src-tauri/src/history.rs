@@ -23,6 +23,8 @@ pub struct Message {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sources: Vec<crate::web_search::citations::Source>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_sources: Option<Vec<crate::project_search::Passage>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub web_search: Option<crate::web_search::turn::TurnSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
@@ -424,6 +426,9 @@ fn validate(conversation: &Conversation) -> Result<()> {
     }
     for message in &conversation.messages {
         crate::web_search::citations::validate_sources(&message.sources)?;
+        if let Some(sources) = &message.project_sources {
+            crate::project_search::validate(sources)?;
+        }
         if !matches!(message.role.as_str(), "user" | "assistant")
             || !matches!(
                 message.status.as_str(),
@@ -459,6 +464,7 @@ mod tests {
                 content: "Partial response".into(),
                 reasoning: String::new(),
                 sources: vec![],
+                project_sources: None,
                 web_search: None,
                 model: None,
                 status: "streaming".into(),

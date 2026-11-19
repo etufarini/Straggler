@@ -251,6 +251,35 @@ impl Projects {
         Ok(project)
     }
 
+    pub fn search(
+        &self,
+        history: &History,
+        id: Uuid,
+        query: &str,
+        budget: usize,
+    ) -> Result<Vec<crate::project_search::Passage>> {
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.prepare(history)?;
+        let project = self.read(id)?;
+        crate::project_search::search(
+            &self.directory.join(id.to_string()).join("search-index"),
+            &project,
+            query,
+            budget,
+        )
+    }
+
+    pub fn file_text(&self, history: &History, id: Uuid, file: Uuid) -> Result<String> {
+        let _guard = self.writer.lock().map_err(|e| e.to_string())?;
+        self.prepare(history)?;
+        self.read(id)?
+            .files
+            .into_iter()
+            .find(|value| value.id == file)
+            .map(|value| value.text)
+            .ok_or_else(|| "This file is no longer in the project.".into())
+    }
+
     fn file_path(&self, project: Uuid, file: Uuid) -> PathBuf {
         self.directory
             .join(project.to_string())

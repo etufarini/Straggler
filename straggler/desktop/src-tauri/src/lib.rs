@@ -15,6 +15,7 @@ pub mod model;
 pub mod model_access;
 pub mod platform;
 pub mod preferences;
+pub mod project_search;
 pub mod projects;
 mod server;
 pub mod stream;

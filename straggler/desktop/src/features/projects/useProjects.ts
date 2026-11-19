@@ -8,6 +8,7 @@ import {
   estimateProjectTokens,
   projectContextState,
   projectSystemPrefix,
+  projectInstructions,
 } from '../../domain/projectContext';
 import {
   chooseAttachmentFiles,
@@ -164,10 +165,11 @@ export function useProjects(
       JSON.stringify(
         projects.flatMap((project) => [
           prefixes[project.id],
+          projectInstructions(project, settings),
           ...project.files.map((file) => file.text),
         ]),
       ),
-    [projects, prefixes],
+    [projects, prefixes, settings],
   );
   const measurementKey = useMemo(
     () => JSON.stringify([texts, server.phase, server.runId]),
@@ -202,7 +204,13 @@ export function useProjects(
     const count = estimate(prefixes[project.id] ?? projectSystemPrefix(project, settings));
     const capacity =
       server.phase === 'ready' && details?.runId === server.runId ? details?.contextSize : null;
-    return projectContextState(count.tokens, capacity, count.source !== 'server');
+    const instructions = estimate(projectInstructions(project, settings));
+    return projectContextState(
+      count.tokens,
+      capacity,
+      count.source !== 'server',
+      instructions.tokens,
+    );
   }
   return {
     projects,

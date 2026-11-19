@@ -2,7 +2,7 @@ import { documentTypes } from '../domain/attachments';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
-import type { Attachment, Conversation } from '../domain/types';
+import type { Attachment, Conversation, ProjectPassage } from '../domain/types';
 import type { BackendRelease } from '../domain/backendRelease';
 import { projectTokenEstimateCharacters } from '../domain/projectContext';
 import type {
@@ -79,6 +79,8 @@ export type DesktopCommand =
   | 'history_save'
   | 'history_delete'
   | 'projects_list'
+  | 'project_search'
+  | 'project_file_text'
   | 'project_save'
   | 'project_file_add'
   | 'project_file_remove'
@@ -279,6 +281,10 @@ export async function estimatePromptTokens(
 
 export const projectService = {
   list: () => invoke<Project[]>('projects_list'),
+  search: (projectId: string, query: string, budget: number) =>
+    invoke<ProjectPassage[]>('project_search', { projectId, query, budget }),
+  fileText: (projectId: string, fileId: string) =>
+    invoke<string>('project_file_text', { projectId, fileId }),
   save: (project: Project) => invoke<ProjectMutation>('project_save', { project }),
   addFile: (projectId: string, path: string, replaceFileId?: string) =>
     invoke<ProjectMutation>('project_file_add', {

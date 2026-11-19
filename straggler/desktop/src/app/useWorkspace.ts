@@ -107,6 +107,7 @@ export function useWorkspace() {
     server,
     serverDetails,
     currentProject,
+    currentProject ? projects.context(currentProject).search : false,
   );
   const {
     chatOptionsDisabled,
@@ -287,7 +288,9 @@ export function useWorkspace() {
   function startProjectChat(id: string, text: string) {
     if (generating || editingBusy || storageError || server.phase !== 'ready') return;
     const project = projects.current.current.find((value) => value.id === id);
-    if (!project || project.archived || projects.context(project).level === 'over') return;
+    if (!project || project.archived) return;
+    const context = projects.context(project);
+    if (context.level === 'over' && !context.search) return;
     const value = { ...newConversation(), projectId: id, ownSystemPrompt: null };
     openChat(value);
     setInput(text);
@@ -548,7 +551,8 @@ export function useWorkspace() {
       (projects.ready &&
         !projects.error &&
         !!currentProject &&
-        projects.context(currentProject).level !== 'over'));
+        (projects.context(currentProject).level !== 'over' ||
+          projects.context(currentProject).search)));
 
   return {
     webSearch,

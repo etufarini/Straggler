@@ -6,8 +6,9 @@ interface MarkdownNode {
   url?: string;
   children?: MarkdownNode[];
 }
-export function citationPlugin(sources: WebSource[]) {
-  const numbers = new Set(sources.map((source) => source.n));
+export function citationPlugin(sources: WebSource[], projectSources: { n: number }[] = []) {
+  const numbers = new Set(sources.map((source) => String(source.n)));
+  for (const source of projectSources) numbers.add(`P${source.n}`);
   return () => (tree: MarkdownNode) => {
     function visit(node: MarkdownNode) {
       if (
@@ -24,8 +25,8 @@ export function citationPlugin(sources: WebSource[]) {
         }
         const parts: MarkdownNode[] = [];
         let offset = 0;
-        for (const match of child.value.matchAll(/\[(\d+)\]/g)) {
-          const n = Number(match[1]);
+        for (const match of child.value.matchAll(/\[(P?\d+)\]/g)) {
+          const n = match[1];
           if (!numbers.has(n)) continue;
           const index = match.index!;
           if (index > offset) parts.push({ type: 'text', value: child.value.slice(offset, index) });

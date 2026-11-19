@@ -1,7 +1,7 @@
 import { attachmentBlocks, composeRequest } from './attachments';
 import { ownSystemPrompt } from './projects';
 import type { Project } from './projects';
-import type { Conversation, Message, Settings } from './types';
+import type { Conversation, Message, ProjectPassage, Settings } from './types';
 
 export const projectContextThresholds = { close: 0.75, over: 1 } as const;
 export const projectTokenEstimateCharacters = 4;
@@ -23,12 +23,14 @@ export interface ProjectContextState {
   level: 'unknown' | 'ok' | 'high' | 'over';
   shortfall: number;
   approximate: boolean;
+  search: boolean;
 }
 
 export function projectContextState(
   used: number,
   capacity: number | null | undefined,
   approximate: boolean,
+  instructionTokens = used,
 ): ProjectContextState {
   if (!capacity || !Number.isFinite(capacity) || capacity < 0) {
     return {
@@ -40,6 +42,7 @@ export function projectContextState(
       level: 'unknown',
       shortfall: 0,
       approximate,
+      search: false,
     };
   }
   const reserve = projectConversationReserve(capacity);
@@ -59,6 +62,7 @@ export function projectContextState(
           : 'ok',
     shortfall: Math.max(0, used - available),
     approximate,
+    search: used > available && instructionTokens < available,
   };
 }
 
@@ -81,7 +85,7 @@ export function projectSystemPrefix(project: Project, settings?: Settings): stri
   return [instructions, files].filter((part) => part.length > 0).join('\n\n');
 }
 
-function projectInstructions(project: Project, settings?: Settings): string {
+export function projectInstructions(project: Project, settings?: Settings): string {
   return project.instructions.trim() ? project.instructions : (settings?.chat_system_prompt ?? '');
 }
 
@@ -90,9 +94,24 @@ export function assembleProjectRequest(
   messages: Message[],
   settings?: Settings,
   project?: Project,
+  passages?: ProjectPassage[],
 ) {
   const systemPrompt = resolveProjectSystemPrompt(conversation, settings, project);
-  const prefix =
-    conversation.projectId && project ? projectSystemPrefix(project, settings) : systemPrompt;
+  let prefix = systemPrompt;
+  if (conversation.projectId && project) {
+    if (passages === undefined) {
+      prefix = projectSystemPrefix(project, settings);
+    } else if (passages.length) {
+      prefix = [
+        systemPrompt,
+        'Use the following project excerpts as reference material. Cite relevant passages as [P1], [P2], and so on.',
+        ...passages.map(
+          (source) => `[P${source.n}] ${source.name} · section ${source.section}\n${source.text}`,
+        ),
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+    }
+  }
   return composeRequest(messages, prefix, conversation.attachments ?? []);
 }

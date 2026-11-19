@@ -44,6 +44,31 @@ export function createProjectFixture(
   }
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
     if (command === 'projects_list') return structuredClone(projects);
+    if (command === 'project_file_text') {
+      const file = find(args.projectId).files.find((value) => value.id === args.fileId);
+      if (!file) throw new Error('This file is no longer in the project.');
+      return file.text;
+    }
+    if (command === 'project_search') {
+      if (localStorage.getItem('straggler-fixture-project-search-error'))
+        throw new Error('Project search is unavailable.');
+      const project = find(args.projectId);
+      const query = String(args.query).toLowerCase().split(/\W+/).filter(Boolean);
+      const file = project.files.find(
+        (value) => value.included && query.some((word) => value.text.toLowerCase().includes(word)),
+      );
+      if (!file || Number(args.budget) < 32) return [];
+      return [
+        {
+          n: 1,
+          projectId: project.id,
+          fileId: file.id,
+          name: file.name,
+          section: 1,
+          text: file.text.slice(0, 40),
+        },
+      ];
+    }
     if (localStorage.getItem('straggler-fixture-project-save-error'))
       throw new Error('Project storage is not writable.');
     if (command === 'project_save') {

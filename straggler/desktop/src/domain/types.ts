@@ -120,7 +120,16 @@ export interface Message {
   metrics?: GenerationMetrics;
   serverRunId?: string;
   sources?: WebSource[];
+  projectSources?: ProjectPassage[];
   webSearch?: WebSearchTurn;
+}
+export interface ProjectPassage {
+  n: number;
+  projectId: string;
+  fileId: string;
+  name: string;
+  section: number;
+  text: string;
 }
 export interface Attachment {
   id: string;

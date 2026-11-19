@@ -297,7 +297,7 @@ test('CHAT-02 and PROJ-01 support star, description search, sort and arrow-key t
   await expect(control(page, 'button-project-product-launch-brief')).toBeVisible();
 });
 
-test('PROJ-03 and PROJ-05 include files across thresholds, block without truncation and preserve recovery draft', async ({
+test('PROJ-03 and PROJ-05 switch between full context and project search across file thresholds', async ({
   page,
 }) => {
   const values = projects();
@@ -328,10 +328,11 @@ test('PROJ-03 and PROJ-05 include files across thresholds, block without truncat
   await control(page, 'switch-include-large-txt').click();
   await expect(page.getByText('Close to the limit', { exact: true })).toBeVisible();
   await control(page, 'switch-include-extra-txt').click();
-  await expect(control(page, 'button-start-chat')).toBeDisabled();
-  await expect(
-    page.getByText('This project does not fit in the context window', { exact: true }),
-  ).toBeVisible();
+  await expect(control(page, 'button-start-chat')).toBeEnabled();
+  await expect(page.getByRole('status').filter({ hasText: 'Search mode' })).toBeVisible();
+  await expect(control(page, 'switch-include-extra-txt')).toHaveAccessibleName(
+    'Include extra.txt in project search',
+  );
   await expect(control(page, 'meter-project-context')).toHaveAttribute(
     'aria-valuetext',
     /over the limit/,
@@ -339,7 +340,6 @@ test('PROJ-03 and PROJ-05 include files across thresholds, block without truncat
   expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-request'))).toBeNull();
   await control(page, 'button-review-files').click();
   await expect(page.getByRole('heading', { name: 'Files', exact: true })).toBeFocused();
-  await expect(draft).toHaveText('Keep this first message through recovery');
   await control(page, 'button-change-context-size').click();
   await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Model settings', exact: true })).toHaveAttribute(
@@ -355,6 +355,47 @@ test('PROJ-03 and PROJ-05 include files across thresholds, block without truncat
   await openResearch(page);
   await expect(control(page, 'switch-include-large-txt')).toHaveAttribute('aria-checked', 'true');
   await expect(control(page, 'switch-include-extra-txt')).toHaveAttribute('aria-checked', 'false');
+});
+
+test('D011 sends only selected passages, preserves drafts on search failure and opens saved sources', async ({
+  page,
+}) => {
+  const values = projects();
+  values[0].files[0].text = 'Included research notes. ' + 'Extra content '.repeat(4000);
+  await seed(page, {
+    projects: values,
+    flags: { 'straggler-fixture-project-search-error': 'true' },
+  });
+  await loadModel(page);
+  await openResearch(page);
+  await control(page, 'textarea-start-chat').fill('Research notes');
+  await control(page, 'button-start-chat').click();
+  const draft = page.getByRole('textbox', { name: 'Message', exact: true });
+  await expect(draft).toHaveText('Research notes');
+  await expect(page.getByRole('alert')).toContainText('Couldn’t search project files.');
+  expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-request'))).toBeNull();
+  await page.evaluate(() => localStorage.removeItem('straggler-fixture-project-search-error'));
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByText('Searched project files · 1 passage from 1 file')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send message' })).toBeVisible();
+  const request = await lastRequest(page);
+  expect(request.messages[0].content).toContain('[P1] notes.md · section 1');
+  expect(request.messages[0].content).not.toContain('Excluded project text');
+  expect(request.messages[0].content.length).toBeLessThan(400);
+  await page.reload();
+  await control(page, 'button-chat-research-notes').click();
+  await expect(page.getByRole('region', { name: 'Latest response sources' })).toContainText(
+    'notes.md · section 1',
+  );
+  const source = page.getByRole('button', { name: 'Project source 1: notes.md · section 1' });
+  await source.click();
+  const viewer = page.getByRole('dialog', { name: 'notes.md · section 1' });
+  await expect(viewer.getByLabel('Cited passage')).toContainText('Included research notes.');
+  await viewer.getByText('Full file text').click();
+  await expect(viewer.locator('details pre')).toContainText('Extra content');
+  await page.keyboard.press('Escape');
+  await expect(viewer).toHaveCount(0);
+  await expect(source).toBeFocused();
 });
 
 test('PROJ-03 starts a member chat with stable project prefix and sidebar New chat stays outside', async ({

@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { memo, useMemo } from 'react';
 import { citationPlugin } from '../../domain/citations';
+import type { ProjectPassage } from '../../domain/types';
 import type { WebSource } from '../../domain/webSearch';
 import WebLink from '../websearch/WebLink';
 import type { Components } from 'react-markdown';
@@ -28,26 +29,50 @@ const userComponents: Components = {
     href ? <WebLink url={href}>{children}</WebLink> : <span>{children}</span>,
 };
 const emptySources: WebSource[] = [];
+const emptyProjectSources: ProjectPassage[] = [];
 
 export default memo(function Markdown({
   children,
   sources = emptySources,
+  projectSources = emptyProjectSources,
+  onProjectSource,
   user = false,
 }: {
   children: string;
   sources?: WebSource[];
+  projectSources?: ProjectPassage[];
+  onProjectSource?: (source: ProjectPassage) => void;
   user?: boolean;
 }) {
   const sourcePlugins = useMemo(
-    () => (sources.length ? [...plugins, citationPlugin(sources)] : plugins),
-    [sources],
+    () =>
+      sources.length || projectSources.length
+        ? [...plugins, citationPlugin(sources, projectSources)]
+        : plugins,
+    [sources, projectSources],
   );
   const sourceComponents = useMemo<Components>(
     () =>
-      sources.length
+      sources.length || projectSources.length
         ? {
             ...components,
             a: ({ children, href }) => {
+              const projectMatch = /^#straggler-source-P(\d+)$/.exec(href ?? '');
+              const passage =
+                projectMatch &&
+                projectSources.find((source) => source.n === Number(projectMatch[1]));
+              if (passage && onProjectSource) {
+                return (
+                  <button
+                    type="button"
+                    className="web-citation"
+                    aria-label={`Project source ${passage.n}: ${passage.name} · section ${passage.section}`}
+                    onClick={() => onProjectSource(passage)}
+                  >
+                    {children}
+                  </button>
+                );
+              }
               const match = /^#straggler-source-(\d+)$/.exec(href ?? '');
               const source = match && sources.find((source) => source.n === Number(match[1]));
               return source ? (
@@ -69,7 +94,7 @@ export default memo(function Markdown({
             },
           }
         : components,
-    [sources],
+    [sources, projectSources, onProjectSource],
   );
   return (
     <ReactMarkdown

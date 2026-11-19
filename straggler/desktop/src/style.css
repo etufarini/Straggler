@@ -4075,3 +4075,44 @@ input:focus-visible {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.project-source-link {
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.project-source-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 20px;
+  overflow: auto;
+  color: var(--ui-text);
+  background: var(--ui-raised);
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+}
+.project-source-dialog::backdrop {
+  background: rgb(0 0 0 / 60%);
+}
+.project-source-dialog form {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.project-source-dialog h2 {
+  font-size: var(--ui-fs-title-3);
+  overflow-wrap: anywhere;
+}
+.project-source-dialog pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.project-search-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+  color: var(--ui-muted);
+  font-size: var(--ui-fs-meta);
+}

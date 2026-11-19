@@ -192,6 +192,7 @@ describe('project capacity policy', () => {
       level: 'ok',
       shortfall: 0,
       approximate: false,
+      search: false,
     });
   });
 
@@ -218,9 +219,16 @@ describe('project capacity policy', () => {
         level: 'unknown',
         shortfall: 0,
         approximate: true,
+        search: false,
       });
     },
   );
+
+  it('switches oversized files to search when instructions still fit', () => {
+    expect(projectContextState(13000, 16384, false, 100).search).toBe(true);
+    expect(projectContextState(13000, 16384, false, 13000).search).toBe(false);
+    expect(projectContextState(12000, 16384, false, 100).search).toBe(false);
+  });
 
   it('marks approximate and counted values independently of capacity', () => {
     expect(projectContextState(100, 16384, true).approximate).toBe(true);

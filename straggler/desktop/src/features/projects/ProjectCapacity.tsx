@@ -92,11 +92,14 @@ export function ProjectLimitFeedback({
   if (!over) return null;
   return (
     <Feedback
-      announce={announce}
+      announce={context.search || announce}
+      severity={context.search ? 'warning' : 'error'}
       title={
-        chat
-          ? 'Project files exceed the context window'
-          : 'This project does not fit in the context window'
+        context.search
+          ? 'Search mode'
+          : chat
+            ? 'Project files exceed the context window'
+            : 'This project does not fit in the context window'
       }
       actions={
         <>
@@ -119,9 +122,15 @@ export function ProjectLimitFeedback({
         </>
       }
     >
-      Its instructions and included files need {number(context.used)} tokens;{' '}
-      {number(context.available!)} are available. The project needs {number(context.shortfall)} more
-      tokens than are available. Chats in this project cannot send messages until it fits.
+      {context.search ? (
+        'Too large for one chat, so Straggler searches these files for each message and uses the most relevant passages.'
+      ) : (
+        <>
+          Its instructions and included files need {number(context.used)} tokens;{' '}
+          {number(context.available!)} are available. The project needs {number(context.shortfall)}{' '}
+          more tokens than are available. Chats in this project cannot send messages until it fits.
+        </>
+      )}
     </Feedback>
   );
 }
