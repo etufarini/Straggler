@@ -106,7 +106,7 @@ async function seed(
   values: {
     projects?: Project[];
     history?: Conversation[];
-    scenario?: 'normal' | 'cancel';
+    scenario?: 'normal' | 'cancel' | 'web-normal';
     flags?: Record<string, string>;
   } = {},
 ) {
@@ -364,6 +364,7 @@ test('D011 sends only selected passages, preserves drafts on search failure and 
   values[0].files[0].text = 'Included research notes. ' + 'Extra content '.repeat(4000);
   await seed(page, {
     projects: values,
+    scenario: 'web-normal',
     flags: { 'straggler-fixture-project-search-error': 'true' },
   });
   await loadModel(page);
@@ -374,11 +375,22 @@ test('D011 sends only selected passages, preserves drafts on search failure and 
   await expect(draft).toHaveText('Research notes');
   await expect(page.getByRole('alert')).toContainText('Couldn’t search project files.');
   expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-request'))).toBeNull();
+  const webSearch = page.getByRole('button', { name: 'Web search', exact: true });
+  await webSearch.click();
+  await page.getByRole('button', { name: 'Got it', exact: true }).click();
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByRole('alert')).toContainText('Couldn’t search project files.');
+  await expect(webSearch).toHaveAttribute('aria-pressed', 'true');
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-project-search-error'));
   await page.getByRole('button', { name: 'Send message' }).click();
   await expect(page.getByText('Searched project files · 1 passage from 1 file')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Send message' })).toBeVisible();
   const request = await lastRequest(page);
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem('straggler-fixture-request')!).webSearch,
+    ),
+  ).toBe(true);
   expect(request.messages[0].content).toContain('[P1] notes.md · section 1');
   expect(request.messages[0].content).not.toContain('Excluded project text');
   expect(request.messages[0].content.length).toBeLessThan(400);
