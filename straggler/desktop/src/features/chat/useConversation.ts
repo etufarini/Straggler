@@ -197,7 +197,6 @@ export function useConversation(
       return;
     }
     const useWebSearch = webSearchOn;
-    setWebSearchOn(false);
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     setGenerating(true);
@@ -289,19 +288,12 @@ export function useConversation(
             0,
             Math.min(capacity.available! - instructionTokens, contextSize - baseCount.tokens),
           );
-          const passages = await projectService.search(project.id, query, budget);
+          let passages = await projectService.search(project.id, query, budget);
           // File estimates and server token counts can disagree, especially across scripts.
           // Keep the highest ranked excerpts and remeasure the request that will be sent.
-          let included = passages.length;
           messages = base;
-          while (included > 0) {
-            const candidate = assembleProjectRequest(
-              current,
-              history,
-              settings,
-              project,
-              passages.slice(0, included),
-            );
+          while (passages.length) {
+            const candidate = assembleProjectRequest(current, history, settings, project, passages);
             const [projectCount, promptCount] = await Promise.all([
               estimateTextTokens(candidate[0].content),
               estimatePromptTokens(candidate),
@@ -310,9 +302,16 @@ export function useConversation(
               messages = candidate;
               break;
             }
-            included = Math.floor(included / 2);
+            if (passages.length > 1) {
+              passages = passages.slice(0, Math.floor(passages.length / 2));
+            } else {
+              const [best] = passages;
+              const text = Array.from(best.text);
+              const shorter = text.slice(0, Math.floor(text.length / 2)).join('');
+              passages = shorter ? [{ ...best, text: shorter }] : [];
+            }
           }
-          assistant.projectSources = passages.slice(0, included);
+          assistant.projectSources = passages;
           current.messages[current.messages.length - 1] = { ...assistant };
         } catch (error) {
           restoreSubmittedInput();
@@ -333,6 +332,7 @@ export function useConversation(
       setGenerating(false);
       return;
     }
+    setWebSearchOn(false);
     setContextError('');
     rejectedDraft.current = null;
     if (!replacement) updateChat(current);
