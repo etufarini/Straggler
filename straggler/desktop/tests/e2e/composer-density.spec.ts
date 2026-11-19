@@ -167,19 +167,40 @@ test('all four densities follow measured space with hysteresis and accessible ac
   await page.setViewportSize({ width: 1440, height: 820 });
   await prepare(page, 'on', true);
   const composer = page.locator('.composer');
-  const seen = new Set<string>();
-  let transitionWidth = 0;
-  for (let width = 770; width >= 160; width -= 10) {
+  const [fullWidth, compactWidth, iconWidth] = await composer.evaluate((form) => {
+    const footer = form.querySelector('.composer-footer')!;
+    const tools = form.querySelector('.composer-tools')!;
+    const send = form.querySelector('.composer-send')!;
+    const style = getComputedStyle(footer);
+    const overhead =
+      form.getBoundingClientRect().width -
+      footer.clientWidth +
+      parseFloat(style.paddingLeft) +
+      parseFloat(style.paddingRight) +
+      parseFloat(style.columnGap);
+    const original = form.getAttribute('data-density')!;
+    const widths = ['full', 'compact', 'icon'].map((density) => {
+      form.setAttribute('data-density', density);
+      return Math.ceil(
+        tools.getBoundingClientRect().width + send.getBoundingClientRect().width + overhead,
+      );
+    });
+    form.setAttribute('data-density', original);
+    return widths;
+  });
+  // Font metrics and the extra Attach chip alter the breakpoints across engines.
+  const transitionWidth = fullWidth - 2;
+  for (const [width, density] of [
+    [fullWidth + 32, 'full'],
+    [transitionWidth, 'compact'],
+    [compactWidth - 2, 'icon'],
+    [iconWidth - 2, 'wrap'],
+    [160, 'wrap'],
+  ] as const) {
     await resizeComposer(page, width);
-    const density = (await composer.getAttribute('data-density'))!;
-    if (!seen.has(density)) {
-      if (density === 'compact') transitionWidth = width;
-      await inspectControls(page);
-      seen.add(density);
-    }
+    await expect(composer).toHaveAttribute('data-density', density);
+    await inspectControls(page);
   }
-  expect([...seen]).toEqual(['full', 'compact', 'icon', 'wrap']);
-  await inspectControls(page);
   for (const name of ['Reasoning', 'Web search']) {
     const chip = page.getByRole('button', { name, exact: true });
     await expect(chip).toHaveAttribute('aria-pressed', 'true');
