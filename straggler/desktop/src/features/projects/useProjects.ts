@@ -122,7 +122,7 @@ export function useProjects(
   async function addFileBatch(id: string, paths?: string[]) {
     let selected: string[];
     try {
-      selected = paths ?? (await chooseAttachmentFiles());
+      selected = paths ?? (await chooseAttachmentFiles(true));
     } catch (failure) {
       setError(errorDetail(failure).message);
       return;
@@ -222,7 +222,7 @@ export function useProjects(
     addFiles,
     replaceFile: (projectId: string, fileId: string) =>
       trackStorageWork(pendingWork.current, async () => {
-        const paths = await chooseAttachmentFiles();
+        const paths = await chooseAttachmentFiles(true);
         if (!paths.length) return;
         if (paths.length !== 1) {
           setError('Choose one file to replace this project file.');

@@ -318,6 +318,25 @@ impl NativeConfiguration {
                     .into(),
             ]);
         }
+        if [
+            "LLAMA_ARG_MMPROJ",
+            "LLAMA_ARG_MMPROJ_URL",
+            "LLAMA_ARG_MMPROJ_AUTO",
+        ]
+        .iter()
+        .all(|name| self.store.environment.value(name).is_none())
+            && capabilities::supports(&discovery.help, "--mmproj")
+        {
+            if let Some(projector) = super::models::projector_candidate(&model) {
+                let resolved = Path::new(&projector)
+                    .canonicalize()
+                    .map_err(|error| format!("Cannot resolve image projector: {error}"))?;
+                if !self.model_access.permits(&resolved) {
+                    return Err("Choose the projector’s folder in Settings to grant access before launching.".into());
+                }
+                args.extend(["--mmproj".into(), projector]);
+            }
+        }
         let mtp_arguments =
             speculation::arguments(settings, &discovery.help, &self.store.environment)?;
         if settings.mtp == "file"

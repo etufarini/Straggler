@@ -21,6 +21,8 @@ pub struct Attachment {
     pub extension: String,
     pub size: u64,
     pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<crate::image_attachments::ImageMetadata>,
 }
 
 #[derive(Debug)]
@@ -30,7 +32,41 @@ pub struct ExtractedFile {
 }
 
 pub fn supported(extension: &str) -> bool {
-    matches!(extension, "txt" | "md" | "docx" | "xlsx" | "pptx" | "pdf")
+    document_supported(extension) || crate::image_attachments::supported(extension)
+}
+
+pub fn document_supported(extension: &str) -> bool {
+    matches!(
+        extension,
+        "txt"
+            | "md"
+            | "docx"
+            | "xlsx"
+            | "pptx"
+            | "pdf"
+            | "csv"
+            | "tsv"
+            | "json"
+            | "jsonl"
+            | "yaml"
+            | "yml"
+            | "xml"
+            | "html"
+            | "log"
+            | "toml"
+            | "ini"
+            | "sql"
+            | "py"
+            | "js"
+            | "ts"
+            | "rs"
+            | "go"
+            | "java"
+            | "c"
+            | "cpp"
+            | "h"
+            | "sh"
+    )
 }
 
 pub fn extract(path: &Path) -> Result<ExtractedFile> {
@@ -49,7 +85,7 @@ pub fn extract(path: &Path) -> Result<ExtractedFile> {
         return Err(if let Some((family, replacement)) = legacy {
             format!("{family} 97–2003 (.{extension}) is not supported. Save it as .{replacement} and add it again.")
         } else {
-            "This file type is not supported. Choose .txt, .md, .docx, .xlsx, .pptx or .pdf.".into()
+            "This file type is not supported. Choose a supported text, code, document or image file.".into()
         });
     }
     let name = path
@@ -77,10 +113,8 @@ pub fn extract(path: &Path) -> Result<ExtractedFile> {
     if original.len() as u64 > MAX_FILE_BYTES {
         return Err("This file is larger than the 10 MB limit.".into());
     }
+    let mut image = None;
     let text = match extension.as_str() {
-        "txt" | "md" => String::from_utf8(original.clone()).map_err(|_| {
-            "The file is not valid UTF-8. Save it as UTF-8 text and add it again.".to_string()
-        })?,
         "docx" => {
             let mut archive = ZipArchive::new(Cursor::new(original.as_slice()))
                 .map_err(|e| format!("Cannot open this Word document: {e}"))?;
@@ -89,7 +123,11 @@ pub fn extract(path: &Path) -> Result<ExtractedFile> {
         "pptx" => presentation_text(&original)?,
         "xlsx" => spreadsheet_text(&original)?,
         "pdf" => pdf_text(&original)?,
-        _ => unreachable!(),
+        extension if crate::image_attachments::supported(extension) => {
+            image = Some(crate::image_attachments::prepare(&original)?.0);
+            format!("[Image: {name}]")
+        }
+        _ => decode_text(&original)?,
     };
     Ok(ExtractedFile {
         attachment: Attachment {
@@ -98,9 +136,34 @@ pub fn extract(path: &Path) -> Result<ExtractedFile> {
             extension,
             size: original.len() as u64,
             text,
+            image,
         },
         original,
     })
+}
+
+fn decode_text(bytes: &[u8]) -> Result<String> {
+    let text = if let Some((encoding, offset)) = encoding_rs::Encoding::for_bom(bytes) {
+        encoding
+            .decode_without_bom_handling_and_without_replacement(&bytes[offset..])
+            .map(|value| value.into_owned())
+    } else if let Ok(text) = std::str::from_utf8(bytes) {
+        Some(text.to_owned())
+    } else {
+        let mut detector = chardetng::EncodingDetector::new();
+        detector.feed(bytes, true);
+        detector
+            .guess(None, true)
+            .decode_without_bom_handling_and_without_replacement(bytes)
+            .map(|value| value.into_owned())
+    }
+    .ok_or("This text encoding could not be read. Save the file as UTF-8 and try again.")?;
+    if text.chars().any(|character| {
+        character.is_control() && !matches!(character, '\n' | '\r' | '\t' | '\u{000c}')
+    }) {
+        return Err("This file contains binary data and cannot be read as text.".into());
+    }
+    Ok(text)
 }
 
 fn pdf_text(original: &[u8]) -> Result<String> {
@@ -337,6 +400,22 @@ mod tests {
     }
 
     #[test]
+    fn text_formats_decode_utf16_and_detect_legacy_encoding_but_reject_binary() {
+        let directory = tempfile::tempdir().unwrap();
+        for extension in ["csv", "json", "yaml", "rs", "py", "sql", "html"] {
+            let path = directory.path().join(format!("document.{extension}"));
+            fs::write(&path, [0xff, 0xfe, b'H', 0, b'i', 0]).unwrap();
+            assert_eq!(extract(&path).unwrap().attachment.text, "Hi");
+            fs::write(&path, b"Binary\0data").unwrap();
+            assert!(extract(&path).unwrap_err().contains("binary"));
+        }
+        assert_eq!(
+            decode_text(b"Un caff\xe8 italiano").unwrap(),
+            "Un caffè italiano"
+        );
+    }
+
+    #[test]
     fn pdf_text_keeps_page_order_non_ascii_text_and_original_bytes() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("report.PDF");
@@ -459,7 +538,7 @@ mod tests {
             assert_eq!(extracted.original, fs::read(path).unwrap());
         }
         let invalid = directory.path().join("invalid.txt");
-        fs::write(&invalid, [0xff, 0xfe]).unwrap();
+        fs::write(&invalid, [0xff, 0xfe, 0xff]).unwrap();
         assert!(extract(&invalid).unwrap_err().contains("UTF-8"));
         File::create(&invalid)
             .unwrap()
@@ -471,7 +550,7 @@ mod tests {
             assert!(error.contains("97–2003"));
             assert!(error.contains(&format!("Save it as .{extension}x")));
         }
-        assert!(extract(&directory.path().join("unsupported.csv"))
+        assert!(extract(&directory.path().join("unsupported.binary"))
             .unwrap_err()
             .contains("not supported"));
     }

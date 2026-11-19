@@ -199,3 +199,26 @@ describe('project conversation exports', () => {
     },
   );
 });
+
+it('exports image names as explicit text placeholders without changing the v1 schema', () => {
+  const chat = conversation();
+  chat.attachments = [
+    {
+      id: 'image',
+      name: 'diagram.png',
+      extension: 'png',
+      size: 42,
+      text: '[Image: diagram.png]',
+      image: { width: 30, height: 20, resized: false, thumbnail: 'data:image/png;base64,private' },
+    },
+  ];
+  const output = serializeConversation(chat, false, '2026-11-19T00:00:00Z');
+  const value = JSON.parse(output);
+  expect(value.format).toBe('mir.cpp/conversation');
+  expect(value.version).toBe(1);
+  expect(value.conversation.messages[0].content).toContain(
+    '[Image: diagram.png — image data not included in this export]',
+  );
+  expect(output).not.toContain('base64');
+  expect(value.conversation).not.toHaveProperty('attachments');
+});

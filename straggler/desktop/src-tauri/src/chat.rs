@@ -108,6 +108,31 @@ impl Runtime {
             "stream_options": {"include_usage": true},
             "timings_per_token": true,
         });
+        if !request.image_ids.is_empty() {
+            if self.server_details().await?.vision_supported != Some(true) {
+                return Err(
+                    "This model can’t read images. Choose a vision model or remove the images."
+                        .into(),
+                );
+            }
+            let originals = self.image_originals(request)?;
+            let index = request
+                .messages
+                .iter()
+                .rposition(|message| message.role == "user")
+                .ok_or("Images need a user message.")?;
+            let mut parts = vec![json!({"type": "text", "text": request.messages[index].content})];
+            for original in originals {
+                let data = tokio::task::spawn_blocking(move || {
+                    crate::image_attachments::prepare(&original)
+                })
+                .await
+                .map_err(|error| error.to_string())??
+                .1;
+                parts.push(json!({"type": "image_url", "image_url": {"url": data}}));
+            }
+            body["messages"][index]["content"] = json!(parts);
+        }
         if let Some(id) = request.temporary_id {
             let run = self.server.lock().map_err(|e| e.to_string())?.run;
             body["id_slot"] = json!(self.temporary_slot(id, url, run).await?);
@@ -152,6 +177,60 @@ impl Runtime {
             return Err("The model returned tools that were not enabled for this message.".into());
         }
         Ok(status)
+    }
+
+    fn image_originals(&self, request: &ChatRequest) -> Result<Vec<Vec<u8>>> {
+        if let Some(id) = request.temporary_id {
+            let session = self.temporary.lock().map_err(|error| error.to_string())?;
+            let session = session
+                .as_ref()
+                .filter(|session| session.id == id && !session.ending)
+                .ok_or("The temporary chat is no longer available.")?;
+            return request
+                .image_ids
+                .iter()
+                .map(|id| {
+                    session
+                        .originals
+                        .get(id)
+                        .filter(|file| file.attachment.image.is_some())
+                        .map(|file| file.original.clone())
+                        .ok_or_else(|| "This image is no longer in the chat.".into())
+                })
+                .collect();
+        }
+        let id = request
+            .conversation_id
+            .ok_or("Images need a saved chat identifier.")?;
+        let _guard = self
+            .history
+            .writer
+            .lock()
+            .map_err(|error| error.to_string())?;
+        self.history.recover()?;
+        let chat = self.history.read_one(id)?;
+        request
+            .image_ids
+            .iter()
+            .map(|id| {
+                let attachment = chat
+                    .attachments
+                    .iter()
+                    .find(|attachment| attachment.id == *id && attachment.image.is_some())
+                    .ok_or("This image is no longer in the chat.")?;
+                use std::io::Read;
+                let file = std::fs::File::open(self.history.original_path(chat.id, attachment))
+                    .map_err(|error| format!("Cannot read the stored image: {error}"))?;
+                let mut bytes = Vec::new();
+                file.take(crate::attachments::MAX_FILE_BYTES + 1)
+                    .read_to_end(&mut bytes)
+                    .map_err(|error| error.to_string())?;
+                if bytes.len() as u64 > crate::attachments::MAX_FILE_BYTES {
+                    return Err("This image exceeds the attachment size limit.".into());
+                }
+                Ok(bytes)
+            })
+            .collect()
     }
 
     async fn receive_step(

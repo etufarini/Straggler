@@ -1,3 +1,5 @@
+import { Paperclip } from 'lucide-react';
+import { attachmentTypesLabel } from '../../domain/attachments';
 import RichComposer, { FormattingToggle, composerHint } from './composer/RichComposer';
 import type { ComposerContext } from './composer/commands';
 import WebSearchMenu from '../websearch/WebSearchMenu';
@@ -436,6 +438,29 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
               : controller.contextError}
           </p>
         )}
+        {!controller.attachments.visionSupported &&
+          controller.attachments.rows.some((row) => row.attachment?.image) && (
+            <Feedback
+              severity="warning"
+              title="This model can’t read images. It won’t be sent."
+              actions={
+                <>
+                  <button onClick={() => controller.setPanel('models')}>Choose model</button>
+                  <button
+                    disabled={controller.attachments.disabled}
+                    onClick={() => {
+                      const row = controller.attachments.rows.find((row) => row.attachment?.image);
+                      if (row) void controller.attachments.removeFile(row);
+                    }}
+                  >
+                    Remove image
+                  </button>
+                </>
+              }
+            >
+              <span>Choose a model that supports images, or remove the image.</span>
+            </Feedback>
+          )}
         <form
           ref={composerRef}
           className="composer"
@@ -474,6 +499,16 @@ export default function ChatPanel({ controller }: { controller: WorkspaceControl
                 onChange={toggleFormatting}
                 disabled={!controller.preferencesReady}
               />
+              <button
+                type="button"
+                className="composer-chip attach-chip"
+                aria-label="Attach files"
+                title={attachmentTypesLabel}
+                disabled={controller.attachments.disabled}
+                onClick={() => void controller.attachments.chooseFiles()}
+              >
+                <Paperclip size={15} />
+              </button>
               <SystemPromptMenu controller={controller} />
               <ReasoningMenu controller={controller} />
               <WebSearchMenu controller={controller} />

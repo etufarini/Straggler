@@ -115,6 +115,13 @@ export default function App() {
                 </small>
               )}
             </span>
+            {controller.serverDetails?.runId === controller.server.runId &&
+            controller.serverDetails?.visionSupported ? (
+              <span className="vision-badge">Vision</span>
+            ) : config?.models.find((model) => model.path === controller.draft?.model)
+                ?.projector ? (
+              <span className="vision-badge">Vision · restart to enable</span>
+            ) : null}
             <ChevronDown size={15} />
           </button>
           <div className="header-controls">

@@ -14,8 +14,9 @@ export default function useTopbarDensity() {
 
     function measure() {
       if (!bar || !model || !controls || disposed) return;
+      const vision = model.querySelector<HTMLElement>('.vision-badge');
+      if (vision) vision.style.display = '';
       const temporary = controls.querySelector<HTMLElement>('.temp-toggle, .temp-status');
-      if (!temporary) return;
       const style = getComputedStyle(bar);
       const available =
         bar.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
@@ -26,17 +27,18 @@ export default function useTopbarDensity() {
       const previousShrink = model.style.flexShrink;
       model.style.width = 'max-content';
       model.style.flexShrink = '0';
-      temporary.dataset.density = 'full';
+      if (temporary) temporary.dataset.density = 'full';
       const required =
         model.getBoundingClientRect().width +
         controls.getBoundingClientRect().width +
         parseFloat(style.columnGap);
+      if (vision && required > available) vision.style.display = 'none';
       model.style.width = previousWidth;
       model.style.flexShrink = previousShrink;
 
       if (required > available) density = 'icon';
       else if (required + hysteresis <= available) density = 'full';
-      temporary.dataset.density = density;
+      if (temporary) temporary.dataset.density = density;
     }
 
     measure();

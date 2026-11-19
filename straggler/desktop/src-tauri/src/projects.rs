@@ -377,6 +377,9 @@ impl Projects {
             return Err("Token estimates need a positive characters-per-token value.".into());
         }
         let extracted = attachments::extract(path)?;
+        if extracted.attachment.image.is_some() {
+            return Err("Images can be attached to chats, but not projects.".into());
+        }
         let _guard = self.writer.lock().map_err(|error| error.to_string())?;
         self.prepare(history)?;
         let mut project = self.read(project_id)?;
@@ -834,7 +837,7 @@ fn validate(project: &Project) -> Result<()> {
     for file in &project.files {
         if !ids.insert(file.id)
             || file.name.is_empty()
-            || !attachments::supported(&file.extension)
+            || !attachments::document_supported(&file.extension)
             || file.size > attachments::MAX_FILE_BYTES
             || file
                 .token_source

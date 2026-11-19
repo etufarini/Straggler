@@ -40,6 +40,7 @@ export function useConversation(
   contextSize?: number | null,
   projects?: ProjectsController,
   sharedQueue?: StorageQueue,
+  visionSupported = false,
 ) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
@@ -328,6 +329,11 @@ export function useConversation(
           : await invoke<Response>('generate', {
               request: {
                 requestId,
+                imageIds: visionSupported
+                  ? (current.attachments ?? [])
+                      .filter((attachment) => attachment.image)
+                      .map((attachment) => attachment.id)
+                  : [],
                 webSearch: useWebSearch,
                 webSearchQuery: replacement
                   ? [...replacement].reverse().find((message) => message.role === 'user')?.content

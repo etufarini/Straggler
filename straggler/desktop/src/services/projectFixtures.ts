@@ -7,7 +7,7 @@ import {
 } from '../domain/projects';
 import type { Project, ProjectUndo } from '../domain/projects';
 import type { Conversation } from '../domain/types';
-import { attachmentTypes } from '../domain/attachments';
+import { documentTypes } from '../domain/attachments';
 
 // Development transport only. Native storage/rollback is verified independently.
 export function createProjectFixture(
@@ -81,7 +81,7 @@ export function createProjectFixture(
       const project = find(args.projectId);
       assertProjectWritable(project);
       const name = String(args.path).split('/').at(-1)!;
-      const extension = attachmentTypes.find((type) => name.toLowerCase().endsWith(`.${type}`));
+      const extension = documentTypes.find((type) => name.toLowerCase().endsWith(`.${type}`));
       if (!extension) throw new Error('This file type is not supported.');
       while (localStorage.getItem('straggler-fixture-reading-paused'))
         await new Promise((resolve) => setTimeout(resolve, 20));

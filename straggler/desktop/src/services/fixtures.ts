@@ -13,7 +13,12 @@ import type {
   Attachment,
 } from '../domain/types';
 import { emptyServer, fileName } from '../domain/types';
-import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
+import {
+  approximatePromptTokens,
+  approximateTokens,
+  attachmentTypes,
+  imageTypes,
+} from '../domain/attachments';
 import { createProjectFixture } from './projectFixtures';
 import { createHuggingFaceFixture } from './huggingFaceFixtures';
 
@@ -236,7 +241,20 @@ export function createFixture(scenario: Scenario) {
       name,
       extension,
       size: 1234,
-      text: `Extracted fixture text from ${name}.`,
+      text: imageTypes.some((type) => type === extension)
+        ? `[Image: ${name}]`
+        : `Extracted fixture text from ${name}.`,
+      ...(imageTypes.some((type) => type === extension)
+        ? {
+            image: {
+              width: 2048,
+              height: 1024,
+              resized: true,
+              thumbnail:
+                'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aDaYAAAAASUVORK5CYII=',
+            },
+          }
+        : {}),
     };
   }
 
@@ -317,6 +335,7 @@ export function createFixture(scenario: Scenario) {
                 ? ['minimal', 'xhigh']
                 : ['low', 'medium', 'high'],
           systemRoleSupported: true,
+          visionSupported: localStorage.getItem('straggler-fixture-vision') === 'true',
           error: null,
         } satisfies ServerDetails;
       case 'server_status':

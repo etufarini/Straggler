@@ -14,7 +14,7 @@ if '--version' in sys.argv:
 if '--help' in sys.argv:
     print('--spec-type [none|draft-mtp]\n--spec-draft-model FNAME')
     print('--slots\n--cache-ram N\n--log-disable\n--jinja\n--chat-template-file JINJA_TEMPLATE_FILE')
-    print('--model FNAME\n--port PORT\n--host HOST\n--ctx-size N\n--cache-type-k TYPE\n--cache-type-v TYPE\n--split-mode MODE\n--tensor-split N\n--fit-target N\n--device DEV\n--threads N\n--gpu-layers N\n--batch-size N\n--ubatch-size N\n--temperature N\n--top-p N\n--top-k N\n--min-p N\n--repeat-penalty N\n--presence-penalty N\n--frequency-penalty N\n--seed N\n--n-predict N')
+    print('--mmproj FNAME\n--model FNAME\n--port PORT\n--host HOST\n--ctx-size N\n--cache-type-k TYPE\n--cache-type-v TYPE\n--split-mode MODE\n--tensor-split N\n--fit-target N\n--device DEV\n--threads N\n--gpu-layers N\n--batch-size N\n--ubatch-size N\n--temperature N\n--top-p N\n--top-k N\n--min-p N\n--repeat-penalty N\n--presence-penalty N\n--frequency-penalty N\n--seed N\n--n-predict N')
     sys.exit()
 if '--list-devices' in sys.argv:
     print('Available devices:\n  Test0: Test accelerator (8192 MiB, 6144 MiB free)')
@@ -22,6 +22,7 @@ if '--list-devices' in sys.argv:
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model')
+parser.add_argument('--mmproj')
 parser.add_argument('--port', type=int)
 parser.add_argument('--host')
 parser.add_argument('--jinja', action='store_true')
@@ -47,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/slots':
             data = [{'id': 7, 'is_processing': False}]
         if self.path == '/props':
-            data = {'default_generation_settings': {'n_ctx': 4096},
+            data = {'modalities': {'vision': os.path.exists(os.environ['TEST_REQUEST'] + '.vision')}, 'default_generation_settings': {'n_ctx': 4096},
                     'chat_template_caps': {'supports_system_role': True, 'supports_reasoning_effort': True,
                                            'reasoning_effort_levels': ['low', 'high']}}
             if os.environ.get('TEST_TOOLS'):
@@ -98,7 +99,10 @@ class Handler(BaseHTTPRequestHandler):
             record.write(json.dumps(request) + '\n')
         # Failed assistant turns are omitted, so consecutive user turns can be
         # merged. Fixture control words belong to the final user paragraph.
-        prompt = request['messages'][-1]['content'].split('\n\n')[-1]
+        content = request['messages'][-1]['content']
+        if isinstance(content, list):
+            content = '\n'.join(part.get('text', '') for part in content if part.get('type') == 'text')
+        prompt = content.split('\n\n')[-1]
         if os.environ.get('TEST_EMIT_PROMPT_LOG'):
             print(prompt, file=sys.stderr, flush=True)
         if prompt == 'context-reject':

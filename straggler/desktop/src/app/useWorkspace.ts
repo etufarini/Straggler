@@ -80,6 +80,7 @@ export function useWorkspace() {
     serverDetails?.runId === server.runId ? serverDetails?.contextSize : null,
     projects,
     storageQueue,
+    serverDetails?.runId === server.runId && serverDetails?.visionSupported === true,
   );
   const webSearch = useWebSearch(
     ui.preferences,
@@ -97,6 +98,7 @@ export function useWorkspace() {
     server,
     view === 'chat' && panel !== 'settings',
     !!currentProject?.archived,
+    serverDetails?.runId === server.runId && serverDetails?.visionSupported === true,
   );
   const contextEstimate = useContextEstimate(
     conversation.chat,

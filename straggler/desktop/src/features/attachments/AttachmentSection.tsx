@@ -2,7 +2,7 @@ import { Download, FileUp, X } from 'lucide-react';
 import { useId } from 'react';
 import AttachmentRow from './AttachmentRow';
 import Feedback from '../../components/Feedback';
-import { attachmentTypes } from '../../domain/attachments';
+import { attachmentTypesLabel } from '../../domain/attachments';
 import { fileName } from '../../domain/types';
 import type { AttachmentController } from './useAttachments';
 
@@ -24,7 +24,12 @@ export default function AttachmentSection({ controller }: { controller: Attachme
           {controller.rows.map((row) => {
             const tokens = row.attachment ? controller.estimate(row.attachment) : null;
             return (
-              <AttachmentRow key={row.id} row={row} estimate={tokens}>
+              <AttachmentRow
+                key={row.id}
+                row={row}
+                estimate={tokens}
+                visionSupported={controller.visionSupported}
+              >
                 {row.state !== 'error' && (
                   <button
                     type="button"
@@ -83,9 +88,7 @@ export default function AttachmentSection({ controller }: { controller: Attachme
                 : 'or choose files'}
           </span>
           {!controller.rows.length && (
-            <small className="dropzone-types">
-              {attachmentTypes.map((extension) => `.${extension}`).join(' · ')}
-            </small>
+            <small className="dropzone-types">{attachmentTypesLabel}</small>
           )}
         </span>
       </button>

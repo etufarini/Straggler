@@ -4,6 +4,7 @@ export interface Model {
   path: string;
   label: string;
   template?: string | null;
+  projector?: string | null;
 }
 export interface Settings {
   chat_system_prompt: string;
@@ -122,7 +123,8 @@ export interface Message {
 export interface Attachment {
   id: string;
   name: string;
-  extension: 'txt' | 'md' | 'docx' | 'xlsx' | 'pptx' | 'pdf';
+  extension: string;
+  image?: { width: number; height: number; resized: boolean; thumbnail: string };
   size: number;
   text: string;
 }
@@ -239,6 +241,7 @@ export interface ServerDetails {
   runId: string;
   contextSize: number | null;
   toolsSupported?: boolean | null;
+  visionSupported?: boolean | null;
   reasoningSupported: boolean | null;
   effortLevels: string[];
   systemRoleSupported: boolean | null;

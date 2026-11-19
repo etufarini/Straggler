@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import type { WorkspaceController } from '../../app/useWorkspace';
 import type { Project } from '../../domain/projects';
-import { attachmentTypes } from '../../domain/attachments';
+import { documentTypesLabel } from '../../domain/attachments';
 import { ProjectCapacity, ProjectLimitFeedback } from './ProjectCapacity';
 import Feedback from '../../components/Feedback';
 import AttachmentRow from '../attachments/AttachmentRow';
@@ -452,7 +452,7 @@ export default function ProjectDetail({
                 <span className="dropzone-text">
                   <strong>Add files</strong>
                   <small className="dropzone-types" id="project-file-types">
-                    {attachmentTypes.map((extension) => `.${extension}`).join(' · ')}
+                    {documentTypesLabel}
                   </small>
                 </span>
               </button>

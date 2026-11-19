@@ -17,12 +17,14 @@ export default function AttachmentRow({
   estimate,
   excluded = false,
   project = false,
+  visionSupported = false,
   children,
 }: {
   row: Row;
   estimate?: TokenEstimate | null;
   excluded?: boolean;
   project?: boolean;
+  visionSupported?: boolean;
   children: ReactNode;
 }) {
   const Icon = icons[row.extension as keyof typeof icons] ?? FileText;
@@ -31,7 +33,17 @@ export default function AttachmentRow({
       className={`file-row type-${row.extension} is-${row.state}${excluded ? ' is-excluded' : ''}`}
     >
       <span className="file-tile">
-        <Icon size={17} aria-hidden="true" />
+        {row.attachment?.image ? (
+          <img
+            className="file-thumb"
+            src={row.attachment.image.thumbnail}
+            alt=""
+            width={30}
+            height={30}
+          />
+        ) : (
+          <Icon size={17} aria-hidden="true" />
+        )}
       </span>
       <div className="file-text">
         <span
@@ -47,6 +59,14 @@ export default function AttachmentRow({
           ) : row.state === 'error' ? (
             <span className="file-error" role="alert">
               {row.error}
+            </span>
+          ) : row.attachment?.image ? (
+            <span role="status">
+              {!visionSupported
+                ? 'This model can’t read images. It won’t be sent.'
+                : row.attachment.image.resized
+                  ? 'Resized to 2,048 px'
+                  : 'Image ready'}
             </span>
           ) : (
             <>

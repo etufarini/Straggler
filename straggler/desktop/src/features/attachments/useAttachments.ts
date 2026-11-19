@@ -26,6 +26,7 @@ export function useAttachments(
   server: ServerStatus,
   visible = true,
   readOnly = false,
+  visionSupported = false,
 ) {
   const [pending, setPending] = useState<Record<string, AttachmentRow[]>>({});
   const [dragged, setDragged] = useState<string[]>([]);
@@ -214,6 +215,7 @@ export function useAttachments(
   const tokens = stored.reduce((total, attachment) => total + estimate(attachment).tokens, 0);
   return {
     temporary: !!conversation.temporaryId,
+    visionSupported,
     generating: conversation.generating,
     rows,
     dragged,

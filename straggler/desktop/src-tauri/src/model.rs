@@ -10,6 +10,7 @@ pub struct ServerDetails {
     pub run_id: Uuid,
     pub context_size: Option<u64>,
     pub tools_supported: Option<bool>,
+    pub vision_supported: Option<bool>,
     pub reasoning_supported: Option<bool>,
     pub effort_levels: Vec<String>,
     pub system_role_supported: Option<bool>,
@@ -45,6 +46,7 @@ impl Runtime {
             run_id: run,
             context_size: None,
             tools_supported: None,
+            vision_supported: None,
             reasoning_supported: None,
             effort_levels: Vec::new(),
             system_role_supported: None,
@@ -73,6 +75,7 @@ impl Runtime {
             .json()
             .await
             .map_err(|e| format!("Invalid model properties: {e}"))?;
+        details.vision_supported = props["modalities"]["vision"].as_bool();
         details.context_size = props["default_generation_settings"]["n_ctx"]
             .as_u64()
             .filter(|&n| n > 0);
