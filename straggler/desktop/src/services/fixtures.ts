@@ -1,3 +1,4 @@
+import { searchText } from '../domain/chatSearch';
 import { createWebSearchFixture } from './webSearchFixtures';
 import nativeDefaults from '../../src-tauri/src/configuration/defaults.json';
 import backendManifest from '../../packaging/llama-runtime.json';
@@ -480,6 +481,16 @@ export function createFixture(scenario: Scenario) {
           throw new Error('Destination is not writable');
         localStorage.setItem('straggler-fixture-export', String(args.contents));
         return;
+      case 'history_search_text': {
+        if (localStorage.getItem('straggler-fixture-chat-text-error'))
+          throw new Error('Chat message search is unavailable.');
+        const query = searchText(String(args.query));
+        return history
+          .filter((chat) =>
+            chat.messages.some((message) => searchText(message.content).includes(query)),
+          )
+          .map((chat) => chat.id);
+      }
       case 'history_list':
         if (
           scenario === 'history-error' &&

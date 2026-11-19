@@ -77,6 +77,7 @@ export type DesktopCommand =
   | 'history_branch'
   | 'write_export'
   | 'history_list'
+  | 'history_search_text'
   | 'history_save'
   | 'history_delete'
   | 'projects_list'
@@ -97,6 +98,10 @@ export async function invoke<T = void>(
   if (!nativeAvailable())
     throw new Error('Native desktop services are unavailable in this preview.');
   return nativeInvoke<T>(command, args);
+}
+
+export function searchChatMessages(query: string): Promise<string[]> {
+  return invoke('history_search_text', { query });
 }
 
 export function getBackendRelease(): Promise<BackendRelease> {

@@ -103,3 +103,54 @@ test('search folds accents, rename restores focus, and stars survive reload', as
   await expect(page.locator('.assistant .markdown')).toContainText('local answer');
   await expect(page.getByRole('button', { name: 'Starred New chat', exact: true })).toBeVisible();
 });
+
+test('D011 finds saved message text alongside title matches and keeps titles usable on failure', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const chats = [
+      {
+        id: '20000000-0000-4000-8000-000000000001',
+        title: 'Research notebook',
+        content: 'A paragraph about birds.',
+      },
+      {
+        id: '20000000-0000-4000-8000-000000000002',
+        title: 'Unrelated title',
+        content: 'Research on migrations.',
+      },
+    ];
+    localStorage.setItem(
+      'straggler-fixture-normal',
+      JSON.stringify(
+        chats.map((chat) => ({
+          id: chat.id,
+          title: chat.title,
+          createdAt: 1,
+          updatedAt: 2,
+          model: null,
+          messages: [
+            { id: chat.id, role: 'user', status: 'complete', content: chat.content, reasoning: '' },
+          ],
+        })),
+      ),
+    );
+  });
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Search chats', exact: true }).click();
+  const search = page.getByRole('textbox', { name: 'Search chats', exact: true });
+  await search.fill('Research');
+  await expect(page.locator('.conversation-row mark')).toHaveText('Research');
+  await expect(
+    page.getByRole('button', { name: 'Unrelated title Match in messages' }),
+  ).toBeVisible();
+  await expect(page.locator('.chat-search').getByRole('status')).toHaveText('2 chats');
+  await page.evaluate(() => localStorage.setItem('straggler-fixture-chat-text-error', 'true'));
+  await search.fill('Research notebook');
+  await expect(page.getByRole('alert')).toContainText('Couldn’t search chat messages.');
+  await expect(page.locator('.conversation-row')).toHaveCount(1);
+  await expect(page.locator('.conversation-row mark')).toHaveText('Research notebook');
+  await search.press('Escape');
+  await expect(search).toHaveCount(0);
+  await expect(page.locator('.conversation-row')).toHaveCount(2);
+});

@@ -1,15 +1,22 @@
-use crate::{projects::Project, Result};
+use crate::{history::Conversation, projects::Project, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{fs, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+};
+
 use tantivy::{
-    collector::TopDocs,
+    collector::{DocSetCollector, TopDocs},
     query::{BooleanQuery, Occur, Query, TermQuery},
     schema::{Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, STORED},
     tokenizer::{Language, LowerCaser, SimpleTokenizer, Stemmer, TextAnalyzer},
-    Index, TantivyDocument, Term,
+    DocAddress, Index, Searcher, TantivyDocument, Term,
 };
 use uuid::Uuid;
+
+type Fingerprint = sha2::digest::Output<Sha256>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -106,140 +113,271 @@ fn passages(text: &str) -> impl Iterator<Item = String> + '_ {
     })
 }
 
-pub fn search(
-    directory: &Path,
-    project: &Project,
-    query: &str,
-    budget: usize,
-) -> Result<Vec<Passage>> {
-    search_index(directory, project, query, budget)
-        .map_err(|error| format!("Cannot search project files: {error}"))
+#[derive(Serialize)]
+struct SearchDocument<'a> {
+    id: Uuid,
+    text: &'a str,
 }
 
-fn search_index(
-    directory: &Path,
-    project: &Project,
-    query: &str,
-    budget: usize,
-) -> Result<Vec<Passage>> {
-    let (schema, stored, fields) = schema();
-    let files: Vec<_> = project.files.iter().filter(|file| file.included).collect();
-    let content: Vec<_> = files
-        .iter()
-        .map(|file| (file.id, &file.name, &file.text))
-        .collect();
-    let fingerprint = format!(
-        "v1:{:x}",
-        Sha256::digest(serde_json::to_vec(&content).map_err(|e| e.to_string())?)
-    );
-    let marker = directory.join("fingerprint");
-    let current = fs::read_to_string(&marker).ok().as_deref() == Some(&fingerprint);
-    let existing = Index::open_in_dir(directory)
-        .ok()
-        .filter(|index| index.schema() == schema);
-    let rebuild = !current || existing.is_none();
-    let index = if let Some(index) = existing {
-        index
-    } else {
-        if directory.exists() {
-            fs::remove_dir_all(directory).map_err(|e| e.to_string())?;
+#[derive(Serialize, Deserialize)]
+struct IndexedPassage {
+    id: Uuid,
+    section: usize,
+    text: String,
+}
+
+struct PassageIndex {
+    index: Index,
+    stored: Field,
+    fields: Vec<(&'static str, Field)>,
+}
+
+impl PassageIndex {
+    fn open(directory: Option<&Path>, documents: &[SearchDocument<'_>]) -> Result<Self> {
+        let (schema, stored, fields) = schema();
+        let (index, marker) = if let Some(directory) = directory {
+            let fingerprint = format!("v2:{:x}", fingerprint(documents)?);
+            let path = directory.join("fingerprint");
+            if let Ok(index) = Index::open_in_dir(directory) {
+                if index.schema() == schema {
+                    let current = fs::read_to_string(&path).ok().as_deref() == Some(&fingerprint);
+                    (index, (!current).then_some((path, fingerprint)))
+                } else {
+                    (
+                        recreate_index(directory, schema)?,
+                        Some((path, fingerprint)),
+                    )
+                }
+            } else {
+                (
+                    recreate_index(directory, schema)?,
+                    Some((path, fingerprint)),
+                )
+            }
+        } else {
+            (Index::create_in_ram(schema), None)
+        };
+        register_analyzers(&index);
+        let result = Self {
+            index,
+            stored,
+            fields,
+        };
+        if directory.is_none() || marker.is_some() {
+            result.rebuild(documents)?;
         }
-        fs::create_dir_all(directory).map_err(|e| e.to_string())?;
-        Index::create_in_dir(directory, schema).map_err(|e| e.to_string())?
-    };
-    register_analyzers(&index);
-    if rebuild {
-        let mut writer = index
+        if let Some((path, value)) = marker {
+            crate::files::write_atomic(&path, value.as_bytes())?;
+        }
+        Ok(result)
+    }
+
+    fn rebuild(&self, documents: &[SearchDocument<'_>]) -> Result<()> {
+        let mut writer = self
+            .index
             .writer_with_num_threads::<TantivyDocument>(1, 20_000_000)
             .map_err(|e| e.to_string())?;
         writer.delete_all_documents().map_err(|e| e.to_string())?;
-        for file in files {
-            let sample: String = file.text.chars().take(16000).collect();
+        for source in documents {
+            let sample: String = source.text.chars().take(16000).collect();
             let code = language(&sample);
-            let field = fields.iter().find(|(name, _)| *name == code).unwrap().1;
-            for (section, text) in passages(&file.text).enumerate() {
-                let passage = Passage {
-                    n: 0,
-                    project_id: project.id,
-                    file_id: file.id,
-                    name: file.name.clone(),
+            let field = self
+                .fields
+                .iter()
+                .find(|(name, _)| *name == code)
+                .unwrap()
+                .1;
+            for (section, text) in passages(source.text).enumerate() {
+                let passage = IndexedPassage {
+                    id: source.id,
                     section: section + 1,
                     text,
                 };
                 let mut document = TantivyDocument::default();
                 document.add_text(field, &passage.text);
                 document.add_text(
-                    stored,
+                    self.stored,
                     serde_json::to_string(&passage).map_err(|e| e.to_string())?,
                 );
                 writer.add_document(document).map_err(|e| e.to_string())?;
             }
         }
         writer.commit().map_err(|e| e.to_string())?;
-        writer.wait_merging_threads().map_err(|e| e.to_string())?;
-        fs::write(marker, fingerprint).map_err(|e| e.to_string())?;
+        writer.wait_merging_threads().map_err(|e| e.to_string())
     }
+
+    fn query(&self, query: &str, require_all: bool) -> Result<Option<BooleanQuery>> {
+        let mut terms = Vec::<(Occur, Box<dyn Query>)>::new();
+        for (_, field) in &self.fields {
+            let mut analyzer = self
+                .index
+                .tokenizer_for_field(*field)
+                .map_err(|e| e.to_string())?;
+            let mut tokens = analyzer.token_stream(query);
+            let mut seen = HashSet::new();
+            let mut field_terms = Vec::<Box<dyn Query>>::new();
+            tokens.process(&mut |token| {
+                if seen.insert(token.text.clone()) {
+                    field_terms.push(Box::new(TermQuery::new(
+                        Term::from_field_text(*field, &token.text),
+                        IndexRecordOption::WithFreqs,
+                    )));
+                }
+            });
+            if require_all && field_terms.len() > 1 {
+                terms.push((
+                    Occur::Should,
+                    Box::new(BooleanQuery::intersection(field_terms)),
+                ));
+            } else {
+                terms.extend(field_terms.into_iter().map(|term| (Occur::Should, term)));
+            }
+        }
+        Ok((!terms.is_empty()).then(|| BooleanQuery::new(terms)))
+    }
+
+    fn read(&self, searcher: &Searcher, address: DocAddress) -> Result<IndexedPassage> {
+        let document: TantivyDocument = searcher.doc(address).map_err(|e| e.to_string())?;
+        let encoded = document
+            .get_first(self.stored)
+            .and_then(|value| value.as_str())
+            .ok_or("Invalid derived search passage")?;
+        serde_json::from_str(encoded).map_err(|e| e.to_string())
+    }
+}
+
+fn recreate_index(directory: &Path, schema: Schema) -> Result<Index> {
+    if directory.exists() {
+        fs::remove_dir_all(directory).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(directory).map_err(|e| e.to_string())?;
+    Index::create_in_dir(directory, schema).map_err(|e| e.to_string())
+}
+
+fn fingerprint(documents: &[SearchDocument<'_>]) -> Result<Fingerprint> {
+    Ok(Sha256::digest(
+        serde_json::to_vec(documents).map_err(|e| e.to_string())?,
+    ))
+}
+
+pub fn search(
+    directory: &Path,
+    project: &Project,
+    query: &str,
+    budget: usize,
+) -> Result<Vec<Passage>> {
+    search_project(directory, project, query, budget)
+        .map_err(|error| format!("Cannot search project files: {error}"))
+}
+
+fn search_project(
+    directory: &Path,
+    project: &Project,
+    query: &str,
+    budget: usize,
+) -> Result<Vec<Passage>> {
     if budget == 0 {
         return Ok(Vec::new());
     }
-    let mut terms = Vec::<(Occur, Box<dyn Query>)>::new();
-    for (_, field) in &fields {
-        let mut analyzer = index
-            .tokenizer_for_field(*field)
-            .map_err(|e| e.to_string())?;
-        let mut tokens = analyzer.token_stream(query);
-        let mut seen = std::collections::HashSet::new();
-        tokens.process(&mut |token| {
-            if seen.insert(token.text.clone()) {
-                terms.push((
-                    Occur::Should,
-                    Box::new(TermQuery::new(
-                        Term::from_field_text(*field, &token.text),
-                        IndexRecordOption::WithFreqs,
-                    )),
-                ));
-            }
-        });
-    }
-    if terms.is_empty() {
+    let included = project.files.iter().filter(|file| file.included);
+    let files: HashMap<_, _> = included.clone().map(|file| (file.id, file)).collect();
+    let documents: Vec<_> = included
+        .map(|file| SearchDocument {
+            id: file.id,
+            text: &file.text,
+        })
+        .collect();
+    let index = PassageIndex::open(Some(directory), &documents)?;
+    let Some(query) = index.query(query, false)? else {
         return Ok(Vec::new());
-    }
-    let reader = index.reader().map_err(|e| e.to_string())?;
+    };
+    let reader = index.index.reader().map_err(|e| e.to_string())?;
     let searcher = reader.searcher();
     let limit = (searcher.num_docs() as usize).min(budget);
     if limit == 0 {
         return Ok(Vec::new());
     }
     let matches = searcher
-        .search(
-            &BooleanQuery::new(terms),
-            &TopDocs::with_limit(limit).order_by_score(),
-        )
+        .search(&query, &TopDocs::with_limit(limit).order_by_score())
         .map_err(|e| e.to_string())?;
     let mut result = Vec::new();
     let mut remaining = budget.saturating_mul(4);
     for (_, address) in matches {
-        let document: TantivyDocument = searcher.doc(address).map_err(|e| e.to_string())?;
-        let encoded = document
-            .get_first(stored)
-            .and_then(|value| value.as_str())
-            .ok_or("Invalid derived search passage")?;
-        let mut passage: Passage = serde_json::from_str(encoded).map_err(|e| e.to_string())?;
-        passage.n = result.len() + 1;
-        let overhead = format!(
-            "[P{}] {} · section {}\n\n",
-            passage.n, passage.name, passage.section
-        )
-        .chars()
-        .count();
+        let IndexedPassage { id, section, text } = index.read(&searcher, address)?;
+        let file = files
+            .get(&id)
+            .ok_or("Project search index is out of date.")?;
+        let n = result.len() + 1;
+        let overhead = format!("[P{n}] {} · section {section}\n\n", file.name)
+            .chars()
+            .count();
         if remaining <= overhead {
             break;
         }
-        passage.text = passage.text.chars().take(remaining - overhead).collect();
-        remaining -= overhead + passage.text.chars().count();
-        result.push(passage);
+        let text: String = text.chars().take(remaining - overhead).collect();
+        remaining -= overhead + text.chars().count();
+        result.push(Passage {
+            n,
+            project_id: project.id,
+            file_id: id,
+            name: file.name.clone(),
+            section,
+            text,
+        });
     }
     Ok(result)
+}
+
+#[derive(Default)]
+pub(crate) struct ChatTextIndex {
+    // The cache lives only in memory. Deleting a chat cannot leave a second file on disk.
+    index: Option<(Fingerprint, PassageIndex)>,
+}
+
+impl ChatTextIndex {
+    pub fn matches(&mut self, mut chats: Vec<Conversation>, query: &str) -> Result<Vec<Uuid>> {
+        chats.sort_unstable_by_key(|chat| chat.id);
+        let texts: Vec<_> = chats
+            .iter()
+            .filter(|chat| !chat.messages.is_empty())
+            .map(|chat| {
+                (
+                    chat.id,
+                    chat.messages
+                        .iter()
+                        .map(|message| message.content.as_str())
+                        .collect::<Vec<_>>()
+                        .join("\n\n"),
+                )
+            })
+            .collect();
+        let documents: Vec<_> = texts
+            .iter()
+            .map(|(id, text)| SearchDocument { id: *id, text })
+            .collect();
+        let key = fingerprint(&documents)?;
+        if self
+            .index
+            .as_ref()
+            .is_none_or(|(previous, _)| *previous != key)
+        {
+            self.index = Some((key, PassageIndex::open(None, &documents)?));
+        }
+        let index = &self.index.as_ref().unwrap().1;
+        let Some(query) = index.query(query, true)? else {
+            return Ok(Vec::new());
+        };
+        let reader = index.index.reader().map_err(|e| e.to_string())?;
+        let searcher = reader.searcher();
+        let hits = searcher
+            .search(&query, &DocSetCollector)
+            .map_err(|e| e.to_string())?;
+        let mut ids = HashSet::new();
+        for address in hits {
+            ids.insert(index.read(&searcher, address)?.id);
+        }
+        Ok(ids.into_iter().collect())
+    }
 }
 
 pub fn validate(sources: &[Passage]) -> Result<()> {

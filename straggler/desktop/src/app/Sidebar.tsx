@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import ChatHistoryRow from './ChatHistoryRow';
+import { searchChatMessages } from '../services/desktop';
 import { titleMatch } from '../domain/chatSearch';
 import {
   PanelLeftClose,
@@ -14,6 +15,7 @@ import {
 import { controlSlug } from '../components/ActionMenu';
 import { newConversation } from '../domain/types';
 import { projectUpdatedAt } from '../domain/projects';
+import type { Conversation } from '../domain/types';
 import type { WorkspaceController } from './useWorkspace';
 import brandMark from '../assets/brand-mark.svg';
 
@@ -49,6 +51,11 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
 
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
+  const [bodyResult, setBodyResult] = useState<{
+    query: string;
+    conversations: Conversation[];
+    ids: Set<string> | null;
+  } | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const searchButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -74,7 +81,31 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
     window.addEventListener('keydown', shortcut);
     return () => window.removeEventListener('keydown', shortcut);
   }, []);
-  const filtered = conversations.filter((value) => !query.trim() || titleMatch(value.title, query));
+  const needle = query.trim();
+  useEffect(() => {
+    if (!searching || !needle || !controller.historyReady) return;
+    let disposed = false;
+    const timer = setTimeout(() => {
+      void searchChatMessages(needle).then(
+        (ids) => {
+          if (!disposed) setBodyResult({ query: needle, conversations, ids: new Set(ids) });
+        },
+        () => {
+          if (!disposed) setBodyResult({ query: needle, conversations, ids: null });
+        },
+      );
+    }, 180);
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+    };
+  }, [searching, needle, conversations, controller.historyReady]);
+  const currentResult =
+    bodyResult?.query === needle && bodyResult.conversations === conversations ? bodyResult : null;
+  const searchingMessages = !!needle && controller.historyReady && !currentResult;
+  const filtered = conversations.filter(
+    (value) => !needle || titleMatch(value.title, query) || currentResult?.ids?.has(value.id),
+  );
   const groups =
     searching && query.trim()
       ? [
@@ -233,6 +264,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             />
             <p role="status">
               {filtered.length} {filtered.length === 1 ? 'chat' : 'chats'}
+              {searchingMessages && ' · Searching messages…'}
             </p>
             {query && (
               <button
@@ -247,7 +279,12 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             )}
           </div>
         )}
-        {query.trim() && filtered.length === 0 && (
+        {currentResult?.ids === null && (
+          <p className="history-empty" role="alert">
+            Couldn’t search chat messages. Title matches are shown.
+          </p>
+        )}
+        {needle && !searchingMessages && currentResult?.ids !== null && filtered.length === 0 && (
           <p className="history-empty">No chats match ‘{query}’</p>
         )}
         {groups.map(
@@ -264,6 +301,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
                     controller={controller}
                     value={value}
                     query={query}
+                    messageMatch={!!currentResult?.ids?.has(value.id)}
                     navigationDisabled={conversationNavigationDisabled}
                   />
                 ))}
