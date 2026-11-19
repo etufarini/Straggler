@@ -576,6 +576,39 @@ async fn projects_list(
 }
 
 #[tauri::command]
+async fn project_search(
+    project_id: Uuid,
+    query: String,
+    budget: usize,
+    state: State<'_, Application>,
+) -> Result<Vec<straggler_desktop::project_search::Passage>> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime
+            .projects
+            .search(&runtime.history, project_id, &query, budget)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn project_file_text(
+    project_id: Uuid,
+    file_id: Uuid,
+    state: State<'_, Application>,
+) -> Result<String> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime
+            .projects
+            .file_text(&runtime.history, project_id, file_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn project_save(
     project: straggler_desktop::projects::Project,
     state: State<'_, Application>,
@@ -813,6 +846,8 @@ fn main() {
             read_conversation_import,
             projects_list,
             project_save,
+            project_search,
+            project_file_text,
             project_file_add,
             project_file_remove,
             project_move_chat,

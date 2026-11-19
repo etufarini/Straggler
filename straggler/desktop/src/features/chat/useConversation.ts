@@ -7,6 +7,7 @@ import {
   chooseConversationImport,
   estimatePromptTokens,
   estimateTextTokens,
+  projectService,
 } from '../../services/desktop';
 import { fileName, newConversation } from '../../domain/types';
 import { inheritedChatOptions, resolveChatOptions } from '../../domain/chat';
@@ -17,6 +18,7 @@ import {
   assembleProjectRequest,
   estimateProjectTokens,
   projectContextState,
+  projectInstructions,
   projectSystemPrefix,
 } from '../../domain/projectContext';
 import { flushStorage, serializeStorage } from '../../domain/storageQueue';
@@ -84,10 +86,11 @@ export function useConversation(
   const composerInput = useRef<{ focus: () => void }>(null);
   useEffect(() => {
     setContextError('');
-  }, [input, chat.attachments, contextSize]);
+  }, [chat.attachments, contextSize]);
 
   function setInput(value: string) {
     inputRevision.current += 1;
+    setContextError('');
     updateInput(value);
   }
 
@@ -189,7 +192,6 @@ export function useConversation(
       return;
     }
     const useWebSearch = webSearchOn;
-    setWebSearchOn(false);
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     setGenerating(true);
@@ -242,21 +244,29 @@ export function useConversation(
       ],
     };
     const options = resolveChatOptions(current.options, settings);
-    const messages = assembleProjectRequest(
-      current,
-      current.messages.slice(0, -1),
-      settings,
-      project,
-    );
-    if (project) {
+    const history = current.messages.slice(0, -1);
+    let messages = assembleProjectRequest(current, history, settings, project);
+    const query = replacement
+      ? ([...history].reverse().find((message) => message.role === 'user')?.content ?? '')
+      : text;
+    if (project && contextSize) {
       const prefix = projectSystemPrefix(project, settings);
-      const prefixCount = await estimateTextTokens(prefix);
+      const instructions = projectInstructions(project, settings);
+      const [prefixCount, instructionsCount] = await Promise.all([
+        estimateTextTokens(prefix),
+        estimateTextTokens(instructions),
+      ]);
+      const instructionTokens =
+        instructionsCount.source === 'server'
+          ? instructionsCount.tokens
+          : estimateProjectTokens(instructions);
       const capacity = projectContextState(
         prefixCount.source === 'server' ? prefixCount.tokens : estimateProjectTokens(prefix),
         contextSize,
         prefixCount.source !== 'server',
+        instructionTokens,
       );
-      if (capacity.level === 'over') {
+      if (capacity.level === 'over' && !capacity.search) {
         restoreSubmittedInput();
         setContextError(
           `This project does not fit in the context window. It needs ${capacity.shortfall.toLocaleString('en-US')} more tokens than are available.`,
@@ -264,6 +274,47 @@ export function useConversation(
         requestRef.current = null;
         setGenerating(false);
         return;
+      }
+      if (capacity.search) {
+        try {
+          const base = assembleProjectRequest(current, history, settings, project, []);
+          const baseCount = await estimatePromptTokens(base);
+          const budget = Math.max(
+            0,
+            Math.min(capacity.available! - instructionTokens, contextSize - baseCount.tokens),
+          );
+          let passages = await projectService.search(project.id, query, budget);
+          // File estimates and server token counts can disagree, especially across scripts.
+          // Keep the highest ranked excerpts and remeasure the request that will be sent.
+          messages = base;
+          while (passages.length) {
+            const candidate = assembleProjectRequest(current, history, settings, project, passages);
+            const [projectCount, promptCount] = await Promise.all([
+              estimateTextTokens(candidate[0].content),
+              estimatePromptTokens(candidate),
+            ]);
+            if (projectCount.tokens <= capacity.available! && promptCount.tokens <= contextSize) {
+              messages = candidate;
+              break;
+            }
+            if (passages.length > 1) {
+              passages = passages.slice(0, Math.floor(passages.length / 2));
+            } else {
+              const [best] = passages;
+              const text = Array.from(best.text);
+              const shorter = text.slice(0, Math.floor(text.length / 2)).join('');
+              passages = shorter ? [{ ...best, text: shorter }] : [];
+            }
+          }
+          assistant.projectSources = passages;
+          current.messages[current.messages.length - 1] = { ...assistant };
+        } catch (error) {
+          restoreSubmittedInput();
+          setContextError(`Couldn’t search project files. ${errorDetail(error).message}`);
+          requestRef.current = null;
+          setGenerating(false);
+          return;
+        }
       }
     }
     const estimate = await estimatePromptTokens(messages);
@@ -276,6 +327,7 @@ export function useConversation(
       setGenerating(false);
       return;
     }
+    setWebSearchOn(false);
     setContextError('');
     rejectedDraft.current = null;
     if (!replacement) updateChat(current);
@@ -335,9 +387,7 @@ export function useConversation(
                       .map((attachment) => attachment.id)
                   : [],
                 webSearch: useWebSearch,
-                webSearchQuery: replacement
-                  ? [...replacement].reverse().find((message) => message.role === 'user')?.content
-                  : text,
+                webSearchQuery: query,
                 conversationId: temporaryRef.current ? undefined : current.id,
                 temporaryId: temporaryRef.current ?? undefined,
                 messages,

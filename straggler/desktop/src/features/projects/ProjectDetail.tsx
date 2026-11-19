@@ -97,7 +97,7 @@ export default function ProjectDetail({
   const canStartChat =
     !!draft.trim() &&
     !project.archived &&
-    context.level !== 'over' &&
+    (context.level !== 'over' || context.search) &&
     !controller.generating &&
     controller.server.phase === 'ready' &&
     controller.historyReady &&
@@ -152,7 +152,7 @@ export default function ProjectDetail({
       )}
       <div className="project-detail-layout">
         <div className="project-detail-main">
-          {!project.archived && (
+          {!project.archived && !context.search && (
             <ProjectLimitFeedback
               context={context}
               onReviewFiles={reviewFiles}
@@ -195,8 +195,9 @@ export default function ProjectDetail({
                 <span className="project-start-note">
                   {project.instructions.trim()
                     ? 'Uses the project instructions'
-                    : 'No instructions yet · uses the system prompt from Settings'}{' '}
-                  and {included} of {countLabel(project.files.length, 'file')}
+                    : 'No instructions yet · uses the system prompt from Settings'}
+                  {context.search ? ' and searches ' : ' and '}
+                  {included} of {countLabel(project.files.length, 'file')}
                 </span>
               </div>
               <div className="composer-send">
@@ -353,6 +354,13 @@ export default function ProjectDetail({
               context={context}
               serverRunning={controller.server.phase === 'ready'}
             />
+            {context.search && !project.archived && (
+              <ProjectLimitFeedback
+                context={context}
+                onReviewFiles={reviewFiles}
+                onChangeContext={() => controller.reviewSettings('model')}
+              />
+            )}
             {context.level === 'high' && !project.archived && (
               <Feedback severity="warning" title="Close to the limit">
                 Long chats in this project will run out of room sooner. Exclude files you do not
@@ -367,6 +375,7 @@ export default function ProjectDetail({
                     key={file.id}
                     row={{ ...file, state: 'ready', attachment: file }}
                     project
+                    projectSearch={context.search}
                     estimate={projects.estimate(file.text)}
                     excluded={!file.included}
                   >
@@ -375,7 +384,7 @@ export default function ProjectDetail({
                       className="project-switch"
                       role="switch"
                       aria-checked={file.included}
-                      aria-label={`Include ${file.name} in context`}
+                      aria-label={`Include ${file.name} in ${context.search ? 'project search' : 'context'}`}
                       data-control-id={`switch-include-${controlSlug(file.name)}`}
                       disabled={project.archived}
                       onClick={() =>

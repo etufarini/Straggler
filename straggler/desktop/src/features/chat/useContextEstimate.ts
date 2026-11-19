@@ -13,6 +13,7 @@ export function useContextEstimate(
   server: ServerStatus,
   details: ServerDetails | null,
   project?: Project,
+  searchProjectFiles = false,
 ) {
   const unavailable = !!chat.projectId && project?.id !== chat.projectId;
   const messages = unavailable
@@ -35,6 +36,7 @@ export function useContextEstimate(
         ],
         settings,
         project,
+        searchProjectFiles ? [] : undefined,
       );
   const key = JSON.stringify(messages);
   const [measured, setMeasured] = useState<{

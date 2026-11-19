@@ -610,6 +610,11 @@ export function createFixture(scenario: Scenario) {
         if (delta.sources?.length)
           delta.content =
             'This simulated local answer cites a source [1], another source [2], and leaves an unknown citation [99] as text.\n\n`Code [1]`';
+        const savedResponse = history
+          .find((chat) => chat.id === request.conversationId)
+          ?.messages.at(-1);
+        if (savedResponse?.projectSources?.length)
+          delta.content += '\n\nThe project notes support this answer [P1].';
         if (scenario === 'burst-stream') {
           delta.content =
             '## Streamed answer\n\n' + 'A **local** answer with caffè ☕.\n\n'.repeat(80);

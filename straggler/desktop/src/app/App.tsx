@@ -17,10 +17,13 @@ import { useWorkspace } from './useWorkspace';
 import ProjectsPage from '../features/projects/ProjectsPage';
 import ProjectDetail from '../features/projects/ProjectDetail';
 import ProjectDialogs from '../features/projects/ProjectDialogs';
+import ProjectSourceDialog from '../features/projects/ProjectSourceDialog';
+import type { ProjectPassage } from '../domain/types';
 import useTopbarDensity from './useTopbarDensity';
 export default function App() {
   const controller = useWorkspace();
   const topbar = useTopbarDensity();
+  const [projectSource, setProjectSource] = useState<ProjectPassage | null>(null);
   const [pageHasPrimaryAction, setPageHasPrimaryAction] = useState(false);
   const {
     setPanel,
@@ -296,10 +299,12 @@ export default function App() {
         ) : (
           <div className="chat-body">
             <div className="chat-main">
-              <ChatPanel controller={controller} />
+              <ChatPanel controller={controller} onProjectSource={setProjectSource} />
             </div>
             <PresencePanel
               sources={lastResponse?.sources}
+              projectSources={lastResponse?.projectSources}
+              onProjectSource={setProjectSource}
               attachments={controller.attachments}
               state={presence}
               metrics={lastResponse?.metrics}
@@ -314,6 +319,9 @@ export default function App() {
       {panel && panel !== 'settings' && <ServerPanel controller={controller} />}
 
       <ProjectDialogs controller={controller} />
+      {projectSource && (
+        <ProjectSourceDialog source={projectSource} onClose={() => setProjectSource(null)} />
+      )}
 
       {controller.projects.notice && (
         <div className="project-toast" role="status">

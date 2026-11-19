@@ -6,11 +6,13 @@ import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import AssistantPresence from './AssistantPresence';
 import type { PresenceState } from '../../domain/presence';
-import type { GenerationMetrics, UiPreferences } from '../../domain/types';
+import type { GenerationMetrics, ProjectPassage, UiPreferences } from '../../domain/types';
 
 export default function PresencePanel({
   state,
   sources = [],
+  projectSources,
+  onProjectSource,
   metrics,
   preferences,
   onPreferences,
@@ -19,6 +21,8 @@ export default function PresencePanel({
 }: {
   state: PresenceState;
   sources?: WebSource[];
+  projectSources?: ProjectPassage[];
+  onProjectSource: (source: ProjectPassage) => void;
   metrics?: GenerationMetrics;
   preferences: UiPreferences;
   onPreferences: (patch: Partial<UiPreferences>) => void;
@@ -94,7 +98,12 @@ export default function PresencePanel({
         </button>
         <div id={id}>
           <AssistantPresence state={state} metrics={metrics} size={expanded ? 224 : 48} />
-          <Sources sources={sources} compact />
+          <Sources
+            sources={sources}
+            projectSources={projectSources}
+            onProjectSource={onProjectSource}
+            compact
+          />
           <AttachmentSection controller={attachments} />
         </div>
       </aside>
