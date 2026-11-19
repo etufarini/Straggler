@@ -30,6 +30,15 @@ jobs:
       - name: Frontend dependencies
         working-directory: straggler/desktop
         run: npm ci --no-audit --no-fund
+      - name: Use the Ubuntu distribution archive
+        if: runner.os == 'Linux'
+        # Regional EC2 mirror downloads exhausted the job limit before tests.
+        run: |
+          rewrite='s@https?://([a-z0-9.-]+\.)?ec2\.archive\.ubuntu\.com/ubuntu@https://archive.ubuntu.com/ubuntu@g'
+          sudo sed -i -E "$rewrite" /etc/apt/sources.list.d/ubuntu.sources
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -i -E "$rewrite" /etc/apt/apt-mirrors.txt
+          fi
       - name: Check tools
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Shared checks
@@ -65,6 +74,15 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: straggler/desktop/package-lock.json
+      - name: Use the Ubuntu distribution archive
+        if: runner.os == 'Linux'
+        # Regional EC2 mirror downloads exhausted the job limit before tests.
+        run: |
+          rewrite='s@https?://([a-z0-9.-]+\.)?ec2\.archive\.ubuntu\.com/ubuntu@https://archive.ubuntu.com/ubuntu@g'
+          sudo sed -i -E "$rewrite" /etc/apt/sources.list.d/ubuntu.sources
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -i -E "$rewrite" /etc/apt/apt-mirrors.txt
+          fi
       - name: Install Linux native dependencies
         if: runner.os == 'Linux'
         run: |

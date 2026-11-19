@@ -86,16 +86,23 @@ export function createProjectFixture(
       while (localStorage.getItem('straggler-fixture-reading-paused'))
         await new Promise((resolve) => setTimeout(resolve, 20));
       const text = `Extracted fixture text from ${name}.`;
-      project.files.push({
+      const replaceIndex = args.replaceFileId
+        ? project.files.findIndex((file) => file.id === args.replaceFileId)
+        : -1;
+      if (args.replaceFileId && replaceIndex < 0)
+        throw new Error('This file is no longer in the project.');
+      const replacement = {
         id: crypto.randomUUID(),
         name,
         extension,
         size: 1234,
-        included: true,
+        included: replaceIndex < 0 ? true : project.files[replaceIndex].included,
         text,
         tokens: Math.ceil(Array.from(text).length / charactersPerToken),
-        tokenSource: 'approximate',
-      });
+        tokenSource: 'approximate' as const,
+      };
+      if (replaceIndex < 0) project.files.push(replacement);
+      else project.files[replaceIndex] = replacement;
       timestamp(project);
       persist();
       return { project: structuredClone(project) };

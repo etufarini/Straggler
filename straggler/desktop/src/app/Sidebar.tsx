@@ -1,9 +1,11 @@
-import ConversationMenu from './ConversationMenu';
+import { useEffect, useRef, useState } from 'react';
+import ChatHistoryRow from './ChatHistoryRow';
+import { titleMatch } from '../domain/chatSearch';
 import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  MessageSquare,
+  Search,
   Settings2,
   Import,
   Folder,
@@ -12,8 +14,6 @@ import {
 import { controlSlug } from '../components/ActionMenu';
 import { newConversation } from '../domain/types';
 import { projectUpdatedAt } from '../domain/projects';
-import type { Conversation } from '../domain/types';
-import { errorDetail } from '../domain/errors';
 import type { WorkspaceController } from './useWorkspace';
 import brandMark from '../assets/brand-mark.svg';
 
@@ -33,7 +33,6 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
     projects,
     view,
     projectId,
-    generating,
   } = controller;
   const starred = projects.projects
     .filter((project) => project.starred && !project.archived)
@@ -48,13 +47,44 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
     (!controller.temporary &&
       (chatOptionsDisabled || (!!storageError && chat.messages.length > 0)));
 
-  async function removeFromProject(value: Conversation) {
-    try {
-      await controller.moveChat(value, null);
-    } catch (failure) {
-      projects.setError(errorDetail(failure).message);
-    }
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searchButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (controller.renamingChatId) setQuery('');
+  }, [controller.renamingChatId]);
+  function openSearch() {
+    changePreferences({ sidebarCollapsed: false });
+    setSearching(true);
+    requestAnimationFrame(() => searchInput.current?.focus());
   }
+  useEffect(() => {
+    function shortcut(event: KeyboardEvent) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.code === 'KeyK'
+      ) {
+        event.preventDefault();
+        searchButton.current?.click();
+      }
+    }
+    window.addEventListener('keydown', shortcut);
+    return () => window.removeEventListener('keydown', shortcut);
+  }, []);
+  const filtered = conversations.filter((value) => !query.trim() || titleMatch(value.title, query));
+  const groups =
+    searching && query.trim()
+      ? [
+          { label: 'Chats', chats: filtered.filter((value) => !value.projectId) },
+          { label: 'In projects', chats: filtered.filter((value) => value.projectId) },
+        ]
+      : [
+          { label: 'STARRED', chats: filtered.filter((value) => value.starred) },
+          { label: 'CHATS', chats: filtered.filter((value) => !value.starred) },
+        ];
   return (
     <aside id="sidebar" className={`sidebar ${preferences.sidebarCollapsed ? 'is-compact' : ''}`}>
       <div className="brand">
@@ -148,7 +178,18 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         </div>
       </div>
       <div className="section-label has-action">
-        <span>CHATS</span>
+        <span>
+          {!query.trim() && conversations.some((value) => value.starred) ? 'STARRED' : 'CHATS'}
+        </span>
+        <button
+          ref={searchButton}
+          className="section-action"
+          aria-label="Search chats"
+          title="Search chats (Ctrl/⌘+K)"
+          onClick={openSearch}
+        >
+          <Search size={13} />
+        </button>
         <button
           type="button"
           className="section-action"
@@ -173,54 +214,62 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             on this device.
           </p>
         )}
-        {conversations.map((value) => {
-          const project = projects.projects.find((item) => item.id === value.projectId);
-          const selected = view === 'chat' && chat.id === value.id && panel !== 'settings';
-          const mutationReason =
-            generating && chat.id === value.id
-              ? 'Available when the current response finishes or is stopped'
-              : editingBusy && chat.id === value.id
-                ? 'Wait for this chat to finish saving.'
-                : projects.busy
-                  ? 'Wait for the project change to finish.'
-                  : undefined;
-          return (
-            <div key={value.id} className={`conversation-row ${selected ? 'selected' : ''}`}>
+        {searching && (
+          <div className="chat-search">
+            <input
+              ref={searchInput}
+              aria-label="Search chats"
+              placeholder="Search chats…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setQuery('');
+                  setSearching(false);
+                  searchButton.current?.focus();
+                }
+              }}
+            />
+            <p role="status">
+              {filtered.length} {filtered.length === 1 ? 'chat' : 'chats'}
+            </p>
+            {query && (
               <button
-                disabled={conversationNavigationDisabled && value.id !== chat.id}
-                onClick={() => openChat(value)}
-                title={value.title}
-                aria-current={selected ? 'page' : undefined}
-                data-control-id={`button-${value.projectId ? 'chat-' : ''}${controlSlug(value.title)}`}
+                className="text-button"
+                onClick={() => {
+                  setQuery('');
+                  searchInput.current?.focus();
+                }}
               >
-                <MessageSquare size={15} />
-                <span className="project-row-text">
-                  <span>{value.title}</span>
-                  {project && (
-                    <span className="project-row-project">
-                      in {project.name}
-                      {project.archived ? ' · archived' : ''}
-                    </span>
-                  )}
-                </span>
+                Clear search
               </button>
-              <ConversationMenu
-                conversation={value}
-                onExport={(includesReasoning) =>
-                  void controller.exportChat(value, includesReasoning)
-                }
-                disabled={!controller.native}
-                readOnly={!!project?.archived}
-                actionBusyReason={mutationReason}
-                onMove={() =>
-                  controller.setProjectDialog({ kind: 'move', conversationId: value.id })
-                }
-                onRemove={() => void removeFromProject(value)}
-                onDelete={() => controller.requestDeleteChat(value)}
-              />
-            </div>
-          );
-        })}
+            )}
+          </div>
+        )}
+        {query.trim() && filtered.length === 0 && (
+          <p className="history-empty">No chats match ‘{query}’</p>
+        )}
+        {groups.map(
+          (group) =>
+            group.chats.length > 0 && (
+              <div key={group.label}>
+                {(group.label === 'In projects' ||
+                  (group.label === 'CHATS' && groups[0].chats.length > 0)) && (
+                  <div className="section-label">{group.label}</div>
+                )}
+                {group.chats.map((value) => (
+                  <ChatHistoryRow
+                    key={value.id}
+                    controller={controller}
+                    value={value}
+                    query={query}
+                    navigationDisabled={conversationNavigationDisabled}
+                  />
+                ))}
+              </div>
+            ),
+        )}
       </div>
       <div className="sidebar-bottom">
         <button

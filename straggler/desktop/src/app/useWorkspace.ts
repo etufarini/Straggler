@@ -28,6 +28,7 @@ export interface ProjectDialog {
 }
 
 export function useWorkspace() {
+  const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [config, setConfig] = useState<Configuration | null>(null);
   const [server, setServer] = useState<ServerStatus>(emptyServer);
   const [draft, setDraft] = useState<Settings | null>(null);
@@ -564,6 +565,12 @@ export function useWorkspace() {
     projectDialog,
     setProjectDialog,
     acceptStoredConversation: conversation.acceptStoredConversation,
+    updateChatMetadata: conversation.updateChatMetadata,
+    renamingChatId,
+    renameChat: (id: string | null) => {
+      if (id) ui.changePreferences({ sidebarCollapsed: false });
+      setRenamingChatId(id);
+    },
     reviewFiles,
     setReviewFiles,
     openProject,

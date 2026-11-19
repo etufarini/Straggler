@@ -129,6 +129,8 @@ export interface Attachment {
 export interface Conversation {
   id: string;
   title: string;
+  starred?: boolean;
+  titleCustomized?: boolean;
   createdAt: number;
   updatedAt: number;
   model: string | null;

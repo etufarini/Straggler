@@ -362,6 +362,17 @@ impl Projects {
         path: &Path,
         characters_per_token: usize,
     ) -> Result<ProjectMutation> {
+        self.add_or_replace_file(history, project_id, path, characters_per_token, None)
+    }
+
+    pub fn add_or_replace_file(
+        &self,
+        history: &History,
+        project_id: Uuid,
+        path: &Path,
+        characters_per_token: usize,
+        replace_file_id: Option<Uuid>,
+    ) -> Result<ProjectMutation> {
         if characters_per_token == 0 {
             return Err("Token estimates need a positive characters-per-token value.".into());
         }
@@ -370,6 +381,15 @@ impl Projects {
         self.prepare(history)?;
         let mut project = self.read(project_id)?;
         ensure_active(&project)?;
+        let replacement = replace_file_id
+            .map(|id| {
+                project
+                    .files
+                    .iter()
+                    .position(|file| file.id == id)
+                    .ok_or("This file is no longer in the project.")
+            })
+            .transpose()?;
         let attachment = extracted.attachment;
         let approximate_tokens = attachment
             .text
@@ -381,7 +401,7 @@ impl Projects {
             name: attachment.name,
             extension: attachment.extension,
             size: attachment.size,
-            included: true,
+            included: replacement.is_none_or(|index| project.files[index].included),
             text: attachment.text,
             tokens: Some(approximate_tokens),
             token_source: Some("approximate".into()),
@@ -393,7 +413,11 @@ impl Projects {
                 .ok_or("Project file storage has no parent directory.")?,
         )?;
         crate::files::write_atomic(&path, file.text.as_bytes())?;
-        project.files.push(file);
+        if let Some(index) = replacement {
+            project.files[index] = file;
+        } else {
+            project.files.push(file);
+        }
         project.updated_at = timestamp();
         if let Err(error) = self.write(&project) {
             return match fs::remove_file(&path) {
@@ -1009,6 +1033,8 @@ mod tests {
             let chat = Conversation {
                 id: Uuid::new_v4(),
                 title: "A conversation".into(),
+                starred: None,
+                title_customized: None,
                 created_at: 1,
                 updated_at: 2,
                 model: None,
@@ -1039,6 +1065,51 @@ mod tests {
             updated_at: 0,
             files: vec![],
         }
+    }
+
+    #[test]
+    fn replacement_preserves_inclusion_and_failed_extraction_preserves_the_old_file() {
+        let storage = Storage::new();
+        let project = storage.create("Replacement");
+        let source = storage.directory.path().join("original.txt");
+        fs::write(&source, "Original contents").unwrap();
+        let mut project = storage
+            .projects
+            .add_file(&storage.history, project.id, &source, 4)
+            .unwrap()
+            .project
+            .unwrap()
+            .project;
+        project.files[0].included = false;
+        let old_id = project.files[0].id;
+        storage
+            .projects
+            .save(&storage.history, project.clone(), None)
+            .unwrap();
+        let missing = storage.directory.path().join("missing.txt");
+        assert!(storage
+            .projects
+            .add_or_replace_file(&storage.history, project.id, &missing, 4, Some(old_id))
+            .is_err());
+        assert_eq!(
+            storage.projects.list(&storage.history).unwrap()[0]
+                .project
+                .files[0]
+                .text,
+            "Original contents"
+        );
+        fs::write(&source, "New contents").unwrap();
+        let replaced = storage
+            .projects
+            .add_or_replace_file(&storage.history, project.id, &source, 4, Some(old_id))
+            .unwrap()
+            .project
+            .unwrap()
+            .project;
+        assert_eq!(replaced.files.len(), 1);
+        assert!(!replaced.files[0].included);
+        assert_eq!(replaced.files[0].text, "New contents");
+        assert_ne!(replaced.files[0].id, old_id);
     }
 
     #[test]

@@ -220,6 +220,16 @@ export function useProjects(
     accept,
     update,
     addFiles,
+    replaceFile: (projectId: string, fileId: string) =>
+      trackStorageWork(pendingWork.current, async () => {
+        const paths = await chooseAttachmentFiles();
+        if (!paths.length) return;
+        if (paths.length !== 1) {
+          setError('Choose one file to replace this project file.');
+          return;
+        }
+        await mutation(() => projectService.addFile(projectId, paths[0], fileId));
+      }),
     context,
     estimate,
     create: (project: Project) => mutation(() => projectService.save(project)),

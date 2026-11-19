@@ -18,8 +18,14 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   await trigger.focus();
   await page.keyboard.press('Space');
   const items = page.getByRole('menuitem');
-  await expect(items).toHaveCount(4);
-  await expect(items.nth(2)).toHaveText('Move to project…');
+  await expect(items).toHaveText([
+    'Star',
+    'Rename',
+    'Export chat…',
+    'Export with reasoning…',
+    'Move to project…',
+    'Delete',
+  ]);
   await expect(items.nth(0)).toBeFocused();
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-response-paused'));
   await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
@@ -31,9 +37,13 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   await page.keyboard.press('ArrowDown');
   await expect(items.nth(3)).toBeFocused();
   await page.keyboard.press('ArrowDown');
+  await expect(items.nth(4)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(items.nth(5)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
   await expect(items.nth(0)).toBeFocused();
   await page.keyboard.press('End');
-  await expect(items.nth(3)).toBeFocused();
+  await expect(items.nth(5)).toBeFocused();
   await page.keyboard.press('Home');
   await expect(items.nth(0)).toBeFocused();
   await page.keyboard.press('Escape');
@@ -47,7 +57,7 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   await expect(page.getByRole('menu')).toHaveCount(0);
   await trigger.focus();
   await page.keyboard.press('ArrowUp');
-  await expect(items.nth(3)).toBeFocused();
+  await expect(items.nth(5)).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('alertdialog')).toContainText('Delete conversation?');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
