@@ -169,7 +169,10 @@ class Handler(BaseHTTPRequestHandler):
                     send_delta({'content': content[offset:offset + 16]})
                     time.sleep(0.008)
             else:
-                event = 'data: ' + json.dumps({'choices': [{'delta': {'content': 'caffè ☕', 'reasoning_content': 'Thinking'}}], 'timings': {'cache_n': 10, 'prompt_n': 20, 'predicted_n': 2, 'predicted_ms': 100, 'predicted_per_second': 20, 'prompt_ms': 30}}, ensure_ascii=False) + '\r\n\r\n'
+                answer = 'caffè ☕'
+                if prompt == 'Native test question':
+                    answer += '\n\nInline \\(x^2\\).\n\n$$\n\\frac{a}{b}\n$$\n\n```python\nprint(1)\n```'
+                event = 'data: ' + json.dumps({'choices': [{'delta': {'content': answer, 'reasoning_content': 'Thinking'}}], 'timings': {'cache_n': 10, 'prompt_n': 20, 'predicted_n': 2, 'predicted_ms': 100, 'predicted_per_second': 20, 'prompt_ms': 30}}, ensure_ascii=False) + '\r\n\r\n'
                 for byte in event.encode():
                     self.wfile.write(bytes([byte]))
                     self.wfile.flush()

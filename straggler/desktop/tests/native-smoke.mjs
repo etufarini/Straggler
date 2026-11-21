@@ -318,6 +318,12 @@ try {
       () => evaluate('document.querySelector(".local-badge")?.textContent === "Ready"'),
       'server readiness',
     );
+    // Production WebView fonts and CSP cannot be established by browser preview alone.
+    // Reuse the first fixture response rather than add another native inference turn.
+    await evaluate(`(() => {
+      window.mathCspViolations = [];
+      document.addEventListener('securitypolicyviolation', event => window.mathCspViolations.push(event.violatedDirective));
+    })()`);
     await sendMessage('Native test question');
     await until(
       () => evaluate(`!!document.querySelector('[aria-label="Copy response"]')`),
@@ -338,7 +344,22 @@ try {
       saved = JSON.parse(await readFile(conversationFile, 'utf8'));
       return saved.messages[1]?.status === 'complete';
     }, 'completed response persisted');
-    assert.equal(saved.messages[1].content, 'caffè ☕');
+    assert.equal(
+      saved.messages[1].content,
+      'caffè ☕\n\nInline \\(x^2\\).\n\n$$\n\\frac{a}{b}\n$$\n\n```python\nprint(1)\n```',
+    );
+    await until(
+      () =>
+        evaluate(
+          'document.querySelectorAll(".assistant .katex-mathml math").length === 2 && Array.from(document.fonts).some(face => face.family === "KaTeX_Main" && face.status === "loaded")',
+        ),
+      'native math and locally loaded KaTeX fonts',
+    );
+    assert.deepEqual(await evaluate('window.mathCspViolations'), []);
+    assert.equal(
+      await evaluate('document.querySelector(".code-header").textContent.trim()'),
+      'python',
+    );
     assert.equal(saved.messages[1].status, 'complete');
     await mkdir(path.join(desktop, 'test-results'), { recursive: true });
     const shot = await screenshot();
@@ -477,8 +498,14 @@ try {
     await fillField('[aria-label="Search Hugging Face"]', 'publisher/repository');
     await evaluate('document.querySelector(".hf-search").requestSubmit()');
     await until(
-      () => evaluate('!!document.querySelector(".hf-variants input")'),
-      'native Hub repository metadata',
+      () =>
+        evaluate(`(() => {
+          const selected = document.querySelector('.hf-variants input:checked');
+          const download = Array.from(document.querySelectorAll('.hf-browser button'))
+            .find(button => button.textContent === 'Download selected files');
+          return !!selected && !!download && !download.disabled;
+        })()`),
+      'selected native Hub variant and enabled download',
     );
     await evaluate(
       'Array.from(document.querySelectorAll(".hf-browser button")).find(button => button.textContent === "Download selected files").click()',
