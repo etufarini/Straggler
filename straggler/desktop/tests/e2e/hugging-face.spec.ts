@@ -114,7 +114,9 @@ test('disk-space feedback blocks starting a download without blocking server con
   await page.evaluate(() => localStorage.setItem('straggler-fixture-hf-low-disk', 'true'));
   await openHub(page);
   await openRepository(page);
-  await expect(page.getByRole('alert')).toContainText('not enough disk space');
+  await expect(page.getByRole('alert')).toHaveText(
+    'Not enough disk space. Free up space or choose another models folder.',
+  );
   await expect(page.getByRole('button', { name: 'Download selected files' })).toBeDisabled();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Launch server', exact: true })).toBeEnabled();

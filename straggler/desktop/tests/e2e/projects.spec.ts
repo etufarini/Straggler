@@ -562,7 +562,9 @@ test('CHAT-20 creates a destination when no projects exist and warns about an ex
   await openOwnChat(page);
   await control(page, 'button-options-for-a-chat-with-its-own-prompt').click();
   await control(page, 'button-move-to-project').click();
-  await expect(page.getByRole('dialog')).toContainText('There are no active projects yet.');
+  await expect(page.getByRole('dialog')).toContainText(
+    'No active projects yet. Create one to move this chat into it.',
+  );
   await control(page, 'button-new-project-for-chat').click();
   await control(page, 'input-project-name').fill('A new destination');
   await expect(page.getByRole('dialog', { name: 'New project', exact: true })).toContainText(
