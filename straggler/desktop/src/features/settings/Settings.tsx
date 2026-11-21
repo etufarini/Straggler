@@ -116,6 +116,7 @@ export default function Settings({
                   {config.currentProfile || 'Custom settings'}
                   {modified && (
                     <b
+                      role="note"
                       title="Differs from the saved configuration. Save it to keep these values."
                       aria-label="Modified. Differs from the saved configuration. Save it to keep these values."
                     >
@@ -124,6 +125,7 @@ export default function Settings({
                   )}
                   {dirty && (
                     <b
+                      role="note"
                       title="Select Apply changes to use these values."
                       aria-label="Unapplied changes. Select Apply changes to use these values."
                     >
@@ -132,6 +134,7 @@ export default function Settings({
                   )}
                   {active && restart && (
                     <b
+                      role="note"
                       title="Stop and launch the server to use the new values."
                       aria-label="Restart required. Stop and launch the server to use the new values."
                     >
