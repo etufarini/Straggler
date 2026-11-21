@@ -111,3 +111,27 @@ test('sampling shares its default hint while retaining each field description', 
     expect(description).not.toContain('llama.cpp default');
   }
 });
+
+test('destructive confirmation retains AA text contrast while hovered', async ({ page }) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop server', exact: true }).click();
+  const action = page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Stop server', exact: true });
+  for (const hover of [false, true]) {
+    if (hover) await action.hover();
+    const colors = await action.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const hex = (value: string) =>
+        '#' +
+        value
+          .match(/\d+/g)!
+          .slice(0, 3)
+          .map((n) => Number(n).toString(16).padStart(2, '0'))
+          .join('');
+      return { text: hex(style.color), surface: hex(style.backgroundColor) };
+    });
+    expect(contrastRatio(colors.text, colors.surface)).toBeGreaterThanOrEqual(4.5);
+  }
+});

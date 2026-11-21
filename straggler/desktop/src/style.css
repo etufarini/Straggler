@@ -2102,7 +2102,8 @@ input[type='checkbox'] {
   color: white;
 }
 .confirmation .danger-button:hover:not(:disabled) {
-  background: var(--ui-danger-hover);
+  background: var(--ui-danger);
+  border-color: var(--ui-danger-hover);
 }
 @supports not (position: sticky) {
   .settings-page,
