@@ -1378,7 +1378,7 @@ textarea:disabled {
   gap: 10px;
   margin-top: 24px;
 }
-/* Action hierarchy (DESIGN_SYSTEM · Azioni): one filled primary per view, outlined
+/* Action hierarchy: one filled primary per view, outlined
    secondary, text-only tertiary and danger. Unclassed buttons inside action groups are
    secondary actions, so Cancel always reads as the safe alternative. */
 .primary-button,
