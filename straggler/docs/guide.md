@@ -224,6 +224,38 @@ messages still go to the selected service. Export keeps the existing conversatio
 version 1 format and contains no keys. No cloud request runs at startup or merely
 by opening Settings or the model selector.
 
+### Compact a long chat manually
+
+Choose **Compact chat** from the open chat’s menu or the **Context** popover. At
+75% of the context capacity, a reminder offers the same action; **Dismiss** hides
+that reminder for this chat until the app restarts. Nothing compacts automatically.
+When a draft exceeds the available context, **Compact and continue** keeps the draft,
+summarizes earlier messages and sends it after success. If you edit the draft while
+the summary is being generated, Straggler keeps it for review instead of sending it.
+
+The active local or cloud model summarizes older turns in bounded blocks. Recent
+exchanges remain whole, with roughly 25% of known capacity reserved for them; with
+unknown capacity, the latest four messages are kept. The previous summary is included
+when compacting again. Original messages, files and project instructions stay saved;
+files retain their own context/search settings. Reasoning is not summarized. Cloud
+compaction uses the same first-send acknowledgement and sends the earlier message
+text to that service. No web search or tools run during compaction.
+
+**Stop response** cancels generation without changing the chat. Completed summaries
+are committed through normal atomic storage; storage errors keep the previous chat.
+The divider **Earlier messages summarized** opens the summary. Its menu offers
+**Edit summary** in raw Markdown and **Remove summary** to use original messages again.
+Editing or regenerating a covered message removes the summary and announces why.
+A branch strictly after the divider copies the summary; a branch before it does not.
+Exports still include the original messages in conversation version 1, without the
+summary. Temporary-chat summaries remain in memory until explicit **Save chat**.
+
+Compaction is unavailable during another chat operation, in archived projects or
+with fewer than four messages. Open the chat before compacting it from its menu.
+When capacity is unknown, more than four messages are needed to leave older text
+to summarize. Messages themselves or project instructions can still exceed capacity;
+compaction does not silently discard them.
+
 ### Use reasoning controls
 
 The reasoning and effort controls beside the message box depend on what the

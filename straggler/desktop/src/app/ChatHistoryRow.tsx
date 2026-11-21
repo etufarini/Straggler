@@ -156,6 +156,8 @@ export default function ChatHistoryRow({
             setError('');
             controller.renameChat(value.id);
           }}
+          onCompact={() => void controller.compact(value)}
+          compactReason={controller.compactReason(value)}
           onExport={(reasoning) => void controller.exportChat(value, reasoning)}
           onMove={() => controller.setProjectDialog({ kind: 'move', conversationId: value.id })}
           onRemove={() =>

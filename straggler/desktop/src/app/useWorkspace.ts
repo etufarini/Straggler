@@ -1,3 +1,4 @@
+import { currentContext } from '../domain/chat';
 import { useCloudModels } from '../features/cloud/useCloudModels';
 import type { CloudSelection } from '../domain/cloudModels';
 import { useWebSearch } from '../features/websearch/useWebSearch';
@@ -102,6 +103,7 @@ export function useWorkspace() {
     visionSupported,
     cloud.active,
     cloud.ensureConsent,
+    serverDetails?.systemRoleSupported,
   );
   const webSearch = useWebSearch(
     ui.preferences,
@@ -135,6 +137,32 @@ export function useWorkspace() {
       cloud.active?.kind === 'deepseek' &&
       serverDetails?.toolsSupported === true,
   );
+  const reportedContext = currentContext(
+    conversation.chat.messages,
+    serverDetails,
+    server,
+    cloud.active,
+  );
+  const contextEstimated =
+    (!!conversation.chat.summary ||
+      !!conversation.chat.attachments?.length ||
+      (!!cloud.active && (!reportedContext || !!conversation.input.trim()))) &&
+    !!contextEstimate.capacity &&
+    (!contextEstimate.includesImages || !!conversation.input || !reportedContext);
+  const contextUsage = contextEstimated
+    ? {
+        tokens: contextEstimate.tokens,
+        capacity: contextEstimate.capacity!,
+        percent: Math.round((contextEstimate.tokens / contextEstimate.capacity!) * 100),
+        source: contextEstimate.source,
+        level:
+          contextEstimate.tokens / contextEstimate.capacity! >= 0.9
+            ? 'full'
+            : contextEstimate.tokens / contextEstimate.capacity! >= 0.75
+              ? 'high'
+              : 'normal',
+      }
+    : reportedContext;
   const {
     chatOptionsDisabled,
     flushSaves,
@@ -593,6 +621,21 @@ export function useWorkspace() {
 
   return {
     cloud,
+    compact: (target = conversation.chatRef.current, continueDraft = false) => {
+      if (conversation.compactReason(target)) return Promise.resolve();
+      setView('chat');
+      setPanel(null);
+      return conversation.compact(target, continueDraft);
+    },
+    compactReason: conversation.compactReason,
+    changeSummary: conversation.changeSummary,
+    editingSummary: conversation.editingSummary,
+    beginSummaryEdit: conversation.beginSummaryEdit,
+    summarizing: conversation.summarizing,
+    summaryError: conversation.summaryError,
+    setSummaryError: conversation.setSummaryError,
+    compactionDismissed: conversation.compactionDismissed,
+    dismissCompaction: conversation.dismissCompaction,
     useCloudModel,
     modelReady,
     visionSupported,
@@ -633,6 +676,11 @@ export function useWorkspace() {
     chatOptionsDisabled,
     attachments,
     contextEstimate,
+    contextUsage,
+    compactionSuggested: contextEstimate.capacity
+      ? contextEstimate.tokens / contextEstimate.capacity >= 0.75
+      : (contextUsage?.percent ?? 0) >= 75,
+    contextEstimated,
     contextError,
     branchChat: conversation.branchChat,
     branchError: conversation.branchError,

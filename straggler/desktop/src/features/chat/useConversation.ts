@@ -1,3 +1,11 @@
+import {
+  compactionPlan,
+  summaryAfterChange,
+  summaryChunk,
+  summaryRequest,
+  summaryTextError,
+} from '../../domain/compaction';
+import { approximatePromptTokens } from '../../domain/attachments';
 import type { ActiveCloud } from '../../domain/cloudModels';
 import type { Project } from '../../domain/projects';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -51,6 +59,7 @@ export function useConversation(
   visionSupported = false,
   cloud: ActiveCloud | null = null,
   ensureCloudConsent: () => Promise<boolean> = async () => true,
+  systemRoleSupported: boolean | null = null,
 ) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
@@ -125,6 +134,10 @@ export function useConversation(
     fileDecision.capacity === contextSize
       ? fileDecision.search
       : inferredSearch);
+  const [summarizing, setSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+  const [dismissedCompaction, setDismissedCompaction] = useState(new Set<string>());
+  useEffect(() => setSummaryError(''), [chat.id]);
   const [webSearchOn, setWebSearchOn] = useState(false);
   const [input, updateInput] = useState('');
   const inputRevision = useRef(0);
@@ -313,6 +326,9 @@ export function useConversation(
       ...chatRef.current,
       updatedAt: Date.now(),
       model: cloud?.model.id ?? server.model,
+      summary: replacement
+        ? summaryAfterChange(chatRef.current, replacement.at(-1)!.id)
+        : chatRef.current.summary,
       title:
         chatRef.current.messages.length || chatRef.current.titleCustomized
           ? chatRef.current.title
@@ -345,6 +361,7 @@ export function useConversation(
       undefined,
       undefined,
       includeReasoning,
+      systemRoleSupported,
     );
     const query = replacement
       ? ([...history].reverse().find((message) => message.role === 'user')?.content ?? '')
@@ -384,6 +401,7 @@ export function useConversation(
             [],
             [],
             includeReasoning,
+            systemRoleSupported,
           );
           const baseCount = await estimatePromptTokens(base);
           const budgets = passageBudgets(
@@ -415,6 +433,7 @@ export function useConversation(
               projectPassages,
               attachmentPassages,
               includeReasoning,
+              systemRoleSupported,
             );
             const [resourceTokens, promptCount] = await Promise.all([
               estimateTextTokens(
@@ -460,6 +479,7 @@ export function useConversation(
     rejectedDraft.current = null;
     if (!replacement) updateChat(current);
     const onDelta = new Channel<Delta>();
+    const summaryRemoved = !!chatRef.current.summary && !current.summary;
     let generationStarted = false;
     let lastSave = Date.now();
     let phase: 'waiting' | 'reasoning' | 'generating' = 'waiting';
@@ -507,6 +527,8 @@ export function useConversation(
       updateChat(current);
       setEditor(null);
       generationStarted = true;
+      if (replacement && summaryRemoved)
+        setFileNotice('Summary removed because earlier messages changed.');
       const response: Response =
         cancelledRef.current === requestId
           ? { status: 'stopped', content: '', reasoning: '', error: null }
@@ -562,6 +584,171 @@ export function useConversation(
         await save(current).catch(() => {});
       }
       setGenerating(false);
+    }
+  }
+
+  function compactReason(value = chatRef.current): string | undefined {
+    if (editor) return 'Finish or cancel the current edit before compacting.';
+    if (value.id !== chatRef.current.id) return 'Open this chat before compacting it.';
+    if (requestRef.current || mutation.current || generating || editingBusy || importBusy)
+      return 'Available when the current chat operation finishes or is stopped.';
+    if (!cloud && server.phase !== 'ready')
+      return 'Load a local model or choose a cloud model first.';
+    if (value.messages.length < 4) return 'At least four messages are needed to compact a chat.';
+    if (!contextSize && value.messages.length <= 4 && !value.summary)
+      return 'Keep the latest four messages. Send another message before compacting.';
+    if (temporaryRef.current && temporaryRef.current !== value.id)
+      return 'Leave the temporary chat before compacting another chat.';
+    if (!temporaryRef.current && (!historyReady || storageError))
+      return 'Resolve the chat storage error before compacting.';
+    if (value.projectId) {
+      const project = projects?.current.current.find((item) => item.id === value.projectId);
+      if (!project || !projects?.ready || projects.error)
+        return 'Reload the project before compacting.';
+      if (project.archived) return 'Restore the project before compacting this chat.';
+    }
+  }
+
+  async function performCompaction(target: Conversation, continueDraft: boolean) {
+    if (compactReason(target)) return;
+    if (cloud && !(await ensureCloudConsent())) return;
+    if (compactReason(target)) return;
+    const original = structuredClone(chatRef.current);
+    const plan = compactionPlan(original, contextSize);
+    if (!plan.source || !plan.throughMessageId) {
+      setSummaryError('There are no earlier messages to summarize while keeping the recent chat.');
+      return;
+    }
+    const draft = input;
+    const revision = inputRevision.current;
+    requestRef.current = crypto.randomUUID();
+    setSummaryError('');
+    setSummarizing(true);
+    setGenerating(true);
+    setGenerationPhase('waiting');
+    let completed = false;
+    let committing = false;
+    try {
+      await flushSaves();
+      let remaining = plan.source;
+      let summary = '';
+      while (remaining) {
+        if (cancelledRef.current === requestRef.current) return;
+        const requestId = crypto.randomUUID();
+        requestRef.current = requestId;
+        let budget =
+          plan.inputLimit -
+          approximatePromptTokens(summaryRequest(summary, '', systemRoleSupported === true)) -
+          32;
+        let piece = summaryChunk(remaining, budget);
+        let messages = summaryRequest(summary, piece.chunk, systemRoleSupported === true);
+        while ((await estimatePromptTokens(messages)).tokens > plan.inputLimit) {
+          budget = Math.floor(budget / 2);
+          piece = summaryChunk(remaining, budget);
+          messages = summaryRequest(summary, piece.chunk, systemRoleSupported === true);
+        }
+        if (cancelledRef.current === requestId) return;
+        const response = await invoke<Response>('generate', {
+          request: {
+            requestId,
+            messages,
+            cloud: cloud?.selection,
+            maxOutputTokens: plan.outputLimit,
+            conversationId: temporaryRef.current ? undefined : original.id,
+            temporaryId: temporaryRef.current ?? undefined,
+            webSearch: false,
+            imageIds: [],
+            options: {},
+          },
+          onDelta: new Channel<Delta>(),
+        });
+        if (response.status === 'stopped' || cancelledRef.current === requestId) return;
+        if (response.error || response.status !== 'complete')
+          throw new Error(
+            response.error ||
+              'The summary was interrupted or reached its output limit. The chat was kept unchanged.',
+          );
+        if (!response.content.trim())
+          throw new Error(
+            'The model returned an empty summary. Review its reasoning settings or choose another model.',
+          );
+        const error = summaryTextError(response.content);
+        if (error) throw new Error(error);
+        summary = response.content;
+        remaining = piece.rest;
+      }
+      const next: Conversation = {
+        ...original,
+        updatedAt: Date.now(),
+        summary: {
+          throughMessageId: plan.throughMessageId,
+          text: summary,
+          model: cloud?.model.id ?? server.model ?? original.model ?? 'Unknown model',
+          createdAt: Date.now(),
+        },
+      };
+      if (cancelledRef.current === requestRef.current) return;
+      // Generation is complete; the existing atomic storage commit is not cancellable.
+      requestRef.current = null;
+      setSummarizing(false);
+      setGenerating(false);
+      mutation.current = true;
+      committing = true;
+      setEditingBusy(true);
+      await save(next);
+      updateChat(next);
+      setContextError('');
+      completed = true;
+    } catch (failure) {
+      setSummaryError(`${errorDetail(failure).message} The original chat was kept unchanged.`);
+    } finally {
+      requestRef.current = null;
+      setSummarizing(false);
+      setGenerating(false);
+      if (committing) {
+        mutation.current = false;
+        setEditingBusy(false);
+      }
+    }
+    if (completed && continueDraft && original.id === chatRef.current.id) {
+      if (revision !== inputRevision.current)
+        setFileNotice('Chat compacted. Your draft changed; review it before sending.');
+      else await send(undefined, draft);
+    }
+  }
+  function compact(target = chatRef.current, continueDraft = false) {
+    const pending = performCompaction(target, continueDraft);
+    sendPromise.current = pending;
+    return pending;
+  }
+  async function changeSummary(text: string | null) {
+    if (requestRef.current || mutation.current || editingBusy) return;
+    const original = chatRef.current;
+    if (
+      !original.summary ||
+      projects?.current.current.find((item) => item.id === original.projectId)?.archived
+    )
+      return;
+    if (text !== null) {
+      const error = summaryTextError(text);
+      if (error) throw new Error(error);
+    }
+    const next = {
+      ...original,
+      updatedAt: Date.now(),
+      summary: text === null ? undefined : { ...original.summary, text },
+    };
+    mutation.current = true;
+    setEditingBusy(true);
+    try {
+      await save(next);
+      updateChat(next);
+      setFileNotice(
+        text === null ? 'Summary removed. Original messages are used again.' : 'Summary updated.',
+      );
+    } finally {
+      mutation.current = false;
+      setEditingBusy(false);
     }
   }
 
@@ -726,6 +913,11 @@ export function useConversation(
         ?.archived
     )
       return;
+    if (editor.messageId === 'summary') {
+      await changeSummary(editor.text);
+      setEditor(null);
+      return;
+    }
     const original = chatRef.current;
     const message = original.messages.find((value) => value.id === editor.messageId);
     if (!message) return;
@@ -738,6 +930,8 @@ export function useConversation(
     try {
       const value = replaceMessage(original, message.id, editor.text, Date.now());
       await save(value);
+      if (original.summary && !value.summary)
+        setFileNotice('Summary removed because earlier messages changed.');
       updateChat(value);
       setEditor(null);
     } finally {
@@ -806,6 +1000,26 @@ export function useConversation(
   }
 
   return {
+    summarizing,
+    summaryError,
+    setSummaryError,
+    compact,
+    compactReason,
+    changeSummary,
+    editingSummary: editor?.messageId === 'summary',
+    beginSummaryEdit: () => {
+      if (
+        requestRef.current ||
+        mutation.current ||
+        !chatRef.current.summary ||
+        projects?.current.current.find((item) => item.id === chatRef.current.projectId)?.archived
+      )
+        return;
+      // Native message identifiers are UUIDs, so this editor key cannot collide.
+      setEditor({ messageId: 'summary', text: chatRef.current.summary.text });
+    },
+    compactionDismissed: dismissedCompaction.has(chat.id),
+    dismissCompaction: () => setDismissedCompaction((previous) => new Set([...previous, chat.id])),
     attachmentSearch,
     webSearchOn,
     setWebSearchOn,

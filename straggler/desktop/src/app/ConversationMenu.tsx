@@ -1,4 +1,12 @@
-import { Download, FolderInput, FolderOutput, Trash2, Star, Pencil } from 'lucide-react';
+import {
+  Download,
+  FolderInput,
+  FolderOutput,
+  Trash2,
+  Star,
+  Pencil,
+  FileArchive,
+} from 'lucide-react';
 import ActionMenu, { controlSlug } from '../components/ActionMenu';
 import type { ActionMenuItem } from '../components/ActionMenu';
 import type { Conversation } from '../domain/types';
@@ -16,6 +24,8 @@ export default function ConversationMenu({
   onExport,
   onMove,
   onRemove,
+  onCompact,
+  compactReason,
 }: {
   conversation: Conversation;
   disabled?: boolean;
@@ -29,6 +39,8 @@ export default function ConversationMenu({
   onExport?: (includesReasoning: boolean) => void;
   onMove?: () => void;
   onRemove?: () => void;
+  onCompact?: () => void;
+  compactReason?: string;
 }) {
   const hasReasoning = conversation.messages.some(
     (message) => message.role === 'assistant' && !!message.reasoning,
@@ -102,6 +114,16 @@ export default function ConversationMenu({
       onSelect: onRemove,
     });
   }
+  if (onCompact)
+    items.push({
+      label: 'Compact chat',
+      controlId: 'button-compact-chat',
+      icon: <FileArchive size={15} />,
+      separatorBefore: true,
+      disabled: !!(mutationReason || compactReason),
+      disabledReason: mutationReason || compactReason,
+      onSelect: onCompact,
+    });
   items.push({
     label: 'Delete',
     ariaLabel: `Delete ${conversation.title}`,

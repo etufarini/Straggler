@@ -4511,3 +4511,15 @@ body[data-model='cloud'] a {
 body[data-model='cloud'] a:hover {
   color: #f4d2eb;
 }
+
+.chat-summary {
+  margin: 20px 0;
+  padding: 10px 0;
+  border-block: 1px solid var(--ui-section-line);
+}
+.chat-summary .branch-divider {
+  margin: 0 0 10px;
+}
+.context-overflow button {
+  margin-left: 8px;
+}

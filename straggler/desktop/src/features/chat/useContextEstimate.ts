@@ -43,6 +43,7 @@ export function useContextEstimate(
         searchProjectFiles || searchAttachments ? [] : undefined,
         searchAttachments ? [] : undefined,
         includeReasoning,
+        details?.systemRoleSupported,
       );
   const key = JSON.stringify(messages);
   const [measured, setMeasured] = useState<{

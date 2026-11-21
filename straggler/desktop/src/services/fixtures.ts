@@ -651,6 +651,12 @@ export function createFixture(scenario: Scenario) {
           Array.from(source.title.trim()).slice(0, 71).join('').trimEnd() + ' (branch)';
         branch.titleCustomized = true;
         delete branch.starred;
+        if (
+          branch.summary &&
+          source.messages.findIndex((message) => message.id === branch.summary!.throughMessageId) >=
+            index
+        )
+          delete branch.summary;
         branch.messages = branch.messages.slice(0, index + 1);
         branch.branchedFrom = { conversationId: source.id, messageId: branch.messages[index].id };
         branch.createdAt = branch.updatedAt = Date.now();
@@ -702,6 +708,7 @@ export function createFixture(scenario: Scenario) {
       case 'generate': {
         const request = args.request as {
           requestId: string;
+          maxOutputTokens?: number;
           cloud?: import('../domain/cloudModels').CloudSelection;
           messages: { role: string; content: string }[];
           webSearch?: boolean;
@@ -774,6 +781,12 @@ export function createFixture(scenario: Scenario) {
           request.messages.some((message: { content: string }) => message.content.includes('[A1]'))
         )
           delta.content += '\n\nThe attachment supports this answer [A1].';
+        if (request.maxOutputTokens) {
+          delta.content =
+            localStorage.getItem('straggler-fixture-summary-response') ||
+            'Goals and decisions retained. Continue the open questions.';
+          delta.reasoning = 'Internal reasoning is not part of the summary.';
+        }
         if (scenario === 'burst-stream') {
           delta.content =
             '## Streamed answer\n\n' + 'A **local** answer with caffè ☕.\n\n'.repeat(80);

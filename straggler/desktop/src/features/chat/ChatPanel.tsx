@@ -1,3 +1,4 @@
+import ChatSummary from './ChatSummary';
 import CloudNotice from '../cloud/CloudNotice';
 import { Paperclip } from 'lucide-react';
 import { attachmentTypesLabel } from '../../domain/attachments';
@@ -506,6 +507,9 @@ export default function ChatPanel({
                     </Feedback>
                   )}
                   {message.id === branchOrigin?.messageId && divider}
+                  {message.id === chat.summary?.throughMessageId && (
+                    <ChatSummary key={chat.id + chat.summary.createdAt} controller={controller} />
+                  )}
                 </div>
               </article>
             ))}
@@ -575,11 +579,54 @@ export default function ChatPanel({
               />
             )
           ))}
+        {controller.summaryError && (
+          <Feedback
+            title="Couldn’t compact the chat"
+            details={controller.summaryError}
+            onDismiss={() => controller.setSummaryError('')}
+          >
+            Original messages are kept. Review the details and try again.
+          </Feedback>
+        )}
+        {controller.compactionSuggested &&
+          !controller.contextEstimate.overflow &&
+          !controller.contextError &&
+          chat.messages.length >= 4 &&
+          !controller.compactionDismissed &&
+          !controller.generating && (
+            <Feedback
+              severity="warning"
+              title="This chat is getting long. Compact it to keep going."
+              actions={
+                <>
+                  <button
+                    disabled={!!controller.compactReason()}
+                    title={controller.compactReason()}
+                    onClick={() => void controller.compact()}
+                  >
+                    Compact chat
+                  </button>
+                  <button onClick={controller.dismissCompaction}>Dismiss</button>
+                </>
+              }
+            >
+              Original messages stay saved.
+            </Feedback>
+          )}
         {(controller.contextEstimate.overflow || controller.contextError) && (
           <p role="alert" className="context-overflow">
             {controller.contextEstimate.overflow
               ? `The prompt and attachments exceed the ${controller.contextEstimate.capacity?.toLocaleString('en-US')}-token context. Remove files, shorten your message or increase the context size.`
               : controller.contextError}
+            {chat.messages.length >= 4 && (
+              <button
+                disabled={!!controller.compactReason()}
+                title={controller.compactReason()}
+                onClick={() => void controller.compact(chat, true)}
+              >
+                Compact and continue
+              </button>
+            )}
           </p>
         )}
         {!controller.attachments.visionSupported &&
