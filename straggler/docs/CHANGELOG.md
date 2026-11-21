@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- R005: unify local/cloud model selection with search and a Download models view, group Settings by destination, identify response destinations and soften cloud colors and decorative effects.
+
 - R004: unify UI typography, radii, action hierarchy, semantic colors, dark native controls and minimum pointer targets; clarify interface copy without changing workflows.
 
 - Add manual chat compaction with cancellable bounded summaries, preserved originals, editable summary dividers and unchanged conversation exports.
