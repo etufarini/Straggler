@@ -20,7 +20,6 @@
   --ui-list-hover: #5b74c4;
   --ui-list-focus: #9db4ff;
   --ui-list-surface: #1a2550;
-  --ui-tab-ring: #9db4ff26;
   --ui-select-active: #4f86ff2e;
   --ui-select-ring: #9db4ff38;
   --ui-soft-ring: #9db4ff40;
@@ -3579,39 +3578,10 @@ input:focus-visible {
   background:
     linear-gradient(#171d45, #171d45) padding-box,
     linear-gradient(115deg, #a993ffaa, #5fd6ff55 50%, #a993ffaa) border-box;
-  box-shadow: 0 20px 60px -24px #7c66f5cc;
+  box-shadow: none;
 }
 
 /* Hugging Face catalogue and download controls. */
-.hf-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 3px;
-  margin: 4px 0 18px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: color-mix(in srgb, var(--ui-raised) 60%, transparent);
-}
-.hf-tabs button {
-  flex: 1;
-  border: 0;
-  background: transparent;
-  color: var(--ui-muted);
-  font-size: var(--ui-fs-meta);
-  padding: 7px 10px;
-  border-radius: var(--ui-radius);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-}
-.hf-tabs button[aria-selected='true'] {
-  background: var(--ui-raised-2);
-  color: var(--ui-text);
-  box-shadow:
-    inset 0 1px 0 #ffffff14,
-    0 0 0 1px var(--ui-tab-ring);
-}
 .hf-search {
   display: flex;
   gap: 8px;
@@ -4481,7 +4451,6 @@ body[data-model='cloud'] {
   --ui-sidebar-tint: #c586b714;
   --ui-select-active: #c586b724;
   --ui-select-ring: #ddacd130;
-  --ui-tab-ring: #ddacd120;
   --ui-soft-ring: #ddacd130;
   --ui-list-ring: #ddacd110;
   --ui-composer-ring: #ddacd10a;
