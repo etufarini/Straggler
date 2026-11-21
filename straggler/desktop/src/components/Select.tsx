@@ -61,15 +61,20 @@ export default function Select({ value, options, onChange, ...props }: SelectPro
       288,
       12 + options.reduce((height, option) => height + (option.description ? 54 : 38), 0),
     );
-    const below = window.innerHeight - bounds.bottom - 14;
-    const above = bounds.top - 14;
+    // A scrolled label can focus a trigger just outside the viewport in WebKit.
+    // Clamp both popup anchors before calculating the available list height.
+    const viewportBottom = window.innerHeight - 8;
+    const belowTop = Math.max(8, Math.min(bounds.bottom + 6, viewportBottom));
+    const aboveBottom = Math.max(8, Math.min(bounds.top - 6, viewportBottom));
+    const below = Math.max(0, viewportBottom - belowTop);
+    const above = Math.max(0, aboveBottom - 8);
     const upward = below < needed && above > below;
     const maxHeight = Math.max(0, Math.min(needed, upward ? above : below));
     const width = Math.min(Math.max(bounds.width, 220), window.innerWidth - 16);
     setActive(enabled.includes(index) ? index : enabled[0]);
     setPosition({
       left: Math.max(8, Math.min(bounds.left, window.innerWidth - width - 8)),
-      top: upward ? bounds.top - 6 : bounds.bottom + 6,
+      top: upward ? aboveBottom : belowTop,
       width,
       maxHeight,
       upward,

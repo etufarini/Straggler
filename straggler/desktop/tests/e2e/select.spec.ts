@@ -78,24 +78,41 @@ test('clicking outside or resizing dismisses without applying a pending value', 
   await expect(context).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('popup fits above a low control in a compact window and keeps the label actionable', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 760, height: 560 });
-  const context = page.getByRole('combobox', { name: 'Context size', exact: true });
-  await context.scrollIntoViewIfNeeded();
-  await page.getByText('Context size', { exact: true }).click();
-  await expect(context).toBeFocused();
-  if ((await context.getAttribute('aria-expanded')) === 'true') await context.press('Escape');
-  await context.press('End');
-  const popup = page.getByRole('listbox');
-  await expect(popup).toBeVisible();
-  const popupBox = await popup.boundingBox();
-  const controlBox = await context.boundingBox();
-  expect(popupBox!.y).toBeGreaterThanOrEqual(0);
-  expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(560);
-  expect(popupBox!.y + popupBox!.height).toBeLessThan(controlBox!.y);
-});
+test(
+  'popup fits above a low control in a compact window and keeps the label actionable',
+  { tag: '@platform' },
+  async ({ page }) => {
+    await page.setViewportSize({ width: 760, height: 560 });
+    const context = page.getByRole('combobox', { name: 'Context size', exact: true });
+    await context.scrollIntoViewIfNeeded();
+    await page.getByText('Context size', { exact: true }).click();
+    await expect(context).toBeFocused();
+    if ((await context.getAttribute('aria-expanded')) === 'true') await context.press('Escape');
+    await context.press('End');
+    const popup = page.getByRole('listbox');
+    await expect(popup).toBeVisible();
+    const popupBox = await popup.boundingBox();
+    const controlBox = await context.boundingBox();
+    expect(popupBox!.y).toBeGreaterThanOrEqual(0);
+    expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(560);
+    expect(popupBox!.y + popupBox!.height).toBeLessThan(controlBox!.y);
+
+    // Reproduce WebKit's scrolled-label boundary without relying on its font rounding.
+    await context.press('Escape');
+    await context.evaluate((button) => {
+      const offset = window.innerHeight + 8 - button.getBoundingClientRect().top;
+      button.style.transform = `translateY(${offset}px)`;
+      button.focus({ preventScroll: true });
+    });
+    await page.keyboard.press('End');
+    await expect(popup).toBeVisible();
+    const edgePopup = (await popup.boundingBox())!;
+    const edgeControl = (await context.boundingBox())!;
+    expect(edgePopup.y).toBeGreaterThanOrEqual(0);
+    expect(edgePopup.y + edgePopup.height).toBeLessThanOrEqual(560);
+    expect(edgePopup.y + edgePopup.height).toBeLessThan(edgeControl.y);
+  },
+);
 
 test('disabled controls stay unavailable and no native select remains', async ({ page }) => {
   await expect(page.locator('select')).toHaveCount(0);
