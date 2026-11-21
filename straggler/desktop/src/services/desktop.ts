@@ -1,3 +1,4 @@
+import { chatDefaults } from '../domain/chatDefaults';
 import type { ChatDefaultValues } from '../domain/chatDefaults';
 import type { Configuration, Settings } from '../domain/types';
 import { exportFileName } from '../domain/conversationExport';
@@ -379,20 +380,31 @@ export async function measureResourceContext(text: string, instructions: string,
   };
 }
 
-let chatDefaultsQueue: Promise<void> = Promise.resolve();
+let settingsWriteQueue: Promise<void> = Promise.resolve();
+function serializeSettingsWrite(action: () => Promise<Configuration>): Promise<Configuration> {
+  const write = settingsWriteQueue.then(action);
+  settingsWriteQueue = write.then(
+    () => undefined,
+    () => undefined,
+  );
+  return write;
+}
+
 export function saveChatDefaults(values: Partial<ChatDefaultValues>): Promise<Configuration> {
-  const save = chatDefaultsQueue.then(() =>
-    invoke<Configuration>('save_chat_defaults', { values }),
-  );
-  chatDefaultsQueue = save.then(
-    () => undefined,
-    () => undefined,
-  );
-  return save;
+  return serializeSettingsWrite(() => invoke<Configuration>('save_chat_defaults', { values }));
+}
+
+export function applySettings(settings: Settings): Promise<Configuration> {
+  return serializeSettingsWrite(async () => {
+    const accepted = await invoke<Configuration>('configuration');
+    return invoke<Configuration>('apply_settings', {
+      settings: { ...settings, ...chatDefaults(accepted.settings) },
+    });
+  });
 }
 
 export function waitForChatDefaults(): Promise<void> {
-  return chatDefaultsQueue;
+  return settingsWriteQueue;
 }
 
 export function previewProfile(name: string): Promise<Settings> {

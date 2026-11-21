@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { chatDefaults } from '../../domain/chatDefaults';
-import { invoke, isTauri, waitForChatDefaults } from '../../services/desktop';
+import { applySettings, invoke, isTauri } from '../../services/desktop';
 import {
   equalSettings,
   settingsForModel,
@@ -85,11 +84,7 @@ export function useSettings({
     failure?.field === key && failure.value === draft[key] ? failure.message : undefined;
 
   async function apply() {
-    await waitForChatDefaults();
-    const accepted = await invoke<Configuration>('configuration');
-    const value = await invoke<Configuration>('apply_settings', {
-      settings: { ...draft, ...chatDefaults(accepted.settings) },
-    });
+    const value = await applySettings(draft);
     accept(value);
     return value;
   }

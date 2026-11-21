@@ -257,3 +257,44 @@ test('late default saves preserve newer text and profile replacement compares th
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   expect((await saved(page)).seed).toBe('44');
 });
+
+test('launch waits for an in-flight default save and preserves the reviewed local settings', async ({
+  page,
+}) => {
+  await defaults(page);
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }).fill('8192');
+  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await page.evaluate(() =>
+    localStorage.setItem('straggler-fixture-chat-defaults-save-paused', 'true'),
+  );
+  const seed = page.getByRole('textbox', { name: 'Seed', exact: true });
+  await seed.fill('42');
+  await seed.blur();
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem('straggler-fixture-chat-defaults-save-started')),
+    )
+    .toBe('1');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  expect(
+    await page.evaluate(async () => {
+      const modulePath = '/src/services/desktop.ts';
+      const service = await import(modulePath);
+      return (await service.invoke('server_status')).phase;
+    }),
+  ).toBe('stopped');
+  await page.evaluate(() => {
+    localStorage.removeItem('straggler-fixture-chat-defaults-save-paused');
+    window.dispatchEvent(new Event('straggler-fixture-chat-defaults-save-resume'));
+  });
+  await expect(page.locator('.local-badge')).toHaveText('Ready');
+  const accepted = await page.evaluate(async () => {
+    const modulePath = '/src/services/desktop.ts';
+    const service = await import(modulePath);
+    return (await service.invoke('configuration')).settings;
+  });
+  expect(accepted.context).toBe('8192');
+  expect(accepted.seed).toBe('42');
+  expect((await saved(page)).seed).toBe('42');
+});

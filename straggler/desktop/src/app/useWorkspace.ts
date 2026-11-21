@@ -16,7 +16,7 @@ import { newConversation } from '../domain/types';
 import { ownSystemPrompt } from '../domain/projects';
 import { serializeStorage } from '../domain/storageQueue';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
+import { applySettings, invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
 import { equalSettings, emptyServer, serverActive, settingsForModel } from '../domain/types';
 import { errorDetail, settingsFailure as describeSettingsFailure } from '../domain/errors';
 import type { SettingsFailure } from '../domain/errors';
@@ -552,7 +552,7 @@ export function useWorkspace() {
     setBusy(true);
     setError('');
     try {
-      const applied = await invoke<Configuration>('apply_settings', { settings: draft });
+      const applied = await applySettings(draft);
       acceptConfiguration(applied);
       await invoke('start_server', { model: selected });
       await cloud.reload();
