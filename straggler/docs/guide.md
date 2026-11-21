@@ -1108,3 +1108,9 @@ In Settings › System prompts, save reusable instructions with a unique name an
 Choose a preset under This chat in the system prompt menu, or use Insert preset in Chat defaults and project instructions. Selection copies the text; editing or deleting the preset never changes existing chats or projects. Save as preset saves the text currently shown in the chat prompt editor.
 
 Export one preset or all presets as version 1 `straggler.system-prompts` JSON. Import supports that format, UTF-8 `.md` and `.txt` files, and LM Studio JSON containing an explicit `llm.prediction.systemPrompt` entry in `operation.fields`. Review the readable preview and choose Keep both or Replace for each conflicting name. Import never changes chat settings or sampling parameters.
+
+### Formulas and code
+
+Chat messages support inline LaTeX with `\(…\)` and display formulas with `$$…$$` or `\[…\]`. Single dollar signs stay plain text, so prices are unchanged. Display formulas align left and scroll horizontally when needed. Copy LaTeX copies their source. Invalid formulas show their source and an explanation; unfinished formulas remain muted source while the response streams. Formulas inside inline code or fenced code blocks stay literal.
+
+Code blocks show their declared language and a Copy action. Blocks longer than about 24 lines offer Show more and Show less. Highlighting supports JavaScript, TypeScript, Python, Rust, Bash, JSON, CSS, HTML/XML and SQL; other languages remain readable plain code. Formulas, fonts and highlighting work offline. Editing responses and exporting chats preserve the original Markdown.
