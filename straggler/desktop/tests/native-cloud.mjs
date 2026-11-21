@@ -133,7 +133,7 @@ export async function exerciseNativeCloud({
   assert.equal(chat.messages[1].metrics.cost, 0.01);
   assert.equal(
     await evaluate('getComputedStyle(document.body).getPropertyValue("--ui-background").trim()'),
-    '#2f152a',
+    '#231b26',
   );
   await fillField('.rich-composer-field', 'Keep these details too.');
   await evaluate('document.querySelector(".composer").requestSubmit()');
