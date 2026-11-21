@@ -127,7 +127,7 @@ test(
   { tag: '@platform' },
   async ({ page, browserName }) => {
     await page.setViewportSize({ width: 760, height: 620 });
-    await prepare(page, 'example.gguf', false);
+    await prepare(page, 'example-with-a-long-model-name-for-keyboard-validation.gguf', false);
     const temporary = page.getByRole('button', { name: 'Temporary', exact: true });
     await expect(temporary).toHaveAttribute('data-density', 'icon');
     await expect(temporary).toHaveAttribute('aria-pressed', 'false');
