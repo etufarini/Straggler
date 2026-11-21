@@ -17,17 +17,27 @@ import FolderSettings from './FolderSettings';
 import LlamaSettings from '../llama/LlamaSettings';
 import HuggingFaceSettings from '../huggingface/HuggingFaceSettings';
 import Feedback from '../../components/Feedback';
-const sections = [
-  ['model', 'Model settings'],
-  ['prompts', 'System prompts'],
-  ['performance', 'Performance'],
-  ['server', 'Server & port'],
-  ['profiles', 'Saved configurations'],
-  ['folders', 'Folders'],
-  ['huggingface', 'Hugging Face'],
-  ['cloud', 'Cloud models'],
-  ['websearch', 'Web search'],
-  ['llama', 'llama.cpp'],
+const sectionGroups = [
+  { label: 'All models', sections: [['prompts', 'System prompts']] },
+  {
+    label: 'On this computer',
+    sections: [
+      ['model', 'Model settings'],
+      ['performance', 'Performance'],
+      ['server', 'Server & port'],
+      ['profiles', 'Saved configurations'],
+      ['folders', 'Folders'],
+      ['llama', 'llama.cpp'],
+      ['huggingface', 'Hugging Face'],
+    ],
+  },
+  {
+    label: 'Cloud and web',
+    sections: [
+      ['cloud', 'Cloud models'],
+      ['websearch', 'Web search'],
+    ],
+  },
 ] as const;
 
 export default function Settings({
@@ -80,15 +90,25 @@ export default function Settings({
       </div>
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
-          {sections.map(([key, label]) => (
-            <button
-              key={key}
-              className={section === key ? 'selected' : ''}
-              aria-current={section === key ? 'page' : undefined}
-              onClick={() => setSection(key)}
+          {sectionGroups.map((group) => (
+            <div
+              key={group.label}
+              className="settings-nav-group"
+              role="group"
+              aria-label={group.label}
             >
-              {label}
-            </button>
+              <span className="settings-nav-heading">{group.label}</span>
+              {group.sections.map(([key, label]) => (
+                <button
+                  key={key}
+                  className={section === key ? 'selected' : ''}
+                  aria-current={section === key ? 'page' : undefined}
+                  onClick={() => setSection(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="settings-content">
