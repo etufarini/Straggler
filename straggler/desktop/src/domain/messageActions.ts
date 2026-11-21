@@ -1,3 +1,4 @@
+import { summaryAfterChange } from './compaction';
 import type { Conversation, Message } from './types';
 
 export function replaceMessage(
@@ -14,6 +15,7 @@ export function replaceMessage(
   if (!content.trim()) throw new Error('The message cannot be empty.');
   return {
     ...conversation,
+    summary: summaryAfterChange(conversation, messageId),
     updatedAt,
     messages: [...conversation.messages.slice(0, index), { ...message, content }],
   };

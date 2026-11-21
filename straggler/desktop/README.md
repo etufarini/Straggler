@@ -102,6 +102,10 @@ need host keyboard/focus coverage. Use `bash straggler/tests/run.sh browser-plat
 to run that subset locally. Browser failures retain screenshots, traces and a JSON
 report in `test-results/browser/`; no automatic test retries are used.
 
+The shared Linux browser job uses two workers; macOS platform checks keep one.
+Set `STRAGGLER_TEST_WORKERS=1` or `2` to choose either locally. The same tests and
+assertions run at both settings; the control changes only concurrency.
+
 Keep shared behavior at its cheapest effective level. Composer/top-bar checks use
 representative layouts and measured density boundaries instead of multiplying
 viewport, feature and chat-state combinations. Functional accessibility, contrast,

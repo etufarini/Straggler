@@ -265,6 +265,8 @@ export default function ProjectDetail({
                   </button>
                   <ConversationMenu
                     conversation={chat}
+                    onCompact={() => void controller.compact(chat)}
+                    compactReason={controller.compactReason(chat)}
                     metadataBusyReason={
                       controller.generating || controller.editingBusy
                         ? 'Available when the current response finishes or is stopped'

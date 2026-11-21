@@ -111,6 +111,8 @@ pub struct ChatRequest {
     pub web_search_query: Option<String>,
     #[serde(default)]
     pub cloud: Option<cloud::Selection>,
+    #[serde(default)]
+    pub max_output_tokens: Option<u32>,
     pub messages: Vec<ChatMessage>,
     #[serde(default)]
     pub image_ids: Vec<Uuid>,

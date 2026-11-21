@@ -142,7 +142,14 @@ export interface Attachment {
   size: number;
   text: string;
 }
+export interface ChatSummary {
+  throughMessageId: string;
+  text: string;
+  model: string;
+  createdAt: number;
+}
 export interface Conversation {
+  summary?: ChatSummary;
   id: string;
   title: string;
   starred?: boolean;

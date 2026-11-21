@@ -24,6 +24,7 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
     'Export chat…',
     'Export with reasoning…',
     'Move to project…',
+    'Compact chat',
     'Delete',
   ]);
   await expect(items.nth(0)).toBeFocused();
@@ -41,9 +42,11 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   await page.keyboard.press('ArrowDown');
   await expect(items.nth(5)).toBeFocused();
   await page.keyboard.press('ArrowDown');
+  await expect(items.nth(6)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
   await expect(items.nth(0)).toBeFocused();
   await page.keyboard.press('End');
-  await expect(items.nth(5)).toBeFocused();
+  await expect(items.nth(6)).toBeFocused();
   await page.keyboard.press('Home');
   await expect(items.nth(0)).toBeFocused();
   await page.keyboard.press('Escape');
@@ -57,7 +60,7 @@ test('conversation menu supports keyboard navigation, dismissal and Delete parit
   await expect(page.getByRole('menu')).toHaveCount(0);
   await trigger.focus();
   await page.keyboard.press('ArrowUp');
-  await expect(items.nth(5)).toBeFocused();
+  await expect(items.nth(6)).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('alertdialog')).toContainText('Delete conversation?');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();

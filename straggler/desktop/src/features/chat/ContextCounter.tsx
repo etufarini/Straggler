@@ -1,34 +1,10 @@
 import Popover from '../../components/Popover';
-import { currentContext } from '../../domain/chat';
 import type { WorkspaceController } from '../../app/useWorkspace';
 
 export default function ContextCounter({ controller }: { controller: WorkspaceController }) {
-  const reported = currentContext(
-    controller.chat.messages,
-    controller.serverDetails,
-    controller.server,
-    controller.cloud.active,
-  );
   const estimate = controller.contextEstimate;
-  const estimated =
-    (!!controller.chat.attachments?.length ||
-      (!!controller.cloud.active && (!reported || !!controller.input.trim()))) &&
-    !!estimate.capacity &&
-    (!estimate.includesImages || !!controller.input || !reported);
-  const usage = estimated
-    ? {
-        tokens: estimate.tokens,
-        capacity: estimate.capacity!,
-        percent: Math.round((estimate.tokens / estimate.capacity!) * 100),
-        source: estimate.source,
-        level:
-          estimate.tokens / estimate.capacity! >= 0.9
-            ? 'full'
-            : estimate.tokens / estimate.capacity! >= 0.75
-              ? 'high'
-              : 'normal',
-      }
-    : reported;
+  const usage = controller.contextUsage;
+  const estimated = controller.contextEstimated;
   const label = usage
     ? usage.level === 'full'
       ? 'Almost full'
@@ -62,7 +38,7 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
         </>
       }
     >
-      {() => (
+      {(close) => (
         <>
           {estimate.includesImages && estimated && (
             <p className="popover-note" role="status">
@@ -88,7 +64,7 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
               <p className="popover-note">
                 {usage.level === 'normal'
                   ? 'Plenty of room left.'
-                  : 'Context is almost full. Start a new chat or increase the context size. At the limit, replies may stop; context shift, when enabled and supported, discards earlier context.'}
+                  : `Context is almost full. Compact earlier messages, start a new chat or increase the context size. ${controller.temporary ? 'Original messages stay in this temporary chat.' : 'Original messages stay saved.'} At the limit, replies may stop; context shift, when enabled and supported, discards earlier context.`}
               </p>
               <p className="ctx-tech">
                 {estimated
@@ -105,6 +81,20 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
                   ? 'This service does not list the model’s context size.'
                   : 'Available once the server is running.')}
             </p>
+          )}
+          <button
+            className="text-button"
+            disabled={!!controller.compactReason()}
+            title={controller.compactReason()}
+            onClick={() => {
+              close();
+              void controller.compact();
+            }}
+          >
+            Compact chat
+          </button>
+          {controller.compactReason() && (
+            <p className="popover-note">{controller.compactReason()}</p>
           )}
           <p className="ctx-tech">
             {controller.cloud.active ? (

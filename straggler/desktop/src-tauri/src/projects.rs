@@ -1082,6 +1082,7 @@ mod tests {
                 attachments: vec![],
                 project_id: None,
                 own_system_prompt: None,
+                summary: None,
                 options: Some(ConversationOptions {
                     system_prompt: prompt.map(str::to_owned),
                     reasoning: Some("on".into()),

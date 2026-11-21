@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Cloud, ChevronDown, Plus } from 'lucide-react';
 import type { CloudController } from './useCloudModels';
+import { shownCloudModels } from '../../domain/cloudModels';
 import type { CloudProvider } from '../../domain/cloudModels';
 import WebLink from '../websearch/WebLink';
 import Feedback from '../../components/Feedback';
@@ -101,6 +102,8 @@ function ProviderSettings({
     openrouter: 'https://openrouter.ai/settings/keys',
     mistral: 'https://console.mistral.ai/',
   }[provider.kind as 'deepseek' | 'openrouter' | 'mistral'];
+  const visibleCount = shownCloudModels(provider).length;
+  const unlistedCount = provider.shown.length - visibleCount;
   const [key, setKey] = useState('');
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState('');
@@ -124,7 +127,7 @@ function ProviderSettings({
           <strong>{provider.name}</strong>
           <small>
             {provider.saved
-              ? `Key verified · ${provider.shown.length} ${provider.shown.length === 1 ? 'model' : 'models'} shown`
+              ? `Key verified · ${visibleCount} ${visibleCount === 1 ? 'model' : 'models'} shown`
               : 'Not configured'}
           </small>
         </span>
@@ -185,6 +188,14 @@ function ProviderSettings({
         )}
         {provider.saved && (
           <>
+            {unlistedCount > 0 && (
+              <p className="field-help" role="status">
+                {unlistedCount} previously selected{' '}
+                {unlistedCount === 1 ? 'model isn’t' : 'models aren’t'} listed by the service and{' '}
+                {unlistedCount === 1 ? 'doesn’t' : 'don’t'} appear in the picker. Your selection is
+                kept for a future refresh.
+              </p>
+            )}
             <div className="project-section-head">
               <h3>Models to show</h3>
               <button

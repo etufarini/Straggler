@@ -150,6 +150,12 @@ impl Runtime {
             "stream": true,
             "stream_options": {"include_usage": true},
         });
+        if let Some(limit) = request.max_output_tokens {
+            if limit == 0 {
+                return Err("The response token limit must be positive.".into());
+            }
+            body["max_tokens"] = json!(limit);
+        }
         match destination {
             Destination::Local { .. } => body["timings_per_token"] = json!(true),
             Destination::Cloud(cloud) => body["model"] = json!(cloud.active.model.id),
