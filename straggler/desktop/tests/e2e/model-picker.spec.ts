@@ -27,8 +27,28 @@ test('one picker filters local and cloud models without network and restores dow
     await page.evaluate(() => localStorage.getItem('straggler-fixture-cloud-requests')),
   ).toBeNull();
   await search.fill('');
+  await dialog.evaluate((element) => {
+    const observer = new MutationObserver(() => {
+      const heading = element.querySelector('h2');
+      if (heading?.textContent === 'Download models') {
+        observer.disconnect();
+        element.setAttribute(
+          'data-download-focus-ready',
+          String(document.activeElement === heading),
+        );
+      }
+    });
+    observer.observe(element, { childList: true, subtree: true, characterData: true });
+  });
   await dialog.getByRole('button', { name: 'Download models…', exact: true }).click();
+  await expect(dialog).toHaveAttribute('data-download-focus-ready', 'true');
   await expect(dialog.getByRole('heading', { name: 'Download models', exact: true })).toBeFocused();
+  const hubSearch = dialog.getByRole('textbox', { name: 'Search Hugging Face', exact: true });
+  await hubSearch.fill('fixture-publisher/example-GGUF');
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await expect(hubSearch).toBeFocused();
+  await expect(hubSearch).toHaveValue('fixture-publisher/example-GGUF');
+  await expect(dialog.getByRole('button', { name: 'Search', exact: true })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Back to models', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Download models…', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');

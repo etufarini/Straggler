@@ -20,7 +20,7 @@ import { fileName } from '../../domain/types';
 import { statusLabel } from '../../components/statusLabels';
 import type { WorkspaceController } from '../../app/useWorkspace';
 import Feedback from '../../components/Feedback';
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { CloudSelection, ModelSelection } from '../../domain/cloudModels';
 import { shownCloudModels } from '../../domain/cloudModels';
 import HuggingFaceBrowser from '../huggingface/HuggingFaceBrowser';
@@ -32,25 +32,21 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
   const [cloudSelection, setCloudSelection] = useState<CloudSelection | null>(
     controller.cloud.active?.selection ?? null,
   );
-  const search = useRef<HTMLInputElement>(null);
   const download = useRef<HTMLButtonElement>(null);
   const downloadTitle = useRef<HTMLHeadingElement>(null);
   const modelPanel = useRef<HTMLElement>(null);
   const previousView = useRef(view);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (controller.panel !== 'models') return;
-    const frame = requestAnimationFrame(() => {
-      if (view === 'downloads') downloadTitle.current?.focus();
-      else if (previousView.current === 'downloads') download.current?.focus();
-      else {
-        search.current?.focus({ preventScroll: true });
-        modelPanel.current
-          ?.querySelector('[data-in-use="true"]')
-          ?.scrollIntoView({ block: 'nearest' });
-      }
-      previousView.current = view;
-    });
-    return () => cancelAnimationFrame(frame);
+    // Complete view-transition focus before the view accepts typing. The modal
+    // controller owns initial Search models focus and restoration to its opener.
+    if (view === 'downloads') downloadTitle.current?.focus();
+    else if (previousView.current === 'downloads') download.current?.focus();
+    else
+      modelPanel.current
+        ?.querySelector('[data-in-use="true"]')
+        ?.scrollIntoView({ block: 'nearest' });
+    previousView.current = view;
   }, [view, controller.panel]);
   const {
     setPanel,
@@ -160,7 +156,6 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                 <label className="model-search">
                   <Search size={16} aria-hidden="true" />
                   <input
-                    ref={search}
                     data-initial-focus
                     aria-label="Search models"
                     placeholder="Search models"
