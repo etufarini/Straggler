@@ -395,6 +395,18 @@ export function createFixture(scenario: Scenario) {
       case 'configuration':
         return configuration();
       case 'save_chat_defaults': {
+        if (localStorage.getItem('straggler-fixture-chat-defaults-save-paused')) {
+          const started =
+            Number(localStorage.getItem('straggler-fixture-chat-defaults-save-started') || 0) + 1;
+          localStorage.setItem('straggler-fixture-chat-defaults-save-started', String(started));
+          await new Promise<void>((resolve) =>
+            window.addEventListener(
+              'straggler-fixture-chat-defaults-save-resume',
+              () => resolve(),
+              { once: true },
+            ),
+          );
+        }
         if (localStorage.getItem('straggler-fixture-chat-defaults-save-error'))
           throw new Error('Fixture chat defaults storage is read-only.');
         const patch = args.values as Partial<Settings>;

@@ -1,6 +1,6 @@
-import { previewProfile, waitForChatDefaults } from '../../services/desktop';
+import { invoke, previewProfile, waitForChatDefaults } from '../../services/desktop';
 import { chatDefaultKeys } from '../../domain/chatDefaults';
-import type { Settings } from '../../domain/types';
+import type { Configuration, Settings } from '../../domain/types';
 import type { SettingsController } from './useSettings';
 import Select from '../../components/Select';
 
@@ -32,8 +32,9 @@ export default function SavedConfigurations({
   } = controller;
   async function requestLoad() {
     await waitForChatDefaults();
+    const current = await invoke<Configuration>('configuration');
     const values = await previewProfile(profile);
-    const replacesDefaults = chatDefaultKeys.some((key) => values[key] !== config.settings[key]);
+    const replacesDefaults = chatDefaultKeys.some((key) => values[key] !== current.settings[key]);
     async function load() {
       const reviewed = await operation('review-profile', [profile]);
       accept(reviewed);

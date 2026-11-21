@@ -203,3 +203,57 @@ test('composer shows the real attachment count and native drag highlight without
   );
   await expect(page.locator('.composer')).not.toHaveClass(/is-dragover/);
 });
+
+test('late default saves preserve newer text and profile replacement compares the accepted defaults', async ({
+  page,
+}) => {
+  await defaults(page);
+  const seed = page.getByRole('textbox', { name: 'Seed', exact: true });
+  const pause = () =>
+    page.evaluate(() =>
+      localStorage.setItem('straggler-fixture-chat-defaults-save-paused', 'true'),
+    );
+  const started = () =>
+    page.evaluate(() => localStorage.getItem('straggler-fixture-chat-defaults-save-started'));
+  const resume = (last = false) =>
+    page.evaluate((last) => {
+      if (last) localStorage.removeItem('straggler-fixture-chat-defaults-save-paused');
+      window.dispatchEvent(new Event('straggler-fixture-chat-defaults-save-resume'));
+    }, last);
+  await pause();
+  await seed.fill('42');
+  await seed.blur();
+  await expect.poll(started).toBe('1');
+  await seed.fill('43');
+  await seed.blur();
+  await resume();
+  await expect.poll(started).toBe('2');
+  await expect(seed).toHaveValue('43');
+  expect((await saved(page)).seed).toBe('42');
+  await resume(true);
+  await expect.poll(async () => (await saved(page)).seed).toBe('43');
+
+  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'New configuration name', exact: true })
+    .fill('Queued defaults');
+  await page.getByRole('button', { name: 'Save as new configuration', exact: true }).click();
+  await expect(page.getByText('Configuration saved.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await pause();
+  await seed.fill('44');
+  await seed.blur();
+  await expect.poll(started).toBe('3');
+  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await selectValue(
+    page.getByRole('combobox', { name: 'Configuration', exact: true }),
+    'Queued defaults',
+  );
+  const load = page.getByRole('button', { name: 'Load configuration', exact: true });
+  await load.click();
+  await expect(load).toBeDisabled();
+  await resume(true);
+  await expect(page.getByRole('alertdialog')).toContainText('Also replaces your chat defaults.');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect((await saved(page)).seed).toBe('44');
+});
