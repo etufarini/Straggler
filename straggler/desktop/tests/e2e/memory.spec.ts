@@ -7,7 +7,7 @@ test('memory summary uses actual context and opens the context setting', async (
   await expect(
     page.getByText('Estimate from the file size and detected memory;', { exact: false }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.locator('.local-badge').click();
   const memory = page.getByRole('region', { name: 'Memory', exact: true });

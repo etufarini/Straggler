@@ -4,7 +4,7 @@ import { selectValue } from './select';
 
 async function openHub(page: Page) {
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('tab', { name: 'Hugging Face', exact: true }).click();
+  await page.getByRole('button', { name: 'Download models…', exact: true }).click();
 }
 async function openRepository(page: Page, query = 'fixture-publisher/example-GGUF') {
   await page.getByRole('textbox', { name: 'Search Hugging Face', exact: true }).fill(query);
@@ -49,7 +49,7 @@ test('Hub network actions are explicit; pause, resume and verified completion up
   await expect(downloads).toContainText('paused');
   await page.getByRole('button', { name: 'Resume', exact: true }).click();
   await expect(downloads).toContainText('SHA-256 verified. Available on this computer.');
-  await page.getByRole('tab', { name: 'On this computer', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to models', exact: true }).click();
   await expect(page.locator('.model-option')).toContainText(['example.gguf', 'model.gguf']);
   expect(
     await page.evaluate(() => (window as unknown as { hubActions: string[] }).hubActions),

@@ -237,7 +237,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                             </small>
                             <MemoryBadge
                               bytes={model.sizeBytes}
-                              memory={config.memory}
+                              memory={config?.memory}
                               context={controller.draft?.context}
                             />
                             {controller.server.model === model.path &&

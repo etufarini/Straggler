@@ -100,12 +100,11 @@ export async function exerciseNativeCloud({
   );
   await evaluate('document.querySelector(".settings-heading button").click()');
   await evaluate('document.querySelector(".model-switch").click()');
-  await evaluate('document.querySelector("#models-tab-cloud").click()');
   await until(
-    () => evaluate('!!document.querySelector(".cloud-model-group .model-option")'),
+    () => evaluate('!!document.querySelector(".model-group.is-cloud .model-option")'),
     'cloud model picker',
   );
-  await evaluate('document.querySelector(".cloud-model-group .model-option").click()');
+  await evaluate('document.querySelector(".model-group.is-cloud .model-option").click()');
   await evaluate('document.querySelector(".panel .primary-button").click()');
   await until(
     () => evaluate('document.body.dataset.model === "cloud" && !document.querySelector(".panel")'),
@@ -170,7 +169,9 @@ export async function exerciseNativeCloud({
   assert.ok(fixture.requests.some((request) => request.maxOutputTokens > 0));
   await writeFile(output, Buffer.from(await screenshot(), 'base64'));
   await evaluate('document.querySelector(".model-switch").click()');
-  await evaluate('document.querySelector("#models-tab-local").click()');
+  await evaluate(
+    `document.querySelector('.model-group[aria-label="On this computer"] .model-option').click()`,
+  );
   await evaluate('document.querySelector(".panel .primary-button").click()');
   await until(
     () =>

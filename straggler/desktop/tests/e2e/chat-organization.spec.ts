@@ -94,7 +94,7 @@ test('search folds accents, rename restores focus, and stars survive reload', as
   await title.press('Enter');
   await page.getByRole('button', { name: 'Starred New chat', exact: true }).click();
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page
     .getByRole('textbox', { name: 'Message', exact: true })
