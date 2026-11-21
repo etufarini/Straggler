@@ -124,6 +124,11 @@ test('cloud compaction requires consent and Stop keeps the prior chat unchanged'
   await page.getByRole('button', { name: 'Stop response', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toHaveCount(0);
   expect(await saved(page, 'cloud-cancel')).toEqual(original);
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: 'Compaction stopped. The chat was kept unchanged.' }),
+  ).toBeVisible();
   await expect(page.locator('.chat-summary')).toHaveCount(0);
 });
 

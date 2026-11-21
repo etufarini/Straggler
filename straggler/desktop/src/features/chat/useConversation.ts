@@ -626,6 +626,9 @@ export function useConversation(
     setSummarizing(true);
     setGenerating(true);
     setGenerationPhase('waiting');
+    function reportCompactionStopped() {
+      setFileNotice('Compaction stopped. The chat was kept unchanged.');
+    }
     let completed = false;
     let committing = false;
     try {
@@ -633,7 +636,7 @@ export function useConversation(
       let remaining = plan.source;
       let summary = '';
       while (remaining) {
-        if (cancelledRef.current === requestRef.current) return;
+        if (cancelledRef.current === requestRef.current) return reportCompactionStopped();
         const requestId = crypto.randomUUID();
         requestRef.current = requestId;
         let budget =
@@ -647,7 +650,7 @@ export function useConversation(
           piece = summaryChunk(remaining, budget);
           messages = summaryRequest(summary, piece.chunk, systemRoleSupported === true);
         }
-        if (cancelledRef.current === requestId) return;
+        if (cancelledRef.current === requestId) return reportCompactionStopped();
         const response = await invoke<Response>('generate', {
           request: {
             requestId,
@@ -662,7 +665,8 @@ export function useConversation(
           },
           onDelta: new Channel<Delta>(),
         });
-        if (response.status === 'stopped' || cancelledRef.current === requestId) return;
+        if (response.status === 'stopped' || cancelledRef.current === requestId)
+          return reportCompactionStopped();
         if (response.error || response.status !== 'complete')
           throw new Error(
             response.error ||
@@ -687,7 +691,7 @@ export function useConversation(
           createdAt: Date.now(),
         },
       };
-      if (cancelledRef.current === requestRef.current) return;
+      if (cancelledRef.current === requestRef.current) return reportCompactionStopped();
       // Generation is complete; the existing atomic storage commit is not cancellable.
       requestRef.current = null;
       setSummarizing(false);
