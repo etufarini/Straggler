@@ -78,6 +78,28 @@ async fn apply_settings(
 }
 
 #[tauri::command]
+async fn save_chat_defaults(
+    values: std::collections::BTreeMap<String, String>,
+    state: State<'_, Application>,
+) -> std::result::Result<Configuration, straggler_desktop::workspace::ConfigurationError> {
+    let runtime =
+        runtime(&state).map_err(straggler_desktop::workspace::ConfigurationError::from)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.save_chat_defaults(values))
+        .await
+        .map_err(|error| error.to_string())
+        .and_then(|result| result)
+        .map_err(straggler_desktop::workspace::ConfigurationError::from)
+}
+
+#[tauri::command]
+async fn preview_profile(name: String, state: State<'_, Application>) -> Result<Settings> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.preview_profile(&name))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn workspace_action(
     action: String,
     arguments: Vec<String>,
@@ -981,6 +1003,8 @@ fn main() {
             configuration,
             backend_release,
             apply_settings,
+            save_chat_defaults,
+            preview_profile,
             workspace_action,
             choose_models_folder,
             choose_model_file,

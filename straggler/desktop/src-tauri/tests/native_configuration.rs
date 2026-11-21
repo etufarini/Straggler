@@ -411,3 +411,88 @@ fn saved_configuration_names_are_bounded_and_cannot_escape_the_profile_folder() 
     assert!(profile_name(&"Z".repeat(80)));
     assert!(profile_name("Name with spaces._-"));
 }
+
+#[test]
+fn chat_defaults_reuse_profile_serialization_and_preserve_environment_precedence() {
+    use straggler_desktop::configuration::chat_defaults::merge;
+    let work = tempfile::tempdir().unwrap();
+    let store = Store::new(environment(work.path(), &[])).unwrap();
+    let settings = Settings {
+        context: "8192".into(),
+        temperature: "0.6".into(),
+        seed: "42".into(),
+        chat_system_prompt: "Literal $(touch unsafe)\nUnicode: caffè ☕".into(),
+        ..Settings::default()
+    };
+    store.save_chat_defaults(&settings).unwrap();
+    let path = store.environment.config.join("chat-defaults.conf");
+    let data = fs::read_to_string(&path).unwrap();
+    assert_eq!(data.lines().count(), 11);
+    assert!(!data.contains("context="));
+    assert!(data.lines().all(|line| settings
+        .profile_data()
+        .unwrap()
+        .lines()
+        .any(|profile| profile == line)));
+    let loaded = store.initial_settings().unwrap();
+    assert_eq!(loaded.temperature, "0.6");
+    assert_eq!(loaded.seed, "42");
+    assert_eq!(loaded.chat_system_prompt, settings.chat_system_prompt);
+    assert_eq!(loaded.context, "auto");
+    let controlled = Store::new(environment(
+        work.path(),
+        &[
+            ("STRAGGLER_TEMPERATURE", "0.8"),
+            ("MIR_TEMPERATURE", "1"),
+            ("LLAMA_TEMPERATURE", "2"),
+        ],
+    ))
+    .unwrap();
+    assert_eq!(controlled.initial_settings().unwrap().temperature, "0.8");
+    let explicit_empty = Store::new(environment(
+        work.path(),
+        &[("STRAGGLER_TEMPERATURE", ""), ("MIR_TEMPERATURE", "1")],
+    ))
+    .unwrap();
+    assert!(explicit_empty.initial_settings().is_err());
+    assert!(merge(&loaded, BTreeMap::from([("context".into(), "4096".into())])).is_err());
+    let before = fs::read(&path).unwrap();
+    assert!(merge(&loaded, BTreeMap::from([("top_p".into(), "2".into())])).is_err());
+    assert_eq!(fs::read(&path).unwrap(), before);
+    fs::write(&path, "temperature=broken\n").unwrap();
+    assert!(store.save_chat_defaults(&settings).is_err());
+    assert_eq!(fs::read_to_string(path).unwrap(), "temperature=broken\n");
+}
+
+#[test]
+fn generation_defaults_do_not_change_server_identity_or_launch_arguments() {
+    use straggler_desktop::configuration::capabilities;
+    let work = tempfile::tempdir().unwrap();
+    let environment = environment(work.path(), &[]);
+    let initial = Settings::default();
+    let mut values = initial.fields();
+    for field in straggler_desktop::generation::fields() {
+        values.insert(field.into(), "1".into());
+    }
+    let settings = Settings::from_fields(values).unwrap().validated().unwrap();
+    assert!(initial.same_server_configuration(&settings));
+    let arguments = capabilities::arguments(&settings, "", None, &environment).unwrap();
+    for flag in [
+        "--temperature",
+        "--top-p",
+        "--top-k",
+        "--min-p",
+        "--repeat-penalty",
+        "--presence-penalty",
+        "--frequency-penalty",
+        "--seed",
+        "--n-predict",
+    ] {
+        assert!(!arguments.iter().any(|argument| argument == flag));
+    }
+    let changed = Settings {
+        context: "8192".into(),
+        ..settings
+    };
+    assert!(!initial.same_server_configuration(&changed));
+}

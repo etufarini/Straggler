@@ -30,6 +30,8 @@ pub struct CloudModel {
     pub id: String,
     pub name: String,
     pub details: ServerDetails,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supported_parameters: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -73,6 +75,7 @@ pub struct ProviderStatus {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CloudStatus {
+    pub generation_parameters: std::collections::BTreeMap<String, Vec<&'static str>>,
     pub providers: Vec<ProviderStatus>,
     pub active: Option<ActiveCloud>,
     pub error: Option<String>,
@@ -299,6 +302,7 @@ impl CloudService {
             Ok(providers) => providers,
             Err(error) => {
                 return Ok(CloudStatus {
+                    generation_parameters: crate::generation::provider_parameters(),
                     providers: Vec::new(),
                     active,
                     error: Some(error),
@@ -320,6 +324,7 @@ impl CloudService {
             })
             .collect();
         Ok(CloudStatus {
+            generation_parameters: crate::generation::provider_parameters(),
             providers,
             active,
             error: None,

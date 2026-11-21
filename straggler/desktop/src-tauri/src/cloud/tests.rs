@@ -21,7 +21,7 @@ impl HttpFixture {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
-        let reply: Arc<Mutex<(u16, String, String)>> = Arc::new(Mutex::new((200, "".into(), r#"{"data":[{"id":"example","context_length":8192,"architecture":{"input_modalities":["text","image"]},"supported_parameters":["tools","reasoning"],"max_context_length":4096,"capabilities":{"vision":false,"function_calling":true}}]}"#.into())));
+        let reply: Arc<Mutex<(u16, String, String)>> = Arc::new(Mutex::new((200, "".into(), r#"{"data":[{"id":"example","context_length":8192,"architecture":{"input_modalities":["text","image"]},"supported_parameters":["tools","reasoning","max_tokens"],"max_context_length":4096,"capabilities":{"vision":false,"function_calling":true}}]}"#.into())));
         let requests = Arc::new(Mutex::new(Vec::new()));
         let stop = Arc::new(AtomicBool::new(false));
         let (response, record, done) = (reply.clone(), requests.clone(), stop.clone());
@@ -376,6 +376,7 @@ fn provider_reasoning_adapters_strip_local_fields_and_keep_deepseek_tool_history
                     id: "example".into(),
                     name: "Example".into(),
                     details,
+                    supported_parameters: None,
                 },
             },
         };

@@ -1,6 +1,7 @@
 //! Native configuration owns validation and persistence independently of the GUI.
 
 pub mod capabilities;
+pub mod chat_defaults;
 pub mod environment;
 pub mod model_files;
 pub mod models;

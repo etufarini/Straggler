@@ -192,15 +192,6 @@ pub fn arguments(
         ("context", "ctx-size"),
         ("threads", "threads"),
         ("device", "device"),
-        ("temperature", "temperature"),
-        ("top_p", "top-p"),
-        ("top_k", "top-k"),
-        ("min_p", "min-p"),
-        ("repeat_penalty", "repeat-penalty"),
-        ("presence_penalty", "presence-penalty"),
-        ("frequency_penalty", "frequency-penalty"),
-        ("seed", "seed"),
-        ("max_tokens", "n-predict"),
     ] {
         if fields[field] != "auto" {
             pairs.push((flag.into(), fields[field].clone()));

@@ -9,6 +9,7 @@ pub mod credentials;
 pub mod diagnostics;
 pub mod external_links;
 pub mod files;
+pub mod generation;
 pub mod history;
 pub mod huggingface;
 pub mod image_attachments;
