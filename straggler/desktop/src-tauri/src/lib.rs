@@ -19,6 +19,7 @@ pub mod project_search;
 pub mod projects;
 mod server;
 pub mod stream;
+pub mod system_prompts;
 pub mod temporary;
 pub mod tokens;
 pub mod web_search;
@@ -80,6 +81,7 @@ pub struct Runtime {
     pub history: History,
     pub projects: projects::Projects,
     pub preferences: preferences::Preferences,
+    pub system_prompts: system_prompts::SystemPrompts,
     workspace: Mutex<workspace::Workspace>,
     temporary: Mutex<Option<temporary::TemporaryChat>>,
     _instance: File,
@@ -176,6 +178,7 @@ impl Runtime {
             history,
             projects,
             preferences: preferences::Preferences::new(data.clone()),
+            system_prompts: system_prompts::SystemPrompts::new(data.clone()),
             _instance: instance,
             workspace: Mutex::new(workspace::Workspace::default()),
             temporary: Mutex::new(None),

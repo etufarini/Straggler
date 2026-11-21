@@ -1,3 +1,4 @@
+import SystemPromptsSettings from '../prompts/SystemPromptsSettings';
 import { settingsForModel } from '../../domain/types';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import WebSearchSettings from '../websearch/WebSearchSettings';
@@ -16,6 +17,7 @@ import HuggingFaceSettings from '../huggingface/HuggingFaceSettings';
 import Feedback from '../../components/Feedback';
 const sections = [
   ['model', 'Model settings'],
+  ['prompts', 'System prompts'],
   ['performance', 'Performance'],
   ['server', 'Server & port'],
   ['profiles', 'Saved configurations'],
@@ -130,6 +132,7 @@ export default function Settings({
                   {message}
                 </p>
               )}
+              {section === 'prompts' && <SystemPromptsSettings confirm={props.confirm} />}
               {section === 'model' && <ModelSettings controller={controller} />}
               {section === 'performance' && <PerformanceSettings controller={controller} />}
               {section === 'server' && <ServerSettings controller={controller} />}

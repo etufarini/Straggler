@@ -1100,3 +1100,11 @@ hardware inventory is a release gate.
 Use semantic versions. The exact version, full candidate SHA and release notes
 require explicit approval before tagging or publishing. Never move a published
 tag or delete a remote branch without approval.
+
+### System prompt presets
+
+In Settings › System prompts, save reusable instructions with a unique name and an optional description. Changes are saved automatically in `system-prompts.json` beside the desktop chat storage. An unreadable preset file is preserved and reported; reload after resolving the storage error.
+
+Choose a preset under This chat in the system prompt menu, or use Insert preset in Chat defaults and project instructions. Selection copies the text; editing or deleting the preset never changes existing chats or projects. Save as preset saves the text currently shown in the chat prompt editor.
+
+Export one preset or all presets as version 1 `straggler.system-prompts` JSON. Import supports that format, UTF-8 `.md` and `.txt` files, and LM Studio JSON containing an explicit `llm.prediction.systemPrompt` entry in `operation.fields`. Review the readable preview and choose Keep both or Replace for each conflicting name. Import never changes chat settings or sampling parameters.

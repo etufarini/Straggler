@@ -4129,3 +4129,64 @@ input:focus-visible {
   font-size: var(--ui-fs-meta);
   overflow-wrap: anywhere;
 }
+
+/* Prompt presets use the same surfaces and controls as saved configurations. */
+.preset-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.preset-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.preset-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-elev-2);
+  min-width: 0;
+}
+.preset-card > div {
+  min-width: 0;
+}
+.preset-card h3 {
+  margin: 0 0 6px;
+}
+.preset-card p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.preset-preview {
+  color: var(--ui-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60ch;
+}
+.insert-preset {
+  margin: 10px 0;
+  max-width: 320px;
+}
+.preset-import-list {
+  max-height: 48vh;
+  overflow: auto;
+}
+.preset-import-list section {
+  border-bottom: 1px solid var(--ui-border);
+  padding: 12px 0;
+}
+.preset-import-list pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 13px;
+}

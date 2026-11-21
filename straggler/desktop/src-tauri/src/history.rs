@@ -449,7 +449,7 @@ fn validate(conversation: &Conversation) -> Result<()> {
         .own_system_prompt
         .as_ref()
         .and_then(Option::as_ref)
-        .is_some_and(|value| value.len() > 65536 || value.contains('\0'))
+        .is_some_and(|value| !crate::system_prompts::valid_prompt(value))
     {
         return Err("Invalid chat system prompt.".into());
     }
@@ -457,7 +457,7 @@ fn validate(conversation: &Conversation) -> Result<()> {
         if options
             .system_prompt
             .as_ref()
-            .is_some_and(|value| value.len() > 65536 || value.contains('\0'))
+            .is_some_and(|value| !crate::system_prompts::valid_prompt(value))
             || options
                 .reasoning
                 .as_deref()

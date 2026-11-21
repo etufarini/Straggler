@@ -465,6 +465,82 @@ async fn write_export(path: PathBuf, contents: String) -> Result<()> {
 }
 
 #[tauri::command]
+async fn system_prompts_export(ids: Vec<Uuid>, state: State<'_, Application>) -> Result<String> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let presets = runtime.system_prompts.list()?;
+        let selected = ids
+            .iter()
+            .map(|id| {
+                presets
+                    .iter()
+                    .find(|preset| &preset.id == id)
+                    .map(|preset| preset.content.clone())
+                    .ok_or_else(|| "The preset no longer exists.".to_owned())
+            })
+            .collect::<Result<Vec<_>>>()?;
+        straggler_desktop::system_prompts::export(selected)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn system_prompts_list(
+    state: State<'_, Application>,
+) -> Result<Vec<straggler_desktop::system_prompts::Preset>> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.system_prompts.list())
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn system_prompt_save(
+    id: Option<Uuid>,
+    preset: straggler_desktop::system_prompts::PresetText,
+    state: State<'_, Application>,
+) -> Result<Vec<straggler_desktop::system_prompts::Preset>> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.system_prompts.save(id, preset))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn system_prompt_delete(
+    id: Uuid,
+    state: State<'_, Application>,
+) -> Result<Vec<straggler_desktop::system_prompts::Preset>> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.system_prompts.delete(id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn system_prompts_import(
+    choices: Vec<straggler_desktop::system_prompts::ImportChoice>,
+    state: State<'_, Application>,
+) -> Result<Vec<straggler_desktop::system_prompts::Preset>> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.system_prompts.import(choices))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn system_prompts_read_import(
+    path: PathBuf,
+) -> Result<Vec<straggler_desktop::system_prompts::PresetText>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        straggler_desktop::system_prompts::read_import(&path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn history_list(state: State<'_, Application>) -> Result<Vec<Conversation>> {
     let runtime = runtime(&state)?;
     tauri::async_runtime::spawn_blocking(move || runtime.history.list())
@@ -854,6 +930,12 @@ fn main() {
             temporary_attachment_add,
             temporary_attachment_remove,
             write_export,
+            system_prompts_list,
+            system_prompts_export,
+            system_prompt_save,
+            system_prompt_delete,
+            system_prompts_import,
+            system_prompts_read_import,
             history_list,
             history_save,
             history_delete,

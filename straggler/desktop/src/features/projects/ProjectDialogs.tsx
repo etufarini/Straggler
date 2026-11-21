@@ -1,3 +1,4 @@
+import { InsertPreset } from '../prompts/PromptPresets';
 import { countLabel } from '../../domain/text';
 import { useId, useState } from 'react';
 import { Folder, Search, X } from 'lucide-react';
@@ -364,6 +365,7 @@ function ProjectDialogContent({
           <p className="panel-intro">
             Replaces the Settings system prompt for every chat in this project.
           </p>
+          <InsertPreset disabled={project.archived || busy} onInsert={setInstructions} />
           <label className="setting-field">
             <span>Instructions</span>
             <textarea

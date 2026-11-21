@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add reusable system prompt presets with atomic native storage, import previews, export and copy-based insertion into chat, default and project instructions.
+
+
+## Unreleased
+
 Desktop development changes; no package release or tag is implied.
 
 - D003: static globular-cluster and starfield assets, translucent surfaces and warm

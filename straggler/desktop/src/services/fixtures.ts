@@ -1,3 +1,5 @@
+import type { SystemPromptPreset, PresetText } from '../domain/systemPrompts';
+import { availablePresetName } from '../domain/systemPrompts';
 import { searchText } from '../domain/chatSearch';
 import { createWebSearchFixture } from './webSearchFixtures';
 import nativeDefaults from '../../src-tauri/src/configuration/defaults.json';
@@ -301,6 +303,62 @@ export function createFixture(scenario: Scenario) {
       case 'web_search_key_save':
       case 'open_web_url':
         return webSearch.invoke(command, args);
+      case 'system_prompts_export': {
+        const presets: SystemPromptPreset[] = JSON.parse(
+          localStorage.getItem('straggler-fixture-presets') || '[]',
+        );
+        return JSON.stringify({
+          format: 'straggler.system-prompts',
+          version: 1,
+          presets: presets
+            .filter((p) => (args.ids as string[]).includes(p.id))
+            .map(({ name, description, prompt }) => ({ name, description, prompt })),
+        });
+      }
+      case 'system_prompts_list':
+        if (localStorage.getItem('straggler-fixture-presets-error'))
+          throw new Error('Cannot read system prompts. The file was kept.');
+        return JSON.parse(localStorage.getItem('straggler-fixture-presets') || '[]');
+      case 'system_prompt_save':
+      case 'system_prompt_delete':
+      case 'system_prompts_import': {
+        if (localStorage.getItem('straggler-fixture-presets-write-error'))
+          throw new Error('Disk is full. Previous data was kept.');
+        let presets: SystemPromptPreset[] = JSON.parse(
+          localStorage.getItem('straggler-fixture-presets') || '[]',
+        );
+        if (command === 'system_prompt_delete') presets = presets.filter((p) => p.id !== args.id);
+        else {
+          const choices =
+            command === 'system_prompt_save'
+              ? [{ preset: args.preset as PresetText, replace: false }]
+              : (args.choices as { preset: PresetText; replace: boolean }[]);
+          for (const choice of choices) {
+            const existing =
+              command === 'system_prompt_save'
+                ? presets.find((p) => p.id === args.id)
+                : choice.replace
+                  ? presets.find((p) => p.name.toLowerCase() === choice.preset.name.toLowerCase())
+                  : undefined;
+            if (existing) Object.assign(existing, choice.preset, { updatedAt: Date.now() });
+            else
+              presets.push({
+                ...choice.preset,
+                name: availablePresetName(choice.preset.name, presets),
+                id: crypto.randomUUID(),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              });
+          }
+        }
+        localStorage.setItem('straggler-fixture-presets', JSON.stringify(presets));
+        return presets;
+      }
+      case 'system_prompts_read_import':
+        return JSON.parse(
+          localStorage.getItem('straggler-fixture-preset-import') ||
+            '[{"name":"Imported prompt","description":"From a file","prompt":"Imported instructions."}]',
+        );
       case 'preferences_read':
         return JSON.parse(
           localStorage.getItem('straggler-fixture-ui-preferences') ||
