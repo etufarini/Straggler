@@ -29,7 +29,26 @@ export class OrbRenderer implements PresenceRenderer {
     this.motion.addEventListener('change', this.updateMotion);
   }
   setPalette(palette: OrbPalette | null) {
-    this.engine?.setPalette(palette);
+    if (!palette) {
+      this.engine?.setPalette(null);
+      return;
+    }
+    // The orb engine consumes hex colors; the theme supplies CSS colors, including OKLCH.
+    const context = document.createElement('canvas').getContext('2d');
+    if (!context) return;
+    function hex(color: string) {
+      context!.clearRect(0, 0, 1, 1);
+      context!.fillStyle = color;
+      context!.fillRect(0, 0, 1, 1);
+      return (
+        '#' +
+        [...context!.getImageData(0, 0, 1, 1).data]
+          .slice(0, 3)
+          .map((value) => value.toString(16).padStart(2, '0'))
+          .join('')
+      );
+    }
+    this.engine?.setPalette({ primary: hex(palette.primary), secondary: hex(palette.secondary) });
   }
   setState(state: PresenceState) {
     if (state === this.state) return;
