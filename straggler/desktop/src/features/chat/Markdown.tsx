@@ -1,3 +1,13 @@
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import {
+  remarkLatexDelimiters,
+  rehypeLiteralMathCode,
+  rehypeMathErrors,
+} from '../../domain/markdownMath';
+import { CodeBlock, MathFormula } from './MarkdownBlocks';
+import 'katex/dist/katex.min.css';
+import type { PluggableList } from 'unified';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -11,6 +21,13 @@ import type { Components } from 'react-markdown';
 // Component identities stay stable during status polling and streamed updates.
 // Generated content stays inside the app without remote loads or navigation.
 const components: Components = {
+  pre: CodeBlock,
+  span: ({ node, children, ...props }) =>
+    node?.properties.dataMathSource !== undefined ? (
+      <MathFormula node={node}>{children}</MathFormula>
+    ) : (
+      <span {...props}>{children}</span>
+    ),
   a: ({ children, href }) =>
     /^mailto:/i.test(href ?? '') ? (
       <WebLink url={href!}>{children}</WebLink>
@@ -21,8 +38,17 @@ const components: Components = {
     ),
   img: ({ alt }) => <span className="image-placeholder">[Image: {alt || 'not loaded'}]</span>,
 };
-const plugins = [remarkGfm];
-const userPlugins = [remarkGfm, remarkBreaks];
+const plugins: PluggableList = [
+  remarkGfm,
+  [remarkMath, { singleDollarTextMath: false }],
+  remarkLatexDelimiters,
+];
+const mathPlugins: PluggableList = [
+  rehypeLiteralMathCode,
+  [rehypeKatex, { trust: false, output: 'htmlAndMathml', errorColor: 'currentColor' }],
+  rehypeMathErrors,
+];
+const userPlugins = [...plugins, remarkBreaks];
 const userComponents: Components = {
   ...components,
   a: ({ children, href }) =>
@@ -99,6 +125,7 @@ export default memo(function Markdown({
   return (
     <ReactMarkdown
       remarkPlugins={user ? userPlugins : sourcePlugins}
+      rehypePlugins={mathPlugins}
       components={user ? userComponents : sourceComponents}
     >
       {children}

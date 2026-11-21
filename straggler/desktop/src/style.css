@@ -4190,3 +4190,119 @@ input:focus-visible {
   overflow: auto;
   font-size: 13px;
 }
+
+/* Math stays in the message column; only a wide formula scrolls. */
+.math-inline-formula .katex {
+  font-size: 1.1em;
+  color: currentColor;
+}
+.math-block {
+  display: block;
+  position: relative;
+  margin: 16px 0;
+  padding-right: 36px;
+  min-width: 0;
+}
+.math-content {
+  min-width: 0;
+}
+.math-block > .math-content {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 3px 0;
+}
+.math-block .katex-display {
+  margin: 0;
+  text-align: left;
+}
+.math-block .katex-display > .katex {
+  text-align: left;
+}
+.math-block > .markdown-copy {
+  position: absolute;
+  right: 0;
+  top: 0;
+  opacity: 0;
+}
+.math-block:hover > .markdown-copy,
+.math-block:focus-within > .markdown-copy {
+  opacity: 1;
+}
+.math-pending,
+.math-invalid .katex-error {
+  color: var(--ui-subtle);
+  font-family: ui-monospace, monospace;
+  background: none;
+}
+.math-error-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--ui-subtle);
+  font-size: 12px;
+}
+.markdown-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.markdown-copy .message-action {
+  width: 28px;
+  height: 28px;
+}
+.code-block {
+  margin: 12px 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-code);
+  overflow: hidden;
+}
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  padding: 4px 10px 4px 14px;
+  color: var(--ui-text-3);
+  font-size: 12px;
+}
+.markdown .code-block pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  white-space: pre;
+  overflow: auto;
+}
+.markdown .code-block code {
+  color: var(--ui-text-1);
+  white-space: pre;
+}
+.code-block pre.code-collapsed {
+  max-height: 36em;
+}
+.code-expand {
+  margin: 4px 10px 8px;
+  font-size: 12px;
+}
+.code-block .hljs-keyword,
+.code-block .hljs-selector-tag,
+.code-block .hljs-literal {
+  color: var(--ui-accent-text);
+}
+.code-block .hljs-string,
+.code-block .hljs-attr {
+  color: var(--ui-text-2);
+}
+.code-block .hljs-comment {
+  color: var(--ui-text-3);
+  font-style: italic;
+}
+@media (hover: none) {
+  .math-block > .markdown-copy {
+    opacity: 1;
+  }
+}
