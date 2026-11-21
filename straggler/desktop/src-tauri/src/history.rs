@@ -59,6 +59,8 @@ pub struct Conversation {
     pub title_customized: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branched_from: Option<BranchOrigin>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<ChatSummary>,
     pub created_at: u64,
     pub updated_at: u64,
     pub model: Option<String>,
@@ -75,6 +77,15 @@ pub struct Conversation {
         skip_serializing_if = "Option::is_none"
     )]
     pub own_system_prompt: Option<Option<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChatSummary {
+    pub through_message_id: Uuid,
+    pub text: String,
+    pub model: String,
+    pub created_at: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -218,6 +229,15 @@ impl History {
                 && !matches!(message.status.as_str(), "streaming" | "error")
         });
         let response = response.ok_or("Choose a saved response to branch from.")?;
+        if branch.summary.as_ref().is_some_and(|summary| {
+            branch
+                .messages
+                .iter()
+                .position(|message| message.id == summary.through_message_id)
+                .is_some_and(|boundary| response <= boundary)
+        }) {
+            branch.summary = None;
+        }
         branch.messages.truncate(response + 1);
         branch.id = Uuid::new_v4();
         let suffix = " (branch)";
@@ -464,6 +484,22 @@ fn validate(conversation: &Conversation) -> Result<()> {
     {
         return Err("Invalid chat system prompt.".into());
     }
+    if let Some(summary) = &conversation.summary {
+        // Summaries become prompt input, so they share the bounded UTF-8/NUL rule.
+        if summary.text.trim().is_empty()
+            || !crate::system_prompts::valid_prompt(&summary.text)
+            || summary.model.trim().is_empty()
+            || summary.model.len() > 4096
+            || summary.model.contains('\0')
+            || summary.created_at == 0
+            || !conversation
+                .messages
+                .iter()
+                .any(|message| message.id == summary.through_message_id)
+        {
+            return Err("Invalid chat summary. Original messages were kept.".into());
+        }
+    }
     if let Some(options) = &conversation.options {
         if options
             .system_prompt
@@ -555,6 +591,7 @@ mod tests {
             options: None,
             project_id: None,
             own_system_prompt: None,
+            summary: None,
             attachments: Vec::new(),
             messages: vec![Message {
                 id: Uuid::new_v4(),
@@ -573,6 +610,60 @@ mod tests {
                 server_run_id: None,
             }],
         }
+    }
+
+    #[test]
+    fn summaries_are_optional_bounded_atomic_and_follow_branch_boundaries() {
+        let root = tempfile::tempdir().unwrap();
+        let history = History::new(root.path().join("conversations")).unwrap();
+        let mut chat = conversation();
+        chat.messages[0].status = "complete".into();
+        history.create(&chat).unwrap();
+        let old = serde_json::to_value(&chat).unwrap();
+        assert!(old.get("summary").is_none());
+        assert!(serde_json::from_value::<Conversation>(old)
+            .unwrap()
+            .summary
+            .is_none());
+        let boundary = chat.messages[0].id;
+        chat.messages.push(Message {
+            id: Uuid::new_v4(),
+            role: "user".into(),
+            content: "Next question".into(),
+            ..chat.messages[0].clone()
+        });
+        chat.messages.push(Message {
+            id: Uuid::new_v4(),
+            content: "Next answer".into(),
+            ..chat.messages[0].clone()
+        });
+        chat.summary = Some(ChatSummary {
+            through_message_id: boundary,
+            text: "Preserved decisions".into(),
+            model: "fixture".into(),
+            created_at: 1,
+        });
+        history.save(&chat).unwrap();
+        assert_eq!(
+            history.read_one(chat.id).unwrap().summary.unwrap().text,
+            "Preserved decisions"
+        );
+        assert!(history.branch(chat.id, boundary).unwrap().summary.is_none());
+        assert!(history
+            .branch(chat.id, chat.messages[2].id)
+            .unwrap()
+            .summary
+            .is_some());
+        let path = history.directory.join(format!("{}.json", chat.id));
+        let previous = fs::read(&path).unwrap();
+        for text in [String::new(), "bad\0text".into(), "あ".repeat(21846)] {
+            chat.summary.as_mut().unwrap().text = text;
+            assert!(history.save(&chat).is_err());
+            assert_eq!(fs::read(&path).unwrap(), previous);
+        }
+        chat.summary.as_mut().unwrap().text = "Valid".into();
+        chat.summary.as_mut().unwrap().through_message_id = Uuid::new_v4();
+        assert!(history.save(&chat).is_err());
     }
 
     #[test]

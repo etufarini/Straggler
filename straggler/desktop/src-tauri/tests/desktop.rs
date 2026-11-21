@@ -131,6 +131,7 @@ impl Fixture {
 
 fn request(id: Uuid, content: &str) -> ChatRequest {
     ChatRequest {
+        max_output_tokens: None,
         cloud: None,
         web_search: false,
         image_ids: Vec::new(),

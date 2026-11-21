@@ -254,6 +254,7 @@ fn runtime(root: &std::path::Path, fixture: &HttpFixture) -> Runtime {
 }
 fn request(selection: Selection) -> ChatRequest {
     ChatRequest {
+        max_output_tokens: None,
         request_id: Uuid::new_v4(),
         conversation_id: None,
         temporary_id: None,
@@ -296,11 +297,22 @@ async fn cloud_generation_requires_consent_but_no_local_server_or_temporary_slot
             _ => wire.into(),
         };
         fixture.respond(200, "Content-Type: text/event-stream\r\n", &wire);
+        let count = fixture.count();
+        let mut invalid = request(selection.clone());
+        invalid.max_output_tokens = Some(0);
+        assert!(runtime
+            .generate(invalid, |_| Ok(()))
+            .await
+            .unwrap_err()
+            .contains("positive"));
+        assert_eq!(fixture.count(), count);
+        let mut bounded = request(selection.clone());
+        bounded.max_output_tokens = Some(17);
         let mut content = String::new();
         let mut reasoning = String::new();
         assert_eq!(
             runtime
-                .generate(request(selection.clone()), |delta| {
+                .generate(bounded, |delta| {
                     content.push_str(&delta.content);
                     reasoning.push_str(&delta.reasoning);
                     Ok(())
@@ -312,6 +324,7 @@ async fn cloud_generation_requires_consent_but_no_local_server_or_temporary_slot
         assert_eq!(content, "Answer");
         assert_eq!(reasoning, "Reason");
         let body = &fixture.requests.lock().unwrap().last().unwrap().1.clone();
+        assert_eq!(body["max_tokens"], 17);
         for field in [
             "chat_template_kwargs",
             "id_slot",

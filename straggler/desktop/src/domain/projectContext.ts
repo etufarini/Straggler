@@ -1,3 +1,4 @@
+import { summarizedMessages } from './compaction';
 import { attachmentBlocks, composeRequest } from './attachments';
 import { ownSystemPrompt } from './projects';
 import type { Project } from './projects';
@@ -161,18 +162,31 @@ export function assembleProjectRequest(
   passages?: ProjectPassage[],
   attachmentPassages?: ProjectPassage[],
   includeReasoning = false,
+  systemRoleSupported: boolean | null = null,
 ) {
   const systemPrompt = resolveProjectSystemPrompt(conversation, settings, project);
   const prefix =
     conversation.projectId && project && passages === undefined
       ? projectSystemPrefix(project, settings)
       : systemPrompt;
+  const retained = summarizedMessages(conversation, messages);
   const turns = composeRequest(
-    messages,
+    retained,
     prefix,
     attachmentPassages === undefined ? (conversation.attachments ?? []) : [],
     includeReasoning,
   );
+  if (conversation.summary && retained !== messages) {
+    const summary = `Earlier chat summary (original messages remain saved):\n${conversation.summary.text}`;
+    if (systemRoleSupported === true) {
+      if (turns[0]?.role === 'system') turns[0].content += `\n\n${summary}`;
+      else turns.unshift({ role: 'system', content: summary });
+    } else {
+      const lastUser = [...turns].reverse().find((message) => message.role === 'user');
+      if (lastUser) lastUser.content += `\n\n${summary}`;
+      else turns.push({ role: 'user', content: summary });
+    }
+  }
   const context = passageContext(passages, attachmentPassages);
   if (context) {
     const lastUser = [...turns].reverse().find((message) => message.role === 'user');
