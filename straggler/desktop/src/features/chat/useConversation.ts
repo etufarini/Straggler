@@ -1,3 +1,4 @@
+import type { ActiveCloud } from '../../domain/cloudModels';
 import type { Project } from '../../domain/projects';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -48,6 +49,8 @@ export function useConversation(
   projects?: ProjectsController,
   sharedQueue?: StorageQueue,
   visionSupported = false,
+  cloud: ActiveCloud | null = null,
+  ensureCloudConsent: () => Promise<boolean> = async () => true,
 ) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
@@ -257,10 +260,12 @@ export function useConversation(
       (!replacement && (!text || (editor && submittedText === undefined))) ||
       requestRef.current ||
       mutation.current ||
-      server.phase !== 'ready' ||
+      (!cloud && server.phase !== 'ready') ||
       (!temporaryRef.current && (!historyReady || storageError))
     )
       return;
+    if (cloud && !(await ensureCloudConsent())) return;
+    if (requestRef.current) return;
     const project = projects?.current.current.find(
       (value) => value.id === chatRef.current.projectId,
     );
@@ -294,8 +299,12 @@ export function useConversation(
     const assistant: Message = {
       id: crypto.randomUUID(),
       role: 'assistant',
-      serverRunId: server.runId,
-      ...(server.model ? { model: server.model } : {}),
+      ...(cloud
+        ? {
+            cloud: { providerId: cloud.selection.providerId, name: cloud.providerName },
+            model: cloud.model.id,
+          }
+        : { serverRunId: server.runId, ...(server.model ? { model: server.model } : {}) }),
       content: '',
       reasoning: '',
       status: 'streaming',
@@ -303,7 +312,7 @@ export function useConversation(
     let current: Conversation = {
       ...chatRef.current,
       updatedAt: Date.now(),
-      model: server.model,
+      model: cloud?.model.id ?? server.model,
       title:
         chatRef.current.messages.length || chatRef.current.titleCustomized
           ? chatRef.current.title
@@ -324,9 +333,19 @@ export function useConversation(
         { ...assistant },
       ],
     };
-    const options = resolveChatOptions(current.options, settings);
+    const options = resolveChatOptions(current.options, cloud ? undefined : settings);
+    const includeReasoning =
+      cloud?.kind === 'deepseek' && useWebSearch && cloud.model.details.toolsSupported === true;
     const history = current.messages.slice(0, -1);
-    let messages = assembleProjectRequest(current, history, settings, project);
+    let messages = assembleProjectRequest(
+      current,
+      history,
+      settings,
+      project,
+      undefined,
+      undefined,
+      includeReasoning,
+    );
     const query = replacement
       ? ([...history].reverse().find((message) => message.role === 'user')?.content ?? '')
       : text;
@@ -357,7 +376,15 @@ export function useConversation(
       }
       if (capacity.search) {
         try {
-          const base = assembleProjectRequest(current, history, settings, project, [], []);
+          const base = assembleProjectRequest(
+            current,
+            history,
+            settings,
+            project,
+            [],
+            [],
+            includeReasoning,
+          );
           const baseCount = await estimatePromptTokens(base);
           const budgets = passageBudgets(
             Math.min(capacity.available! - instructionTokens, contextSize - baseCount.tokens),
@@ -387,6 +414,7 @@ export function useConversation(
               project,
               projectPassages,
               attachmentPassages,
+              includeReasoning,
             );
             const [resourceTokens, promptCount] = await Promise.all([
               estimateTextTokens(
@@ -456,7 +484,11 @@ export function useConversation(
       if (delta.sources) assistant.sources = delta.sources;
       if (delta.webSearch) assistant.webSearch = delta.webSearch;
       if (delta.metrics)
-        assistant.metrics = { ...assistant.metrics, ...delta.metrics, runId: server.runId };
+        assistant.metrics = {
+          ...assistant.metrics,
+          ...delta.metrics,
+          ...(cloud ? {} : { runId: server.runId }),
+        };
       if (delta.content) phase = 'generating';
       else if (delta.reasoning) phase = 'reasoning';
       if (streamFrame.current === null && mounted.current)
@@ -481,6 +513,7 @@ export function useConversation(
           : await invoke<Response>('generate', {
               request: {
                 requestId,
+                cloud: cloud?.selection,
                 imageIds: visionSupported
                   ? (current.attachments ?? [])
                       .filter((attachment) => attachment.image)
@@ -501,7 +534,11 @@ export function useConversation(
       assistant.content = response.content;
       assistant.reasoning = response.reasoning;
       if (response.metrics)
-        assistant.metrics = { ...assistant.metrics, ...response.metrics, runId: server.runId };
+        assistant.metrics = {
+          ...assistant.metrics,
+          ...response.metrics,
+          ...(cloud ? {} : { runId: server.runId }),
+        };
       if (response.error) assistant.error = response.error;
       if (response.error && isContextRejection(response.error) && !replacement) {
         rejectedDraft.current = { chatId: current.id, userId: user.id };

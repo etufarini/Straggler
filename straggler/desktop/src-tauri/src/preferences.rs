@@ -11,6 +11,8 @@ pub struct UiPreferences {
     pub sidebar_collapsed: bool,
     #[serde(default)]
     pub web_search_notice_seen: bool,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub cloud_notice_seen: std::collections::BTreeMap<String, String>,
     #[serde(default = "default_search_limit")]
     pub web_search_max_searches: u8,
     #[serde(default = "crate::web_search::registry::default_provider")]
@@ -34,6 +36,7 @@ impl Default for UiPreferences {
             sidebar_collapsed: false,
             presence_expanded: None,
             web_search_notice_seen: false,
+            cloud_notice_seen: Default::default(),
             web_search_max_searches: 3,
             web_search_provider: crate::web_search::registry::default_provider(),
         }

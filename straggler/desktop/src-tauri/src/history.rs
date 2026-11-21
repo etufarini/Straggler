@@ -14,6 +14,13 @@ use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CloudOrigin {
+    pub provider_id: String,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Message {
     pub id: Uuid,
     pub role: String,
@@ -30,6 +37,8 @@ pub struct Message {
     pub web_search: Option<crate::web_search::turn::TurnSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cloud: Option<CloudOrigin>,
     pub status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -495,6 +504,21 @@ fn validate(conversation: &Conversation) -> Result<()> {
         }
     }
     for message in &conversation.messages {
+        if let Some(cloud) = &message.cloud {
+            if message.role != "assistant"
+                || cloud.provider_id.is_empty()
+                || cloud.provider_id.len() > 128
+                || !cloud
+                    .provider_id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+                || cloud.name.trim().is_empty()
+                || cloud.name.chars().count() > 80
+                || cloud.name.chars().any(char::is_control)
+            {
+                return Err("Invalid saved cloud response origin.".into());
+            }
+        }
         crate::web_search::citations::validate_sources(&message.sources)?;
         if let Some(sources) = &message.attachment_sources {
             crate::project_search::validate(sources)?;
@@ -542,12 +566,32 @@ mod tests {
                 attachment_sources: None,
                 web_search: None,
                 model: None,
+                cloud: None,
                 status: "streaming".into(),
                 error: None,
                 metrics: None,
                 server_run_id: None,
             }],
         }
+    }
+
+    #[test]
+    fn cloud_origin_is_optional_validated_and_round_trips() {
+        let mut chat = conversation();
+        assert!(validate(&chat).is_ok());
+        chat.messages[0].cloud = Some(CloudOrigin {
+            provider_id: "openrouter".into(),
+            name: "OpenRouter".into(),
+        });
+        assert!(validate(&chat).is_ok());
+        let bytes = serde_json::to_vec(&chat).unwrap();
+        let loaded: Conversation = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            loaded.messages[0].cloud.as_ref().unwrap().name,
+            "OpenRouter"
+        );
+        chat.messages[0].role = "user".into();
+        assert!(validate(&chat).is_err());
     }
 
     #[test]

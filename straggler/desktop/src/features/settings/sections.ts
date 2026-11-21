@@ -1,6 +1,7 @@
 import type { Settings } from '../../domain/types';
 
 export type Section =
+  | 'cloud'
   | 'prompts'
   | 'model'
   | 'performance'

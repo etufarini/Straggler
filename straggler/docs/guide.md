@@ -193,6 +193,37 @@ For the pinned backend, disabling `cache_prompt` alone does not prevent its glob
 RAM prompt cache from retaining data; disabling cache RAM and ending the process
 are therefore required.
 
+### Use an optional cloud model
+
+Local chat works offline. To use a cloud service, open **Settings → Cloud models**,
+enter your own API key and choose **Save and verify**. This explicitly requests the
+service’s model list. A rejected replacement keeps the previous key. Keys live only
+in the system keychain; provider addresses, cached model metadata and **Models to
+show** are stored separately without credentials. **Refresh models** makes another
+explicit request. Custom providers must use HTTPS, except HTTP on loopback, and
+redirects are not followed. Custom services use the OpenAI Chat Completions format
+and are not tested by Straggler.
+
+In the model selector, choose **Cloud**, select a visible model and choose **Use
+model**. This stops only the llama.cpp process owned by Straggler and frees its
+memory. Choose **On this computer → Load model** to return to local inference.
+Selection lasts for this app session; provider setup and visible models are saved.
+Sampling settings apply only to local models. Capabilities and context capacity
+appear only when the service declares them; missing capabilities remain unknown.
+
+Before the first message to each service, **Continue** acknowledges that the chat
+history, applicable project instructions/files and included attachments leave this
+computer. Cancel preserves the draft and sends nothing. The service’s terms apply.
+The model header and composer identify the destination on every message. Cloud
+chat supports projects, attachment search, web search and branches. Unsupported
+images are explicitly excluded. **Stop response** cancels generation and retains
+partial text. Usage and cost appear only when reported by the service.
+
+Temporary cloud chats stay in memory and are not saved on this computer, but their
+messages still go to the selected service. Export keeps the existing conversation
+version 1 format and contains no keys. No cloud request runs at startup or merely
+by opening Settings or the model selector.
+
 ### Use reasoning controls
 
 The reasoning and effort controls beside the message box depend on what the

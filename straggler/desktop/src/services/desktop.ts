@@ -38,6 +38,12 @@ export const isTauri = () => !!fixture || nativeAvailable();
 export const isFixture = () => !!fixture;
 
 export type DesktopCommand =
+  | 'cloud_status'
+  | 'cloud_add_provider'
+  | 'cloud_models_show'
+  | 'cloud_key_save'
+  | 'cloud_models_refresh'
+  | 'cloud_use_model'
   | 'system_prompts_export'
   | 'system_prompts_list'
   | 'system_prompt_save'

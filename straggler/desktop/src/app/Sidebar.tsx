@@ -240,7 +240,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
       <div className="conversation-list">
         {conversations.length === 0 && (
           <p className="history-empty">
-            Your chats stay
+            Your chats are saved
             <br />
             on this device.
           </p>

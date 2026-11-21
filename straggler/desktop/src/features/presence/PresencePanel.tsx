@@ -19,8 +19,10 @@ export default function PresencePanel({
   onPreferences,
   ready,
   attachments,
+  cloudProvider,
 }: {
   state: PresenceState;
+  cloudProvider?: string;
   sources?: WebSource[];
   projectSources?: ProjectPassage[];
   attachmentSources?: ProjectPassage[];
@@ -99,7 +101,12 @@ export default function PresencePanel({
           {expanded ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
         </button>
         <div id={id}>
-          <AssistantPresence state={state} metrics={metrics} size={expanded ? 224 : 48} />
+          <AssistantPresence
+            state={state}
+            metrics={metrics}
+            provider={cloudProvider}
+            size={expanded ? 224 : 48}
+          />
           <Sources
             sources={sources}
             projectSources={projectSources}

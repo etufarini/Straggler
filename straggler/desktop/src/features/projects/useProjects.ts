@@ -17,7 +17,7 @@ import {
   projectService,
 } from '../../services/desktop';
 import type { TokenEstimate } from '../../services/desktop';
-import { pendingAttachmentRow } from '../../domain/attachments';
+import { pendingAttachmentRow, approximateTokens } from '../../domain/attachments';
 import type { AttachmentRow } from '../../domain/attachments';
 
 export function useProjects(
@@ -25,6 +25,7 @@ export function useProjects(
   server: ServerStatus,
   settings: Settings | undefined,
   details: ServerDetails | null,
+  cloud = false,
 ) {
   const [projects, setProjects] = useState<Project[]>([]);
   const current = useRef(projects);
@@ -196,14 +197,20 @@ export function useProjects(
       server.phase === 'ready' && measured?.key === measurementKey
         ? measured.values[text]
         : undefined;
-    return value?.source === 'server'
+    return !cloud && value?.source === 'server'
       ? value
-      : { tokens: estimateProjectTokens(text), source: 'approximate' };
+      : {
+          tokens: cloud ? approximateTokens(text) : estimateProjectTokens(text),
+          source: 'approximate',
+        };
   }
   function context(project: Project) {
     const count = estimate(prefixes[project.id] ?? projectSystemPrefix(project, settings));
-    const capacity =
-      server.phase === 'ready' && details?.runId === server.runId ? details?.contextSize : null;
+    const capacity = cloud
+      ? details?.contextSize
+      : server.phase === 'ready' && details?.runId === server.runId
+        ? details?.contextSize
+        : null;
     const instructions = estimate(projectInstructions(project, settings));
     return projectContextState(
       count.tokens,

@@ -1,3 +1,4 @@
+import CloudNotice from '../cloud/CloudNotice';
 import { Paperclip } from 'lucide-react';
 import { attachmentTypesLabel } from '../../domain/attachments';
 import RichComposer, { FormattingToggle, composerHint } from './composer/RichComposer';
@@ -20,6 +21,7 @@ import {
   RotateCcw,
   Folder,
   GitBranch,
+  Cloud,
 } from 'lucide-react';
 import { fileName } from '../../domain/types';
 import type { ProjectPassage } from '../../domain/types';
@@ -159,9 +161,17 @@ export default function ChatPanel({
           <div className="welcome">
             <h1>{controller.temporary ? 'Temporary chat' : 'What’s on your mind?'}</h1>
             {controller.temporary ? (
-              <p>Not saved. Leaving erases this chat unless you save it.</p>
+              <p>
+                {controller.cloud.active
+                  ? `Not saved on this computer. Messages are still sent to ${controller.cloud.active.providerName}.`
+                  : 'Not saved. Leaving erases this chat unless you save it.'}
+              </p>
             ) : (
-              <p>Powered by a model on this computer.</p>
+              <p>
+                {controller.cloud.active
+                  ? `Messages are sent to ${controller.cloud.active.providerName}.`
+                  : 'Powered by a model on this computer.'}
+              </p>
             )}
             <div className="suggestions">
               {[
@@ -214,8 +224,16 @@ export default function ChatPanel({
                     {message.role === 'user' ? 'You' : 'Straggler'}
                     {message.role === 'assistant' && (
                       <span>
+                        {message.cloud && (
+                          <Cloud
+                            size={12}
+                            aria-label={`Cloud response from ${message.cloud.name}`}
+                          />
+                        )}
                         {message.model || chat.model
-                          ? fileName(message.model || chat.model!)
+                          ? message.cloud
+                            ? message.model || chat.model!
+                            : fileName(message.model || chat.model!)
                           : 'Local model'}
                       </span>
                     )}
@@ -311,7 +329,7 @@ export default function ChatPanel({
                               editingBusy ||
                               generating ||
                               !editor.text.trim() ||
-                              (message.role === 'user' && server.phase !== 'ready')
+                              (message.role === 'user' && !controller.modelReady)
                             }
                             onClick={() => void saveEdit().catch(() => {})}
                           >
@@ -350,10 +368,11 @@ export default function ChatPanel({
                       {message.content ? 'Generating' : 'Thinking'}
                     </span>
                   )}
-                  {messageStatusLabel[message.status] && !(message.error && !server.issue) && (
-                    <div className="message-status">{messageStatusLabel[message.status]}</div>
-                  )}
-                  {message.error && !server.issue && (
+                  {messageStatusLabel[message.status] &&
+                    !(message.error && (!server.issue || !!message.cloud)) && (
+                      <div className="message-status">{messageStatusLabel[message.status]}</div>
+                    )}
+                  {message.error && (!server.issue || !!message.cloud) && (
                     <Feedback
                       title={
                         message.status === 'interrupted'
@@ -451,7 +470,7 @@ export default function ChatPanel({
                             disabled={
                               generating ||
                               editingBusy ||
-                              server.phase !== 'ready' ||
+                              !controller.modelReady ||
                               !!controller.storageError ||
                               archived
                             }
@@ -586,6 +605,7 @@ export default function ChatPanel({
               <span>Choose a model that supports images, or remove the image.</span>
             </Feedback>
           )}
+        {controller.cloud.notice && <CloudNotice controller={controller.cloud} />}
         <form
           ref={composerRef}
           className="composer"
@@ -604,14 +624,16 @@ export default function ChatPanel({
             label="Message"
             controlId="textarea-message"
             placeholder={
-              server.phase === 'ready'
-                ? 'Message your local model…'
-                : server.issue
-                  ? 'Review settings and restart the server to continue…'
-                  : 'Load a model to start chatting…'
+              controller.cloud.active
+                ? `Message ${controller.cloud.active.model.name}…`
+                : controller.modelReady
+                  ? 'Message your local model…'
+                  : server.issue
+                    ? 'Review settings and restart the server to continue…'
+                    : 'Load a model to start chatting…'
             }
             value={input}
-            disabled={archived || server.phase !== 'ready'}
+            disabled={archived || !controller.modelReady}
             toolbarVisible={toolbarVisible}
             onChange={setInput}
             onContextChange={setComposerMode}
@@ -668,7 +690,11 @@ export default function ChatPanel({
             </div>
           </div>
         </form>
-        <p className="composer-note">Models can make mistakes. Check important information.</p>
+        <p className="composer-note">
+          {controller.cloud.active
+            ? `Sent to ${controller.cloud.active.providerName} · ${controller.temporary ? 'Not saved on this computer · Models can make mistakes.' : 'Models can make mistakes. Check important information.'}`
+            : 'Models can make mistakes. Check important information.'}
+        </p>
       </div>
     </>
   );

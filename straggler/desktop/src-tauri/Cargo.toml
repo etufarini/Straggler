@@ -29,6 +29,7 @@ chardetng = "=0.1.17"
 encoding_rs = "0.8"
 base64 = "0.22"
 async-trait = "0.1"
+httpdate = "=1.0.3"
 url = { version = "2", features = ["serde"] }
 dom_smoothie = "0.19"
 zip = { version = "8.6", default-features = false, features = ["deflate"] }

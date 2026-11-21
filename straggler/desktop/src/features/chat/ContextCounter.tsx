@@ -7,10 +7,12 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
     controller.chat.messages,
     controller.serverDetails,
     controller.server,
+    controller.cloud.active,
   );
   const estimate = controller.contextEstimate;
   const estimated =
-    !!controller.chat.attachments?.length &&
+    (!!controller.chat.attachments?.length ||
+      (!!controller.cloud.active && (!reported || !!controller.input.trim()))) &&
     !!estimate.capacity &&
     (!estimate.includesImages || !!controller.input || !reported);
   const usage = estimated
@@ -90,17 +92,28 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
               </p>
               <p className="ctx-tech">
                 {estimated
-                  ? `${estimate.source === 'approximate' ? 'Approximate local estimate' : 'Estimated with llama-server tokenization'} of the prompt including attachments${estimate.templated ? ' and the chat template' : ''}.`
-                  : `Last reported response ${usage.source === 'usage' ? 'usage' : 'timings'} from llama-server. After a context shift, response totals may include discarded context.`}
+                  ? `${estimate.source === 'approximate' ? (controller.cloud.active ? 'Approximate estimate' : 'Approximate local estimate') : 'Estimated with llama-server tokenization'} of the prompt including attachments${estimate.templated ? ' and the chat template' : ''}.`
+                  : controller.cloud.active
+                    ? `Last response usage reported by ${controller.cloud.active.providerName}.`
+                    : `Last reported response ${usage.source === 'usage' ? 'usage' : 'timings'} from llama-server. After a context shift, response totals may include discarded context.`}
               </p>
             </>
           ) : (
             <p className="popover-note">
-              {controller.serverDetails?.error || 'Available once the server is running.'}
+              {controller.serverDetails?.error ||
+                (controller.cloud.active
+                  ? 'This service does not list the model’s context size.'
+                  : 'Available once the server is running.')}
             </p>
           )}
           <p className="ctx-tech">
-            Window size comes from the running server <code>n_ctx</code>
+            {controller.cloud.active ? (
+              'Window size is advertised by the cloud service'
+            ) : (
+              <>
+                Window size comes from the running server <code>n_ctx</code>
+              </>
+            )}
             {controller.serverDetails?.contextSize
               ? `: ${controller.serverDetails.contextSize.toLocaleString('en-US')} tokens`
               : ' · unavailable'}

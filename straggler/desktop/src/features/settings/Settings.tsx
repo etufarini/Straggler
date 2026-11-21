@@ -1,3 +1,5 @@
+import CloudSettings from '../cloud/CloudSettings';
+import type { CloudController } from '../cloud/useCloudModels';
 import SystemPromptsSettings from '../prompts/SystemPromptsSettings';
 import { settingsForModel } from '../../domain/types';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
@@ -23,16 +25,19 @@ const sections = [
   ['profiles', 'Saved configurations'],
   ['folders', 'Folders'],
   ['huggingface', 'Hugging Face'],
+  ['cloud', 'Cloud models'],
   ['websearch', 'Web search'],
   ['llama', 'llama.cpp'],
 ] as const;
 
 export default function Settings({
   webSearch,
+  cloud,
   onPrimaryActionChange,
   ...props
 }: SettingsProps & {
   webSearch: WebSearchController;
+  cloud: CloudController;
   onPrimaryActionChange: (active: boolean) => void;
 }) {
   const controller = useSettings(props);
@@ -132,6 +137,7 @@ export default function Settings({
                   {message}
                 </p>
               )}
+              {section === 'cloud' && <CloudSettings controller={cloud} />}
               {section === 'prompts' && <SystemPromptsSettings confirm={props.confirm} />}
               {section === 'model' && <ModelSettings controller={controller} />}
               {section === 'performance' && <PerformanceSettings controller={controller} />}
