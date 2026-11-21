@@ -4036,14 +4036,6 @@ input:focus-visible {
   padding: 4px;
 }
 
-.composer-chip.attach-chip {
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
-  padding: 0;
-  flex: 0 0 30px;
-  justify-content: center;
-}
 .file-thumb {
   object-fit: cover;
   border-radius: var(--ui-radius-xs);

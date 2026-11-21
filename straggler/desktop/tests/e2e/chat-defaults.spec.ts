@@ -172,6 +172,18 @@ test('composer shows the real attachment count and native drag highlight without
   await page.getByRole('button', { name: 'Attach files', exact: true }).click();
   const attach = page.getByRole('button', { name: 'Attach files, 2 attached', exact: true });
   await expect(attach).toHaveText('Attach · 2');
+  for (const width of [1440, 760]) {
+    await page.setViewportSize({ width, height: 820 });
+    await expect
+      .poll(() =>
+        attach.evaluate((button) => {
+          const bounds = button.getBoundingClientRect();
+          const label = button.querySelector('span')!.getBoundingClientRect();
+          return label.left >= bounds.left && label.right <= bounds.right;
+        }),
+      )
+      .toBe(true);
+  }
   await page.getByRole('textbox', { name: 'Message', exact: true }).focus();
   await page.evaluate(() =>
     window.dispatchEvent(
