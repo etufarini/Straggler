@@ -1,3 +1,5 @@
+import { exportFileName } from '../domain/conversationExport';
+import type { PresetText, SystemPromptPreset } from '../domain/systemPrompts';
 import { documentTypes } from '../domain/attachments';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
@@ -36,6 +38,12 @@ export const isTauri = () => !!fixture || nativeAvailable();
 export const isFixture = () => !!fixture;
 
 export type DesktopCommand =
+  | 'system_prompts_export'
+  | 'system_prompts_list'
+  | 'system_prompt_save'
+  | 'system_prompt_delete'
+  | 'system_prompts_import'
+  | 'system_prompts_read_import'
   | 'web_search_status'
   | 'web_search_key_save'
   | 'open_web_url'
@@ -310,4 +318,36 @@ export const projectService = {
 
 export async function openWebUrl(url: string): Promise<void> {
   await invoke('open_web_url', { url });
+}
+
+export async function choosePromptImport(): Promise<PresetText[] | null> {
+  const path = fixture
+    ? (await fixture).chooseImportPath()
+    : await nativeOpen({
+        title: 'Import system prompts',
+        multiple: false,
+        directory: false,
+        filters: [{ name: 'Prompt files', extensions: ['json', 'md', 'txt'] }],
+      });
+  return path ? invoke<PresetText[]>('system_prompts_read_import', { path }) : null;
+}
+
+export async function exportPromptPresets(presets: SystemPromptPreset[]): Promise<boolean> {
+  const defaultPath =
+    presets.length === 1
+      ? exportFileName(presets[0].name).replace(/\.json$/, '.straggler-prompts.json')
+      : 'straggler-prompts.json';
+  const path = fixture
+    ? (await fixture).chooseSavePath(defaultPath)
+    : await nativeSave({
+        title: 'Export system prompts',
+        defaultPath,
+        filters: [{ name: 'System prompt presets', extensions: ['json'] }],
+      });
+  if (!path) return false;
+  const contents = await invoke<string>('system_prompts_export', {
+    ids: presets.map((preset) => preset.id),
+  });
+  await invoke('write_export', { path, contents });
+  return true;
 }

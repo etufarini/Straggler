@@ -1,3 +1,6 @@
+import Select from '../../components/Select';
+import { systemPromptError, availablePresetName } from '../../domain/systemPrompts';
+import { InsertPreset, usePromptPresets } from '../prompts/PromptPresets';
 import { countLabel } from '../../domain/text';
 import { useState } from 'react';
 import { ChevronDown, FileText } from 'lucide-react';
@@ -20,7 +23,11 @@ function SystemPromptEditor({
   const [text, setText] = useState(
     ownSystemPrompt(chat) ?? config?.settings.chat_system_prompt ?? '',
   );
-  const tooLong = new TextEncoder().encode(text).length > 65536 || text.includes('\0');
+  const { presets, ready, error, edit } = usePromptPresets();
+  const [selectedPreset, setSelectedPreset] = useState('');
+  const selected = presets.find((preset) => preset.id === selectedPreset);
+  const matching = presets.find((preset) => preset.prompt === text);
+  const tooLong = systemPromptError(text);
   return (
     <>
       <p className="popover-note">
@@ -53,6 +60,30 @@ function SystemPromptEditor({
           </label>
         </div>
       </fieldset>
+      {source === 'chat' && (
+        <label className="setting-field">
+          <span>Preset</span>
+          <Select
+            aria-label="Preset"
+            value={selectedPreset}
+            disabled={!ready}
+            options={[
+              { value: '', label: 'None' },
+              ...presets.map((preset) => ({ value: preset.id, label: preset.name })),
+            ]}
+            onChange={(id) => {
+              setSelectedPreset(id);
+              const preset = presets.find((preset) => preset.id === id);
+              if (preset) setText(preset.prompt);
+            }}
+          />
+        </label>
+      )}
+      {error && (
+        <p className="field-error" role="alert">
+          Couldn’t load presets. {error}
+        </p>
+      )}
       <textarea
         className="instructions-input"
         aria-label="System prompt instructions"
@@ -62,9 +93,14 @@ function SystemPromptEditor({
         placeholder="Use the model’s default"
         onChange={(event) => setText(event.target.value)}
       />
+      {source === 'chat' && (matching || selected) && (
+        <p className="popover-note">
+          {matching ? `From preset ‘${matching.name}’` : `Edited from ‘${selected!.name}’`}
+        </p>
+      )}
       {source === 'chat' && tooLong && (
         <p className="field-error" role="alert">
-          Use at most 65536 UTF-8 bytes without NUL characters.
+          {tooLong}
         </p>
       )}
       <div className="popover-actions">
@@ -80,8 +116,23 @@ function SystemPromptEditor({
         </button>
         <button
           type="button"
+          className="text-button"
+          disabled={!ready || !!tooLong}
+          onClick={() => {
+            edit({
+              name: availablePresetName(selected?.name ?? 'Chat prompt', presets),
+              description: '',
+              prompt: source === 'default' ? (config?.settings.chat_system_prompt ?? '') : text,
+            });
+            close();
+          }}
+        >
+          Save as preset…
+        </button>
+        <button
+          type="button"
           className="primary-button"
-          disabled={controller.chatOptionsDisabled || (source === 'chat' && tooLong)}
+          disabled={controller.chatOptionsDisabled || (source === 'chat' && !!tooLong)}
           onClick={() => {
             setChatOptions({ systemPrompt: source === 'default' ? null : text });
             close();
@@ -180,6 +231,7 @@ function ProjectInstructionsEditor({
           This chat’s own prompt is kept and returns if the chat leaves the project.
         </p>
       )}
+      {!project.archived && <InsertPreset disabled={busy} onInsert={setText} />}
       <textarea
         className="instructions-input"
         data-initial-focus

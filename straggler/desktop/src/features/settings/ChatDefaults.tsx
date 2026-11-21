@@ -1,3 +1,4 @@
+import { InsertPreset } from '../prompts/PromptPresets';
 import ReasoningControls from '../../components/ReasoningControls';
 import { useId } from 'react';
 import type { SettingsController } from './useSettings';
@@ -11,6 +12,7 @@ export default function ChatDefaults({ controller }: { controller: SettingsContr
       <p className="field-help">
         New chats start with these. Change them for one chat from the message box.
       </p>
+      <InsertPreset onInsert={(text) => change('chat_system_prompt', text)} />
       <label className="setting-field">
         <span>Default system prompt</span>
         <textarea
