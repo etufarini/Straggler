@@ -22,7 +22,10 @@ type Fingerprint = sha2::digest::Output<Sha256>;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Passage {
     pub n: usize,
-    pub project_id: Uuid,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation_id: Option<Uuid>,
     pub file_id: Uuid,
     pub name: String,
     pub section: usize,
@@ -280,7 +283,10 @@ fn search_project(
         return Ok(Vec::new());
     }
     let included = project.files.iter().filter(|file| file.included);
-    let files: HashMap<_, _> = included.clone().map(|file| (file.id, file)).collect();
+    let files: HashMap<_, _> = included
+        .clone()
+        .map(|file| (file.id, file.name.as_str()))
+        .collect();
     let documents: Vec<_> = included
         .map(|file| SearchDocument {
             id: file.id,
@@ -288,6 +294,31 @@ fn search_project(
         })
         .collect();
     let index = PassageIndex::open(Some(directory), &documents)?;
+    ranked_passages(
+        &index,
+        SourceScope::Project(project.id),
+        &files,
+        query,
+        budget,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum SourceScope {
+    Project(Uuid),
+    Attachment(Uuid),
+}
+
+fn ranked_passages(
+    index: &PassageIndex,
+    scope: SourceScope,
+    files: &HashMap<Uuid, &str>,
+    query: &str,
+    budget: usize,
+) -> Result<Vec<Passage>> {
+    if budget == 0 {
+        return Ok(Vec::new());
+    }
     let Some(query) = index.query(query, false)? else {
         return Ok(Vec::new());
     };
@@ -300,15 +331,19 @@ fn search_project(
     let matches = searcher
         .search(&query, &TopDocs::with_limit(limit).order_by_score())
         .map_err(|e| e.to_string())?;
+    let (project_id, conversation_id, marker) = match scope {
+        SourceScope::Project(id) => (Some(id), None, 'P'),
+        SourceScope::Attachment(id) => (None, Some(id), 'A'),
+    };
     let mut result = Vec::new();
     let mut remaining = budget.saturating_mul(4);
     for (_, address) in matches {
         let IndexedPassage { id, section, text } = index.read(&searcher, address)?;
-        let file = files
+        let name = files
             .get(&id)
-            .ok_or("Project search index is out of date.")?;
+            .ok_or("The file search index is out of date.")?;
         let n = result.len() + 1;
-        let overhead = format!("[P{n}] {} · section {section}\n\n", file.name)
+        let overhead = format!("[{marker}{n}] {name} · section {section}\n\n")
             .chars()
             .count();
         if remaining <= overhead {
@@ -318,9 +353,10 @@ fn search_project(
         remaining -= overhead + text.chars().count();
         result.push(Passage {
             n,
-            project_id: project.id,
+            project_id,
+            conversation_id,
             file_id: id,
-            name: file.name.clone(),
+            name: (*name).into(),
             section,
             text,
         });
@@ -329,9 +365,109 @@ fn search_project(
 }
 
 #[derive(Default)]
+struct MemoryPassageIndex {
+    index: Option<(Fingerprint, PassageIndex)>,
+}
+
+impl MemoryPassageIndex {
+    fn get(&mut self, documents: &[SearchDocument<'_>]) -> Result<&PassageIndex> {
+        let key = fingerprint(documents)?;
+        if self
+            .index
+            .as_ref()
+            .is_none_or(|(previous, _)| *previous != key)
+        {
+            self.index = Some((key, PassageIndex::open(None, documents)?));
+        }
+        Ok(&self.index.as_ref().unwrap().1)
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct AttachmentIndex {
+    cache: MemoryPassageIndex,
+}
+
+impl AttachmentIndex {
+    pub fn search(
+        &mut self,
+        conversation_id: Uuid,
+        attachments: &[crate::attachments::Attachment],
+        query: &str,
+        budget: usize,
+    ) -> Result<Vec<Passage>> {
+        if budget == 0 {
+            return Ok(Vec::new());
+        }
+        let mut files: Vec<_> = attachments
+            .iter()
+            .filter(|file| file.image.is_none())
+            .collect();
+        files.sort_unstable_by_key(|file| file.id);
+        let documents: Vec<_> = files
+            .iter()
+            .map(|file| SearchDocument {
+                id: file.id,
+                text: &file.text,
+            })
+            .collect();
+        let names: HashMap<_, _> = files
+            .iter()
+            .map(|file| (file.id, file.name.as_str()))
+            .collect();
+        let index = self.cache.get(&documents)?;
+        ranked_passages(
+            index,
+            SourceScope::Attachment(conversation_id),
+            &names,
+            query,
+            budget,
+        )
+    }
+}
+
+impl crate::Runtime {
+    pub fn search_attachments(
+        &self,
+        id: Uuid,
+        temporary: bool,
+        query: &str,
+        budget: usize,
+    ) -> Result<Vec<Passage>> {
+        if temporary {
+            // Keep the session lock through indexing so erasure also drops this cache.
+            let session = self.temporary.lock().map_err(|e| e.to_string())?;
+            let session = session
+                .as_ref()
+                .filter(|session| session.id == id && !session.ending)
+                .ok_or("The temporary chat is no longer available.")?;
+            let attachments = session
+                .originals
+                .values()
+                .map(|file| file.attachment.clone())
+                .collect::<Vec<_>>();
+            return self
+                .attachment_index
+                .lock()
+                .map_err(|e| e.to_string())?
+                .search(id, &attachments, query, budget);
+        }
+        let attachments = {
+            let _guard = self.history.writer.lock().map_err(|e| e.to_string())?;
+            self.history.recover()?;
+            self.history.read_one(id)?.attachments
+        };
+        self.attachment_index
+            .lock()
+            .map_err(|e| e.to_string())?
+            .search(id, &attachments, query, budget)
+    }
+}
+
+#[derive(Default)]
 pub(crate) struct ChatTextIndex {
     // The cache lives only in memory. Deleting a chat cannot leave a second file on disk.
-    index: Option<(Fingerprint, PassageIndex)>,
+    cache: MemoryPassageIndex,
 }
 
 impl ChatTextIndex {
@@ -339,13 +475,19 @@ impl ChatTextIndex {
         chats.sort_unstable_by_key(|chat| chat.id);
         let texts: Vec<_> = chats
             .iter()
-            .filter(|chat| !chat.messages.is_empty())
+            .filter(|chat| !chat.messages.is_empty() || !chat.attachments.is_empty())
             .map(|chat| {
                 (
                     chat.id,
                     chat.messages
                         .iter()
                         .map(|message| message.content.as_str())
+                        .chain(
+                            chat.attachments
+                                .iter()
+                                .filter(|file| file.image.is_none())
+                                .map(|file| file.text.as_str()),
+                        )
                         .collect::<Vec<_>>()
                         .join("\n\n"),
                 )
@@ -355,15 +497,7 @@ impl ChatTextIndex {
             .iter()
             .map(|(id, text)| SearchDocument { id: *id, text })
             .collect();
-        let key = fingerprint(&documents)?;
-        if self
-            .index
-            .as_ref()
-            .is_none_or(|(previous, _)| *previous != key)
-        {
-            self.index = Some((key, PassageIndex::open(None, &documents)?));
-        }
-        let index = &self.index.as_ref().unwrap().1;
+        let index = self.cache.get(&documents)?;
         let Some(query) = index.query(query, true)? else {
             return Ok(Vec::new());
         };
@@ -382,13 +516,14 @@ impl ChatTextIndex {
 
 pub fn validate(sources: &[Passage]) -> Result<()> {
     for (index, source) in sources.iter().enumerate() {
-        if source.n != index + 1
+        if source.project_id.is_some() == source.conversation_id.is_some()
+            || source.n != index + 1
             || source.section == 0
             || source.name.is_empty()
             || source.name.len() > 4096
             || source.text.chars().count() > 3200
         {
-            return Err("Invalid saved project source.".into());
+            return Err("Invalid saved file source.".into());
         }
     }
     Ok(())
@@ -398,6 +533,67 @@ pub fn validate(sources: &[Passage]) -> Result<()> {
 mod tests {
     use super::*;
     use crate::projects::ProjectFile;
+
+    #[test]
+    fn attachment_index_is_memory_only_refreshes_content_and_preserves_scope() {
+        let id = Uuid::new_v4();
+        let mut files = vec![crate::attachments::Attachment {
+            id: Uuid::new_v4(),
+            name: "research.txt".into(),
+            extension: "txt".into(),
+            size: 20000,
+            text: format!(
+                "{}neutrino evidence",
+                "unrelated archival text. ".repeat(600)
+            ),
+            image: None,
+        }];
+        let mut index = AttachmentIndex::default();
+        let sources = index.search(id, &files, "neutrino", 1000).unwrap();
+        assert!(!sources.is_empty());
+        assert!(sources[0].section > 1);
+        assert_eq!(sources[0].conversation_id, Some(id));
+        assert_eq!(sources[0].project_id, None);
+        assert!(sources[0].text.contains("neutrino"));
+        validate(&sources).unwrap();
+        let key = index.cache.index.as_ref().unwrap().0;
+        files[0].name = "renamed.txt".into();
+        let other = Uuid::new_v4();
+        let renamed = index.search(other, &files, "neutrino", 1000).unwrap();
+        assert_eq!(renamed[0].name, "renamed.txt");
+        assert_eq!(renamed[0].conversation_id, Some(other));
+        assert_eq!(index.cache.index.as_ref().unwrap().0, key);
+        files[0].text = "replacement evidence about telescopes".into();
+        assert!(index
+            .search(id, &files, "neutrino", 1000)
+            .unwrap()
+            .is_empty());
+        assert_ne!(index.cache.index.as_ref().unwrap().0, key);
+        assert!(!index
+            .search(id, &files, "telescopes", 1000)
+            .unwrap()
+            .is_empty());
+        assert!(index
+            .search(id, &[], "telescopes", 1000)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn sidebar_index_includes_attachment_text_and_refreshes_after_removal() {
+        let id = Uuid::new_v4();
+        let mut chat: Conversation = serde_json::from_value(serde_json::json!({
+            "id": id, "title": "Research", "createdAt": 1, "updatedAt": 1, "model": null,
+            "messages": [], "attachments": [{"id": Uuid::new_v4(), "name": "notes.txt", "extension": "txt", "size": 10, "text": "neutrino observations"}]
+        })).unwrap();
+        let mut index = ChatTextIndex::default();
+        assert_eq!(
+            index.matches(vec![chat.clone()], "neutrino").unwrap(),
+            vec![id]
+        );
+        chat.attachments.clear();
+        assert!(index.matches(vec![chat], "neutrino").unwrap().is_empty());
+    }
 
     #[test]
     fn rebuilds_from_included_files_and_keeps_ranked_passages_within_budget() {

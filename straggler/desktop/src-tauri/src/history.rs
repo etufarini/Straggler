@@ -25,6 +25,8 @@ pub struct Message {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_sources: Option<Vec<crate::project_search::Passage>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_sources: Option<Vec<crate::project_search::Passage>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub web_search: Option<crate::web_search::turn::TurnSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
@@ -494,6 +496,9 @@ fn validate(conversation: &Conversation) -> Result<()> {
     }
     for message in &conversation.messages {
         crate::web_search::citations::validate_sources(&message.sources)?;
+        if let Some(sources) = &message.attachment_sources {
+            crate::project_search::validate(sources)?;
+        }
         if let Some(sources) = &message.project_sources {
             crate::project_search::validate(sources)?;
         }
@@ -534,6 +539,7 @@ mod tests {
                 reasoning: String::new(),
                 sources: vec![],
                 project_sources: None,
+                attachment_sources: None,
                 web_search: None,
                 model: None,
                 status: "streaming".into(),
@@ -542,6 +548,45 @@ mod tests {
                 server_run_id: None,
             }],
         }
+    }
+
+    #[test]
+    fn optional_attachment_sources_roundtrip_without_changing_old_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::new(dir.path().into()).unwrap();
+        let mut chat = conversation();
+        history.save(&chat).unwrap();
+        assert!(history.list().unwrap()[0].messages[0]
+            .attachment_sources
+            .is_none());
+        chat.messages[0].attachment_sources = Some(vec![crate::project_search::Passage {
+            n: 1,
+            project_id: None,
+            conversation_id: Some(chat.id),
+            file_id: Uuid::new_v4(),
+            name: "notes.txt".into(),
+            section: 1,
+            text: "Saved excerpt".into(),
+        }]);
+        history.save(&chat).unwrap();
+        assert_eq!(
+            history.list().unwrap()[0].messages[0]
+                .attachment_sources
+                .as_ref()
+                .unwrap()[0]
+                .text,
+            "Saved excerpt"
+        );
+        chat.messages[0].attachment_sources.as_mut().unwrap()[0].n = 2;
+        assert!(history.save(&chat).is_err());
+        assert_eq!(
+            history.list().unwrap()[0].messages[0]
+                .attachment_sources
+                .as_ref()
+                .unwrap()[0]
+                .n,
+            1
+        );
     }
 
     #[test]

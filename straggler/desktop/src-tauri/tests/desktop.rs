@@ -317,6 +317,12 @@ async fn saving_temporary_attachments_is_explicit_and_storage_failure_preserves_
     let original = fixture._directory.path().join("private.txt");
     fs::write(&original, "temporary original bytes").unwrap();
     let attachment = runtime.temporary_attachment(id, &original).unwrap();
+    let passages = runtime
+        .search_attachments(id, true, "temporary", 100)
+        .unwrap();
+    assert_eq!(passages.len(), 1);
+    assert_eq!(passages[0].text, "temporary original bytes");
+    assert_eq!(passages[0].conversation_id, Some(id));
     assert_eq!(stored_files(&fixture.data), before);
     let chat: straggler_desktop::history::Conversation =
         serde_json::from_value(serde_json::json!({
@@ -337,6 +343,9 @@ async fn saving_temporary_attachments_is_explicit_and_storage_failure_preserves_
     fs::rename(&backup, &directory).unwrap();
     runtime.finish_temporary(id, Some(chat), false).unwrap();
     runtime.ensure_persistent(id).unwrap();
+    assert!(runtime
+        .search_attachments(id, true, "temporary", 100)
+        .is_err());
     let saved = runtime.history.list().unwrap();
     assert_eq!(saved.len(), 1);
     assert_eq!(saved[0].attachments[0].text, "temporary original bytes");
