@@ -31,7 +31,19 @@
   --ui-action-tonal-border: #4f86ff66;
   --ui-option-text: #dfe6ff;
   --ui-select-check: var(--star-a);
+  --ui-control-accent: var(--ui-accent-edge);
   --ui-sidebar-tint: #4f86ff1f;
+  /* Semantic colours shared by every area (DESIGN_SYSTEM: status colours stay unchanged). */
+  --ui-ready: #4fe3b0;
+  --ui-warning: #d9ae80;
+  --ui-error: #e08b8b;
+  --ui-star: #f5d37a;
+  --ui-danger: #c2415f;
+  --ui-danger-hover: #d4526f;
+  --ui-danger-text: #ffc6d6;
+  --ui-danger-surface: #3a1f33;
+  --ui-danger-border: #9a4a6a;
+  --ui-scrim-shadow: #050a1fcc;
   /* Static stellar layers from the approved D003 proposal. */
   --stars-field: url('./assets/starfield.svg');
   --stars-field-light: url('./assets/starfield-light.svg');
@@ -48,6 +60,7 @@
     sans-serif;
   color: var(--ui-text);
   background: var(--ui-background);
+  color-scheme: dark;
   font-synthesis: none;
   font-size: var(--ui-font-size);
   line-height: 1.55;
@@ -67,7 +80,7 @@
   --ui-radius-xl: 16px;
   --ui-radius-pill: 999px;
   --ui-sidebar-width: 248px;
-  --ui-font-size: var(--ui-fs-body);
+  --ui-font-size: 14px;
   --ui-subtle: var(--ui-text-3);
   --ui-elev-0: #0d1534;
   --ui-elev-1: #141d3d;
@@ -137,6 +150,12 @@ body[data-area='settings'] {
   --ui-select-ring: #5fd6c840;
   --ui-option-text: var(--ui-text-1);
   --ui-select-check: var(--gnd-accent);
+  --ui-control-accent: var(--gnd-accent);
+  --ui-action-secondary: var(--gnd-2);
+  --ui-action-secondary-hover: var(--gnd-3);
+  --ui-danger-surface: #3a2026;
+  --ui-danger-border: #8a4a55;
+  --ui-danger-text: #ffc9cf;
   --gnd-0: #0a171c;
   --gnd-1: #0e1f25;
   --gnd-2: #14292f;
@@ -203,7 +222,7 @@ textarea {
 }
 input {
   font: inherit;
-  color: #f3f6ff;
+  color: var(--ui-text-1);
   background: var(--ui-field);
   border: 1px solid #3b4862;
   border-radius: var(--ui-radius);
@@ -226,7 +245,9 @@ input:disabled {
   flex-shrink: 0;
 }
 .header-controls button {
+  min-height: 0;
   font-size: var(--ui-fs-meta);
+  line-height: inherit;
   padding: 7px 10px;
 }
 .settings-page {
@@ -400,7 +421,6 @@ input:disabled {
   overflow-wrap: anywhere;
   border: 1px solid #39445c;
   border-radius: var(--ui-radius);
-  background: #121823;
   font-size: var(--ui-fs-badge);
   padding: 15px;
 }
@@ -409,10 +429,6 @@ input:disabled {
   flex-wrap: wrap;
   gap: 8px;
   margin: 18px 0;
-}
-.row-actions button {
-  font-size: var(--ui-fs-badge);
-  border-color: #3e4d6c;
 }
 .profile-actions {
   display: flex;
@@ -423,10 +439,6 @@ input:disabled {
 }
 .profile-actions > button {
   justify-content: center;
-  font-size: var(--ui-fs-meta);
-  border-color: #3a4861;
-  border: 1px solid var(--ui-control-border);
-  background: var(--ui-raised);
 }
 .folder-setting {
   padding: 0 0 22px;
@@ -436,7 +448,6 @@ input:disabled {
 .folder-setting code {
   display: block;
   overflow-wrap: anywhere;
-  color: #91a5ca;
   margin: 0 0 15px;
 }
 .folder-setting button {
@@ -454,7 +465,6 @@ input:disabled {
   display: block;
   overflow-wrap: anywhere;
   font-size: var(--ui-fs-badge);
-  color: #8296bb;
   margin-top: 6px;
 }
 .build-summary p {
@@ -489,7 +499,6 @@ input:disabled {
 }
 .folder-browser {
   width: min(600px, calc(100% - 30px));
-  background: #1b2435;
   border: 1px solid #4a6087;
   border-radius: var(--ui-radius-lg);
   padding: 25px;
@@ -499,6 +508,7 @@ input:disabled {
 .folder-browser h2 {
   margin: 0;
   font-size: var(--ui-fs-title-2);
+  font-weight: var(--ui-fw-strong);
 }
 .path-entry {
   display: flex;
@@ -528,7 +538,6 @@ input:disabled {
   min-height: 100px;
   max-height: 35dvh;
   overflow: auto;
-  background: #121b2b;
   border: 1px solid #344664;
   border-radius: var(--ui-radius);
   padding: 7px;
@@ -602,6 +611,11 @@ summary:focus-visible {
 button svg {
   flex-shrink: 0;
 }
+/* Disclosure toggles keep the WCAG 2.2 minimum pointer target. */
+summary {
+  min-height: 24px;
+  cursor: pointer;
+}
 code,
 pre {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
@@ -664,9 +678,6 @@ code {
   font-size: var(--ui-fs-label);
   color: var(--ui-text-2);
 }
-.nav-item svg {
-  color: #737c90;
-}
 .selected {
   background: #ffffff05;
   color: #e3e9f8;
@@ -711,9 +722,6 @@ code {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-:is(.conversation-row, .sidebar-project-row) svg {
-  color: #727c91;
-}
 
 .sidebar-bottom {
   border-top: 1px solid #ffffff08;
@@ -729,7 +737,7 @@ code {
   background: #8090bf;
 }
 .status-dot.ready {
-  background: #4fe3b0;
+  background: var(--ui-ready);
   box-shadow: 0 0 10px #4fe3b066;
 }
 .status-dot.loading,
@@ -737,7 +745,7 @@ code {
   background: #d0ae76;
 }
 .status-dot.error {
-  background: #e08b8b;
+  background: var(--ui-error);
 }
 .version {
   display: flex;
@@ -836,9 +844,9 @@ code {
 .local-badge {
   display: flex;
   align-items: center;
+  color: #d3dbf5;
   gap: 7px;
   font-size: var(--ui-fs-badge);
-  color: #d3dbf5;
   border: 1px solid #303646;
   border-radius: var(--ui-radius-pill);
   padding: 5px 10px 5px 11px;
@@ -856,6 +864,7 @@ code {
   margin: clamp(40px, 10vh, 125px) auto 40px;
   text-align: center;
 }
+/* Default heading roles; component rules refine margins and colours. */
 h2 {
   font-size: var(--ui-fs-title-2);
   font-weight: var(--ui-fw-strong);
@@ -919,7 +928,7 @@ h1 {
   border: 1px solid transparent;
   border-radius: var(--ui-radius-xl);
   box-shadow:
-    0 16px 40px -24px #050a1fcc,
+    0 16px 40px -24px var(--ui-scrim-shadow),
     0 0 0 1px var(--ui-composer-ring);
   position: relative;
   container-type: inline-size;
@@ -939,7 +948,7 @@ textarea {
   min-height: 93px;
   max-height: 200px;
   background: transparent;
-  color: #f3f6ff;
+  color: var(--ui-text-1);
   padding: 18px 20px 6px;
   font-size: var(--ui-fs-body);
   line-height: 1.7;
@@ -1108,7 +1117,7 @@ textarea:disabled {
   border-color: #c7847a;
 }
 .status-dot.needs-restart {
-  background: #d9ae80;
+  background: var(--ui-warning);
 }
 .message-column {
   max-width: 770px;
@@ -1143,7 +1152,7 @@ textarea:disabled {
 }
 .message-heading {
   font-size: var(--ui-fs-label);
-  color: #f3f6ff;
+  color: var(--ui-text-1);
   font-weight: var(--ui-fw-strong);
   margin: 4px 0 10px;
 }
@@ -1161,7 +1170,7 @@ textarea:disabled {
   overflow-wrap: anywhere;
 }
 .user .markdown {
-  color: #f3f6ff;
+  color: var(--ui-text-1);
 }
 .markdown > :first-child {
   margin-top: 0;
@@ -1269,7 +1278,7 @@ textarea:disabled {
 .panel-heading h2 {
   font-size: var(--ui-fs-title-2);
   font-weight: var(--ui-fw-strong);
-  letter-spacing: -0.6px;
+  letter-spacing: -0.01em;
   margin: 3px 0;
 }
 .panel-heading button {
@@ -1278,7 +1287,6 @@ textarea:disabled {
 }
 .panel-intro {
   font-size: var(--ui-fs-label);
-  color: #a2acc0;
   margin-bottom: 18px;
 }
 .text-button {
@@ -1291,10 +1299,8 @@ textarea:disabled {
   gap: 12px;
   padding: 17px;
   margin: 20px 0;
-  background: #222b3d;
-  border: 1px solid #354766;
+  border: 1px solid;
   border-radius: var(--ui-radius);
-  color: #b7c7e8;
 }
 .setup-callout > svg {
   margin-top: 2px;
@@ -1362,7 +1368,6 @@ textarea:disabled {
   font-size: var(--ui-fs-badge);
 }
 .capability-note {
-  color: #8998b4;
   font-size: var(--ui-fs-badge);
   line-height: 1.9;
   margin: 20px 0;
@@ -1373,12 +1378,44 @@ textarea:disabled {
   gap: 10px;
   margin-top: 24px;
 }
+/* Action hierarchy (DESIGN_SYSTEM · Azioni): one filled primary per view, outlined
+   secondary, text-only tertiary and danger. Unclassed buttons inside action groups are
+   secondary actions, so Cancel always reads as the safe alternative. */
+.primary-button,
+.danger-button,
+.secondary-button,
+.text-button,
+:is(.panel-actions, .popover-actions, .row-actions, .profile-actions, .folder-setting)
+  button:not(.primary-button, .danger-button, .text-button) {
+  min-height: 36px;
+  padding: 7px 14px;
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-medium);
+  line-height: 20px;
+}
+.secondary-button,
+:is(.panel-actions, .popover-actions, .row-actions, .profile-actions, .folder-setting)
+  button:not(.primary-button, .danger-button, .text-button) {
+  border-color: var(--ui-control-border);
+  background: var(--ui-action-secondary, transparent);
+  color: var(--ui-text-1);
+}
+:is(
+    .secondary-button,
+    :is(.panel-actions, .popover-actions, .row-actions, .profile-actions, .folder-setting)
+      button:not(.primary-button, .danger-button, .text-button)
+  ):hover:not(:disabled) {
+  border-color: var(--ui-control-hover);
+  background: var(--ui-action-secondary-hover, var(--ui-hover));
+}
 .primary-button {
   background: var(--ui-primary);
   color: #ffffff;
-  font-weight: var(--ui-fw-strong);
-  font-size: var(--ui-fs-meta);
-  padding: 10px 17px;
+  font-weight: var(--ui-fw-medium);
+}
+input[type='radio'],
+input[type='checkbox'] {
+  accent-color: var(--ui-control-accent);
 }
 .topbar.has-page-primary .header-controls .primary-button {
   background: var(--ui-action-tonal, var(--ui-selected));
@@ -1390,16 +1427,9 @@ textarea:disabled {
   background: var(--ui-primary-hover);
 }
 .danger-button {
-  border: 1px solid #765052;
-  color: #ffc6d6;
-  background: #3a1f33;
-  font-size: var(--ui-fs-meta);
-  border-color: #9a4a6a;
-}
-body[data-area='settings'] .danger-button {
-  background: #3a2026;
-  border-color: #8a4a55;
-  color: #ffc9cf;
+  border: 1px solid var(--ui-danger-border);
+  color: var(--ui-danger-text);
+  background: var(--ui-danger-surface);
 }
 
 .log-panel {
@@ -1419,7 +1449,6 @@ body[data-area='settings'] .danger-button {
 .server-log {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: #10141c;
   border: 1px solid #303b51;
   border-radius: var(--ui-radius);
   padding: 16px;
@@ -1427,7 +1456,6 @@ body[data-area='settings'] .danger-button {
   line-height: 1.8;
   height: 55vh;
   overflow: auto;
-  color: #acbad3;
 }
 .confirmation-backdrop {
   z-index: 20;
@@ -1436,8 +1464,7 @@ body[data-area='settings'] .danger-button {
 }
 .confirmation {
   width: min(440px, calc(100% - 32px));
-  border: 1px solid #465674;
-  background: #202838;
+  border: 1px solid;
   border-radius: var(--ui-radius-lg);
   padding: 27px;
   box-shadow: 0 20px 80px #00000070;
@@ -1445,6 +1472,7 @@ body[data-area='settings'] .danger-button {
 .confirmation h2 {
   font-size: var(--ui-fs-title-2);
   font-weight: var(--ui-fw-strong);
+  line-height: 1.3;
   margin: 0 0 12px;
 }
 .confirmation p {
@@ -1670,7 +1698,7 @@ body[data-area='settings'] .danger-button {
   border-radius: var(--ui-radius-lg);
   border: 1px solid var(--ui-control-border);
   background: var(--ui-elev-3);
-  box-shadow: 0 28px 70px -20px #050a1fcc;
+  box-shadow: 0 28px 70px -20px var(--ui-scrim-shadow);
   color: var(--ui-text);
   font-size: var(--ui-fs-label);
   max-height: min(440px, 65dvh);
@@ -1823,6 +1851,7 @@ body[data-area='settings'] .danger-button {
 }
 .ctx-figures b {
   font-size: var(--ui-fs-title-3);
+  font-weight: var(--ui-fw-strong);
 }
 .ctx-figures span {
   color: var(--ui-muted);
@@ -2004,7 +2033,7 @@ body[data-area='settings'] .danger-button {
   bottom: 0;
   z-index: 7;
   width: 288px;
-  box-shadow: -24px 0 60px #050a1fcc;
+  box-shadow: -24px 0 60px var(--ui-scrim-shadow);
 }
 /* Density follows the measured composer and natural control widths, not the window. */
 .composer[data-narrow='true'] .keyboard-hint {
@@ -2067,15 +2096,13 @@ body[data-area='settings'] .danger-button {
 }
 .profile-actions > .danger-button {
   margin-left: auto;
-  border-color: #9a4a6a;
-  background: #3a1f33;
 }
 .confirmation .danger-button {
-  background: #c2415f;
+  background: var(--ui-danger);
   color: white;
 }
 .confirmation .danger-button:hover:not(:disabled) {
-  background: #d4526f;
+  background: var(--ui-danger-hover);
 }
 @supports not (position: sticky) {
   .settings-page,
@@ -2142,12 +2169,6 @@ input:focus-visible {
   background:
     linear-gradient(var(--ui-panel), var(--ui-panel)) padding-box,
     var(--ui-holo) border-box;
-}
-.row-actions button,
-.folder-setting button,
-.profile-actions > button {
-  font-size: var(--ui-fs-meta);
-  border-color: var(--ui-control-border);
 }
 .folder-setting code,
 .build-summary code {
@@ -2288,7 +2309,7 @@ input:focus-visible {
   border: 1px solid var(--ui-control-border);
   border-radius: var(--ui-radius-lg);
   background: var(--ui-list-surface);
-  box-shadow: 0 18px 50px -16px #050a1fcc;
+  box-shadow: 0 18px 50px -16px var(--ui-scrim-shadow);
 }
 .chat-menu button {
   justify-content: flex-start;
@@ -2305,7 +2326,7 @@ input:focus-visible {
 }
 .chat-menu button.is-danger,
 .chat-menu button.is-danger svg {
-  color: #ffc6d6;
+  color: var(--ui-danger-text);
 }
 .chat-menu button[aria-disabled='true'] {
   opacity: 0.5;
@@ -2409,7 +2430,7 @@ input:focus-visible {
 }
 .dropzone-text strong {
   font-size: var(--ui-fs-label);
-  font-weight: var(--ui-fw-strong);
+  font-weight: var(--ui-fw-medium);
   color: var(--ui-text);
 }
 .dropzone-text span {
@@ -2539,7 +2560,7 @@ input:focus-visible {
   flex-wrap: wrap;
 }
 .context-overflow {
-  color: #ffc6d6;
+  color: var(--ui-danger-text);
   font-size: var(--ui-fs-meta);
   margin: 0 0 10px;
 }
@@ -2708,7 +2729,7 @@ input:focus-visible {
   padding: 0;
   font-size: var(--ui-fs-body);
   font-weight: var(--ui-fw-strong);
-  color: #ffffff;
+  color: var(--ui-text-1);
   text-align: left;
 }
 .project-card-open:hover:not(:disabled) {
@@ -2756,7 +2777,7 @@ input:focus-visible {
 }
 .project-star[aria-pressed='true'],
 .conversation-row .chat-star {
-  color: #f5d37a;
+  color: var(--ui-star);
 }
 .project-star[aria-pressed='true'] svg {
   fill: currentColor;
@@ -2799,8 +2820,8 @@ input:focus-visible {
   color: #dfcc9f;
 }
 .project-badge.is-over {
-  border-color: #9a4a6a;
-  color: #ffc6d6;
+  border-color: var(--ui-danger-border);
+  color: var(--ui-danger-text);
 }
 .project-empty {
   max-width: 460px;
@@ -2868,7 +2889,7 @@ input:focus-visible {
   background: var(--ui-raised);
 }
 .project-head-actions .project-star[aria-pressed='true'] {
-  color: #f5d37a;
+  color: var(--ui-star);
 }
 .project-detail-layout {
   display: grid;
@@ -3142,7 +3163,7 @@ input:focus-visible {
 }
 .project-dialog input[aria-invalid='true'],
 .project-dialog textarea[aria-invalid='true'] {
-  border-color: #c2415f;
+  border-color: var(--ui-danger);
 }
 .project-check {
   display: flex;
@@ -3159,7 +3180,7 @@ input:focus-visible {
   height: 16px;
   margin: 3px 0 0;
   padding: 0;
-  accent-color: #c2415f;
+  accent-color: var(--ui-danger);
 }
 .project-check small {
   display: block;
@@ -3237,7 +3258,7 @@ input:focus-visible {
   border: 1px solid var(--ui-panel-border);
   border-radius: var(--ui-radius-lg);
   background: var(--ui-info-surface);
-  box-shadow: 0 18px 50px -16px #050a1fcc;
+  box-shadow: 0 18px 50px -16px var(--ui-scrim-shadow);
   color: #e3eaff;
   font-size: var(--ui-fs-label);
 }
@@ -3276,26 +3297,13 @@ input:focus-visible {
 [data-area='settings'] .local-badge {
   color: var(--ui-text-2);
 }
-[data-area='settings']
-  :is(
-    .row-actions button:not(.primary-button),
-    .folder-setting button,
-    .profile-actions > button:not(.danger-button),
-    .configuration-heading button:disabled,
-    .composer-chip
-  ) {
+[data-area='settings'] :is(.configuration-heading button:disabled, .composer-chip) {
   background: var(--gnd-2);
   border-color: var(--gnd-line);
   color: var(--ui-text-1);
   box-shadow: none;
 }
-[data-area='settings']
-  :is(
-    .new-chat,
-    .row-actions button:not(.primary-button),
-    .folder-setting button,
-    .profile-actions > button:not(.danger-button)
-  ):hover:not(:disabled) {
+[data-area='settings'] .new-chat:hover:not(:disabled) {
   background: var(--gnd-3);
   border-color: var(--gnd-line-strong);
 }
@@ -3327,7 +3335,7 @@ input:focus-visible {
   gap: 10px;
   text-align: left;
   font: inherit;
-  color: #f3f6ff;
+  color: var(--ui-text-1);
   padding: 9px 12px;
   border-radius: var(--ui-radius);
   border: 1px solid var(--ui-border);
@@ -3688,7 +3696,6 @@ input:focus-visible {
 }
 .hf-file input {
   margin: 0;
-  accent-color: var(--ui-accent-edge);
 }
 .hf-file .q {
   font-weight: var(--ui-fw-strong);
@@ -3867,10 +3874,10 @@ input:focus-visible {
   appearance: none;
 }
 .web-usage.is-high {
-  --usage-color: #d9ae80;
+  --usage-color: var(--ui-warning);
 }
 .web-usage.is-full {
-  --usage-color: #e08b8b;
+  --usage-color: var(--ui-error);
 }
 .web-usage::-webkit-meter-bar {
   height: 8px;
@@ -4537,4 +4544,63 @@ body[data-model='cloud'] a:hover {
 }
 .context-overflow button {
   margin-left: 8px;
+}
+
+/* Pointer targets retain a minimum size of 24 × 24 CSS px. */
+.feedback-dismiss {
+  min-width: 24px;
+  min-height: 24px;
+}
+.feedback-details > summary {
+  padding-block: 3px;
+}
+.cloud-provider-content > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+/* The project file switch is 20 px tall: a transparent hit area brings the target to 24 px
+   without changing its look (::after is the knob, so the hit area uses ::before). */
+.project-switch::before {
+  content: '';
+  position: absolute;
+  inset: -3px -1px;
+}
+
+/* Type scale: provider names used the browser's bold (700); the scale tops out at 600. */
+.cloud-provider > summary strong {
+  font-weight: var(--ui-fw-strong);
+}
+
+/* Native controls: with color-scheme dark the unchecked native radio still renders an olive
+   fill on the blue and teal surfaces. The file list draws its own radio from area tokens. */
+.hf-file input[type='radio'] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.5px solid var(--ui-control-border);
+  border-radius: 50%;
+  background: var(--ui-field);
+}
+.hf-file input[type='radio']::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ui-control-accent);
+  transform: scale(0);
+}
+.hf-file input[type='radio']:checked {
+  border-color: var(--ui-control-accent);
+}
+.hf-file input[type='radio']:checked::before {
+  transform: scale(1);
+}
+.hf-file input[type='radio']:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
 }
