@@ -29,8 +29,11 @@ impl Store {
             let (name, value) = line
                 .split_once('=')
                 .ok_or("Invalid chat defaults record.")?;
-            if !chat_default_fields().any(|field| field == name) || fields.contains_key(name) {
-                return Err("Invalid or duplicate chat default field.".into());
+            if !chat_default_fields().any(|field| field == name) {
+                continue;
+            }
+            if fields.contains_key(name) {
+                return Err("Duplicate chat default field.".into());
             }
             let value = if name == "chat_system_prompt" {
                 serde_json::from_str::<String>(value).map_err(|error| error.to_string())?

@@ -434,6 +434,11 @@ fn chat_defaults_reuse_profile_serialization_and_preserve_environment_precedence
         .unwrap()
         .lines()
         .any(|profile| profile == line)));
+    fs::write(
+        &path,
+        format!("{data}future_default=literal $(touch unsafe)\n"),
+    )
+    .unwrap();
     let loaded = store.initial_settings().unwrap();
     assert_eq!(loaded.temperature, "0.6");
     assert_eq!(loaded.seed, "42");
