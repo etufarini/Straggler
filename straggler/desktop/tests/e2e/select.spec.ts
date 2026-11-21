@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 test.beforeEach(async ({ page }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
 });
 
 test(
@@ -42,6 +43,7 @@ test(
 );
 
 test('typeahead cycles repeated initials and selects a full prefix', async ({ page }) => {
+  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
   const style = page.getByRole('combobox', { name: 'Reply style', exact: true });
   await style.focus();
   await style.press('m');
@@ -53,6 +55,7 @@ test('typeahead cycles repeated initials and selects a full prefix', async ({ pa
   await style.press('f');
   await style.press('Enter');
   await expect(style).toHaveText('Focused');
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   const context = page.getByRole('combobox', { name: 'Context size', exact: true });
   await context.press('Home');
   await context.press('2');
@@ -96,7 +99,7 @@ test('popup fits above a low control in a compact window and keeps the label act
 
 test('disabled controls stay unavailable and no native select remains', async ({ page }) => {
   await expect(page.locator('select')).toHaveCount(0);
-  const effort = page.getByRole('combobox', { name: 'Reasoning effort', exact: true });
+  const effort = page.getByRole('combobox', { name: 'Default effort for this model', exact: true });
   await expect(effort).toBeDisabled();
   await effort.dispatchEvent('click');
   await expect(page.getByRole('listbox')).toHaveCount(0);

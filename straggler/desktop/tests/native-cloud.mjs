@@ -135,6 +135,32 @@ export async function exerciseNativeCloud({
     await evaluate('getComputedStyle(document.body).getPropertyValue("--ui-background").trim()'),
     '#231b26',
   );
+  const localIdentity = (await invokeNative('server_status', {})).runId;
+  await evaluate(`document.querySelector('.sidebar-bottom [aria-label="Settings"]').click()`);
+  await until(
+    () => evaluate('!!document.querySelector(".settings-nav")'),
+    'chat default settings navigation',
+  );
+  await evaluate(
+    'Array.from(document.querySelectorAll(".settings-nav button")).find(button => button.textContent === "Chat defaults").click()',
+  );
+  await until(
+    () => evaluate(`!!document.querySelector('input[aria-label="Seed"]')`),
+    'chat default Seed field',
+  );
+  await fillField('input[aria-label="Seed"]', '42');
+  await until(
+    async () => (await invokeNative('configuration', {})).settings.seed === '42',
+    'native partial chat-default auto-save',
+  );
+  assert.equal((await invokeNative('server_status', {})).runId, localIdentity);
+  assert.equal((await invokeNative('configuration', {})).restartRequired, false);
+  await fillField('input[aria-label="Seed"]', '');
+  await until(
+    async () => (await invokeNative('configuration', {})).settings.seed === 'auto',
+    'native chat-default reset',
+  );
+  await evaluate('document.querySelector(".settings-heading button").click()');
   await fillField('.rich-composer-field', 'Keep these details too.');
   await evaluate('document.querySelector(".composer").requestSubmit()');
   await until(

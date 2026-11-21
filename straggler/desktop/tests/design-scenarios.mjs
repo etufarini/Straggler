@@ -20,6 +20,8 @@ export const reviewScreens = [
   'CHAT-17',
   'CHAT-18',
   'MODEL-01',
+  'CHAT-DEFAULTS',
+  'CHAT-DEFAULTS-REPLIES',
   'SET-01',
   'SET-01B',
   'SET-02',
@@ -224,8 +226,10 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
   if (screen === 'DIALOG-02') await button('Stop server').click();
   if (screen === 'MODEL-01') await page.getByRole('button', { name: /^Choose model · / }).click();
   const sections = {
+    'CHAT-DEFAULTS': 'Chat defaults',
+    'CHAT-DEFAULTS-REPLIES': 'Chat defaults',
     'SET-01': 'Model settings',
-    'SET-01B': 'Model settings',
+    'SET-01B': 'Chat defaults',
     'SET-02': 'Performance',
     'SET-02B': 'Performance',
     'SET-03': 'Server & port',
@@ -244,7 +248,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     await button('Settings').click();
     await button(sections[screen]).click();
   }
-  if (screen === 'SET-01B') {
+  if (['SET-01B', 'CHAT-DEFAULTS-REPLIES'].includes(screen)) {
     await page.getByText('Fine-tune reply style', { exact: true }).click();
     await page.getByRole('textbox', { name: 'Seed', exact: true }).scrollIntoViewIfNeeded();
   }

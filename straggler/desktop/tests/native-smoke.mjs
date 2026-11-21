@@ -256,7 +256,9 @@ try {
       'Array.from(document.querySelectorAll(".sidebar-bottom button")).find(button => button.textContent.trim() === "Settings").click()',
     );
     await until(() => evaluate('!!document.querySelector(".settings-nav")'), 'settings page');
-    await evaluate('document.querySelector(".settings-nav button").click()');
+    await evaluate(
+      'Array.from(document.querySelectorAll(".settings-nav button")).find(button => button.textContent === "Model settings").click()',
+    );
     await until(
       () =>
         evaluate(

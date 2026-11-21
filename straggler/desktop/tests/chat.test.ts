@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { currentContext, resolveChatOptions } from '../src/domain/chat';
-import { sameServerConfiguration, equalSettings } from '../src/domain/types';
+import { sameServerConfiguration, equalSettings, generationKeys } from '../src/domain/types';
 import type { Message, ServerDetails, ServerStatus } from '../src/domain/types';
 import { defaultSettings } from '../src/services/fixtures';
 
@@ -19,8 +19,18 @@ test('request defaults and overrides are independent of server restart compariso
   expect(
     resolveChatOptions({ systemPrompt: '', reasoning: 'off', effort: null }, settings),
   ).toEqual({ systemPrompt: '', reasoning: 'off', effort: 'xhigh' });
+  expect(resolveChatOptions(undefined, settings, true)).toEqual({
+    systemPrompt: 'Default instructions',
+    reasoning: 'on',
+    effort: 'auto',
+  });
   expect(equalSettings(defaultSettings, settings)).toBe(false);
   expect(sameServerConfiguration(defaultSettings, settings)).toBe(true);
+  for (const key of generationKeys) {
+    const changed = { ...settings, [key]: '1' };
+    expect(sameServerConfiguration(settings, changed)).toBe(true);
+    expect(equalSettings(settings, changed)).toBe(false);
+  }
   expect(sameServerConfiguration(defaultSettings, { ...settings, context: '8192' })).toBe(false);
 });
 
