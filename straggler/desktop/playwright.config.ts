@@ -3,12 +3,15 @@ import { defineConfig } from '@playwright/test';
 const browserName = process.env.STRAGGLER_TEST_BROWSER ?? 'webkit';
 if (browserName !== 'webkit' && browserName !== 'chromium')
   throw new Error('STRAGGLER_TEST_BROWSER must be webkit or chromium.');
+const configuredWorkers = process.env.STRAGGLER_TEST_WORKERS;
+if (configuredWorkers !== undefined && configuredWorkers !== '1' && configuredWorkers !== '2')
+  throw new Error('STRAGGLER_TEST_WORKERS must be 1 or 2.');
 
 export default defineConfig({
   testDir: './tests/e2e',
   outputDir: './test-results/browser',
   forbidOnly: Boolean(process.env.CI),
-  workers: process.env.CI ? 1 : undefined,
+  workers: configuredWorkers ? Number(configuredWorkers) : process.env.CI ? 1 : undefined,
   retries: 0,
   reporter: process.env.CI
     ? [['line'], ['json', { outputFile: 'test-results/browser/results.json' }]]
