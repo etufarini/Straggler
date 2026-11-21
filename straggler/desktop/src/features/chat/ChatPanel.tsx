@@ -202,7 +202,13 @@ export default function ChatPanel({
               ))}
             </div>
             {!active && !controller.modelReady && (
-              <button className="welcome-load" onClick={() => setPanel('models')}>
+              <button
+                className="welcome-load"
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  setPanel('models');
+                }}
+              >
                 <HardDrive size={15} />
                 Choose a model to get started <span>→</span>
               </button>

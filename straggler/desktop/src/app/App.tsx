@@ -119,7 +119,10 @@ export default function App() {
             aria-label={`Choose model · ${modelName}`}
             title={modelName}
             aria-expanded={panel === 'models'}
-            onClick={() => setPanel('models')}
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              setPanel('models');
+            }}
           >
             <span className="model-icon">
               {cloudActive ? <Cloud size={17} /> : <HardDrive size={17} />}
