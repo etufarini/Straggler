@@ -71,7 +71,7 @@ export default function ModelsFolderActions({
         </small>
       )}
       {error && (
-        <Feedback title="Models folder could not be updated" details={error}>
+        <Feedback title="Couldn’t update the models folder" details={error}>
           {error}
         </Feedback>
       )}

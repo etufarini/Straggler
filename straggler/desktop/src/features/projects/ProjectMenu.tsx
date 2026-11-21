@@ -33,7 +33,7 @@ export default function ProjectMenu({
           onSelect: onRestore,
         },
         {
-          label: 'Delete…',
+          label: 'Delete',
           controlId: 'button-delete-project-menu',
           icon: <Trash2 size={15} />,
           destructive: true,
@@ -57,7 +57,7 @@ export default function ProjectMenu({
           onSelect: onEdit,
         },
         {
-          label: 'Archive…',
+          label: 'Archive',
           controlId: 'button-archive-project-menu',
           icon: <Archive size={15} />,
           disabled: !!busyReason,
@@ -65,7 +65,7 @@ export default function ProjectMenu({
           onSelect: onArchive,
         },
         {
-          label: 'Delete…',
+          label: 'Delete',
           controlId: 'button-delete-project-menu',
           icon: <Trash2 size={15} />,
           destructive: true,

@@ -63,7 +63,7 @@ export default function ReasoningMenu({ controller }: { controller: WorkspaceCon
               className="text-button"
               onClick={() => setChatOptions({ reasoning: 'auto', effort: 'auto' })}
             >
-              Use default
+              Default
             </button>
           )}
         </>

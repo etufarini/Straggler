@@ -37,7 +37,7 @@ export default function ChatHistoryRow({
   const match = titleMatch(value.title, query);
   const mutationReason =
     controller.generating && chat.id === value.id
-      ? 'Available when the current response finishes or is stopped'
+      ? 'Available when the response ends.'
       : controller.editingBusy && chat.id === value.id
         ? 'Wait for this chat to finish saving.'
         : projects.busy
@@ -146,7 +146,7 @@ export default function ChatHistoryRow({
           actionBusyReason={mutationReason}
           metadataBusyReason={
             controller.generating || controller.editingBusy
-              ? 'Available when the current response finishes or is stopped'
+              ? 'Available when the response ends.'
               : undefined
           }
           onStar={() =>

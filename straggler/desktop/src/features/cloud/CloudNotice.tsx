@@ -46,8 +46,8 @@ export default function CloudNotice({ controller }: { controller: CloudControlle
       <p>{provider.providerName}’s own terms apply to what it receives.</p>
       {provider.kind === 'custom' && <p className="popover-note">Service: {provider.baseUrl}</p>}
       {controller.noticeError && (
-        <Feedback title="Couldn’t save the acknowledgement" details={controller.noticeError}>
-          No message has been sent. Try again.
+        <Feedback title="Couldn’t save your choice" details={controller.noticeError}>
+          Nothing was sent. Try again.
         </Feedback>
       )}
       <div className="popover-actions">

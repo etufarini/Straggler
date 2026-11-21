@@ -29,7 +29,7 @@ test('search folds accents, rename restores focus, and stars survive reload', as
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Options for Café plans' }).click();
   await page.getByRole('menuitem', { name: 'Star', exact: true }).click();
-  await expect(page.locator('.sidebar')).toContainText('STARRED');
+  await expect(page.locator('.sidebar')).toContainText('Starred');
   await page.reload();
   await expect(page.locator('.chat-star')).toHaveCount(1);
   await page.keyboard.press('ControlOrMeta+k');

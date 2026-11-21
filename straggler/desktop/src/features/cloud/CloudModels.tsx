@@ -79,9 +79,7 @@ export default function CloudModels({ controller }: { controller: WorkspaceContr
         Using a cloud model stops the local server and frees its memory. Choose a model on this
         computer to load it again.
       </p>
-      {controller.generating && (
-        <p className="field-help">Available when the current response finishes or is stopped.</p>
-      )}
+      {controller.generating && <p className="field-help">Available when the response ends.</p>}
       {configured && (
         <div className="panel-actions">
           <button

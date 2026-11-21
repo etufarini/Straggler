@@ -214,7 +214,7 @@ test('clipboard failure stays beside its response without blocking chat', async 
   );
   await copy.click();
   await expect(page.locator('.message.assistant').getByRole('alert')).toContainText(
-    'Text could not be copied',
+    'Couldn’t copy the text',
   );
   await expect(page.locator('.workspace-feedback')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeEnabled();
@@ -262,7 +262,7 @@ test('empty setup gives a usable message and keeps launch disabled', async ({ pa
   await mockDesktop(page, 'empty');
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Choose external build' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose external build…' })).toBeVisible();
   await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByText('No GGUF models found', { exact: true })).toBeVisible();
   await expect(
@@ -477,10 +477,10 @@ test('history and backend errors use their own context and recovery actions', as
   await page.goto('/?scenario=backend-error');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
-  await page.getByRole('button', { name: 'Use bundled backend', exact: true }).click();
+  await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: 'Use bundled backend', exact: true })
+    .getByRole('button', { name: 'Use bundled version', exact: true })
     .click();
   const confirmation = page.getByRole('alertdialog');
   await expect(confirmation.getByRole('alert')).toContainText('Couldn’t complete the action');
@@ -490,7 +490,7 @@ test('history and backend errors use their own context and recovery actions', as
   );
   await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: 'Use bundled backend', exact: true }),
+    page.getByRole('button', { name: 'Use bundled version', exact: true }),
   ).toBeEnabled();
   await expect(page.locator('.workspace-feedback')).toHaveCount(0);
 });
@@ -517,14 +517,14 @@ test('occupying listeners require separate normal and force confirmations', asyn
   await page.goto('/?scenario=occupied');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Server & port', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Force quit…', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Force quit', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Close programs using it', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('SIGTERM');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Force quit…', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Force quit', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Close programs using it', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button').last().click();
-  await page.getByRole('button', { name: 'Force quit…', exact: true }).click();
+  await page.getByRole('button', { name: 'Force quit', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('SIGKILL');
   await page.getByRole('alertdialog').getByRole('button').last().click();
   await expect(page.getByText('Port 9931 is free')).toBeVisible();

@@ -14,7 +14,7 @@ export default function ServerMemory({ controller }: { controller: WorkspaceCont
         Memory <span className="memory-badge">{statusLabel[server.phase]}</span>
       </h3>
       <dl>
-        <dt>Layers on GPU</dt>
+        <dt>Layers on the GPU</dt>
         <dd>{offloadedLayers(server.logs)}</dd>
         <dt>Context</dt>
         <dd>

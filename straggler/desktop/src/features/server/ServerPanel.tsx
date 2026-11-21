@@ -127,9 +127,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                       <CircleHelp size={19} />
                       <div>
                         <strong>Set up llama.cpp first</strong>
-                        <p>
-                          Open Settings to select a llama.cpp build and choose your Models folder.
-                        </p>
+                        <p>Open Settings to choose a llama.cpp build and a models folder.</p>
                         <button onClick={() => setPanel('settings')}>Open Settings</button>
                       </div>
                     </div>

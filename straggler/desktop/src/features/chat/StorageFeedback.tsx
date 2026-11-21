@@ -7,7 +7,7 @@ export default function StorageFeedback({ controller }: { controller: WorkspaceC
     <>
       {controller.importError && (
         <Feedback
-          title="Import failed"
+          title="Couldn’t import the chat"
           details={controller.importError.details}
           actions={
             <button
@@ -31,11 +31,11 @@ export default function StorageFeedback({ controller }: { controller: WorkspaceC
       )}
       {controller.fileError && (
         <Feedback
-          title="Export failed"
+          title="Couldn’t export the chat"
           details={controller.fileError}
           onDismiss={() => controller.setFileError('')}
         >
-          The chat could not be exported. Choose a writable destination and try again.
+          Choose a folder you can write to and try again.
         </Feedback>
       )}
       {storageError && (

@@ -704,9 +704,7 @@ test('PROJ-03 adds supported text, removes files with Undo and keeps errors expl
     ),
   );
   await control(page, 'button-add-project-files').click();
-  const failure = page
-    .getByRole('alert')
-    .filter({ hasText: 'Project data could not be saved or loaded' });
+  const failure = page.getByRole('alert').filter({ hasText: 'Couldn’t load or save project data' });
   await expect(failure).toContainText('This file type is not supported.');
   await expect(page.getByRole('list', { name: 'Project files' })).toContainText('report.pdf');
   const failedRow = page
@@ -837,9 +835,7 @@ test('Q2 preserves the sent prefix while shared edits apply next turn and only l
     'aria-disabled',
     'true',
   );
-  await expect(page.getByRole('menu')).toContainText(
-    'Available when the current response finishes or is stopped',
-  );
+  await expect(page.getByRole('menu')).toContainText('Available when the response ends.');
   await page.keyboard.press('Escape');
   await control(page, 'button-options-for-another-research-chat').click();
   await expect(control(page, 'button-move-to-project')).not.toHaveAttribute(
@@ -973,7 +969,7 @@ for (const source of ['All projects', 'Project detail'] as const) {
       localStorage.setItem('straggler-fixture-import-error', 'true');
     });
     await importAction.click();
-    const failure = page.getByRole('alert').filter({ hasText: 'Import failed' });
+    const failure = page.getByRole('alert').filter({ hasText: 'Couldn’t import the chat' });
     await expect(failure).toBeVisible();
     await expect(failure).toContainText('import.json');
     await expect(failure).toContainText('unsupported role');
@@ -1067,7 +1063,7 @@ test('project chats filter and sort; replacing a file preserves its exclusion', 
       JSON.stringify(['/fixture/new-version.md']),
     ),
   );
-  await page.getByRole('button', { name: 'Replace excluded.txt with newer version…' }).click();
+  await page.getByRole('button', { name: 'Replace excluded.txt…' }).click();
   const files = page.getByRole('list', { name: 'Project files' });
   await expect(files).not.toContainText('excluded.txt');
   const replacement = files.locator('li').filter({ hasText: 'new-version.md' });

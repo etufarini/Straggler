@@ -38,8 +38,7 @@ export function createProjectFixture(
     return history.some((chat) => chat.id === generating() && chat.projectId === id);
   }
   function assertChatWritable(chat: Conversation) {
-    if (chat.id === generating())
-      throw new Error('Available when the current response finishes or is stopped');
+    if (chat.id === generating()) throw new Error('Available when the response ends.');
     if (chat.projectId) assertProjectWritable(find(chat.projectId));
   }
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
@@ -81,7 +80,7 @@ export function createProjectFixture(
       next.description = next.description.trim();
       if (previous?.archived && next.archived) assertProjectWritable(previous);
       if (previous && previous.archived !== next.archived && projectBusy(previous.id))
-        throw new Error('Available when the current response finishes or is stopped');
+        throw new Error('Available when the response ends.');
       timestamp(next);
       const undoToken =
         previous && previous.archived !== next.archived
@@ -186,8 +185,7 @@ export function createProjectFixture(
     if (command === 'project_delete') {
       const project = find(args.projectId);
       assertProjectWritable(project);
-      if (projectBusy(project.id))
-        throw new Error('Available when the current response finishes or is stopped');
+      if (projectBusy(project.id)) throw new Error('Available when the response ends.');
       const members = history.filter((chat) => chat.projectId === project.id);
       const conversations: Conversation[] = [];
       const deletedConversationIds: string[] = [];

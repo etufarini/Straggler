@@ -95,11 +95,13 @@ export default function Settings({
           {failure && !failure.field && failure.section === section && (
             <Feedback
               title={
-                section === 'llama' ? 'llama.cpp operation failed' : 'Settings could not be updated'
+                section === 'llama'
+                  ? 'Couldn’t complete the llama.cpp action'
+                  : 'Couldn’t update settings'
               }
               details={failure.message}
             >
-              Review the details and try again. Your edited settings remain available.
+              Check the details and try again. Your edits are kept.
             </Feedback>
           )}
           <fieldset className="settings-fields" disabled={busy || !native}>
@@ -111,10 +113,31 @@ export default function Settings({
             {hasApplyAction && (
               <div className="configuration-heading">
                 <span>
-                  {config.currentProfile || 'Unsaved configuration'}
-                  {modified && <b>Modified</b>}
-                  {dirty && <b>Unapplied changes</b>}
-                  {active && restart && <b>Restart required</b>}
+                  {config.currentProfile || 'Custom settings'}
+                  {modified && (
+                    <b
+                      title="Differs from the saved configuration. Save it to keep these values."
+                      aria-label="Modified. Differs from the saved configuration. Save it to keep these values."
+                    >
+                      Modified
+                    </b>
+                  )}
+                  {dirty && (
+                    <b
+                      title="Select Apply changes to use these values."
+                      aria-label="Unapplied changes. Select Apply changes to use these values."
+                    >
+                      Unapplied changes
+                    </b>
+                  )}
+                  {active && restart && (
+                    <b
+                      title="Stop and launch the server to use the new values."
+                      aria-label="Restart required. Stop and launch the server to use the new values."
+                    >
+                      Restart required
+                    </b>
+                  )}
                 </span>
                 <button
                   className="primary-button"

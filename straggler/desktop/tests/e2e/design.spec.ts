@@ -54,9 +54,9 @@ test('settings keep their save action visible and folders and backend selection 
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Use bundled backend', exact: true }).click();
+  await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
   await expect(
-    page.getByRole('alertdialog').getByRole('button', { name: 'Use bundled backend', exact: true }),
+    page.getByRole('alertdialog').getByRole('button', { name: 'Use bundled version', exact: true }),
   ).toBeVisible();
 });
 
@@ -257,7 +257,7 @@ test('reduced-motion presence draws a still and destroys the renderer in Setting
   );
   await page.getByRole('button', { name: 'Stop response' }).click();
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'stopped');
-  await expect(page.locator('.presence-caption')).toContainText('Stopped by you');
+  await expect(page.locator('.presence-caption')).toContainText('Stopped');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.locator('.presence-stage canvas')).toHaveCount(0);
   const frames = await page.evaluate(() => window.__stragglerOrbMeasurement.frames.length);

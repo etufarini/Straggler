@@ -29,7 +29,7 @@ test('CHAT-18 shows the failed filename, explanation, details and Choose another
   await page.evaluate(() => localStorage.setItem('straggler-fixture-import-error', 'true'));
   await page.getByRole('button', { name: 'Import chat', exact: true }).click();
   const feedback = page.locator('.composer-wrap').getByRole('alert');
-  await expect(feedback).toContainText('Import failed');
+  await expect(feedback).toContainText('Couldn’t import the chat');
   await expect(feedback).toContainText('import.json');
   await expect(feedback).toContainText('unsupported role');
   await expect(feedback.getByText('Technical details', { exact: true })).toBeVisible();
@@ -37,7 +37,7 @@ test('CHAT-18 shows the failed filename, explanation, details and Choose another
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-import-error'));
   await feedback.getByRole('button', { name: 'Choose another file' }).click();
   await expect(page.locator('.message.user')).toContainText('Imported question');
-  await expect(page.getByText('Import failed', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Couldn’t import the chat', { exact: true })).toHaveCount(0);
 });
 
 test('canceling import leaves history empty, and a failed create does not open a new chat', async ({
@@ -53,7 +53,7 @@ test('canceling import leaves history empty, and a failed create does not open a
     localStorage.setItem('straggler-fixture-fail-next-save', 'true');
   });
   await page.getByRole('button', { name: 'Import chat', exact: true }).click();
-  await expect(page.getByText('Import failed', { exact: true })).toBeVisible();
+  await expect(page.getByText('Couldn’t import the chat', { exact: true })).toBeVisible();
   await expect(page.getByText('What’s on your mind?')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('straggler-fixture-normal'))).toBeNull();
 });
@@ -71,7 +71,7 @@ test('invalid import preserves generation; a valid import stops and saves its pa
   await expect(page.locator('.message.assistant .markdown')).toContainText('A local answer');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-import-error', 'true'));
   await page.getByRole('button', { name: 'Import chat', exact: true }).click();
-  await expect(page.getByText('Import failed', { exact: true })).toBeVisible();
+  await expect(page.getByText('Couldn’t import the chat', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stop response' })).toBeVisible();
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-import-error'));
   await page.getByRole('button', { name: 'Choose another file' }).click();
