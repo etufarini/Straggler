@@ -391,7 +391,8 @@ test('D011 sends only selected passages, preserves drafts on search failure and 
       () => JSON.parse(localStorage.getItem('straggler-fixture-request')!).webSearch,
     ),
   ).toBe(true);
-  expect(request.messages[0].content).toContain('[P1] notes.md · section 1');
+  expect(request.messages[0].content).not.toContain('[P1]');
+  expect(request.messages.at(-1)?.content).toContain('[P1] notes.md · section 1');
   expect(request.messages[0].content).not.toContain('Excluded project text');
   expect(request.messages[0].content.length).toBeLessThan(400);
   await page.reload();

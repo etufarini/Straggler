@@ -6,7 +6,7 @@ import type { DragDropEvent } from '@tauri-apps/api/webview';
 import { approximatePromptTokens, approximateTokens, attachmentTypes } from '../domain/attachments';
 import type { Attachment, Conversation, ProjectPassage } from '../domain/types';
 import type { BackendRelease } from '../domain/backendRelease';
-import { projectTokenEstimateCharacters } from '../domain/projectContext';
+import { projectTokenEstimateCharacters, projectContextState } from '../domain/projectContext';
 import type {
   Project,
   ProjectMutation,
@@ -89,6 +89,7 @@ export type DesktopCommand =
   | 'history_save'
   | 'history_delete'
   | 'projects_list'
+  | 'attachment_search'
   | 'project_search'
   | 'project_file_text'
   | 'project_save'
@@ -350,4 +351,20 @@ export async function exportPromptPresets(presets: SystemPromptPreset[]): Promis
   });
   await invoke('write_export', { path, contents });
   return true;
+}
+
+export async function measureResourceContext(text: string, instructions: string, capacity: number) {
+  const [resources, prompt] = await Promise.all([
+    estimateTextTokens(text),
+    estimateTextTokens(instructions),
+  ]);
+  return {
+    context: projectContextState(
+      resources.tokens,
+      capacity,
+      resources.source !== 'server',
+      prompt.tokens,
+    ),
+    instructionTokens: prompt.tokens,
+  };
 }

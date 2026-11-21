@@ -1114,3 +1114,11 @@ Export one preset or all presets as version 1 `straggler.system-prompts` JSON. I
 Chat messages support inline LaTeX with `\(…\)` and display formulas with `$$…$$` or `\[…\]`. Single dollar signs stay plain text, so prices are unchanged. Display formulas align left and scroll horizontally when needed. Copy LaTeX copies their source. Invalid formulas show their source and an explanation; unfinished formulas remain muted source while the response streams. Formulas inside inline code or fenced code blocks stay literal.
 
 Code blocks show their declared language and a Copy action. Blocks longer than about 24 lines offer Show more and Show less. Highlighting supports JavaScript, TypeScript, Python, Rust, Bash, JSON, CSS, HTML/XML and SQL; other languages remain readable plain code. Formulas, fonts and highlighting work offline. Editing responses and exporting chats preserve the original Markdown.
+
+### Searching chat attachments
+
+Small text attachments stay in the context in full. If instructions, included project files and chat attachments exceed the file allowance (75% of a known context window), Straggler switches to Search mode. Instructions remain whole. Each message searches the files using your message as the query and includes the highest-ranked passages that fit. Projects and chat attachments share the remaining space equally when both have files. Actual request token counts can reduce the selected passages further; messages or instructions that still exceed the context produce an explicit error.
+
+The Attachments panel marks text files In context or Searched. Responses show Searched attachments and cite passages as `[A1]`, `[A2]`, and so on. Open a source to read the saved passage and, while the file remains attached, its full text. Project citations remain `[P1]`, `[P2]`, and so on. Retrieved excerpts are appended to the current outgoing user message only; your saved messages stay unchanged.
+
+Attachment indexes live only in memory, including for ordinary chats, and temporary-chat cleanup erases their cache. There are no attachment index files to migrate or remove. Sidebar chat search also checks extracted attachment text. Images keep their existing vision-capability rules and are not searched as text. Chat export remains version 1 with the original messages.

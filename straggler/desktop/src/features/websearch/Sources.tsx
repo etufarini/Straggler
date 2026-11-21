@@ -5,15 +5,17 @@ import WebLink from './WebLink';
 export default function Sources({
   sources = [],
   projectSources = [],
+  attachmentSources = [],
   onProjectSource,
   compact = false,
 }: {
   sources?: WebSource[];
   projectSources?: ProjectPassage[];
+  attachmentSources?: ProjectPassage[];
   onProjectSource?: (source: ProjectPassage) => void;
   compact?: boolean;
 }) {
-  const count = sources.length + projectSources.length;
+  const count = sources.length + projectSources.length + attachmentSources.length;
   return (
     <section
       className={compact ? 'presence-section web-sources-panel' : 'message-sources'}
@@ -37,9 +39,12 @@ export default function Sources({
               </span>
             </li>
           ))}
-          {projectSources.map((source) => (
-            <li key={`P${source.n}`}>
-              <span className="source-number">P{source.n}</span>
+          {[...projectSources, ...attachmentSources].map((source) => (
+            <li key={`${source.projectId ? 'P' : 'A'}${source.n}`}>
+              <span className="source-number">
+                {source.projectId ? 'P' : 'A'}
+                {source.n}
+              </span>
               <button
                 type="button"
                 className="text-button project-source-link"

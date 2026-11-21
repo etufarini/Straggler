@@ -142,12 +142,12 @@ test('D011 finds saved message text alongside title matches and keeps titles usa
   await search.fill('Research');
   await expect(page.locator('.conversation-row mark')).toHaveText('Research');
   await expect(
-    page.getByRole('button', { name: 'Unrelated title Match in messages' }),
+    page.getByRole('button', { name: 'Unrelated title Match in chat text' }),
   ).toBeVisible();
   await expect(page.locator('.chat-search').getByRole('status')).toHaveText('2 chats');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-chat-text-error', 'true'));
   await search.fill('Research notebook');
-  await expect(page.getByRole('alert')).toContainText('Couldn’t search chat messages.');
+  await expect(page.getByRole('alert')).toContainText('Couldn’t search chat text.');
   await expect(page.locator('.conversation-row')).toHaveCount(1);
   await expect(page.locator('.conversation-row mark')).toHaveText('Research notebook');
   await search.press('Escape');

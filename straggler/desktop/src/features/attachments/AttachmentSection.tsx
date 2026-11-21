@@ -1,4 +1,4 @@
-import { Download, FileUp, X } from 'lucide-react';
+import { Download, FileUp, X, TextSearch } from 'lucide-react';
 import { useId } from 'react';
 import AttachmentRow from './AttachmentRow';
 import Feedback from '../../components/Feedback';
@@ -14,11 +14,19 @@ export default function AttachmentSection({ controller }: { controller: Attachme
       <div className="presence-section-heading">
         <h2 id={`${id}-title`}>Attachments</h2>
         <span className="attachments-summary">
-          {ready
-            ? `${ready} ready · ${controller.approximate ? '~' : ''}${controller.tokens.toLocaleString('en-US')} tokens`
-            : 'None'}
+          {controller.searchMode
+            ? 'Search mode'
+            : ready
+              ? `${ready} ready · ${controller.approximate ? '~' : ''}${controller.tokens.toLocaleString('en-US')} tokens`
+              : 'None'}
         </span>
       </div>
+      {controller.searchMode && (
+        <p className="presence-note" role="status">
+          <TextSearch size={14} /> Too large for this chat’s context: Straggler searches these files
+          for each message.
+        </p>
+      )}
       {!!controller.rows.length && (
         <ul className="file-list">
           {controller.rows.map((row) => {
@@ -29,6 +37,7 @@ export default function AttachmentSection({ controller }: { controller: Attachme
                 row={row}
                 estimate={tokens}
                 visionSupported={controller.visionSupported}
+                searched={controller.searchMode}
               >
                 {row.state !== 'error' && (
                   <button

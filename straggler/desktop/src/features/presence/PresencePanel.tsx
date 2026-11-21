@@ -12,6 +12,7 @@ export default function PresencePanel({
   state,
   sources = [],
   projectSources,
+  attachmentSources,
   onProjectSource,
   metrics,
   preferences,
@@ -22,6 +23,7 @@ export default function PresencePanel({
   state: PresenceState;
   sources?: WebSource[];
   projectSources?: ProjectPassage[];
+  attachmentSources?: ProjectPassage[];
   onProjectSource: (source: ProjectPassage) => void;
   metrics?: GenerationMetrics;
   preferences: UiPreferences;
@@ -101,6 +103,7 @@ export default function PresencePanel({
           <Sources
             sources={sources}
             projectSources={projectSources}
+            attachmentSources={attachmentSources}
             onProjectSource={onProjectSource}
             compact
           />

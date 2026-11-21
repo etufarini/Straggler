@@ -18,6 +18,7 @@ export default function AttachmentRow({
   excluded = false,
   project = false,
   projectSearch = false,
+  searched = false,
   visionSupported = false,
   children,
 }: {
@@ -26,6 +27,7 @@ export default function AttachmentRow({
   excluded?: boolean;
   project?: boolean;
   projectSearch?: boolean;
+  searched?: boolean;
   visionSupported?: boolean;
   children: ReactNode;
 }) {
@@ -76,6 +78,7 @@ export default function AttachmentRow({
                 {estimate?.source === 'approximate' ? (project ? '≈ ' : '~') : ''}
                 {estimate?.tokens.toLocaleString('en-US')} tokens
               </span>
+              {!project && <span>{searched ? 'Searched' : 'In context'}</span>}
               {project && (
                 <span>
                   {excluded ? 'Excluded' : projectSearch ? 'In project search' : 'In context'}

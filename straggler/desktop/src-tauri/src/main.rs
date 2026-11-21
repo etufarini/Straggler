@@ -672,6 +672,22 @@ async fn projects_list(
 }
 
 #[tauri::command]
+async fn attachment_search(
+    id: Uuid,
+    temporary: bool,
+    query: String,
+    budget: usize,
+    state: State<'_, Application>,
+) -> Result<Vec<straggler_desktop::project_search::Passage>> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime.search_attachments(id, temporary, &query, budget)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn project_search(
     project_id: Uuid,
     query: String,
@@ -951,6 +967,7 @@ fn main() {
             projects_list,
             project_save,
             project_search,
+            attachment_search,
             project_file_text,
             project_file_add,
             project_file_remove,

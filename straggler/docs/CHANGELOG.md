@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Search oversized chat attachments in memory, preserve cited passages with responses and include attachment text in sidebar search.
+
 - Render accessible LaTeX formulas with local fonts and add copy, syntax highlighting and expansion controls to code blocks.
 
 - Add reusable system prompt presets with atomic native storage, import previews, export and copy-based insertion into chat, default and project instructions.

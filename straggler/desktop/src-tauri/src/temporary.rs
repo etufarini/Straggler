@@ -242,6 +242,7 @@ impl Runtime {
             .filter(|chat| chat.id == id)
             .ok_or("The temporary chat is no longer available.")?;
         self.web_search.clear_cache()?;
+        *self.attachment_index.lock().map_err(|e| e.to_string())? = Default::default();
         if let Some(conversation) = save {
             if conversation.id != id || conversation.project_id.is_some() {
                 return Err("A temporary chat must be saved outside projects.".into());

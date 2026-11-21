@@ -264,7 +264,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
             />
             <p role="status">
               {filtered.length} {filtered.length === 1 ? 'chat' : 'chats'}
-              {searchingMessages && ' · Searching messages…'}
+              {searchingMessages && ' · Searching chat text…'}
             </p>
             {query && (
               <button
@@ -281,7 +281,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         )}
         {currentResult?.ids === null && (
           <p className="history-empty" role="alert">
-            Couldn’t search chat messages. Title matches are shown.
+            Couldn’t search chat text. Title matches are shown.
           </p>
         )}
         {needle && !searchingMessages && currentResult?.ids !== null && filtered.length === 0 && (

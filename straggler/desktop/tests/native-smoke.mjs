@@ -560,6 +560,20 @@ try {
       });
       assert.deepEqual(await readFile(downloaded), original);
     }
+    const attachmentFiles = (await readdir(path.join(history, attachmentChatId))).sort();
+    const retrieved = await invokeNative('attachment_search', {
+      id: attachmentChatId,
+      temporary: false,
+      query: 'Native attachment',
+      budget: 512,
+    });
+    assert.equal(retrieved.length, 2);
+    assert.ok(
+      retrieved.every(
+        (source) => source.conversationId === attachmentChatId && source.projectId === undefined,
+      ),
+    );
+    assert.deepEqual((await readdir(path.join(history, attachmentChatId))).sort(), attachmentFiles);
     const exported = path.join(stage, 'export.json');
     await invokeNative('write_export', {
       path: exported,

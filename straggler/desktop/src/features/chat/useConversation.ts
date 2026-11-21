@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Project } from '../../domain/projects';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Channel,
   invoke,
@@ -7,6 +8,7 @@ import {
   chooseConversationImport,
   estimatePromptTokens,
   estimateTextTokens,
+  measureResourceContext,
   projectService,
 } from '../../services/desktop';
 import { fileName, newConversation } from '../../domain/types';
@@ -16,10 +18,12 @@ import { materializeImport } from '../../domain/conversationImport';
 import type { ImportedConversation } from '../../domain/conversationImport';
 import {
   assembleProjectRequest,
-  estimateProjectTokens,
-  projectContextState,
-  projectInstructions,
-  projectSystemPrefix,
+  resourceContextState,
+  resourceRequestText,
+  passageContext,
+  passageBudgets,
+  resolveProjectSystemPrompt,
+  shrinkPassages,
 } from '../../domain/projectContext';
 import { flushStorage, serializeStorage } from '../../domain/storageQueue';
 import type { StorageQueue } from '../../domain/storageQueue';
@@ -34,6 +38,7 @@ import type {
   ServerStatus,
   Settings,
   ChatOptions,
+  ProjectPassage,
 } from '../../domain/types';
 
 export function useConversation(
@@ -46,6 +51,77 @@ export function useConversation(
 ) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
+  const resourceProject = projects?.projects.find((project) => project.id === chat.projectId);
+  const resourcesAvailable = !chat.projectId || !!resourceProject;
+  const resourceInstructions = resourcesAvailable
+    ? resolveProjectSystemPrompt(chat, settings, resourceProject)
+    : '';
+  const inferredSearch = useMemo(
+    () =>
+      resourcesAvailable &&
+      resourceContextState(chat, settings, resourceProject, contextSize).search,
+    [
+      chat.attachments,
+      chat.projectId,
+      resourceInstructions,
+      resourceProject,
+      resourcesAvailable,
+      contextSize,
+    ],
+  );
+  const [fileDecision, setFileDecision] = useState<{
+    id: string;
+    attachments: Conversation['attachments'];
+    project?: Project;
+    instructions: string;
+    capacity: number | null | undefined;
+    search: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (
+      !contextSize ||
+      !resourcesAvailable ||
+      (!resourceProject && !chat.attachments?.some((file) => !file.image))
+    )
+      return;
+    let active = true;
+    void measureResourceContext(
+      resourceRequestText(chat, settings, resourceProject),
+      resourceInstructions,
+      contextSize,
+    ).then(({ context }) => {
+      if (active)
+        setFileDecision({
+          id: chat.id,
+          attachments: chat.attachments,
+          project: resourceProject,
+          instructions: resourceInstructions,
+          capacity: contextSize,
+          search: context.search,
+        });
+    });
+    return () => {
+      active = false;
+    };
+  }, [
+    chat.id,
+    chat.attachments,
+    resourceProject,
+    resourceInstructions,
+    resourcesAvailable,
+    contextSize,
+    server.runId,
+    server.phase,
+  ]);
+  const attachmentSearch =
+    (chat.attachments ?? []).some((file) => !file.image) &&
+    (fileDecision?.id === chat.id &&
+    fileDecision.attachments === chat.attachments &&
+    fileDecision.project === resourceProject &&
+    fileDecision.instructions === resourceInstructions &&
+    fileDecision.capacity === contextSize
+      ? fileDecision.search
+      : inferredSearch);
   const [webSearchOn, setWebSearchOn] = useState(false);
   const [input, updateInput] = useState('');
   const inputRevision = useRef(0);
@@ -254,24 +330,23 @@ export function useConversation(
     const query = replacement
       ? ([...history].reverse().find((message) => message.role === 'user')?.content ?? '')
       : text;
-    if (project && contextSize) {
-      const prefix = projectSystemPrefix(project, settings);
-      const instructions = projectInstructions(project, settings);
-      const [prefixCount, instructionsCount] = await Promise.all([
-        estimateTextTokens(prefix),
-        estimateTextTokens(instructions),
-      ]);
-      const instructionTokens =
-        instructionsCount.source === 'server'
-          ? instructionsCount.tokens
-          : estimateProjectTokens(instructions);
-      const capacity = projectContextState(
-        prefixCount.source === 'server' ? prefixCount.tokens : estimateProjectTokens(prefix),
+    const documents = (current.attachments ?? []).filter((file) => !file.image);
+    if ((project || documents.length) && contextSize) {
+      const instructions = resolveProjectSystemPrompt(current, settings, project);
+      const { context: capacity, instructionTokens } = await measureResourceContext(
+        resourceRequestText(current, settings, project),
+        instructions,
         contextSize,
-        prefixCount.source !== 'server',
-        instructionTokens,
       );
-      if (capacity.level === 'over' && !capacity.search) {
+      setFileDecision({
+        id: current.id,
+        attachments: current.attachments,
+        project,
+        instructions,
+        capacity: contextSize,
+        search: capacity.search,
+      });
+      if (project && capacity.level === 'over' && !capacity.search) {
         restoreSubmittedInput();
         setContextError(
           `This project does not fit in the context window. It needs ${capacity.shortfall.toLocaleString('en-US')} more tokens than are available.`,
@@ -282,40 +357,60 @@ export function useConversation(
       }
       if (capacity.search) {
         try {
-          const base = assembleProjectRequest(current, history, settings, project, []);
+          const base = assembleProjectRequest(current, history, settings, project, [], []);
           const baseCount = await estimatePromptTokens(base);
-          const budget = Math.max(
-            0,
+          const budgets = passageBudgets(
             Math.min(capacity.available! - instructionTokens, contextSize - baseCount.tokens),
+            !!project?.files.some((file) => file.included),
+            documents.length > 0,
           );
-          let passages = await projectService.search(project.id, query, budget);
-          // File estimates and server token counts can disagree, especially across scripts.
-          // Keep the highest ranked excerpts and remeasure the request that will be sent.
+          let [projectPassages, attachmentPassages] = await Promise.all([
+            project
+              ? projectService.search(project.id, query, budgets.project)
+              : Promise.resolve([]),
+            documents.length
+              ? invoke<ProjectPassage[]>('attachment_search', {
+                  id: current.id,
+                  temporary: !!temporaryRef.current,
+                  query,
+                  budget: budgets.attachments,
+                })
+              : Promise.resolve([]),
+          ]);
+          // Remeasure the actual request, retaining the highest ranked excerpts first.
           messages = base;
-          while (passages.length) {
-            const candidate = assembleProjectRequest(current, history, settings, project, passages);
-            const [projectCount, promptCount] = await Promise.all([
-              estimateTextTokens(candidate[0].content),
+          while (projectPassages.length || attachmentPassages.length) {
+            const candidate = assembleProjectRequest(
+              current,
+              history,
+              settings,
+              project,
+              projectPassages,
+              attachmentPassages,
+            );
+            const [resourceTokens, promptCount] = await Promise.all([
+              estimateTextTokens(
+                [instructions, passageContext(projectPassages, attachmentPassages)]
+                  .filter(Boolean)
+                  .join('\n\n'),
+              ),
               estimatePromptTokens(candidate),
             ]);
-            if (projectCount.tokens <= capacity.available! && promptCount.tokens <= contextSize) {
+            if (resourceTokens.tokens <= capacity.available! && promptCount.tokens <= contextSize) {
               messages = candidate;
               break;
             }
-            if (passages.length > 1) {
-              passages = passages.slice(0, Math.floor(passages.length / 2));
-            } else {
-              const [best] = passages;
-              const text = Array.from(best.text);
-              const shorter = text.slice(0, Math.floor(text.length / 2)).join('');
-              passages = shorter ? [{ ...best, text: shorter }] : [];
-            }
+            projectPassages = shrinkPassages(projectPassages);
+            attachmentPassages = shrinkPassages(attachmentPassages);
           }
-          assistant.projectSources = passages;
+          if (project) assistant.projectSources = projectPassages;
+          if (documents.length) assistant.attachmentSources = attachmentPassages;
           current.messages[current.messages.length - 1] = { ...assistant };
         } catch (error) {
           restoreSubmittedInput();
-          setContextError(`Couldn’t search project files. ${errorDetail(error).message}`);
+          setContextError(
+            `Couldn’t search ${project ? (documents.length ? 'project files or attachments' : 'project files') : 'attachments'}. ${errorDetail(error).message}`,
+          );
           requestRef.current = null;
           setGenerating(false);
           return;
@@ -674,6 +769,7 @@ export function useConversation(
   }
 
   return {
+    attachmentSearch,
     webSearchOn,
     setWebSearchOn,
     temporaryId,

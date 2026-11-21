@@ -55,6 +55,8 @@ jobs:
         working-directory: straggler/desktop
         run: npx playwright install --with-deps webkit
       - name: Shared browser interactions
+        env:
+          STRAGGLER_TEST_WORKERS: "2"
         run: bash straggler/tests/run.sh browser
       - name: Retain browser failure evidence
         if: failure()
