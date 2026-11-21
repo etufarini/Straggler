@@ -7,9 +7,11 @@ import { projectService } from '../../services/desktop';
 export default function ProjectSourceDialog({
   source,
   onClose,
+  attachmentText,
 }: {
   source: ProjectPassage;
   onClose: () => void;
+  attachmentText?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
@@ -17,6 +19,14 @@ export default function ProjectSourceDialog({
   useEffect(() => {
     dialog.current?.showModal();
     let active = true;
+    if (!source.projectId) {
+      setFile(
+        attachmentText !== undefined
+          ? { text: attachmentText }
+          : { error: 'The file is no longer attached. The saved passage is kept.' },
+      );
+      return;
+    }
     void projectService.fileText(source.projectId, source.fileId).then(
       (text) => {
         if (active) setFile({ text });
@@ -28,7 +38,7 @@ export default function ProjectSourceDialog({
     return () => {
       active = false;
     };
-  }, [source]);
+  }, [source, attachmentText]);
   return (
     <dialog
       ref={dialog}
@@ -47,7 +57,7 @@ export default function ProjectSourceDialog({
       <pre aria-label="Cited passage">{source.text}</pre>
       {file &&
         ('error' in file ? (
-          <Feedback title="Couldn’t open the project file" details={file.error}>
+          <Feedback title="Couldn’t open the source file" details={file.error}>
             The saved passage is shown above.
           </Feedback>
         ) : (
@@ -56,7 +66,7 @@ export default function ProjectSourceDialog({
             <pre>{file.text}</pre>
           </details>
         ))}
-      {!file && <p role="status">Opening project file…</p>}
+      {!file && <p role="status">Opening source file…</p>}
     </dialog>
   );
 }

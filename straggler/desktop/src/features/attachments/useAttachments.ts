@@ -214,6 +214,7 @@ export function useAttachments(
     };
   const tokens = stored.reduce((total, attachment) => total + estimate(attachment).tokens, 0);
   return {
+    searchMode: conversation.attachmentSearch,
     temporary: !!conversation.temporaryId,
     visionSupported,
     generating: conversation.generating,

@@ -230,6 +230,9 @@ export default function ChatPanel({
                   {message.projectSources && (
                     <ProjectSearchActivity sources={message.projectSources} />
                   )}
+                  {message.attachmentSources && (
+                    <ProjectSearchActivity sources={message.attachmentSources} attachments />
+                  )}
                   {message.reasoning && (
                     <details className="reasoning">
                       <summary>Reasoning</summary>
@@ -323,16 +326,22 @@ export default function ChatPanel({
                         user={message.role === 'user'}
                         sources={message.sources}
                         projectSources={message.projectSources}
+                        attachmentSources={message.attachmentSources}
                         onProjectSource={onProjectSource}
                       >
                         {message.content}
                       </Markdown>
                     </div>
                   )}
-                  {!!(message.sources?.length || message.projectSources?.length) && (
+                  {!!(
+                    message.sources?.length ||
+                    message.projectSources?.length ||
+                    message.attachmentSources?.length
+                  ) && (
                     <Sources
                       sources={message.sources}
                       projectSources={message.projectSources}
+                      attachmentSources={message.attachmentSources}
                       onProjectSource={onProjectSource}
                     />
                   )}
@@ -665,13 +674,20 @@ export default function ChatPanel({
   );
 }
 
-function ProjectSearchActivity({ sources }: { sources: ProjectPassage[] }) {
+function ProjectSearchActivity({
+  sources,
+  attachments = false,
+}: {
+  sources: ProjectPassage[];
+  attachments?: boolean;
+}) {
   const files = new Set(sources.map((source) => source.fileId)).size;
+  const label = attachments ? 'Searched attachments' : 'Searched project files';
   return (
     <p className="web-search-activity reasoning" role="status">
       {sources.length
-        ? `Searched project files · ${sources.length} ${sources.length === 1 ? 'passage' : 'passages'} from ${files} ${files === 1 ? 'file' : 'files'}`
-        : 'Searched project files · No passages fit or matched this message.'}
+        ? `${label} · ${sources.length} ${sources.length === 1 ? 'passage' : 'passages'} from ${files} ${files === 1 ? 'file' : 'files'}`
+        : `${label} · No passages fit or matched this message.`}
     </p>
   );
 }

@@ -539,13 +539,39 @@ export function createFixture(scenario: Scenario) {
           throw new Error('Destination is not writable');
         localStorage.setItem('straggler-fixture-export', String(args.contents));
         return;
+      case 'attachment_search': {
+        if (localStorage.getItem('straggler-fixture-attachment-search-error'))
+          throw new Error('Attachment search is unavailable.');
+        const files = args.temporary
+          ? [...(temporary?.attachments.values() ?? [])]
+          : (history.find((chat) => chat.id === args.id)?.attachments ?? []);
+        const query = String(args.query).toLowerCase().split(/\W+/).filter(Boolean);
+        const file = files.find(
+          (file) => !file.image && query.some((word) => file.text.toLowerCase().includes(word)),
+        );
+        if (!file || Number(args.budget) < 32) return [];
+        return [
+          {
+            n: 1,
+            conversationId: args.id,
+            fileId: file.id,
+            name: file.name,
+            section: 1,
+            text: file.text.slice(0, 120),
+          },
+        ];
+      }
       case 'history_search_text': {
         if (localStorage.getItem('straggler-fixture-chat-text-error'))
           throw new Error('Chat message search is unavailable.');
         const query = searchText(String(args.query));
         return history
-          .filter((chat) =>
-            chat.messages.some((message) => searchText(message.content).includes(query)),
+          .filter(
+            (chat) =>
+              chat.messages.some((message) => searchText(message.content).includes(query)) ||
+              (chat.attachments ?? []).some(
+                (file) => !file.image && searchText(file.text).includes(query),
+              ),
           )
           .map((chat) => chat.id);
       }
@@ -658,6 +684,7 @@ export function createFixture(scenario: Scenario) {
       case 'generate': {
         const request = args.request as {
           requestId: string;
+          messages: { role: string; content: string }[];
           webSearch?: boolean;
           webSearchQuery?: string;
           conversationId?: string;
@@ -713,6 +740,10 @@ export function createFixture(scenario: Scenario) {
           ?.messages.at(-1);
         if (savedResponse?.projectSources?.length)
           delta.content += '\n\nThe project notes support this answer [P1].';
+        if (
+          request.messages.some((message: { content: string }) => message.content.includes('[A1]'))
+        )
+          delta.content += '\n\nThe attachment supports this answer [A1].';
         if (scenario === 'burst-stream') {
           delta.content =
             '## Streamed answer\n\n' + 'A **local** answer with caffè ☕.\n\n'.repeat(80);

@@ -127,7 +127,7 @@ export default function ChatHistoryRow({
               )}
             </span>
             {messageMatch && !match && (
-              <span className="project-row-project">Match in messages</span>
+              <span className="project-row-project">Match in chat text</span>
             )}
             {project && (
               <span className="project-row-project">

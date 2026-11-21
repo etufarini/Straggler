@@ -108,6 +108,7 @@ export function useWorkspace() {
     serverDetails,
     currentProject,
     currentProject ? projects.context(currentProject).search : false,
+    conversation.attachmentSearch,
   );
   const {
     chatOptionsDisabled,

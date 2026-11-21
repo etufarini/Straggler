@@ -121,11 +121,13 @@ export interface Message {
   serverRunId?: string;
   sources?: WebSource[];
   projectSources?: ProjectPassage[];
+  attachmentSources?: ProjectPassage[];
   webSearch?: WebSearchTurn;
 }
 export interface ProjectPassage {
   n: number;
-  projectId: string;
+  projectId?: string;
+  conversationId?: string;
   fileId: string;
   name: string;
   section: number;

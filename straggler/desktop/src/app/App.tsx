@@ -304,6 +304,7 @@ export default function App() {
             <PresencePanel
               sources={lastResponse?.sources}
               projectSources={lastResponse?.projectSources}
+              attachmentSources={lastResponse?.attachmentSources}
               onProjectSource={setProjectSource}
               attachments={controller.attachments}
               state={presence}
@@ -320,7 +321,13 @@ export default function App() {
 
       <ProjectDialogs controller={controller} />
       {projectSource && (
-        <ProjectSourceDialog source={projectSource} onClose={() => setProjectSource(null)} />
+        <ProjectSourceDialog
+          source={projectSource}
+          attachmentText={
+            controller.chat.attachments?.find((file) => file.id === projectSource.fileId)?.text
+          }
+          onClose={() => setProjectSource(null)}
+        />
       )}
 
       {controller.projects.notice && (

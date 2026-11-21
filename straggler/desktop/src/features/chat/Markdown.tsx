@@ -61,38 +61,42 @@ export default memo(function Markdown({
   children,
   sources = emptySources,
   projectSources = emptyProjectSources,
+  attachmentSources = emptyProjectSources,
   onProjectSource,
   user = false,
 }: {
   children: string;
   sources?: WebSource[];
   projectSources?: ProjectPassage[];
+  attachmentSources?: ProjectPassage[];
   onProjectSource?: (source: ProjectPassage) => void;
   user?: boolean;
 }) {
   const sourcePlugins = useMemo(
     () =>
-      sources.length || projectSources.length
-        ? [...plugins, citationPlugin(sources, projectSources)]
+      sources.length || projectSources.length || attachmentSources.length
+        ? [...plugins, citationPlugin(sources, projectSources, attachmentSources)]
         : plugins,
-    [sources, projectSources],
+    [sources, projectSources, attachmentSources],
   );
   const sourceComponents = useMemo<Components>(
     () =>
-      sources.length || projectSources.length
+      sources.length || projectSources.length || attachmentSources.length
         ? {
             ...components,
             a: ({ children, href }) => {
-              const projectMatch = /^#straggler-source-P(\d+)$/.exec(href ?? '');
+              const projectMatch = /^#straggler-source-([PA])(\d+)$/.exec(href ?? '');
               const passage =
                 projectMatch &&
-                projectSources.find((source) => source.n === Number(projectMatch[1]));
+                (projectMatch[1] === 'P' ? projectSources : attachmentSources).find(
+                  (source) => source.n === Number(projectMatch[2]),
+                );
               if (passage && onProjectSource) {
                 return (
                   <button
                     type="button"
                     className="web-citation"
-                    aria-label={`Project source ${passage.n}: ${passage.name} · section ${passage.section}`}
+                    aria-label={`${passage.projectId ? 'Project' : 'Attachment'} source ${passage.n}: ${passage.name} · section ${passage.section}`}
                     onClick={() => onProjectSource(passage)}
                   >
                     {children}
@@ -120,7 +124,7 @@ export default memo(function Markdown({
             },
           }
         : components,
-    [sources, projectSources, onProjectSource],
+    [sources, projectSources, attachmentSources, onProjectSource],
   );
   return (
     <ReactMarkdown

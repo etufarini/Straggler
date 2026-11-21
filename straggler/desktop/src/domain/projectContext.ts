@@ -89,29 +89,92 @@ export function projectInstructions(project: Project, settings?: Settings): stri
   return project.instructions.trim() ? project.instructions : (settings?.chat_system_prompt ?? '');
 }
 
+export function passageContext(
+  projectPassages: ProjectPassage[] = [],
+  attachmentPassages: ProjectPassage[] = [],
+): string {
+  return (
+    [
+      ['P', 'project', projectPassages],
+      ['A', 'attachment', attachmentPassages],
+    ] as const
+  )
+    .flatMap(([marker, kind, sources]) =>
+      sources.length
+        ? [
+            `Use the following ${kind} excerpts as reference material. Cite relevant passages as [${marker}1], [${marker}2], and so on.`,
+            ...sources.map(
+              (source) =>
+                `[${marker}${source.n}] ${source.name} · section ${source.section}\n${source.text}`,
+            ),
+          ]
+        : [],
+    )
+    .join('\n\n');
+}
+
+export function resourceRequestText(
+  conversation: Conversation,
+  settings?: Settings,
+  project?: Project,
+): string {
+  return assembleProjectRequest(conversation, [], settings, project)
+    .map((message) => message.content)
+    .join('\n\n');
+}
+
+export function resourceContextState(
+  conversation: Conversation,
+  settings: Settings | undefined,
+  project: Project | undefined,
+  capacity: number | null | undefined,
+) {
+  const instructions = resolveProjectSystemPrompt(conversation, settings, project);
+  return projectContextState(
+    estimateProjectTokens(resourceRequestText(conversation, settings, project)),
+    capacity,
+    true,
+    estimateProjectTokens(instructions),
+  );
+}
+
+export function passageBudgets(available: number, project: boolean, attachments: boolean) {
+  const budget = Math.max(0, Math.floor(available));
+  const projectBudget = project ? (attachments ? Math.floor(budget / 2) : budget) : 0;
+  return { project: projectBudget, attachments: attachments ? budget - projectBudget : 0 };
+}
+
+export function shrinkPassages(sources: ProjectPassage[]): ProjectPassage[] {
+  if (sources.length > 1) return sources.slice(0, Math.floor(sources.length / 2));
+  if (!sources.length) return sources;
+  const [best] = sources;
+  const text = Array.from(best.text);
+  const shorter = text.slice(0, Math.floor(text.length / 2)).join('');
+  return shorter ? [{ ...best, text: shorter }] : [];
+}
+
 export function assembleProjectRequest(
   conversation: Conversation,
   messages: Message[],
   settings?: Settings,
   project?: Project,
   passages?: ProjectPassage[],
+  attachmentPassages?: ProjectPassage[],
 ) {
   const systemPrompt = resolveProjectSystemPrompt(conversation, settings, project);
-  let prefix = systemPrompt;
-  if (conversation.projectId && project) {
-    if (passages === undefined) {
-      prefix = projectSystemPrefix(project, settings);
-    } else if (passages.length) {
-      prefix = [
-        systemPrompt,
-        'Use the following project excerpts as reference material. Cite relevant passages as [P1], [P2], and so on.',
-        ...passages.map(
-          (source) => `[P${source.n}] ${source.name} · section ${source.section}\n${source.text}`,
-        ),
-      ]
-        .filter(Boolean)
-        .join('\n\n');
-    }
+  const prefix =
+    conversation.projectId && project && passages === undefined
+      ? projectSystemPrefix(project, settings)
+      : systemPrompt;
+  const turns = composeRequest(
+    messages,
+    prefix,
+    attachmentPassages === undefined ? (conversation.attachments ?? []) : [],
+  );
+  const context = passageContext(passages, attachmentPassages);
+  if (context) {
+    const lastUser = [...turns].reverse().find((message) => message.role === 'user');
+    if (lastUser) lastUser.content += `\n\n${context}`;
   }
-  return composeRequest(messages, prefix, conversation.attachments ?? []);
+  return turns;
 }
