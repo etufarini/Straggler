@@ -135,6 +135,7 @@ export default function ChatPanel({
   ) : null;
   const hasBranchPoint =
     branchOrigin && chat.messages.some((message) => message.id === branchOrigin.messageId);
+  const attachmentCount = controller.attachments.rows.filter((row) => !!row.attachment).length;
   return (
     <>
       {project && (
@@ -677,7 +678,7 @@ export default function ChatPanel({
         {controller.cloud.notice && <CloudNotice controller={controller.cloud} />}
         <form
           ref={composerRef}
-          className="composer"
+          className={`composer${controller.attachments.dragged.length > 0 ? ' is-dragover' : ''}`}
           onSubmit={(event) => {
             event.preventDefault();
             if (canSend) {
@@ -687,6 +688,12 @@ export default function ChatPanel({
             }
           }}
         >
+          {controller.attachments.dragged.length > 0 && (
+            <div className="composer-drop-overlay" aria-hidden="true">
+              <Paperclip size={24} />
+              <span>Drop to attach</span>
+            </div>
+          )}
           <RichComposer
             key={chat.id}
             focusRef={composerInput}
@@ -717,13 +724,16 @@ export default function ChatPanel({
               />
               <button
                 type="button"
-                className="composer-chip attach-chip"
-                aria-label="Attach files"
+                className={`composer-chip attach-chip${attachmentCount ? ' has-attachments' : ''}`}
+                aria-label={
+                  attachmentCount ? `Attach files, ${attachmentCount} attached` : 'Attach files'
+                }
                 title={attachmentTypesLabel}
                 disabled={controller.attachments.disabled}
                 onClick={() => void controller.attachments.chooseFiles()}
               >
                 <Paperclip size={15} />
+                <span>Attach{attachmentCount ? ` · ${attachmentCount}` : ''}</span>
               </button>
               <SystemPromptMenu controller={controller} />
               <ReasoningMenu controller={controller} />

@@ -72,6 +72,7 @@
   --ui-muted: var(--ui-text-2);
   --ui-accent: #2f63f2;
   --ui-border: #33437a;
+  --ui-measure: 36em;
   --ui-radius-xs: 4px;
   --ui-radius-sm: 6px;
   --ui-radius: 8px;
@@ -4668,4 +4669,85 @@ body {
 .dropzone:hover:not(:disabled) {
   border-style: solid;
   border-color: var(--ui-control-hover);
+}
+
+/* Reading measure limits prose, while code, math and media keep the message width. */
+.markdown > :is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, dl) {
+  max-inline-size: var(--ui-measure);
+}
+.markdown > p:has(img),
+.markdown > p:has(.katex-display) {
+  max-inline-size: none;
+}
+.confirmation p,
+.folder-browser > p,
+.panel-intro,
+.settings-scope {
+  max-inline-size: var(--ui-measure);
+}
+.settings-content {
+  max-inline-size: 640px;
+}
+.settings-section-heading h2 {
+  margin-block-start: 0;
+}
+.settings-section-heading .configuration-heading {
+  position: static;
+  margin-block: 16px 0;
+  padding-block: 8px;
+}
+.field-grid:not(.related-fields) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.scope-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-block: 24px;
+  color: var(--ui-text-2);
+  font-size: var(--ui-fs-meta);
+}
+.scope-note > svg {
+  flex-shrink: 0;
+  margin-block-start: 3px;
+}
+.setting-field .field-scope {
+  color: var(--ui-text-3);
+}
+.composer.is-dragover {
+  border-color: var(--ui-accent-edge);
+}
+.composer-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--ui-panel) 94%, transparent);
+  color: var(--ui-text-1);
+  font-size: var(--ui-fs-title-3);
+  pointer-events: none;
+}
+.composer:is([data-density='icon'], [data-density='wrap'])
+  .composer-tools
+  .attach-chip.has-attachments {
+  width: auto;
+  padding-inline: 8px;
+}
+.composer:is([data-density='icon'], [data-density='wrap'])
+  .composer-tools
+  .attach-chip.has-attachments
+  > span {
+  display: inline;
+}
+
+.settings-section-heading {
+  position: sticky;
+  top: -24px;
+  z-index: 3;
+  padding-block: 12px;
+  background: var(--ui-background);
 }
