@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- R004: unify UI typography, radii, action hierarchy, semantic colors, dark native controls and minimum pointer targets; clarify interface copy without changing workflows.
+
 - Add manual chat compaction with cancellable bounded summaries, preserved originals, editable summary dividers and unchanged conversation exports.
 
 - Apply the Aurora palette to cloud chat and project areas, preserving aqua Settings and independent temporary-chat signals.

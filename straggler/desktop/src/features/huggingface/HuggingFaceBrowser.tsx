@@ -76,7 +76,7 @@ export default function HuggingFaceBrowser({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <button type="submit" disabled={busy || !query.trim()}>
+        <button className="secondary-button" type="submit" disabled={busy || !query.trim()}>
           Search
         </button>
       </form>
@@ -86,12 +86,12 @@ export default function HuggingFaceBrowser({
       {busy && <p role="status">Loading…</p>}
       {error && (
         <Feedback
-          title="Hugging Face action failed"
+          title="Couldn’t complete the Hugging Face request"
           details={error}
           onDismiss={() => controller.setError('')}
         >
           {error}
-          <button onClick={onTokenSettings}>Token settings</button>
+          <button onClick={onTokenSettings}>Open token settings</button>
         </Feedback>
       )}
       {(results?.warning || repository?.warning) && (
@@ -148,7 +148,7 @@ export default function HuggingFaceBrowser({
               : 'Check the publisher’s model card and license before downloading.'}
             <div className="row-actions">
               <button onClick={() => void copyLink()}>Copy repository link</button>
-              <button onClick={onTokenSettings}>Token settings</button>
+              <button onClick={onTokenSettings}>Open token settings</button>
               {repository.gated && (
                 <button
                   disabled={busy}
@@ -193,9 +193,9 @@ export default function HuggingFaceBrowser({
             ))}
           </fieldset>
           <label className="setting-field">
-            <span>Optional mmproj file</span>
+            <span>Vision projector (optional)</span>
             <Select
-              aria-label="Optional mmproj file"
+              aria-label="Vision projector (optional)"
               value={projector}
               disabled={busy}
               onChange={setProjector}
@@ -229,7 +229,7 @@ export default function HuggingFaceBrowser({
           {diskError && <p className="hf-callout warn">{diskError}</p>}
           {insufficient && (
             <p role="alert" className="hf-callout error">
-              There is not enough disk space. Choose another models folder or free space.
+              Not enough disk space. Free up space or choose another models folder.
             </p>
           )}
           <button

@@ -35,7 +35,10 @@ test('Hub network actions are explicit; pause, resume and verified completion up
   await expect(
     page.getByText('Estimate from the file size and detected memory;', { exact: false }),
   ).toBeVisible();
-  const projector = page.getByRole('combobox', { name: 'Optional mmproj file', exact: true });
+  const projector = page.getByRole('combobox', {
+    name: 'Vision projector (optional)',
+    exact: true,
+  });
   await projector.click();
   await projector.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Models', exact: true })).toBeVisible();
@@ -61,7 +64,7 @@ test('optional token stays out of browser storage and gated access is retried ex
   await openRepository(page, 'fixture-publisher/gated-GGUF');
   await page.getByRole('button', { name: 'Download selected files' }).click();
   await expect(page.getByRole('alert')).toContainText('access is restricted');
-  await page.getByRole('button', { name: 'Token settings', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Open token settings', exact: true }).first().click();
   const token = page.getByRole('textbox', { name: /^Hugging Face token/ });
   await token.fill('hf_private_fixture');
   await page.getByRole('button', { name: 'Save token', exact: true }).click();
@@ -111,7 +114,9 @@ test('disk-space feedback blocks starting a download without blocking server con
   await page.evaluate(() => localStorage.setItem('straggler-fixture-hf-low-disk', 'true'));
   await openHub(page);
   await openRepository(page);
-  await expect(page.getByRole('alert')).toContainText('not enough disk space');
+  await expect(page.getByRole('alert')).toHaveText(
+    'Not enough disk space. Free up space or choose another models folder.',
+  );
   await expect(page.getByRole('button', { name: 'Download selected files' })).toBeDisabled();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Launch server', exact: true })).toBeEnabled();

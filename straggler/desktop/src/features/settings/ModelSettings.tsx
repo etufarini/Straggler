@@ -67,7 +67,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
           <Folder size={18} />
           <div>
             <strong>No GGUF models found</strong>
-            <p>Choose your models folder in Folders. Models can be organized in subfolders.</p>
+            <p>Choose a models folder in Folders. Subfolders are included.</p>
             <button onClick={() => setSection('folders')}>Choose models folder</button>
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
               />
               <FieldError id={`${key}-error`} message={fieldError(key)} />
               {!advertised.length && (
-                <small>Supported formats unavailable; the current selection is preserved.</small>
+                <small>Couldn’t read the supported formats. Your selection is kept.</small>
               )}
             </label>
           );

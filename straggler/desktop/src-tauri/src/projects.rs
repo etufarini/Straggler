@@ -16,7 +16,7 @@ use std::{
 use uuid::Uuid;
 
 const UNDO_DURATION: Duration = Duration::from_secs(8);
-const GENERATION_BUSY: &str = "Available when the current response finishes or is stopped";
+const GENERATION_BUSY: &str = "Available when the response ends.";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

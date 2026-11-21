@@ -130,7 +130,7 @@ export default function App() {
                 <small>
                   {cloudActive
                     ? `${cloudActive.providerName} · Cloud model`
-                    : config?.currentProfile || 'Unsaved configuration'}
+                    : config?.currentProfile || 'Custom settings'}
                   {!cloudActive && modified ? ' · Modified' : ''}
                 </small>
               )}
@@ -232,11 +232,8 @@ export default function App() {
         {!cloudActive && <ServerFeedback controller={controller} />}
         {controller.preferenceError && (
           <div className="workspace-feedback">
-            <Feedback
-              title="Desktop preferences could not be saved"
-              details={controller.preferenceError}
-            >
-              Your layout remains usable for this session.
+            <Feedback title="Couldn’t save preferences" details={controller.preferenceError}>
+              Changes last until you close the app.
             </Feedback>
           </div>
         )}
@@ -255,7 +252,7 @@ export default function App() {
         {controller.projects.error && (
           <div className="workspace-feedback">
             <Feedback
-              title="Project data could not be saved or loaded"
+              title="Couldn’t load or save project data"
               details={controller.projects.error}
               actions={
                 <button className="text-button" onClick={() => void controller.projects.load()}>

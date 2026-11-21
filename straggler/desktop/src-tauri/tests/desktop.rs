@@ -1030,15 +1030,15 @@ async fn project_storage_and_generation_use_identity_and_immutable_request_snaps
     assert!(runtime
         .move_project_chat(active.id, None)
         .unwrap_err()
-        .contains("current response"));
+        .contains("Available when the response ends."));
     assert!(runtime
         .delete_conversation(active.id)
         .unwrap_err()
-        .contains("current response"));
+        .contains("Available when the response ends."));
     assert!(runtime
         .delete_project(project.id, false)
         .unwrap_err()
-        .contains("current response"));
+        .contains("Available when the response ends."));
     project = runtime
         .projects
         .list(&runtime.history)
@@ -1049,7 +1049,7 @@ async fn project_storage_and_generation_use_identity_and_immutable_request_snaps
     assert!(runtime
         .save_project(project)
         .unwrap_err()
-        .contains("current response"));
+        .contains("Available when the response ends."));
     runtime.move_project_chat(other.id, None).unwrap();
     let recorded: serde_json::Value =
         serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();

@@ -214,11 +214,7 @@ export default function ProjectDetail({
               </div>
             </div>
           </form>
-          {controller.generating && (
-            <p className="field-help">
-              Start chat is available when the current response finishes or is stopped.
-            </p>
-          )}
+          {controller.generating && <p className="field-help">Available when the response ends.</p>}
           {!controller.modelReady && <p className="field-help">Load a model to start chatting.</p>}
           <div className="project-section-head">
             <h2 id="project-chats-title">Chats</h2>
@@ -269,7 +265,7 @@ export default function ProjectDetail({
                     compactReason={controller.compactReason(chat)}
                     metadataBusyReason={
                       controller.generating || controller.editingBusy
-                        ? 'Available when the current response finishes or is stopped'
+                        ? 'Available when the response ends.'
                         : undefined
                     }
                     onStar={() =>
@@ -282,7 +278,7 @@ export default function ProjectDetail({
                     readOnly={project.archived}
                     actionBusyReason={
                       controller.generating && controller.chat.id === chat.id
-                        ? 'Available when the current response finishes or is stopped'
+                        ? 'Available when the response ends.'
                         : undefined
                     }
                     onMove={() =>
@@ -399,8 +395,8 @@ export default function ProjectDetail({
                     />
                     <button
                       className="project-icon-button"
-                      aria-label={`Replace ${file.name} with newer version…`}
-                      title="Replace with newer version…"
+                      aria-label={`Replace ${file.name}…`}
+                      title="Replace file…"
                       disabled={project.archived || projects.busy}
                       onClick={() => void projects.replaceFile(project.id, file.id).catch(() => {})}
                     >
@@ -442,7 +438,7 @@ export default function ProjectDetail({
               </ul>
             ) : (
               <p className="field-help">
-                No files yet. Their extracted text is read into every chat in this project.
+                No files yet. Their text is added to every chat in this project.
               </p>
             )}
             {!project.archived && (

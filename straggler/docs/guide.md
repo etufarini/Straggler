@@ -281,7 +281,7 @@ with the response; open **Technical details** for the original diagnostic.
 ### Reopen or delete a conversation
 
 Select a conversation in the sidebar to reopen it. To delete it, open its menu,
-choose **Delete**, then review the **Delete conversation** confirmation. This
+choose **Delete**, then review the **Delete chat** confirmation. This
 permanently removes the conversation and its stored attachments from this device;
 original source files remain untouched. Export or back up anything you want to keep
 before confirming.
@@ -411,6 +411,13 @@ configuration used by the running server:
 | Unapplied changes | Edited values differ from the applied session settings. | Select **Apply changes** to validate and apply them. |
 | Modified | Edited values differ from the associated saved configuration. | Save to that configuration, or save a new one, to keep the changes. |
 | Restart required | Server launch settings differ from the running configuration. | Stop and launch the server to use the new values. |
+
+When no saved configuration is associated, the heading reads **Custom settings**.
+The status tooltips explain the next action:
+
+- **Modified:** “Differs from the saved configuration. Save it to keep these values.”
+- **Unapplied changes:** “Select Apply changes to use these values.”
+- **Restart required:** “Stop and launch the server to use the new values.”
 
 **Apply changes** does not save a named configuration or restart the server.
 Saving a configuration also applies the edited values. Chat defaults take effect

@@ -29,6 +29,6 @@ export const presenceLabels: Record<PresenceState, { label: string; short: strin
   ready: { label: 'Waiting for your message', short: 'Ready' },
   reasoning: { label: 'Thinking…', short: 'Thinking' },
   generating: { label: 'Writing the answer…', short: 'Writing' },
-  stopped: { label: 'Stopped by you', short: 'Stopped' },
+  stopped: { label: 'Stopped', short: 'Stopped' },
   error: { label: 'Needs attention', short: 'Error' },
 };

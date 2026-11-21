@@ -494,12 +494,12 @@ export default function ChatPanel({
                         title="Couldn’t create the branch"
                         details={controller.branchError.detail}
                       >
-                        Try branching from this response again.
+                        Try again.
                       </Feedback>
                     )}
                   {copyError?.messageId === message.id && (
                     <Feedback
-                      title="Text could not be copied"
+                      title="Couldn’t copy the text"
                       details={copyError.detail}
                       onDismiss={() => setCopyError(null)}
                     >
@@ -528,7 +528,7 @@ export default function ChatPanel({
               </button>
             }
           >
-            Reload projects before continuing this conversation.
+            Reload projects to continue this chat.
           </Feedback>
         )}
         {project &&
@@ -585,7 +585,7 @@ export default function ChatPanel({
             details={controller.summaryError}
             onDismiss={() => controller.setSummaryError('')}
           >
-            Original messages are kept. Review the details and try again.
+            Original messages are kept. Check the details and try again.
           </Feedback>
         )}
         {controller.compactionSuggested &&

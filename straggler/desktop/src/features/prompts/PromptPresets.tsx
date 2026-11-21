@@ -218,7 +218,7 @@ function PresetEditor({
           </label>
           {failure && (
             <Feedback title="Couldn’t save the preset" details={failure}>
-              Your edits remain available. Try again.
+              Your edits are kept. Try again.
             </Feedback>
           )}
           <div className="panel-actions">

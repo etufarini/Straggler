@@ -374,8 +374,8 @@ export function useWorkspace() {
   }
   function requestDeleteChat(value: Conversation) {
     setConfirmation({
-      title: 'Delete conversation?',
-      actionLabel: 'Delete conversation',
+      title: 'Delete chat?',
+      actionLabel: 'Delete chat',
       destructive: true,
       text: `“${value.title}” will be permanently removed from this device.`,
       action: async () => {

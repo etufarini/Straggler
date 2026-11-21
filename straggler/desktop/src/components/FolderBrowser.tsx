@@ -136,7 +136,7 @@ export default function FolderBrowser({
         <p className="field-help">“Use this folder” picks the folder you’re in.</p>
         {error && (
           <Feedback title="Folder unavailable" details={error}>
-            Choose a readable folder or enter another path. Your previous setting has been kept.
+            Choose a folder you can read, or enter another path. Your previous folder is kept.
           </Feedback>
         )}
         <div className="directory-list">

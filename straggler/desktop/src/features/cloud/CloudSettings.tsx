@@ -139,7 +139,7 @@ function ProviderSettings({
       <div className="cloud-provider-content">
         <p className="field-help">{provider.baseUrl}</p>
         {signup && <WebLink url={signup}>Get a key from {provider.name}</WebLink>}
-        <p className="field-help">The API key is stored only in your system keychain.</p>
+        <p className="field-help">Stored only in the system keychain and never shown again.</p>
         {provider.keyError && (
           <Feedback title="Couldn’t read the API key" details={provider.keyError}>
             Unlock your system keychain and try again.

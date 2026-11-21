@@ -39,7 +39,9 @@ test('both exports open save directly, cancellation is silent and write errors u
   });
   await menu.click();
   await page.getByRole('menuitem', { name: 'Export chat…', exact: true }).click();
-  await expect(page.locator('.composer-wrap').getByRole('alert')).toContainText('Export failed');
+  await expect(page.locator('.composer-wrap').getByRole('alert')).toContainText(
+    'Couldn’t export the chat',
+  );
 });
 
 test('reasoning export stays focusable but unavailable with an explanation when no reasoning exists', async ({

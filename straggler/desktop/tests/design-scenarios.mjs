@@ -86,12 +86,12 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
       );
     }
     if (['BUILD-02', 'BUILD-03'].includes(screen)) {
-      await button('Use bundled backend').click();
+      await button('Use bundled version').click();
       await expect(page.getByRole('alertdialog')).toBeVisible();
       if (screen === 'BUILD-03') {
         await page
           .getByRole('alertdialog')
-          .getByRole('button', { name: 'Use bundled backend', exact: true })
+          .getByRole('button', { name: 'Use bundled version', exact: true })
           .click();
         await expect(page.getByText('Build status: ready', { exact: true })).toBeVisible();
       }
@@ -218,7 +218,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
   if (screen === 'CHAT-18') {
     await page.evaluate(() => localStorage.setItem('straggler-fixture-import-error', 'true'));
     await button('Import chat').click();
-    await expect(page.getByText('Import failed', { exact: true })).toBeVisible();
+    await expect(page.getByText('Couldn’t import the chat', { exact: true })).toBeVisible();
   }
   if (screen === 'SERVER-01') await page.getByRole('button', { name: /Server log/ }).click();
   if (screen === 'DIALOG-02') await button('Stop server').click();
@@ -259,7 +259,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
         .getByRole('alertdialog')
         .getByRole('button', { name: 'Close programs', exact: true })
         .click();
-      await button('Force quit…').click();
+      await button('Force quit').click();
     }
   }
   if (['SET-04', 'DIALOG-01', 'STATE-01'].includes(screen)) {
@@ -289,10 +289,10 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     await expect(page.getByRole('button', { name: '.hidden' })).toBeVisible();
   }
   if (screen === 'BUILD-01') {
-    await button('Use bundled backend').click();
+    await button('Use bundled version').click();
     await page
       .getByRole('alertdialog')
-      .getByRole('button', { name: 'Use bundled backend', exact: true })
+      .getByRole('button', { name: 'Use bundled version', exact: true })
       .click();
     await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText(
       'Couldn’t complete the action',

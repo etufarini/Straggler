@@ -103,7 +103,7 @@ export default function ReasoningControls({
             options={[
               { value: 'auto', label: 'Template default' },
               ...(effort !== 'auto' && !levels.includes(effort)
-                ? [{ value: effort, label: `${effort} (not advertised)`, disabled: true }]
+                ? [{ value: effort, label: `${effort} (not listed by the model)`, disabled: true }]
                 : []),
               ...levels.map((value) => ({
                 value,

@@ -110,7 +110,7 @@ function ProjectDialogContent({
           if (chat) await controller.moveChat(chat, result.project.id);
           else
             projects.setNotice({
-              message: `Created “${result.project.name}”. Add instructions and files when you are ready.`,
+              message: `Created “${result.project.name}”.`,
             });
           controller.openProject(result.project.id);
         } else if (project) {
@@ -317,7 +317,7 @@ function ProjectDialogContent({
           </>
         ) : (
           <>
-            <p>There are no active projects yet. Create one and this chat moves into it.</p>
+            <p>No active projects yet. Create one to move this chat into it.</p>
             <div className="panel-actions">
               {cancel}
               <button
@@ -363,7 +363,7 @@ function ProjectDialogContent({
             </button>
           </div>
           <p className="panel-intro">
-            Replaces the Settings system prompt for every chat in this project.
+            Replaces the default system prompt for every chat in this project.
           </p>
           <InsertPreset disabled={project.archived || busy} onInsert={setInstructions} />
           <label className="setting-field">
@@ -382,9 +382,7 @@ function ProjectDialogContent({
               ≈ {estimateProjectTokens(instructions).toLocaleString('en-US')} tokens (estimate)
             </small>
           </label>
-          <p className="field-help">
-            Leave empty to use the system prompt from Settings in this project.
-          </p>
+          <p className="field-help">Leave empty to use the default system prompt.</p>
           {controller.generating && controller.chat.projectId === project.id && (
             <p className="field-help">Changes apply from the next message.</p>
           )}
@@ -422,9 +420,7 @@ function ProjectDialogContent({
         description="Its chats stay readable, but you can’t add chats, instructions or files. Restore it anytime from Projects › Archived."
       >
         {feedback}
-        {lifecycleBusy && (
-          <p className="field-help">Available when the current response finishes or is stopped</p>
-        )}
+        {lifecycleBusy && <p className="field-help">Available when the response ends.</p>}
         <div className="panel-actions">
           {cancel}
           <button
@@ -474,7 +470,7 @@ function ProjectDialogContent({
         <p className="field-help">
           {project.archived
             ? 'Restore the project to delete it.'
-            : 'Available when the current response finishes or is stopped'}
+            : 'Available when the response ends.'}
         </p>
       )}
       <div className="panel-actions">
