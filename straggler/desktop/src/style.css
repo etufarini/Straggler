@@ -4399,9 +4399,6 @@ input:focus-visible {
   gap: 8px;
   padding: 6px 0;
 }
-.cloud-model-group {
-  margin: 16px 0;
-}
 .cloud-badge {
   display: inline-flex;
   align-items: center;
@@ -4424,6 +4421,12 @@ input:focus-visible {
 
 /* Aurora identifies the active cloud destination; Settings keeps its own palette. */
 body[data-model='cloud'] {
+  --ui-raised: var(--ui-elev-2);
+  --ui-text: var(--ui-text-1);
+  --ui-muted: var(--ui-text-2);
+  --ui-subtle: var(--ui-text-3);
+  --ui-option-text: var(--ui-text-1);
+  --ui-control-accent: var(--ui-accent-edge);
   --ui-background: #231b26;
   --ui-elev-0: #1b141e;
   --ui-elev-1: #231b26;
