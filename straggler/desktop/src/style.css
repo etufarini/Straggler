@@ -925,7 +925,7 @@ h1 {
   container-type: inline-size;
 }
 .composer:focus-within {
-  border-color: #56688e;
+  border-color: var(--ui-accent-edge);
   background:
     linear-gradient(var(--ui-composer-surface), var(--ui-composer-surface)) padding-box,
     linear-gradient(var(--ui-accent-edge), var(--ui-accent-edge)) border-box;
