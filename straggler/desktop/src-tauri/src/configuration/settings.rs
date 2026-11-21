@@ -231,7 +231,7 @@ impl Settings {
             ("cache_type_k", cache_type(&self.cache_type_k), "Use a lowercase KV cache K type advertised by llama-server."),
             ("cache_type_v", cache_type(&self.cache_type_v), "Use a lowercase KV cache V type advertised by llama-server."),
             ("prompt_processing", matches!(self.prompt_processing.as_str(), "auto" | "low-memory" | "large-batch"), "STRAGGLER_PROMPT_PROCESSING must be auto, low-memory or large-batch."),
-            ("chat_system_prompt", self.chat_system_prompt.len() <= 65536 && !self.chat_system_prompt.contains('\0'), "System prompt must be valid text of at most 65536 UTF-8 bytes."),
+            ("chat_system_prompt", crate::system_prompts::valid_prompt(&self.chat_system_prompt), "System prompt must be valid text of at most 65536 UTF-8 bytes."),
             ("chat_reasoning", matches!(self.chat_reasoning.as_str(), "auto" | "on" | "off"), "Reasoning must use the model default, on or off."),
             ("chat_reasoning_effort", valid_effort(&self.chat_reasoning_effort), "Use a reasoning effort advertised by the loaded chat template or the model default."),
         ];
