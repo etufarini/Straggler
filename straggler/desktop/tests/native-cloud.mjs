@@ -20,7 +20,7 @@ export async function startCloudFixture() {
               name: 'Cloud fixture',
               context_length: 8192,
               architecture: { input_modalities: ['text'] },
-              supported_parameters: [],
+              supported_parameters: ['max_tokens'],
             },
           ],
         }),
