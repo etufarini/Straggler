@@ -105,7 +105,7 @@
   --ui-check-shadow: drop-shadow(0 0 5px #9db4ffaa);
   --ui-gutter: 32px;
   --ui-primary: linear-gradient(180deg, #3568f5 0%, #2b5de8 100%);
-  --ui-primary-hover: linear-gradient(180deg, #4174ff 0%, #3166f2 100%);
+  --ui-primary-hover: linear-gradient(180deg, #396bf5 0%, #3166f2 100%);
   --ui-holo: linear-gradient(
     115deg,
     #5fd6ff 0%,
@@ -3591,7 +3591,7 @@ input:focus-visible {
   justify-content: center;
   gap: 7px;
 }
-.hf-tabs button.selected {
+.hf-tabs button[aria-selected='true'] {
   background: var(--ui-raised-2);
   color: var(--ui-text);
   box-shadow:
@@ -4407,4 +4407,107 @@ input:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+/* Aurora identifies the active cloud destination; Settings keeps its own palette. */
+body[data-model='cloud'] {
+  --ui-raised: var(--ui-elev-2);
+  --ui-text: var(--ui-text-1);
+  --ui-muted: var(--ui-text-2);
+  --ui-subtle: var(--ui-text-3);
+  --ui-option-text: var(--ui-text-1);
+  --ui-background: #2f152a;
+  --ui-elev-0: #260d21;
+  --ui-elev-1: #2f152a;
+  --ui-elev-2: #3d1a36;
+  --ui-elev-3: #482340;
+  --ui-surface: #251221;
+  --ui-deep: #1b0717;
+  --ui-field: #381832;
+  --ui-code: #261022;
+  --ui-line: #582d4f;
+  --ui-border: #613558;
+  --ui-section-line: #5a3052;
+  --ui-control-border: #6e3c64;
+  --ui-control-hover: #8f5382;
+  --ui-text-2: #d6b5ce;
+  --ui-text-3: #b791ae;
+  --ui-accent-text: #e0a8d3;
+  --ui-focus: #da95ca;
+  --ui-focus-outline: var(--ui-focus);
+  --ui-accent: #a13990;
+  --ui-cyan: #f89dc9;
+  --ui-raised-2: #482340;
+  --ui-panel: #3d1a36;
+  --ui-panel-base: #381832;
+  --ui-panel-border: #8f5382;
+  --ui-primary: linear-gradient(180deg, #a13990, #972f86);
+  --ui-primary-hover: linear-gradient(180deg, #b2459f, #a13990);
+  --ui-holo: linear-gradient(115deg, #f89dc9, #d55cbf 38%, #f4d2eb 62%, #d55cbf 82%, #f89dc9);
+  --ui-holo-soft: linear-gradient(
+    115deg,
+    #f89dc966,
+    #d55cbf80 40%,
+    #f4d2eb59 62%,
+    #d55cbf80 82%,
+    #f89dc966
+  );
+  --ui-primary-shadow: inset 0 1px #ffffff40, 0 0 0 1px #f4b8e440, 0 0 22px -4px #d55cbfcc;
+  --ui-marker: linear-gradient(180deg, #f4d2eb, #f89dc9 45%, #d55cbf);
+  --ui-marker-shadow: 0 0 10px #f4b8e4cc;
+  --ui-check-shadow: drop-shadow(0 0 5px #f4b8e4aa);
+  --ui-sidebar-tint: #d55cbf1f;
+  --ui-hover: #d55cbf1a;
+  --ui-selected: #d55cbf1f;
+  --ui-edge: #582d4f;
+  --ui-composer-surface: #34172f;
+  --ui-inline-code: #f4c6e6;
+  --ui-quote-edge: #d55cbf;
+  --ui-reasoning-edge: #d55cbf;
+  --ui-accent-edge: #d55cbf;
+  --ui-chip-active: #4a1f43;
+  --ui-chip-border: #8f5382;
+  --ui-context-normal: #f4d2eb;
+  --ui-list-hover: #8f5382;
+  --ui-list-focus: #f4b8e4;
+  --ui-list-surface: #3d1a36;
+  --ui-select-active: #e46cc42e;
+  --ui-select-ring: #f4b8e438;
+  --ui-select-check: #f4d2eb;
+  --ui-tab-ring: #f4b8e426;
+  --ui-soft-ring: #f4b8e440;
+  --ui-list-ring: #f4b8e414;
+  --ui-composer-ring: #f4b8e40f;
+  --ui-presence-glow: #d55cbf33;
+  --ui-accent-glow: #d55cbf47;
+  --ui-action-tonal-border: #d55cbf66;
+  --ui-action-surface: #482340;
+  --ui-info-surface: #4a1f43;
+  --ui-switch-hover: #b2459f;
+  --ui-sky-mid: #260d21;
+  --ui-sky-lower: #d55cbf33;
+  --ui-sky-warm: #f89dc917;
+  --ui-orb-primary: #d55cbf;
+  --ui-orb-secondary: #f89dc9;
+}
+body[data-model='cloud'] .workspace.is-temporary {
+  background:
+    radial-gradient(900px 460px at 55% -22%, #d55cbf2b, transparent 65%),
+    linear-gradient(180deg, #2f152a, #260d21 60%, #1b0717);
+}
+body[data-model='cloud'] .workspace.is-temporary .presence {
+  background:
+    radial-gradient(360px 300px at 50% 26%, #d55cbf2e, transparent 70%),
+    linear-gradient(180deg, #251221, #1b0717);
+}
+body[data-model='cloud'] .workspace.is-temporary .composer {
+  background:
+    linear-gradient(#2e1229, #2e1229) padding-box,
+    linear-gradient(115deg, #a993ffaa, #f89dc955 50%, #a993ffaa) border-box;
+}
+body[data-model='cloud'] a {
+  color: var(--ui-accent-text);
+}
+body[data-model='cloud'] a:hover {
+  color: #f4d2eb;
 }

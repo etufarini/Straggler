@@ -275,3 +275,22 @@ test('high refresh displays use a smaller drawing budget', () => {
   expect(frames).toHaveLength(301);
   expect(engine.time).toBeCloseTo(300 / 144);
 });
+
+test('palette changes retain motion, amber error semantics and restore local colors', () => {
+  const { engine } = createEngine('ready');
+  const observed = engine as ObservedOrb & {
+    target(key: string): number;
+    cur: { hue: number; sat: number };
+  };
+  const localHue = observed.target('hue');
+  const spin = observed.target('spin');
+  engine.setPalette({ primary: '#d55cbf', secondary: '#f89dc9' });
+  expect(observed.target('hue')).not.toBe(localHue);
+  expect(observed.target('spin')).toBe(spin);
+  engine.setState('error');
+  const errorHue = observed.target('hue');
+  engine.setPalette(null);
+  expect(observed.target('hue')).toBe(errorHue);
+  engine.setState('ready');
+  expect(observed.target('hue')).toBe(localHue);
+});

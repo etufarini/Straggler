@@ -47,6 +47,7 @@ test('first send requires Continue, Cancel keeps the draft, cloud works without 
   page,
 }) => {
   await page.goto('/?scenario=cloud-ready');
+  await expect(page.getByText('Choose a model to get started', { exact: true })).toHaveCount(0);
   const composer = page.getByRole('textbox', { name: 'Message', exact: true });
   await composer.fill('Keep this draft');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
