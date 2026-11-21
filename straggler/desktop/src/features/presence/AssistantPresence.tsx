@@ -10,10 +10,12 @@ export default function AssistantPresence({
   state,
   metrics,
   size,
+  provider,
 }: {
   state: PresenceState;
   metrics?: GenerationMetrics;
   size: number;
+  provider?: string;
 }) {
   const stage = useRef<HTMLDivElement>(null);
   const renderer = useRef<PresenceRenderer | null>(null);
@@ -88,7 +90,7 @@ export default function AssistantPresence({
           <dl className="presence-stats">
             <div>
               <dt>Speed</dt>
-              <dd title="Tokens per second, reported by llama-server">
+              <dd title={`Tokens per second, reported by ${provider ?? 'llama-server'}`}>
                 {value(metrics?.tokensPerSecond, ' t/s')}
               </dd>
             </div>
@@ -98,10 +100,25 @@ export default function AssistantPresence({
             </div>
             <div>
               <dt>Time</dt>
-              <dd title="Generation time, reported by llama-server">
+              <dd title={`Generation time, reported by ${provider ?? 'llama-server'}`}>
                 {value(metrics?.generationMs, ' s', 1000)}
               </dd>
             </div>
+            {metrics?.cost !== undefined && (
+              <div>
+                <dt>Cost</dt>
+                <dd
+                  title={
+                    metrics.costCurrency
+                      ? 'Reported by the service'
+                      : 'Reported by the service; currency not listed'
+                  }
+                >
+                  {metrics.cost.toLocaleString('en-US', { maximumSignificantDigits: 6 })}
+                  {metrics.costCurrency ? ` ${metrics.costCurrency}` : ''}
+                </dd>
+              </div>
+            )}
           </dl>
         </section>
       )}

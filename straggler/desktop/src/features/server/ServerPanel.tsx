@@ -1,3 +1,4 @@
+import CloudModels from '../cloud/CloudModels';
 import MemoryBadge from '../../components/MemoryBadge';
 import { memoryEstimateNote } from '../../domain/memory';
 import ServerMemory from './ServerMemory';
@@ -21,7 +22,9 @@ import HuggingFaceBrowser from '../huggingface/HuggingFaceBrowser';
 import HubDownloads from '../huggingface/HubDownloads';
 import ModelsFolderActions from '../huggingface/ModelsFolderActions';
 export default function ServerPanel({ controller }: { controller: WorkspaceController }) {
-  const [modelsTab, setModelsTab] = useState<'local' | 'huggingface'>('local');
+  const [modelsTab, setModelsTab] = useState<'local' | 'cloud' | 'huggingface'>(
+    controller.cloud.active ? 'cloud' : 'local',
+  );
   const {
     setPanel,
     panel,
@@ -60,7 +63,7 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
         {panel === 'models' && (
           <>
             <div className="hf-tabs" role="tablist" aria-label="Model sources">
-              {(['local', 'huggingface'] as const).map((tab) => (
+              {(['local', 'cloud', 'huggingface'] as const).map((tab) => (
                 <button
                   key={tab}
                   role="tab"
@@ -72,13 +75,22 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                   onKeyDown={(event) => {
                     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
                       event.preventDefault();
-                      const next = tab === 'local' ? 'huggingface' : 'local';
+                      const tabs = ['local', 'cloud', 'huggingface'] as const;
+                      const index = tabs.indexOf(tab);
+                      const next =
+                        tabs[
+                          (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length
+                        ];
                       setModelsTab(next);
                       document.getElementById(`models-tab-${next}`)?.focus();
                     }
                   }}
                 >
-                  {tab === 'local' ? 'On this computer' : 'Hugging Face'}
+                  {tab === 'local'
+                    ? 'On this computer'
+                    : tab === 'cloud'
+                      ? 'Cloud'
+                      : 'Hugging Face'}
                 </button>
               ))}
             </div>
@@ -87,7 +99,9 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
               id={`models-tabpanel-${modelsTab}`}
               aria-labelledby={`models-tab-${modelsTab}`}
             >
-              {modelsTab === 'huggingface' ? (
+              {modelsTab === 'cloud' ? (
+                <CloudModels controller={controller} />
+              ) : modelsTab === 'huggingface' ? (
                 <HuggingFaceBrowser
                   controller={controller.huggingFace}
                   config={config}
@@ -140,7 +154,9 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                       <button
                         key={model.path}
                         className={`model-option ${selected === model.path ? 'chosen' : ''}`}
-                        disabled={active || busy}
+                        disabled={
+                          active || busy || controller.generating || !!controller.cloud.notice
+                        }
                         onClick={() => setSelected(model.path)}
                       >
                         <HardDrive size={20} />
@@ -177,7 +193,14 @@ export default function ServerPanel({ controller }: { controller: WorkspaceContr
                     ) : (
                       <button
                         className="primary-button"
-                        disabled={!native || !config?.serverAvailable || !selected || busy}
+                        disabled={
+                          !native ||
+                          !config?.serverAvailable ||
+                          !selected ||
+                          busy ||
+                          controller.generating ||
+                          !!controller.cloud.notice
+                        }
                         onClick={() => void start()}
                       >
                         {busy ? <LoaderCircle size={15} className="spin" /> : <Cpu size={15} />}Load

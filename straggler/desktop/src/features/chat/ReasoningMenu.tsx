@@ -6,10 +6,15 @@ import type { WorkspaceController } from '../../app/useWorkspace';
 
 export default function ReasoningMenu({ controller }: { controller: WorkspaceController }) {
   const { chat, config, serverDetails, chatOptionsDisabled, setChatOptions } = controller;
-  const options = resolveChatOptions(chat.options, config?.settings);
+  const options = resolveChatOptions(
+    chat.options,
+    controller.cloud.active ? undefined : config?.settings,
+  );
   const available = serverDetails?.reasoningSupported === true;
   const label = !available
-    ? 'Unavailable'
+    ? controller.cloud.active
+      ? 'Default'
+      : 'Unavailable'
     : options.reasoning === 'auto'
       ? 'Default'
       : options.reasoning === 'off'
@@ -34,15 +39,34 @@ export default function ReasoningMenu({ controller }: { controller: WorkspaceCon
       }
     >
       {() => (
-        <ReasoningControls
-          disabled={chatOptionsDisabled || !!controller.currentProject?.archived}
-          effortPresentation="segments"
-          reasoning={options.reasoning}
-          effort={options.effort}
-          details={serverDetails}
-          onReasoning={(reasoning) => setChatOptions({ reasoning })}
-          onEffort={(effort) => setChatOptions({ effort })}
-        />
+        <>
+          <ReasoningControls
+            disabled={chatOptionsDisabled || !!controller.currentProject?.archived}
+            effortPresentation="segments"
+            reasoning={options.reasoning}
+            effort={options.effort}
+            details={serverDetails}
+            cloud={!!controller.cloud.active}
+            showToggle={controller.cloud.active?.kind !== 'mistral'}
+            onReasoning={(reasoning) => setChatOptions({ reasoning })}
+            onEffort={(effort) =>
+              setChatOptions({
+                effort,
+                ...(controller.cloud.active?.kind === 'mistral'
+                  ? { reasoning: 'on' as const }
+                  : {}),
+              })
+            }
+          />
+          {controller.cloud.active && (
+            <button
+              className="text-button"
+              onClick={() => setChatOptions({ reasoning: 'auto', effort: 'auto' })}
+            >
+              Use default
+            </button>
+          )}
+        </>
       )}
     </Popover>
   );

@@ -8,6 +8,8 @@ export default function ReasoningControls({
   details,
   disabled = false,
   effortPresentation = 'select',
+  showToggle = true,
+  cloud = false,
   onReasoning,
   onEffort,
 }: {
@@ -16,6 +18,8 @@ export default function ReasoningControls({
   details: ServerDetails | null;
   disabled?: boolean;
   effortPresentation?: 'select' | 'segments';
+  showToggle?: boolean;
+  cloud?: boolean;
   onReasoning: (value: 'on' | 'off') => void;
   onEffort: (value: string) => void;
 }) {
@@ -24,29 +28,35 @@ export default function ReasoningControls({
   const levels = details?.effortLevels ?? [];
   return (
     <>
-      <fieldset className="choice-group" disabled={disabled || !available}>
-        <legend>Reasoning</legend>
-        <div className="segmented">
-          {(['on', 'off'] as const).map((value) => (
-            <label key={value}>
-              <input
-                type="radio"
-                name={`${id}-reasoning`}
-                value={value}
-                checked={reasoning === value}
-                onChange={() => onReasoning(value)}
-              />
-              <span>{value === 'on' ? 'On' : 'Off'}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      {showToggle && (
+        <fieldset className="choice-group" disabled={disabled || !available}>
+          <legend>Reasoning</legend>
+          <div className="segmented">
+            {(['on', 'off'] as const).map((value) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name={`${id}-reasoning`}
+                  value={value}
+                  checked={reasoning === value}
+                  onChange={() => onReasoning(value)}
+                />
+                <span>{value === 'on' ? 'On' : 'Off'}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
       <p className="popover-note">
         {!available
           ? details?.error ||
-            'Reasoning controls are unavailable for this server and chat template.'
+            (cloud
+              ? 'This service does not list reasoning controls for the model.'
+              : 'Reasoning controls are unavailable for this server and chat template.')
           : reasoning === 'auto'
-            ? 'Using the server default. Choose On or Off to override it.'
+            ? cloud
+              ? 'Using the service default.'
+              : 'Using the server default. Choose On or Off to override it.'
             : 'The assistant thinks before answering. Slower, often more thorough.'}
       </p>
       {effortPresentation === 'segments' ? (
@@ -72,9 +82,13 @@ export default function ReasoningControls({
           </fieldset>
           <p className="popover-note">
             {!levels.length
-              ? 'This template does not advertise effort levels.'
+              ? cloud
+                ? 'This service does not advertise effort levels.'
+                : 'This template does not advertise effort levels.'
               : effort === 'auto'
-                ? 'Using the template default.'
+                ? cloud
+                  ? 'Using the service default.'
+                  : 'Using the template default.'
                 : 'Available levels depend on the model. Applies from your next message.'}
           </p>
         </>
@@ -99,7 +113,9 @@ export default function ReasoningControls({
           />
           <small>
             {available && !levels.length
-              ? 'This template does not advertise effort levels.'
+              ? cloud
+                ? 'This service does not advertise effort levels.'
+                : 'This template does not advertise effort levels.'
               : 'Applies from your next message.'}
           </small>
         </label>

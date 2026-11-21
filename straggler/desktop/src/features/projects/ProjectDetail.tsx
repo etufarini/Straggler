@@ -99,7 +99,7 @@ export default function ProjectDetail({
     !project.archived &&
     (context.level !== 'over' || context.search) &&
     !controller.generating &&
-    controller.server.phase === 'ready' &&
+    controller.modelReady &&
     controller.historyReady &&
     !controller.storageError &&
     !projects.error;
@@ -177,7 +177,7 @@ export default function ProjectDetail({
               }
               controlId="textarea-start-chat"
               value={draft}
-              disabled={project.archived || controller.server.phase !== 'ready'}
+              disabled={project.archived || !controller.modelReady}
               toolbarVisible={toolbarVisible}
               onChange={setDraft}
               onContextChange={setComposerMode}
@@ -219,9 +219,7 @@ export default function ProjectDetail({
               Start chat is available when the current response finishes or is stopped.
             </p>
           )}
-          {controller.server.phase !== 'ready' && (
-            <p className="field-help">Load a model to start chatting.</p>
-          )}
+          {!controller.modelReady && <p className="field-help">Load a model to start chatting.</p>}
           <div className="project-section-head">
             <h2 id="project-chats-title">Chats</h2>
             <span className="project-meta">{countLabel(chats.length, 'chat')}</span>
@@ -350,10 +348,7 @@ export default function ProjectDetail({
                 </button>
               )}
             </div>
-            <ProjectCapacity
-              context={context}
-              serverRunning={controller.server.phase === 'ready'}
-            />
+            <ProjectCapacity context={context} serverRunning={controller.modelReady} />
             {context.search && !project.archived && (
               <ProjectLimitFeedback
                 context={context}

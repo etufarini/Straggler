@@ -115,6 +115,7 @@ export interface Message {
   content: string;
   reasoning: string;
   model?: string;
+  cloud?: { providerId: string; name: string };
   status: MessageStatus;
   error?: string;
   metrics?: GenerationMetrics;
@@ -229,15 +230,27 @@ export function newConversation(): Conversation {
     messages: [],
   };
 }
-export function requestMessages(messages: Message[]) {
+export function requestMessages(messages: Message[], includeReasoning = false) {
   // Empty or failed assistant placeholders must not become chat template input.
-  const result: { role: Message['role']; content: string }[] = [];
+  const result: { role: Message['role']; content: string; reasoning_content?: string }[] = [];
   for (const message of messages) {
     if (!message.content.trim() || (message.role === 'assistant' && message.status === 'error'))
       continue;
     const previous = result[result.length - 1];
-    if (previous?.role === message.role) previous.content += `\n\n${message.content}`;
-    else result.push({ role: message.role, content: message.content });
+    if (previous?.role === message.role) {
+      previous.content += `\n\n${message.content}`;
+      if (includeReasoning && message.role === 'assistant')
+        previous.reasoning_content = [previous.reasoning_content, message.reasoning]
+          .filter(Boolean)
+          .join('\n\n');
+    } else
+      result.push({
+        role: message.role,
+        content: message.content,
+        ...(includeReasoning && message.role === 'assistant'
+          ? { reasoning_content: message.reasoning }
+          : {}),
+      });
   }
   return result;
 }
@@ -247,6 +260,7 @@ export interface UiPreferences {
   sidebarCollapsed: boolean;
   presenceExpanded: boolean | null;
   webSearchNoticeSeen?: boolean;
+  cloudNoticeSeen?: Record<string, string>;
   webSearchMaxSearches?: number;
   webSearchProvider?: string;
 }
@@ -268,6 +282,8 @@ export interface GenerationMetrics {
   tokensPerSecond?: number;
   generationMs?: number;
   promptMs?: number;
+  cost?: number;
+  costCurrency?: string;
   runId?: string;
 }
 export interface ChatOptions {

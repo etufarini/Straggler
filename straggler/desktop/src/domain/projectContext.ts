@@ -160,6 +160,7 @@ export function assembleProjectRequest(
   project?: Project,
   passages?: ProjectPassage[],
   attachmentPassages?: ProjectPassage[],
+  includeReasoning = false,
 ) {
   const systemPrompt = resolveProjectSystemPrompt(conversation, settings, project);
   const prefix =
@@ -170,6 +171,7 @@ export function assembleProjectRequest(
     messages,
     prefix,
     attachmentPassages === undefined ? (conversation.attachments ?? []) : [],
+    includeReasoning,
   );
   const context = passageContext(passages, attachmentPassages);
   if (context) {

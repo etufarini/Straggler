@@ -1,3 +1,5 @@
+import { useCloudModels } from '../features/cloud/useCloudModels';
+import type { CloudSelection } from '../domain/cloudModels';
 import { useWebSearch } from '../features/websearch/useWebSearch';
 import { useServerDetails } from '../features/server/useServerDetails';
 import { useUiPreferences } from './useUiPreferences';
@@ -70,17 +72,36 @@ export function useWorkspace() {
   const closeAction = useRef<() => void>(() => {});
   const native = isTauri();
   const ui = useUiPreferences();
-  const serverDetails = useServerDetails(server);
-  const projects = useProjects(storageQueue, server, config?.settings, serverDetails);
+  const cloud = useCloudModels(ui.preferences, (patch) => {
+    ui.changePreferences(patch);
+    return ui.preferenceSaveQueue.current;
+  });
+  const localServerDetails = useServerDetails(server);
+  const serverDetails = cloud.active?.model.details ?? localServerDetails;
+  const modelReady = !!cloud.active || server.phase === 'ready';
+  const visionSupported = serverDetails?.visionSupported === true;
+  const projects = useProjects(
+    storageQueue,
+    server,
+    config?.settings,
+    serverDetails,
+    !!cloud.active,
+  );
   const projectBusy = useRef(projects.busy);
   projectBusy.current = projects.busy;
   const conversation = useConversation(
     server,
     config?.settings,
-    serverDetails?.runId === server.runId ? serverDetails?.contextSize : null,
+    cloud.active
+      ? serverDetails?.contextSize
+      : serverDetails?.runId === server.runId
+        ? serverDetails?.contextSize
+        : null,
     projects,
     storageQueue,
-    serverDetails?.runId === server.runId && serverDetails?.visionSupported === true,
+    visionSupported,
+    cloud.active,
+    cloud.ensureConsent,
   );
   const webSearch = useWebSearch(
     ui.preferences,
@@ -98,7 +119,7 @@ export function useWorkspace() {
     server,
     view === 'chat' && panel !== 'settings',
     !!currentProject?.archived,
-    serverDetails?.runId === server.runId && serverDetails?.visionSupported === true,
+    visionSupported,
   );
   const contextEstimate = useContextEstimate(
     conversation.chat,
@@ -109,6 +130,10 @@ export function useWorkspace() {
     currentProject,
     currentProject ? projects.context(currentProject).search : false,
     conversation.attachmentSearch,
+    cloud.active,
+    conversation.webSearchOn &&
+      cloud.active?.kind === 'deepseek' &&
+      serverDetails?.toolsSupported === true,
   );
   const {
     chatOptionsDisabled,
@@ -288,7 +313,7 @@ export function useWorkspace() {
     }
   }
   function startProjectChat(id: string, text: string) {
-    if (generating || editingBusy || storageError || server.phase !== 'ready') return;
+    if (generating || editingBusy || storageError || !modelReady) return;
     const project = projects.current.current.find((value) => value.id === id);
     if (!project || project.archived) return;
     const context = projects.context(project);
@@ -494,6 +519,7 @@ export function useWorkspace() {
       const applied = await invoke<Configuration>('apply_settings', { settings: draft });
       acceptConfiguration(applied);
       await invoke('start_server', { model: selected });
+      await cloud.reload();
       setServer(await invoke<ServerStatus>('server_status'));
       setPanel(null);
     } catch (e) {
@@ -523,6 +549,13 @@ export function useWorkspace() {
     }
   }
 
+  async function useCloudModel(selection: CloudSelection) {
+    if (generating || editingBusy || cloud.busy || cloud.notice) return;
+    await cloud.useModel(selection);
+    setServer(await invoke<ServerStatus>('server_status'));
+    setPanel(null);
+  }
+
   async function confirm(alternative = false) {
     if (!confirmation || confirmBusy) return;
     setConfirmBusy(true);
@@ -539,10 +572,12 @@ export function useWorkspace() {
   }
 
   const active = serverActive(server);
-  const displayModel = active ? server.model : selected;
+  const displayModel = cloud.active?.model.id ?? (active ? server.model : selected);
   const canSend =
     native &&
-    server.phase === 'ready' &&
+    modelReady &&
+    !cloud.busy &&
+    !cloud.notice &&
     (!!conversation.temporaryId || (historyReady && !storageError)) &&
     !chatOptionsDisabled &&
     !busy &&
@@ -557,6 +592,11 @@ export function useWorkspace() {
           projects.context(currentProject).search)));
 
   return {
+    cloud,
+    useCloudModel,
+    modelReady,
+    visionSupported,
+    localServerDetails,
     webSearch,
     webSearchOn: conversation.webSearchOn,
     setWebSearchOn: conversation.setWebSearchOn,

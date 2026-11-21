@@ -1,3 +1,4 @@
+import type { ActiveCloud } from './cloudModels';
 import type {
   ChatOptions,
   GenerationMetrics,
@@ -28,15 +29,21 @@ export function currentContext(
   messages: Message[],
   details: ServerDetails | null,
   server: ServerStatus,
+  cloud: ActiveCloud | null = null,
 ) {
   const last = messages.filter((message) => message.role === 'assistant').at(-1);
   const metrics: GenerationMetrics | undefined = last?.metrics;
-  if (
+  if (!details?.contextSize || metrics?.contextTokens === undefined) return null;
+  if (cloud) {
+    if (
+      last?.cloud?.providerId !== cloud.selection.providerId ||
+      last.model !== cloud.selection.modelId
+    )
+      return null;
+  } else if (
     server.phase !== 'ready' ||
-    !details?.contextSize ||
     details.runId !== server.runId ||
-    metrics?.runId !== server.runId ||
-    metrics.contextTokens === undefined
+    metrics.runId !== server.runId
   )
     return null;
   const usagePercent = (metrics.contextTokens / details.contextSize) * 100;

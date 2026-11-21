@@ -1,3 +1,4 @@
+import type { ActiveCloud } from '../../domain/cloudModels';
 import { useEffect, useState } from 'react';
 import { approximatePromptTokens } from '../../domain/attachments';
 import { assembleProjectRequest } from '../../domain/projectContext';
@@ -15,6 +16,8 @@ export function useContextEstimate(
   project?: Project,
   searchProjectFiles = false,
   searchAttachments = false,
+  cloud: ActiveCloud | null = null,
+  includeReasoning = false,
 ) {
   const unavailable = !!chat.projectId && project?.id !== chat.projectId;
   const messages = unavailable
@@ -39,6 +42,7 @@ export function useContextEstimate(
         project,
         searchProjectFiles || searchAttachments ? [] : undefined,
         searchAttachments ? [] : undefined,
+        includeReasoning,
       );
   const key = JSON.stringify(messages);
   const [measured, setMeasured] = useState<{
@@ -48,7 +52,7 @@ export function useContextEstimate(
   } | null>(null);
   useEffect(() => {
     let disposed = false;
-    if (server.phase !== 'ready' || unavailable) return;
+    if (cloud || server.phase !== 'ready' || unavailable) return;
     const timer = setTimeout(() => {
       void estimatePromptTokens(JSON.parse(key)).then((estimate) => {
         if (!disposed) setMeasured({ key, run: server.runId, estimate });
@@ -58,17 +62,21 @@ export function useContextEstimate(
       disposed = true;
       clearTimeout(timer);
     };
-  }, [key, server.phase, server.runId, unavailable]);
+  }, [key, server.phase, server.runId, unavailable, cloud]);
   const estimate =
-    measured?.key === key && measured.run === server.runId && server.phase === 'ready'
+    !cloud && measured?.key === key && measured.run === server.runId && server.phase === 'ready'
       ? measured.estimate
       : {
           tokens: approximatePromptTokens(messages),
           source: 'approximate' as const,
         };
-  const includesImages = !!chat.attachments?.some((attachment) => attachment.image);
+  const images =
+    details?.visionSupported === true
+      ? (chat.attachments ?? []).filter((attachment) => attachment.image)
+      : [];
+  const includesImages = images.length > 0;
   // A coarse patch estimate is descriptive only; native usage replaces it after generation.
-  const imageTokens = (chat.attachments ?? []).reduce(
+  const imageTokens = images.reduce(
     (total, attachment) =>
       total +
       (attachment.image
@@ -76,7 +84,11 @@ export function useContextEstimate(
         : 0),
     0,
   );
-  const capacity = details?.runId === server.runId ? details?.contextSize : null;
+  const capacity = cloud
+    ? cloud.model.details.contextSize
+    : details?.runId === server.runId
+      ? details?.contextSize
+      : null;
   return {
     ...estimate,
     tokens: estimate.tokens + imageTokens,

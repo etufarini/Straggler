@@ -81,9 +81,13 @@ export function composeRequest(
   messages: Message[],
   systemPrompt: string,
   attachments: Attachment[],
+  includeReasoning = false,
 ) {
-  const turns: { role: 'system' | 'user' | 'assistant'; content: string }[] =
-    requestMessages(messages);
+  const turns: {
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+    reasoning_content?: string;
+  }[] = requestMessages(messages, includeReasoning);
   const documents = attachments.filter((attachment) => !attachment.image);
   if (documents.length) {
     const blocks = attachmentBlocks(documents);
@@ -99,6 +103,12 @@ export function approximateTokens(text: string): number {
   return Math.ceil(new TextEncoder().encode(text).length / 4);
 }
 
-export function approximatePromptTokens(messages: { content: string }[]): number {
-  return approximateTokens(messages.map((message) => message.content).join('\n\n'));
+export function approximatePromptTokens(
+  messages: { content: string; reasoning_content?: string }[],
+): number {
+  return approximateTokens(
+    messages
+      .map((message) => [message.content, message.reasoning_content].filter(Boolean).join('\n\n'))
+      .join('\n\n'),
+  );
 }

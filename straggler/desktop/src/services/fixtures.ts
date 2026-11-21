@@ -1,6 +1,7 @@
 import type { SystemPromptPreset, PresetText } from '../domain/systemPrompts';
 import { availablePresetName } from '../domain/systemPrompts';
 import { searchText } from '../domain/chatSearch';
+import { createCloudFixture } from './cloudFixtures';
 import { createWebSearchFixture } from './webSearchFixtures';
 import nativeDefaults from '../../src-tauri/src/configuration/defaults.json';
 import backendManifest from '../../packaging/llama-runtime.json';
@@ -33,6 +34,10 @@ export type Scenario =
   | 'web-invalid'
   | 'web-no-tools'
   | 'web-no-key'
+  | 'cloud-ready'
+  | 'cloud-unknown'
+  | 'cloud-error'
+  | 'cloud-cancel'
   | 'normal'
   | 'empty'
   | 'cpu'
@@ -71,6 +76,10 @@ export const scenarios: Scenario[] = [
   'web-invalid',
   'web-no-tools',
   'web-no-key',
+  'cloud-ready',
+  'cloud-unknown',
+  'cloud-error',
+  'cloud-cancel',
   'normal',
   'empty',
   'cpu',
@@ -129,6 +138,13 @@ export function createFixture(scenario: Scenario) {
     persistHistory,
     () => generatingConversation,
   );
+
+  const cloud = createCloudFixture(scenario, () => {
+    status = { ...status, phase: 'stopped', url: null, runningSettings: undefined };
+  });
+
+  if (scenario === 'cloud-error')
+    status.issue = { kind: 'memory', details: 'Earlier local backend failure' };
 
   function failMemory() {
     memoryFailureSeen = true;
@@ -262,6 +278,7 @@ export function createFixture(scenario: Scenario) {
   }
 
   async function invoke(command: string, args: Record<string, unknown> = {}): Promise<unknown> {
+    if (command.startsWith('cloud_')) return cloud.invoke(command, args);
     if (command.startsWith('hf_') || command === 'models_folder_info')
       return huggingFace.invoke(command, args);
     if (command === 'projects_list' || command.startsWith('project_'))
@@ -400,6 +417,7 @@ export function createFixture(scenario: Scenario) {
       case 'server_status':
         return structuredClone(status);
       case 'start_server':
+        cloud.clear();
         if (occupied) throw new Error(`Port ${settings.port}: IN USE`);
         status = {
           phase: 'ready',
@@ -684,12 +702,14 @@ export function createFixture(scenario: Scenario) {
       case 'generate': {
         const request = args.request as {
           requestId: string;
+          cloud?: import('../domain/cloudModels').CloudSelection;
           messages: { role: string; content: string }[];
           webSearch?: boolean;
           webSearchQuery?: string;
           conversationId?: string;
           temporaryId?: string;
         };
+        if (request.cloud) cloud.generate(request.cloud);
         if (request.temporaryId) {
           if (temporary?.id !== request.temporaryId || request.conversationId)
             throw new Error('Invalid temporary request');
@@ -735,6 +755,16 @@ export function createFixture(scenario: Scenario) {
         if (delta.sources?.length)
           delta.content =
             'This simulated local answer cites a source [1], another source [2], and leaves an unknown citation [99] as text.\n\n`Code [1]`';
+        if (request.cloud) {
+          delta.content = 'An answer from the selected cloud fixture.';
+          delta.metrics = {
+            contextTokens: 212,
+            contextSource: 'usage',
+            outputTokens: 35,
+            cost: 0.001,
+            costCurrency: 'USD',
+          };
+        }
         const savedResponse = history
           .find((chat) => chat.id === request.conversationId)
           ?.messages.at(-1);
@@ -767,7 +797,7 @@ export function createFixture(scenario: Scenario) {
           if (scenario === 'oom-and-save-error') failedWrites = 1;
           return { ...delta, status: 'error', error: 'Compute error.' };
         }
-        if (scenario === 'cancel')
+        if (scenario === 'cancel' || scenario === 'cloud-cancel')
           await new Promise<void>((resolve) => {
             finish = resolve;
           });
@@ -776,12 +806,19 @@ export function createFixture(scenario: Scenario) {
         return {
           ...delta,
           status:
-            scenario === 'cancel'
+            scenario === 'cancel' || scenario === 'cloud-cancel'
               ? 'stopped'
+              : scenario === 'cloud-error'
+                ? 'error'
+                : scenario === 'interrupted'
+                  ? 'interrupted'
+                  : 'complete',
+          error:
+            scenario === 'cloud-error'
+              ? 'The cloud service has no credit left.'
               : scenario === 'interrupted'
-                ? 'interrupted'
-                : 'complete',
-          error: scenario === 'interrupted' ? 'Connection interrupted' : null,
+                ? 'Connection interrupted'
+                : null,
         };
       }
       default:

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'react';
 import PresencePanel from '../features/presence/PresencePanel';
 import { assistantState } from '../domain/presence';
-import { Cpu, ChevronDown, Square, Terminal, Eclipse } from 'lucide-react';
+import { Cpu, ChevronDown, Square, Terminal, Eclipse, Cloud } from 'lucide-react';
 import { fileName, equalSettings, sameServerConfiguration } from '../domain/types';
 import { statusLabel } from '../components/statusLabels';
 import { isFixture } from '../services/desktop';
@@ -74,12 +74,22 @@ export default function App() {
   const lastResponse = controller.chat.messages
     .filter((message) => message.role === 'assistant')
     .at(-1);
+  const cloudActive = controller.cloud.active;
+  const cloudIdentity = cloudActive
+    ? `${cloudActive.selection.providerId}:${cloudActive.selection.modelId}`
+    : undefined;
   const presence = assistantState({
-    serverPhase: server.phase,
+    serverPhase: cloudActive ? 'ready' : server.phase,
     generating: controller.generating,
     generationPhase: controller.generationPhase,
-    serverRunId: server.runId,
-    responseRunId: lastResponse?.serverRunId,
+    serverRunId: cloudIdentity ?? server.runId,
+    responseRunId:
+      lastResponse?.cloud &&
+      cloudActive &&
+      lastResponse.cloud.providerId === cloudActive.selection.providerId &&
+      lastResponse.model === cloudActive.selection.modelId
+        ? cloudIdentity
+        : lastResponse?.serverRunId,
     responseStatus: lastResponse?.status,
   });
   const modified = !!(
@@ -87,7 +97,8 @@ export default function App() {
     config?.savedSettings &&
     !equalSettings(draft, config.savedSettings)
   );
-  const modelName = displayModel ? fileName(displayModel) : 'Choose a local model';
+  const modelName =
+    cloudActive?.model.name ?? (displayModel ? fileName(displayModel) : 'Choose a local model');
   return (
     <div className="app-shell">
       <Sidebar controller={controller} />
@@ -107,22 +118,23 @@ export default function App() {
             onClick={() => setPanel('models')}
           >
             <span className="model-icon">
-              <Cpu size={17} />
+              {cloudActive ? <Cloud size={17} /> : <Cpu size={17} />}
             </span>
             <span className="model-label">
               <span className="model-name">{modelName}</span>
               {panel !== 'settings' && (
                 <small>
-                  {config?.currentProfile || 'Unsaved configuration'}
-                  {modified ? ' · Modified' : ''}
+                  {cloudActive
+                    ? `${cloudActive.providerName} · Cloud model`
+                    : config?.currentProfile || 'Unsaved configuration'}
+                  {!cloudActive && modified ? ' · Modified' : ''}
                 </small>
               )}
             </span>
-            {controller.serverDetails?.runId === controller.server.runId &&
-            controller.serverDetails?.visionSupported ? (
+            {controller.visionSupported ? (
               <span className="vision-badge">Vision</span>
-            ) : config?.models.find((model) => model.path === controller.draft?.model)
-                ?.projector ? (
+            ) : !cloudActive &&
+              config?.models.find((model) => model.path === controller.draft?.model)?.projector ? (
               <span className="vision-badge">Vision · restart to enable</span>
             ) : null}
             <ChevronDown size={15} />
@@ -164,32 +176,41 @@ export default function App() {
                   <span className="temporary-label">Temporary</span>
                 </button>
               ) : null)}
-            <button
-              className="local-badge"
-              aria-label={`Server log · ${statusLabel[server.phase]}${restartRequired ? ' · Restart required' : ''}`}
-              aria-expanded={panel === 'logs'}
-              onClick={() => setPanel('logs')}
-            >
-              <span className={`status-dot ${server.phase}`} />
-              {statusLabel[server.phase]}
-              {restartRequired && server.phase !== 'needs-restart' && (
-                <span className="restart-label">Restart required</span>
-              )}
-              <Terminal size={14} />
-            </button>
-            {active ? (
-              <button disabled={busy || server.phase === 'stopping'} onClick={requestStop}>
-                <Square size={14} />
-                Stop server
-              </button>
+            {cloudActive ? (
+              <span className="local-badge cloud-badge">
+                <Cloud size={14} />
+                Cloud · {cloudActive.providerName}
+              </span>
             ) : (
-              <button
-                className="primary-button"
-                disabled={!native || !selected || busy || !config?.serverAvailable}
-                onClick={() => void start()}
-              >
-                Launch server
-              </button>
+              <>
+                <button
+                  className="local-badge"
+                  aria-label={`Server log · ${statusLabel[server.phase]}${restartRequired ? ' · Restart required' : ''}`}
+                  aria-expanded={panel === 'logs'}
+                  onClick={() => setPanel('logs')}
+                >
+                  <span className={`status-dot ${server.phase}`} />
+                  {statusLabel[server.phase]}
+                  {restartRequired && server.phase !== 'needs-restart' && (
+                    <span className="restart-label">Restart required</span>
+                  )}
+                  <Terminal size={14} />
+                </button>
+                {active ? (
+                  <button disabled={busy || server.phase === 'stopping'} onClick={requestStop}>
+                    <Square size={14} />
+                    Stop server
+                  </button>
+                ) : (
+                  <button
+                    className="primary-button"
+                    disabled={!native || !selected || busy || !config?.serverAvailable}
+                    onClick={() => void start()}
+                  >
+                    Launch server
+                  </button>
+                )}
+              </>
             )}
           </div>
         </header>
@@ -204,7 +225,7 @@ export default function App() {
             This is the interface preview. Open the Straggler desktop app to use local models.
           </div>
         )}
-        <ServerFeedback controller={controller} />
+        {!cloudActive && <ServerFeedback controller={controller} />}
         {controller.preferenceError && (
           <div className="workspace-feedback">
             <Feedback
@@ -257,7 +278,8 @@ export default function App() {
           <SettingsPage
             onPrimaryActionChange={setPageHasPrimaryAction}
             webSearch={controller.webSearch}
-            serverDetails={controller.serverDetails}
+            cloud={controller.cloud}
+            serverDetails={controller.localServerDetails}
             config={config}
             draft={draft}
             setDraft={setDraft}
@@ -308,6 +330,7 @@ export default function App() {
               onProjectSource={setProjectSource}
               attachments={controller.attachments}
               state={presence}
+              cloudProvider={lastResponse?.cloud?.name}
               metrics={lastResponse?.metrics}
               preferences={controller.preferences}
               onPreferences={controller.changePreferences}
