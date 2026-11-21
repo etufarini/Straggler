@@ -505,7 +505,7 @@ try {
     assert.equal(credential.saved, true);
     await evaluate('document.querySelector(".model-switch").click()');
     await evaluate(
-      'Array.from(document.querySelectorAll("[role=tab]")).find(tab => tab.textContent === "Hugging Face").click()',
+      'Array.from(document.querySelectorAll(".model-group-actions button")).find(button => button.textContent === "Download models…").click()',
     );
     await fillField('[aria-label="Search Hugging Face"]', 'publisher/repository');
     await evaluate('document.querySelector(".hf-search").requestSubmit()');
