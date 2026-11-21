@@ -38,7 +38,7 @@ Preserve release defaults, sampling presets, seed/output independence, cache typ
 
 ## Desktop behavior and data
 
-Keep Settings organized in three groups: All models (System prompts), On this computer (Model settings, Performance, Server & port, Saved configurations, Folders, llama.cpp, Hugging Face) and Cloud and web (Cloud models, Web search). Keep model selection and server controls accessible from chat. Mark Modified relative to saved settings and Restart required relative to the active configuration. Report unavailable native services, unsupported chat requests, interrupted responses and storage errors explicitly.
+Keep Settings organized in three groups: All models (Chat defaults, System prompts), On this computer (Model settings, Performance, Server & port, Saved configurations, Folders, llama.cpp, Hugging Face) and Cloud and web (Cloud models, Web search). Keep model selection and server controls accessible from chat. Mark Modified relative to saved settings and Restart required relative to the active configuration. Report unavailable native services, unsupported chat requests, interrupted responses and storage errors explicitly.
 
 Store conversations under ${XDG_DATA_HOME:-$HOME/.local/share}/straggler/desktop/, separate from profiles and browser data. Validate identifiers and write atomically. Preserve partial responses and serialize saves. Do not overwrite browser conversations or preferences.
 

@@ -12,14 +12,6 @@ export default function CloudSettings({ controller }: { controller: CloudControl
   const [url, setUrl] = useState('');
   return (
     <>
-      <h2>Cloud models</h2>
-      <p className="field-help">
-        Optional services for chatting with models hosted elsewhere. Messages leave this computer
-        only when you choose a cloud model and send.
-      </p>
-      <p className="field-help">
-        Changes are saved automatically. Sampling settings apply to models on this computer only.
-      </p>
       {controller.error && (
         <Feedback title="Couldn’t update cloud models" details={controller.error}>
           Local models remain available.{' '}

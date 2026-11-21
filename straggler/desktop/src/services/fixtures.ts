@@ -1,3 +1,4 @@
+import { chatDefaults, chatDefaultKeys, generationKeys } from '../domain/chatDefaults';
 import type { SystemPromptPreset, PresetText } from '../domain/systemPrompts';
 import { availablePresetName } from '../domain/systemPrompts';
 import { searchText } from '../domain/chatSearch';
@@ -111,6 +112,10 @@ export function createFixture(scenario: Scenario) {
     localStorage.getItem('straggler-fixture-model') ??
     (scenario === 'empty' ? '' : defaultSettings.model);
   let settings = { ...defaultSettings, model: initialModel };
+  settings = {
+    ...settings,
+    ...JSON.parse(localStorage.getItem(`straggler-fixture-chat-defaults-${scenario}`) || '{}'),
+  };
   let status: ServerStatus = { ...emptyServer };
   let llamaDir = scenario === 'empty' ? '' : '/fixture/llama.cpp';
   const bundledAvailable = scenario !== 'empty';
@@ -389,6 +394,34 @@ export function createFixture(scenario: Scenario) {
         return;
       case 'configuration':
         return configuration();
+      case 'save_chat_defaults': {
+        if (localStorage.getItem('straggler-fixture-chat-defaults-save-error'))
+          throw new Error('Fixture chat defaults storage is read-only.');
+        const patch = args.values as Partial<Settings>;
+        for (const [field, value] of Object.entries(patch)) {
+          if (!(chatDefaultKeys as readonly string[]).includes(field))
+            throw new Error('Not a chat default.');
+          // Native tests own the complete validator; these representative failures exercise field feedback.
+          if (
+            (generationKeys as readonly string[]).includes(field) &&
+            value !== 'auto' &&
+            (!/^-?\d+(\.\d+)?$/.test(value) ||
+              (['temperature', 'top_k'].includes(field) && Number(value) < 0))
+          )
+            throw {
+              field,
+              message: `Invalid STRAGGLER_${field.toUpperCase()}. Use auto or a valid generation value.`,
+            };
+        }
+        settings = { ...settings, ...patch };
+        localStorage.setItem(
+          `straggler-fixture-chat-defaults-${scenario}`,
+          JSON.stringify(chatDefaults(settings)),
+        );
+        return configuration();
+      }
+      case 'preview_profile':
+        return structuredClone(profiles.get(String(args.name))!);
       case 'apply_settings': {
         const next = args.settings as Settings;
         // This is a fixture response; numeric validation belongs to the native configuration tests.
@@ -448,6 +481,17 @@ export function createFixture(scenario: Scenario) {
             currentProfile = name;
             savedSettings = structuredClone(settings);
             break;
+          case 'review-profile': {
+            const loaded = profiles.get(name)!;
+            settings = { ...settings, ...chatDefaults(loaded) };
+            localStorage.setItem(
+              `straggler-fixture-chat-defaults-${scenario}`,
+              JSON.stringify(chatDefaults(settings)),
+            );
+            currentProfile = name;
+            savedSettings = structuredClone(loaded);
+            break;
+          }
           case 'load-profile':
             settings = structuredClone(profiles.get(name)!);
             currentProfile = name;

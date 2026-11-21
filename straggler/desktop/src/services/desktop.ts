@@ -1,3 +1,5 @@
+import type { ChatDefaultValues } from '../domain/chatDefaults';
+import type { Configuration, Settings } from '../domain/types';
 import { exportFileName } from '../domain/conversationExport';
 import type { PresetText, SystemPromptPreset } from '../domain/systemPrompts';
 import { documentTypes } from '../domain/attachments';
@@ -58,6 +60,8 @@ export type DesktopCommand =
   | 'configuration'
   | 'backend_release'
   | 'apply_settings'
+  | 'save_chat_defaults'
+  | 'preview_profile'
   | 'workspace_action'
   | 'choose_model_file'
   | 'choose_models_folder'
@@ -373,4 +377,24 @@ export async function measureResourceContext(text: string, instructions: string,
     ),
     instructionTokens: prompt.tokens,
   };
+}
+
+let chatDefaultsQueue: Promise<void> = Promise.resolve();
+export function saveChatDefaults(values: Partial<ChatDefaultValues>): Promise<Configuration> {
+  const save = chatDefaultsQueue.then(() =>
+    invoke<Configuration>('save_chat_defaults', { values }),
+  );
+  chatDefaultsQueue = save.then(
+    () => undefined,
+    () => undefined,
+  );
+  return save;
+}
+
+export function waitForChatDefaults(): Promise<void> {
+  return chatDefaultsQueue;
+}
+
+export function previewProfile(name: string): Promise<Settings> {
+  return invoke('preview_profile', { name });
 }

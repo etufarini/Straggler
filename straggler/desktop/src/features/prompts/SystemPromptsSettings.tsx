@@ -34,8 +34,6 @@ export default function SystemPromptsSettings({
   }
   return (
     <>
-      <h2>System prompts</h2>
-      <p className="field-help">Changes are saved automatically.</p>
       <div className="preset-toolbar">
         <button className="primary-button" disabled={!ready} onClick={() => controller.edit()}>
           New preset

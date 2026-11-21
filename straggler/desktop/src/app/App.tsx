@@ -292,6 +292,7 @@ export default function App() {
             setDraft={setDraft}
             server={server}
             accept={acceptConfiguration}
+            acceptChatDefaults={controller.acceptChatDefaults}
             confirm={setConfirmation}
             onError={reportSettingsError}
             onClearError={() => setSettingsFailure(null)}

@@ -1,3 +1,5 @@
+import generationParameters from '../../tests/fixtures/generation-parameters.json';
+import type { GenerationKey } from '../domain/chatDefaults';
 import type {
   ActiveCloud,
   CloudProvider,
@@ -65,7 +67,12 @@ export function createCloudFixture(scenario: string, stopLocal: () => void) {
     select({ providerId: provider.id, modelId: provider.shown[0] });
   }
   function status(): CloudStatus {
-    return structuredClone({ providers, active, error: null });
+    return structuredClone({
+      providers,
+      active,
+      error: null,
+      generationParameters: generationParameters as Record<string, GenerationKey[]>,
+    });
   }
   function request(providerId: string, method: string, path: string) {
     const calls = JSON.parse(localStorage.getItem('straggler-fixture-cloud-requests') || '[]');

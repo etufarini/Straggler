@@ -209,6 +209,7 @@ export const sameServerConfiguration = (a: Settings, b: Settings) =>
   Object.keys(a).every(
     (key) =>
       (chatSettingKeys as readonly string[]).includes(key) ||
+      (generationKeys as readonly string[]).includes(key) ||
       a[key as keyof Settings] === b[key as keyof Settings],
   );
 export const samplingKeys = [
@@ -220,6 +221,7 @@ export const samplingKeys = [
   'presence_penalty',
   'frequency_penalty',
 ] as const;
+export const generationKeys = [...samplingKeys, 'seed', 'max_tokens'] as const;
 export function samplingPreset(settings: Settings, presets: Record<string, string[]>) {
   return (
     Object.keys(presets).find((name) =>

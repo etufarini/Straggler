@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { invoke, isTauri } from '../../services/desktop';
+import { chatDefaults } from '../../domain/chatDefaults';
+import { invoke, isTauri, waitForChatDefaults } from '../../services/desktop';
 import {
   equalSettings,
   settingsForModel,
   sameServerConfiguration,
-  samplingPreset,
   serverActive,
 } from '../../domain/types';
 import type { SettingsFailure } from '../../domain/errors';
@@ -23,6 +23,7 @@ export function useSettings({
   setDraft,
   server,
   accept,
+  acceptChatDefaults,
   confirm,
   onError,
   onBack,
@@ -38,6 +39,7 @@ export function useSettings({
   setDraft: (value: Values) => void;
   server: ServerStatus;
   accept: (value: Configuration) => void;
+  acceptChatDefaults: (value: Configuration) => void;
   confirm: (value: Confirmation) => void;
   onError: (error: unknown) => void;
   onBack: () => void;
@@ -52,7 +54,6 @@ export function useSettings({
   const [name, setName] = useState('');
   const [folder, setFolderDialog] = useState<'llama' | 'models' | null>(null);
   const [forceTargets, setForceTargets] = useState<Listener[]>([]);
-  const [showSampling, setShowSampling] = useState(false);
   useEffect(() => {
     setForceTargets([]);
   }, [draft.port]);
@@ -62,7 +63,6 @@ export function useSettings({
   const modified = config.savedSettings ? !equalSettings(draft, config.savedSettings) : false;
   const restart =
     !!server.runningSettings && !sameServerConfiguration(draft, server.runningSettings);
-  const preset = samplingPreset(draft, config.presets);
   const change = (key: keyof Values, value: string) => {
     setDraft(key === 'model' ? settingsForModel(draft, value) : { ...draft, [key]: value });
     if (key === 'model' && draft.model !== value) {
@@ -85,7 +85,11 @@ export function useSettings({
     failure?.field === key && failure.value === draft[key] ? failure.message : undefined;
 
   async function apply() {
-    const value = await invoke<Configuration>('apply_settings', { settings: draft });
+    await waitForChatDefaults();
+    const accepted = await invoke<Configuration>('configuration');
+    const value = await invoke<Configuration>('apply_settings', {
+      settings: { ...draft, ...chatDefaults(accepted.settings) },
+    });
     accept(value);
     return value;
   }
@@ -176,6 +180,7 @@ export function useSettings({
     setDraft,
     server,
     accept,
+    acceptChatDefaults,
     confirm,
     onError,
     onBack,
@@ -191,14 +196,11 @@ export function useSettings({
     folder,
     setFolder,
     forceTargets,
-    showSampling,
-    setShowSampling,
     native,
     active,
     dirty,
     modified,
     restart,
-    preset,
     change,
     apply,
     run,

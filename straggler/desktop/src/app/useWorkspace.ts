@@ -1,3 +1,4 @@
+import { chatDefaults } from '../domain/chatDefaults';
 import { currentContext } from '../domain/chat';
 import { useCloudModels } from '../features/cloud/useCloudModels';
 import type { CloudSelection } from '../domain/cloudModels';
@@ -46,6 +47,13 @@ export function useWorkspace() {
     setConfig(value);
     setDraft(value.settings);
   }
+  function acceptChatDefaults(value: Configuration) {
+    configRef.current = value;
+    setConfig(value);
+    setDraft((current) =>
+      current ? { ...current, ...chatDefaults(value.settings) } : value.settings,
+    );
+  }
   const [panel, updatePanel] = useState<Panel>(null);
   const [view, setView] = useState<'chat' | 'projects' | 'project'>('chat');
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -68,7 +76,7 @@ export function useWorkspace() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [settingsFailure, setSettingsFailure] = useState<SettingsFailure | null>(null);
-  const [settingsSection, setSettingsSection] = useState<Section>('model');
+  const [settingsSection, setSettingsSection] = useState<Section>('chat-defaults');
   const mounted = useRef(true);
   const closeAction = useRef<() => void>(() => {});
   const native = isTauri();
@@ -731,6 +739,7 @@ export function useWorkspace() {
     draft,
     setDraft,
     acceptConfiguration,
+    acceptChatDefaults,
     confirm,
     follow,
     composerInput,

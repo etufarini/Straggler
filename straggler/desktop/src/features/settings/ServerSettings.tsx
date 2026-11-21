@@ -18,7 +18,6 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
   } = controller;
   return (
     <>
-      <h2>Server & port</h2>
       <NumberField
         label="Port"
         term="TCP"

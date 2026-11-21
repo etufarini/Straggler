@@ -349,7 +349,7 @@ export function useConversation(
         { ...assistant },
       ],
     };
-    const options = resolveChatOptions(current.options, cloud ? undefined : settings);
+    const options = resolveChatOptions(current.options, settings, !!cloud);
     const includeReasoning =
       cloud?.kind === 'deepseek' && useWebSearch && cloud.model.details.toolsSupported === true;
     const history = current.messages.slice(0, -1);

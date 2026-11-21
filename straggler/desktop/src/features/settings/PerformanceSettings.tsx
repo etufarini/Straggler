@@ -8,7 +8,6 @@ export default function PerformanceSettings({ controller }: { controller: Settin
   const { config, draft, change, fieldError } = controller;
   return (
     <>
-      <h2>Performance</h2>
       <p className="field-help">Auto lets llama.cpp choose for your hardware.</p>
       <label className="setting-field">
         <span>Device</span>
@@ -64,7 +63,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
           aria-label="Reading your message"
           value={draft.prompt_processing}
           aria-invalid={fieldError('prompt_processing') ? true : undefined}
-          aria-describedby={fieldError('prompt_processing') ? 'prompt-processing-error' : undefined}
+          aria-describedby={`prompt-processing-help${fieldError('prompt_processing') ? ' prompt-processing-error' : ''}`}
           onChange={(value) => change('prompt_processing', value)}
           options={[
             { value: 'auto', label: 'Default' },
@@ -72,10 +71,10 @@ export default function PerformanceSettings({ controller }: { controller: Settin
             { value: 'large-batch', label: 'Large batch' },
           ]}
         />
-        <FieldError id="prompt-processing-error" message={fieldError('prompt_processing')} />
-        <small>
+        <small id="prompt-processing-help">
           Larger values read long messages faster but use more memory. Replies aren’t faster.
         </small>
+        <FieldError id="prompt-processing-error" message={fieldError('prompt_processing')} />
       </label>
       <MtpSettings controller={controller} />
       {(config.capabilities.multipleDevices ||
@@ -100,10 +99,13 @@ export default function PerformanceSettings({ controller }: { controller: Settin
             <span>Device names</span>
             <input
               aria-label="Device names"
+              aria-describedby={`device-names-help${fieldError('device') ? ' device-names-error' : ''}`}
+              aria-invalid={fieldError('device') ? true : undefined}
               value={draft.device}
               onChange={(event) => change('device', event.target.value)}
             />
-            <small>Auto, none, or device names separated by commas.</small>
+            <small id="device-names-help">Auto, none, or device names separated by commas.</small>
+            <FieldError id="device-names-error" message={fieldError('device')} />
           </label>
           <label className="setting-field">
             <span>

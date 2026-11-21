@@ -40,7 +40,6 @@ export default function WebSearchSettings({
   const error = controller.error || status?.error || status?.errorKind || linkError;
   return (
     <>
-      <h2>Web search</h2>
       <p className="field-help">
         Turn on Web search in a message to let the model look things up. Only search queries and
         page addresses are sent; chats stay on this computer.
