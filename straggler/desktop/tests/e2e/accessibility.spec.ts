@@ -5,7 +5,8 @@ test('text, primary actions, links and focus meet AA on the actual theme surface
   page,
 }) => {
   await page.goto('/?scenario=web-normal');
-  for (const area of ['chat', 'settings']) {
+  for (const area of ['chat', 'cloud', 'settings']) {
+    if (area === 'cloud') await page.goto('/?scenario=cloud-ready');
     if (area === 'settings')
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const palette = await page.locator('body').evaluate((node) => {
@@ -15,6 +16,8 @@ test('text, primary actions, links and focus meet AA on the actual theme surface
         tertiary: value('--ui-text-3'),
         link: value('--ui-accent-text'),
         focus: value('--ui-focus'),
+        primary: value('--ui-primary'),
+        primaryHover: value('--ui-primary-hover'),
         surfaces: [
           '--ui-elev-0',
           '--ui-elev-1',
@@ -27,6 +30,17 @@ test('text, primary actions, links and focus meet AA on the actual theme surface
         ].map(value),
       };
     });
+    for (const background of [palette.primary, palette.primaryHover].flatMap(
+      (gradient) => gradient.match(/#[0-9a-f]{6}/gi) ?? [],
+    ))
+      expect(contrastRatio('#ffffff', background), `${area} primary`).toBeGreaterThanOrEqual(4.5);
+    if (area === 'cloud') {
+      await expect(page.locator('body')).toHaveAttribute('data-model', 'cloud');
+      await page.getByRole('button', { name: /^Reasoning/ }).focus();
+      await expect(page.locator(':focus-visible')).toHaveCSS('outline-style', 'solid');
+    }
+    if (area === 'settings')
+      await expect(page.locator('body')).not.toHaveAttribute('data-model', 'cloud');
     for (const background of palette.surfaces) {
       expect(
         contrastRatio(palette.tertiary, background),

@@ -176,6 +176,25 @@ const HoloOrb = (function (root) {
   const hsla = (h, s, l, a) =>
     `hsla(${h.toFixed(0)},${s.toFixed(0)}%,${l.toFixed(0)}%,${a.toFixed(3)})`;
 
+  function hueAndSaturation(hex) {
+    const channels = [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16) / 255);
+    const [r, g, b] = channels;
+    const max = Math.max(...channels),
+      min = Math.min(...channels),
+      delta = max - min;
+    const lightness = (max + min) / 2;
+    let hue =
+      delta === 0
+        ? 0
+        : max === r
+          ? ((g - b) / delta) % 6
+          : max === g
+            ? (b - r) / delta + 2
+            : (r - g) / delta + 4;
+    hue = (hue * 60 + 360) % 360;
+    return { hue, sat: delta === 0 ? 0 : (100 * delta) / (1 - Math.abs(2 * lightness - 1)) };
+  }
+
   class HoloOrb {
     constructor(canvas, options = {}) {
       this.canvas = canvas;
@@ -190,6 +209,7 @@ const HoloOrb = (function (root) {
       this.frameIntervals = [];
       this.drawTimes = [];
       this.state = options.state || 'ready';
+      this.palette = null;
       this.scanlines = options.scanlines !== false;
       this.cur = Object.assign({}, STATES[this.state]);
       this.manualScatter = null;
@@ -324,6 +344,18 @@ const HoloOrb = (function (root) {
       return c;
     }
 
+    setPalette(palette) {
+      this.palette = palette
+        ? {
+            primary: hueAndSaturation(palette.primary),
+            secondary: hueAndSaturation(palette.secondary),
+          }
+        : null;
+      this.cur.hue = this.target('hue');
+      this.cur.sat = this.target('sat');
+      this.sprites.clear();
+      this.wake();
+    }
     setState(state) {
       if (!STATES[state]) return;
       if (state === 'loading' && this.state !== 'loading')
@@ -438,6 +470,14 @@ const HoloOrb = (function (root) {
     }
 
     target(key) {
+      if (
+        this.palette &&
+        !['error', 'offline'].includes(this.state) &&
+        (key === 'hue' || key === 'sat')
+      )
+        return this.palette[
+          this.state === 'reasoning' || this.state === 'loading' ? 'secondary' : 'primary'
+        ][key];
       if (key === 'scatter' && this.manualScatter !== null) return this.manualScatter;
       if (
         this.state === 'ready' &&

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Apply the Aurora palette to cloud chat and project areas, preserving aqua Settings and independent temporary-chat signals.
+
 - Add optional cloud Chat Completions services with system-keychain credentials, explicit verification and first-send consent, declared capabilities and preserved local/temporary workflows.
 
 - Search oversized chat attachments in memory, preserve cited passages with responses and include attachment text in sidebar search.

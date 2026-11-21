@@ -200,7 +200,7 @@ export default function ChatPanel({
                 </button>
               ))}
             </div>
-            {!active && (
+            {!active && !controller.modelReady && (
               <button className="welcome-load" onClick={() => setPanel('models')}>
                 <HardDrive size={15} />
                 Choose a model to get started <span>→</span>

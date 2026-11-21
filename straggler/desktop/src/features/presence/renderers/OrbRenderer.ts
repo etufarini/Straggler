@@ -1,5 +1,5 @@
 import HoloOrb from './orb-engine.js';
-import type { PresenceRenderer } from '../renderer';
+import type { PresenceRenderer, OrbPalette } from '../renderer';
 import type { PresenceState } from '../../../domain/presence';
 
 export class OrbRenderer implements PresenceRenderer {
@@ -27,6 +27,9 @@ export class OrbRenderer implements PresenceRenderer {
     this.engine = new HoloOrb(this.canvas, { size: container.clientWidth, state: this.state });
     this.motion = matchMedia('(prefers-reduced-motion: reduce)');
     this.motion.addEventListener('change', this.updateMotion);
+  }
+  setPalette(palette: OrbPalette | null) {
+    this.engine?.setPalette(palette);
   }
   setState(state: PresenceState) {
     if (state === this.state) return;

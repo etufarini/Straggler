@@ -1,3 +1,4 @@
+import { startCloudFixture, exerciseNativeCloud } from './native-cloud.mjs';
 import { measureNativeOrb } from './native-orb-performance.mjs';
 import { installOrbMeasurement } from './orb-performance.mjs';
 // Real Tauri/WebKit window, native services and a test server; no model inference.
@@ -79,7 +80,7 @@ async function until(predicate, description) {
   });
 }
 
-let app, driver, session, inspectPage, captureScreenshot, hubFixture;
+let app, driver, session, inspectPage, captureScreenshot, hubFixture, cloudFixture;
 try {
   if (!process.env.STRAGGLER_TEST_NATIVE) {
     await mkdir(path.dirname(binary));
@@ -129,7 +130,9 @@ try {
     () => /^http:\/\/127\.0\.0\.1:\d+\/$/.test(hubEndpoint.trim()),
     'loopback Hub fixture',
   );
+  cloudFixture = await startCloudFixture();
   Object.assign(environment, {
+    STRAGGLER_TEST_CLOUD_ENDPOINT: cloudFixture.endpoint,
     PATH: guards + path.delimiter + process.env.PATH,
     HOME: stage,
     STRAGGLER_FORBIDDEN_COMMANDS: forbiddenCommands,
@@ -383,6 +386,15 @@ try {
       evaluate(
         `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)})`,
       );
+    await exerciseNativeCloud({
+      evaluate,
+      until,
+      fillField,
+      invokeNative,
+      screenshot,
+      output: path.join(desktop, 'test-results/native-cloud.png'),
+      fixture: cloudFixture,
+    });
     // Exercise the real window and IPC with a memory keychain and injected search provider.
     assert.equal((await invokeNative('web_search_status', { refresh: false })).saved, false);
     await evaluate('document.querySelector(".sidebar-bottom .nav-item").click()');
@@ -943,6 +955,7 @@ try {
   }
   throw error;
 } finally {
+  await cloudFixture?.close();
   if (hubFixture && hubFixture.exitCode === null) {
     hubFixture.kill('SIGTERM');
     await once(hubFixture, 'exit');

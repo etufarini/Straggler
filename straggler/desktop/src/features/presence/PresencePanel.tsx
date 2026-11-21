@@ -20,9 +20,11 @@ export default function PresencePanel({
   ready,
   attachments,
   cloudProvider,
+  cloudModel = false,
 }: {
   state: PresenceState;
   cloudProvider?: string;
+  cloudModel?: boolean;
   sources?: WebSource[];
   projectSources?: ProjectPassage[];
   attachmentSources?: ProjectPassage[];
@@ -102,6 +104,7 @@ export default function PresencePanel({
         </button>
         <div id={id}>
           <AssistantPresence
+            cloud={cloudModel}
             state={state}
             metrics={metrics}
             provider={cloudProvider}

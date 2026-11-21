@@ -11,11 +11,13 @@ export default function AssistantPresence({
   metrics,
   size,
   provider,
+  cloud = false,
 }: {
   state: PresenceState;
   metrics?: GenerationMetrics;
   size: number;
   provider?: string;
+  cloud?: boolean;
 }) {
   const stage = useRef<HTMLDivElement>(null);
   const renderer = useRef<PresenceRenderer | null>(null);
@@ -66,6 +68,17 @@ export default function AssistantPresence({
   useEffect(() => {
     renderer.current?.setState(state);
   }, [state]);
+  useEffect(() => {
+    const style = getComputedStyle(document.body);
+    renderer.current?.setPalette(
+      cloud
+        ? {
+            primary: style.getPropertyValue('--ui-orb-primary').trim(),
+            secondary: style.getPropertyValue('--ui-orb-secondary').trim(),
+          }
+        : null,
+    );
+  }, [cloud]);
   const value = (number: number | undefined, unit: string, scale = 1) =>
     number === undefined
       ? '—'

@@ -59,12 +59,16 @@ export default function App() {
         : controller.temporary
           ? 'temporary'
           : 'chat';
+  const cloudPalette = !!controller.cloud.active && area !== 'settings';
   useLayoutEffect(() => {
     document.body.dataset.area = area;
+    if (cloudPalette) document.body.dataset.model = 'cloud';
+    else delete document.body.dataset.model;
     return () => {
       delete document.body.dataset.area;
+      delete document.body.dataset.model;
     };
-  }, [area]);
+  }, [area, cloudPalette]);
   const restartRequired = !!(
     active &&
     draft &&
@@ -330,6 +334,7 @@ export default function App() {
               onProjectSource={setProjectSource}
               attachments={controller.attachments}
               state={presence}
+              cloudModel={!!controller.cloud.active}
               cloudProvider={lastResponse?.cloud?.name}
               metrics={lastResponse?.metrics}
               preferences={controller.preferences}
