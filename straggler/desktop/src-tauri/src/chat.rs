@@ -41,11 +41,10 @@ impl Runtime {
             return Err("A chat request needs valid messages.".into());
         }
         let token = CancellationToken::new();
-        let cloud = request
-            .cloud
-            .as_ref()
-            .map(|selection| self.cloud.destination(selection))
-            .transpose()?;
+        let cloud = match &request.cloud {
+            Some(selection) => Some(self.cloud.destination(selection).await?),
+            None => None,
+        };
         if let Some(cloud) = &cloud {
             let preferences = self.preferences.read()?;
             if preferences
