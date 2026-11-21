@@ -130,6 +130,177 @@ async fn configured(service: &CloudService, id: &str) -> Selection {
     }
 }
 
+#[derive(Default)]
+struct BlockingCloudKeys {
+    keys: credentials::MemoryCloudKeys,
+    fail_reads: Arc<AtomicBool>,
+    fail_writes: Arc<AtomicBool>,
+}
+
+struct BlockingTokenStore {
+    store: Arc<dyn crate::huggingface::credentials::TokenStore>,
+    fail_reads: Arc<AtomicBool>,
+    fail_writes: Arc<AtomicBool>,
+}
+
+fn run_keychain_runtime() {
+    // The Linux blocking keychain API drives its own runtime, even during reads.
+    tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap()
+        .block_on(async {});
+}
+
+impl CloudKeys for BlockingCloudKeys {
+    fn store(&self, id: &str) -> Arc<dyn crate::huggingface::credentials::TokenStore> {
+        Arc::new(BlockingTokenStore {
+            store: self.keys.store(id),
+            fail_reads: self.fail_reads.clone(),
+            fail_writes: self.fail_writes.clone(),
+        })
+    }
+}
+
+impl crate::huggingface::credentials::TokenStore for BlockingTokenStore {
+    fn read(&self) -> Result<Option<String>> {
+        run_keychain_runtime();
+        if self.fail_reads.load(Ordering::Relaxed) {
+            return Err("Fixture keychain read failed.".into());
+        }
+        self.store.read()
+    }
+
+    fn write(&self, key: Option<&str>) -> Result<()> {
+        run_keychain_runtime();
+        if self.fail_writes.load(Ordering::Relaxed) {
+            return Err("Fixture keychain write failed.".into());
+        }
+        self.store.write(key)
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cloud_key_lifecycle_isolates_blocking_keychain_and_reports_storage_errors() {
+    let root = tempfile::tempdir().unwrap();
+    let fixture = HttpFixture::new();
+    let mut service = service(root.path(), &fixture);
+    let keys = Arc::new(BlockingCloudKeys::default());
+    service.keys = keys.clone();
+
+    let status = service
+        .save_key("deepseek", Some("first-key".into()))
+        .await
+        .unwrap();
+    assert!(status.providers[0].saved);
+    assert!(!status.providers[1].saved);
+    assert_eq!(status.providers[0].provider.models[0].id, "example");
+    assert!(service.refresh("deepseek").await.unwrap().providers[0].saved);
+
+    keys.fail_writes.store(true, Ordering::Relaxed);
+    assert_eq!(
+        service
+            .save_key("deepseek", Some("replacement-key".into()))
+            .await
+            .err()
+            .unwrap(),
+        "Fixture keychain write failed."
+    );
+    assert_eq!(
+        service.save_key("deepseek", None).await.err().unwrap(),
+        "Fixture keychain write failed."
+    );
+    assert_eq!(
+        keys.keys.store("deepseek").read().unwrap().as_deref(),
+        Some("first-key")
+    );
+    keys.fail_writes.store(false, Ordering::Relaxed);
+
+    keys.fail_reads.store(true, Ordering::Relaxed);
+    let status = service
+        .save_key("deepseek", Some("replacement-key".into()))
+        .await
+        .unwrap();
+    assert!(!status.providers[0].saved);
+    assert_eq!(
+        status.providers[0].key_error.as_deref(),
+        Some("Fixture keychain read failed.")
+    );
+    assert_eq!(
+        service.refresh("deepseek").await.err().unwrap(),
+        "Fixture keychain read failed."
+    );
+    keys.fail_reads.store(false, Ordering::Relaxed);
+
+    let count = fixture.count();
+    assert!(!service.save_key("deepseek", None).await.unwrap().providers[0].saved);
+    assert!(!service.save_key("deepseek", None).await.unwrap().providers[0].saved);
+    assert!(service
+        .refresh("deepseek")
+        .await
+        .err()
+        .unwrap()
+        .contains("API key"));
+    assert_eq!(fixture.count(), count);
+}
+
+#[tokio::test]
+async fn cloud_generation_reads_blocking_keychain_without_a_nested_runtime() {
+    let root = tempfile::tempdir().unwrap();
+    let fixture = HttpFixture::new();
+    let mut runtime = runtime(root.path(), &fixture);
+    let keys = Arc::new(BlockingCloudKeys::default());
+    runtime.cloud.keys = keys.clone();
+    runtime
+        .cloud
+        .save_key("deepseek", Some("fixture-key".into()))
+        .await
+        .unwrap();
+    let runtime = Arc::new(runtime);
+    let selection = Selection {
+        provider_id: "deepseek".into(),
+        model_id: "example".into(),
+    };
+    let worker = runtime.clone();
+    let selected = selection.clone();
+    tokio::task::spawn_blocking(move || {
+        worker
+            .cloud
+            .show_models("deepseek", vec!["example".into()])?;
+        worker.choose_cloud_model(selected)
+    })
+    .await
+    .unwrap()
+    .unwrap();
+    let mut preferences = runtime.preferences.read().unwrap();
+    preferences
+        .cloud_notice_seen
+        .insert("deepseek".into(), "https://api.deepseek.com".into());
+    runtime.preferences.save(&preferences).unwrap();
+    fixture.respond(200, "Content-Type: text/event-stream\r\n", "data: {\"choices\":[{\"delta\":{\"content\":\"Answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n");
+    let mut text = String::new();
+    assert_eq!(
+        runtime
+            .generate(request(selection.clone()), |delta| {
+                text.push_str(&delta.content);
+                Ok(())
+            })
+            .await
+            .unwrap(),
+        "complete"
+    );
+    assert_eq!(text, "Answer");
+    keys.fail_reads.store(true, Ordering::Relaxed);
+    let count = fixture.count();
+    assert_eq!(
+        runtime
+            .generate(request(selection), |_| Ok(()))
+            .await
+            .unwrap_err(),
+        "Fixture keychain read failed."
+    );
+    assert_eq!(fixture.count(), count);
+}
+
 #[tokio::test]
 async fn model_metadata_round_trip_key_rejection_and_corrupt_file_are_transactional() {
     let root = tempfile::tempdir().unwrap();
