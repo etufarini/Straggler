@@ -39,7 +39,9 @@ impl HttpFixture {
                 let mut bytes = Vec::new();
                 let mut buffer = [0; 4096];
                 let (head_end, length) = loop {
-                    let count = socket.read(&mut buffer).expect("Cannot read fixture request");
+                    let count = socket
+                        .read(&mut buffer)
+                        .expect("Cannot read fixture request");
                     if count == 0 {
                         break (bytes.len(), 0);
                     }
@@ -58,7 +60,9 @@ impl HttpFixture {
                     }
                 };
                 while bytes.len() < head_end + length {
-                    let count = socket.read(&mut buffer).expect("Cannot read fixture request");
+                    let count = socket
+                        .read(&mut buffer)
+                        .expect("Cannot read fixture request");
                     if count == 0 {
                         break;
                     }
