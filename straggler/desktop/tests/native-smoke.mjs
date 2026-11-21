@@ -55,13 +55,25 @@ function pdfFixture() {
   return Buffer.from(document);
 }
 
-async function freePort() {
+const portReservations = [];
+async function reservePort() {
   const socket = net.createServer();
   socket.listen(0, '127.0.0.1');
   await once(socket, 'listening');
   const port = socket.address().port;
-  await new Promise((resolve) => socket.close(resolve));
+  portReservations.push(socket);
   return port;
+}
+
+async function releasePortReservations() {
+  await Promise.all(
+    portReservations.splice(0).map(
+      (socket) =>
+        new Promise((resolve, reject) => {
+          socket.close((error) => (error ? reject(error) : resolve()));
+        }),
+    ),
+  );
 }
 
 async function until(predicate, description) {
@@ -81,6 +93,7 @@ async function until(predicate, description) {
 }
 
 let app, driver, session, inspectPage, captureScreenshot, hubFixture, cloudFixture;
+let fixturePorts = {};
 try {
   if (!process.env.STRAGGLER_TEST_NATIVE) {
     await mkdir(path.dirname(binary));
@@ -113,8 +126,9 @@ try {
   );
   await chmod(path.join(llama, 'build/bin/llama-server'), 0o755);
   await writeFile(path.join(models, 'test-model.gguf'), '');
-  const port = await freePort(),
-    automationPort = await freePort();
+  // Keep the probes bound until sibling fixtures have chosen their ports.
+  const port = await reservePort(),
+    automationPort = await reservePort();
   const environment = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !/^(STRAGGLER_|MIR_|SPUTNIK_|LLAMA_)/.test(key)),
   );
@@ -131,6 +145,13 @@ try {
     'loopback Hub fixture',
   );
   cloudFixture = await startCloudFixture();
+  fixturePorts = {
+    server: port,
+    automation: automationPort,
+    hub: Number(new URL(hubEndpoint.trim()).port),
+    cloud: Number(new URL(cloudFixture.endpoint).port),
+  };
+  assert.equal(new Set(Object.values(fixturePorts)).size, 4, 'Fixture ports must be distinct.');
   Object.assign(environment, {
     STRAGGLER_TEST_CLOUD_ENDPOINT: cloudFixture.endpoint,
     PATH: guards + path.delimiter + process.env.PATH,
@@ -155,6 +176,7 @@ try {
       STRAGGLER_PORT: '9931',
     });
   const log = createWriteStream(path.join(stage, 'app.log'));
+  await releasePortReservations();
   app = spawn(binary, [], { cwd: tmpdir(), env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
   app.stdout.pipe(log);
   app.stderr.pipe(log);
@@ -948,7 +970,21 @@ try {
     await mkdir(evidence, { recursive: true });
     await writeFile(path.join(evidence, 'native-failure.log'), appLog);
     if (inspectPage) {
-      console.error(await inspectPage('document.body.innerText'));
+      const page = await inspectPage(`({
+        text: document.body.innerText,
+        details: [...document.querySelectorAll('.feedback-details pre')].map(node => node.textContent)
+      })`);
+      const status = await inspectPage('window.__TAURI_INTERNALS__.invoke("server_status")').catch(
+        (failure) => ({ error: String(failure) }),
+      );
+      const launch = await readFile(path.join(stage, 'launch.json'), 'utf8').catch(() => null);
+      const diagnostic = JSON.stringify(
+        { error: String(error), ports: fixturePorts, page, status, launch },
+        null,
+        2,
+      );
+      console.error(diagnostic);
+      await writeFile(path.join(evidence, 'native-failure.json'), diagnostic);
       const shot = await captureScreenshot();
       await writeFile(path.join(evidence, 'native-failure.png'), Buffer.from(shot, 'base64'));
     }
@@ -957,6 +993,7 @@ try {
   }
   throw error;
 } finally {
+  await releasePortReservations();
   await cloudFixture?.close();
   if (hubFixture && hubFixture.exitCode === null) {
     hubFixture.kill('SIGTERM');
