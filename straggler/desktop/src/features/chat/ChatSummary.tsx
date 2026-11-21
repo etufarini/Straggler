@@ -45,7 +45,10 @@ export default function ChatSummary({ controller }: { controller: WorkspaceContr
         Earlier messages summarized
       </div>
       <p className="field-help">
-        Original messages stay saved. Files, project instructions and reasoning aren’t summarized.
+        {controller.temporary
+          ? 'Original messages stay in this temporary chat.'
+          : 'Original messages stay saved.'}{' '}
+        Files, project instructions and reasoning aren’t summarized.
       </p>
       <details className="reasoning" open={editing || undefined}>
         <summary>Summary</summary>

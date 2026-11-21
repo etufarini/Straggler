@@ -610,7 +610,9 @@ export default function ChatPanel({
                 </>
               }
             >
-              Original messages stay saved.
+              {controller.temporary
+                ? 'Original messages stay in memory.'
+                : 'Original messages stay saved.'}
             </Feedback>
           )}
         {(controller.contextEstimate.overflow || controller.contextError) && (

@@ -64,7 +64,7 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
               <p className="popover-note">
                 {usage.level === 'normal'
                   ? 'Plenty of room left.'
-                  : 'Context is almost full. Compact earlier messages, start a new chat or increase the context size. Original messages stay saved. At the limit, replies may stop; context shift, when enabled and supported, discards earlier context.'}
+                  : `Context is almost full. Compact earlier messages, start a new chat or increase the context size. ${controller.temporary ? 'Original messages stay in this temporary chat.' : 'Original messages stay saved.'} At the limit, replies may stop; context shift, when enabled and supported, discards earlier context.`}
               </p>
               <p className="ctx-tech">
                 {estimated

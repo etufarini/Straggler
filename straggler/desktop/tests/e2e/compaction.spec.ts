@@ -200,6 +200,9 @@ test('temporary cloud compaction keeps saved history unchanged', async ({ page }
   await page.getByRole('button', { name: 'Compact chat', exact: true }).click();
   await expect(page.locator('.chat-summary')).toBeVisible();
   expect(await saved(page, 'cloud-ready')).toEqual(original);
+  await expect(page.locator('.chat-summary')).toContainText(
+    'Original messages stay in this temporary chat.',
+  );
 });
 
 test('75 percent warning is dismissed only for the current session', async ({ page }) => {

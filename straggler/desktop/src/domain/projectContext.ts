@@ -177,7 +177,7 @@ export function assembleProjectRequest(
     includeReasoning,
   );
   if (conversation.summary && retained !== messages) {
-    const summary = `Earlier chat summary (original messages remain saved):\n${conversation.summary.text}`;
+    const summary = `Earlier chat summary (original messages are retained):\n${conversation.summary.text}`;
     if (systemRoleSupported === true) {
       if (turns[0]?.role === 'system') turns[0].content += `\n\n${summary}`;
       else turns.unshift({ role: 'system', content: summary });
