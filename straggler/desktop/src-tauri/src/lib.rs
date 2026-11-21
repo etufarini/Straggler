@@ -2,6 +2,7 @@ pub mod attachments;
 pub mod backend_release;
 pub mod bundled_backend;
 mod chat;
+pub mod cloud;
 pub mod configuration;
 pub mod conversation_import;
 pub mod credentials;
@@ -71,6 +72,7 @@ struct Server {
 
 pub struct Runtime {
     pub web_search: web_search::WebSearchService,
+    pub cloud: cloud::CloudService,
     pub hugging_face: huggingface::HuggingFace,
     native: configuration::native::NativeConfiguration,
     server: Arc<Mutex<Server>>,
@@ -107,6 +109,8 @@ pub struct ChatRequest {
     pub web_search: bool,
     #[serde(default)]
     pub web_search_query: Option<String>,
+    #[serde(default)]
+    pub cloud: Option<cloud::Selection>,
     pub messages: Vec<ChatMessage>,
     #[serde(default)]
     pub image_ids: Vec<Uuid>,
@@ -125,6 +129,8 @@ pub struct ChatOptions {
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
 }
 
 impl Runtime {
@@ -156,6 +162,15 @@ impl Runtime {
             Arc::new(web_search::providers::mock::MockProvider::default()),
             Arc::new(web_search::registry::MemoryKeyStore::default()),
         );
+        #[cfg(not(all(feature = "native-tests", debug_assertions)))]
+        let cloud = cloud::CloudService::new(data.clone())?;
+        #[cfg(all(feature = "native-tests", debug_assertions))]
+        let cloud = cloud::CloudService::loopback_fixture(
+            data.clone(),
+            environment
+                .value("STRAGGLER_TEST_CLOUD_ENDPOINT")
+                .as_deref(),
+        )?;
         let native = configuration::native::NativeConfiguration::new(environment)?;
         let history = History::new(data.join("conversations"))?;
         let instance = OpenOptions::new()
@@ -174,6 +189,7 @@ impl Runtime {
         Ok(Self {
             backend_releases: backend_release::ReleaseLookup::new()?,
             web_search,
+            cloud,
             hugging_face,
             native,
             history,

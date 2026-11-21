@@ -131,6 +131,7 @@ impl Fixture {
 
 fn request(id: Uuid, content: &str) -> ChatRequest {
     ChatRequest {
+        cloud: None,
         web_search: false,
         image_ids: Vec::new(),
         web_search_query: None,
@@ -139,6 +140,7 @@ fn request(id: Uuid, content: &str) -> ChatRequest {
         options: Default::default(),
         request_id: id,
         messages: vec![ChatMessage {
+            reasoning_content: None,
             role: "user".into(),
             content: content.into(),
         }],
@@ -905,6 +907,7 @@ async fn tokenization_counts_text_and_rendered_prompts_without_generation() {
     assert_eq!(recorded["parse_special"], false);
     let count = runtime
         .prompt_tokens(vec![ChatMessage {
+            reasoning_content: None,
             role: "user".into(),
             content: "Attachment text".into(),
         }])
@@ -983,6 +986,7 @@ async fn project_storage_and_generation_use_identity_and_immutable_request_snaps
     submitted.messages.insert(
         0,
         ChatMessage {
+            reasoning_content: None,
             role: "system".into(),
             content: snapshot.clone(),
         },
@@ -1095,6 +1099,7 @@ async fn unknown_capacity_rejection_preserves_upstream_type_and_complete_submitt
     submitted.messages.insert(
         0,
         ChatMessage {
+            reasoning_content: None,
             role: "system".into(),
             content: prefix.clone(),
         },

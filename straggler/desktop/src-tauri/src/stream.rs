@@ -19,6 +19,10 @@ pub struct GenerationMetrics {
     pub prompt_ms: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub run_id: Option<uuid::Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_currency: Option<String>,
 }
 
 impl GenerationMetrics {
@@ -35,11 +39,17 @@ impl GenerationMetrics {
         update(&mut self.generation_ms, &newer.generation_ms);
         update(&mut self.prompt_ms, &newer.prompt_ms);
         update(&mut self.run_id, &newer.run_id);
+        update(&mut self.cost, &newer.cost);
+        update(&mut self.cost_currency, &newer.cost_currency);
     }
 }
 
-fn metrics(event: &Value) -> Option<GenerationMetrics> {
-    let timings = &event["timings"];
+fn metrics(event: &Value, allow_timings: bool) -> Option<GenerationMetrics> {
+    let timings = if allow_timings {
+        &event["timings"]
+    } else {
+        &Value::Null
+    };
     let usage = &event["usage"];
     let number = |key: &str| timings[key].as_f64().filter(|n| n.is_finite() && *n >= 0.0);
     let timing_tokens = timings["cache_n"]
@@ -66,6 +76,13 @@ fn metrics(event: &Value) -> Option<GenerationMetrics> {
         generation_ms: number("predicted_ms"),
         prompt_ms: number("prompt_ms"),
         run_id: None,
+        cost: usage["cost"]
+            .as_f64()
+            .filter(|value| value.is_finite() && *value >= 0.0),
+        cost_currency: usage["currency"]
+            .as_str()
+            .filter(|value| value.len() <= 16 && !value.chars().any(char::is_control))
+            .map(str::to_owned),
     })
 }
 
@@ -124,9 +141,42 @@ impl Decoder {
 }
 
 pub fn parse(data: &str) -> Result<(Delta, Option<String>)> {
-    let event: Value =
-        serde_json::from_str(data).map_err(|e| format!("Invalid server stream: {e}"))?;
+    parse_event(data, false)
+}
+
+pub fn parse_cloud(data: &str) -> Result<(Delta, Option<String>)> {
+    parse_event(data, true)
+}
+
+fn thinking_text(value: &Value) -> Result<String> {
+    if let Some(text) = value.as_str() {
+        return Ok(text.into());
+    }
+    if let Some(parts) = value.as_array() {
+        let mut text = String::new();
+        for part in parts {
+            if part["type"] != "text" {
+                return Err(
+                    "The response contains an unsupported thinking block. Partial text was kept."
+                        .into(),
+                );
+            }
+            text.push_str(part["text"].as_str().ok_or(
+                "The response contains an invalid thinking block. Partial text was kept.",
+            )?);
+        }
+        return Ok(text);
+    }
+    Err("The response contains an invalid thinking block. Partial text was kept.".into())
+}
+
+fn parse_event(data: &str, cloud: bool) -> Result<(Delta, Option<String>)> {
+    let event: Value = serde_json::from_str(data)
+        .map_err(|_| "The model returned an invalid response stream. Partial text was kept.")?;
     if let Some(error) = event.get("error") {
+        if cloud {
+            return Err("The cloud service rejected the response. Partial text was kept; review the selected model and supported features.".into());
+        }
         return Err(error
             .get("message")
             .and_then(Value::as_str)
@@ -135,15 +185,34 @@ pub fn parse(data: &str) -> Result<(Delta, Option<String>)> {
     }
     let choice = &event["choices"][0];
     let delta = &choice["delta"];
+    let mut content = String::new();
+    let mut thinking = String::new();
+    match &delta["content"] {
+        Value::String(text) => content.push_str(text),
+        Value::Array(parts) => {
+            for part in parts {
+                match part["type"].as_str() {
+                Some("text") => content.push_str(part["text"].as_str().ok_or("The response contains an invalid text block. Partial text was kept.")?),
+                Some("thinking") => thinking.push_str(&thinking_text(&part["thinking"])?),
+                _ => return Err("The response contains an unsupported content block. Partial text was kept.".into()),
+            }
+            }
+        }
+        Value::Null => {}
+        _ => {
+            return Err("The response contains unsupported content. Partial text was kept.".into())
+        }
+    }
+    let reasoning = delta["reasoning_content"]
+        .as_str()
+        .or_else(|| delta["reasoning"].as_str())
+        .map(str::to_owned)
+        .unwrap_or(thinking);
     Ok((
         Delta {
-            metrics: metrics(&event),
-            content: delta["content"].as_str().unwrap_or("").into(),
-            reasoning: delta["reasoning_content"]
-                .as_str()
-                .or_else(|| delta["reasoning"].as_str())
-                .unwrap_or("")
-                .into(),
+            metrics: metrics(&event, !cloud),
+            content,
+            reasoning,
             ..Delta::default()
         },
         choice["finish_reason"].as_str().map(str::to_owned),
@@ -153,6 +222,34 @@ pub fn parse(data: &str) -> Result<(Delta, Option<String>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cloud_blocks_usage_and_errors_preserve_service_contracts() {
+        for field in ["reasoning_content", "reasoning"] {
+            let wire =
+                serde_json::json!({"choices":[{"delta":{field:"Reason", "content":"Answer"}}]});
+            assert_eq!(
+                parse_cloud(&wire.to_string()).unwrap().0.reasoning,
+                "Reason"
+            );
+        }
+        let wire = r#"{"choices":[{"delta":{"content":[{"type":"thinking","thinking":[{"type":"text","text":"Reason"}]},{"type":"text","text":"Answer"}]}}],"usage":{"total_tokens":21,"completion_tokens":4,"cost":0.02,"currency":"USD"},"timings":{"predicted_per_second":999}}"#;
+        let delta = parse_cloud(wire).unwrap().0;
+        assert_eq!(delta.content, "Answer");
+        assert_eq!(delta.reasoning, "Reason");
+        let metrics = delta.metrics.unwrap();
+        assert_eq!(metrics.cost, Some(0.02));
+        assert_eq!(metrics.context_tokens, Some(21));
+        assert!(metrics.tokens_per_second.is_none());
+        assert!(!parse_cloud(r#"{"error":{"message":"PRIVATE-DATA"}}"#)
+            .unwrap_err()
+            .contains("PRIVATE-DATA"));
+        assert!(
+            parse_cloud(r#"{"choices":[{"delta":{"content":[{"type":"unknown"}]}}]}"#)
+                .unwrap_err()
+                .contains("Partial text was kept")
+        );
+    }
 
     #[test]
     fn timings_and_usage_only_chunks_preserve_real_measurements() {

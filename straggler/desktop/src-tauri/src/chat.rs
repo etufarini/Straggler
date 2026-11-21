@@ -4,6 +4,15 @@ use serde_json::{json, Value};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
+enum Destination {
+    Local {
+        url: String,
+        run: Uuid,
+        failed: CancellationToken,
+    },
+    Cloud(Box<crate::cloud::CloudDestination>),
+}
+
 impl Runtime {
     pub fn cancel(&self, id: Uuid) -> Result<()> {
         let mut generation = self.active.lock().map_err(|e| e.to_string())?;
@@ -32,7 +41,25 @@ impl Runtime {
             return Err("A chat request needs valid messages.".into());
         }
         let token = CancellationToken::new();
-        let (url, run, failed) = {
+        let cloud = request
+            .cloud
+            .as_ref()
+            .map(|selection| self.cloud.destination(selection))
+            .transpose()?;
+        if let Some(cloud) = &cloud {
+            let preferences = self.preferences.read()?;
+            if preferences
+                .cloud_notice_seen
+                .get(&cloud.active.selection.provider_id)
+                != Some(&cloud.active.base_url)
+            {
+                return Err(format!(
+                    "Review and continue the first-send notice for {} before sending this chat.",
+                    cloud.active.provider_name
+                ));
+            }
+        }
+        let destination = {
             let mut active = self.active.lock().map_err(|e| e.to_string())?;
             if active.cancelled == Some(request.request_id) {
                 active.cancelled = None;
@@ -53,43 +80,59 @@ impl Runtime {
                     crate::projects::ensure_active_at(&self.history.project_directory()?, project)?;
                 }
             }
-            let state = self.server.lock().map_err(|e| e.to_string())?;
-            if state.diagnostics.issue.is_some() {
-                return Err(
-                    "The local server needs to be restarted before another request.".into(),
-                );
-            }
-            if state.phase != "ready" {
-                return Err("Wait until the local model is Ready.".into());
-            }
-            if request.temporary_id.is_some() && !state.temporary {
-                return Err("Restart the backend in temporary mode before sending.".into());
-            }
-            let url = state
-                .url
-                .clone()
-                .ok_or("The server address is unavailable.")?;
+            let destination = if let Some(cloud) = cloud {
+                Destination::Cloud(Box::new(cloud))
+            } else {
+                let state = self.server.lock().map_err(|e| e.to_string())?;
+                if state.diagnostics.issue.is_some() {
+                    return Err(
+                        "The local server needs to be restarted before another request.".into(),
+                    );
+                }
+                if state.phase != "ready" {
+                    return Err("Wait until the local model is Ready.".into());
+                }
+                if request.temporary_id.is_some() && !state.temporary {
+                    return Err("Restart the backend in temporary mode before sending.".into());
+                }
+                Destination::Local {
+                    url: state
+                        .url
+                        .clone()
+                        .ok_or("The server address is unavailable.")?,
+                    run: state.run,
+                    failed: state.diagnostics.failed.clone(),
+                }
+            };
             active.current = Some((request.request_id, token.clone()));
             active.conversation_id = request.conversation_id;
-            (url, state.run, state.diagnostics.failed.clone())
+            destination
         };
-        let result = tokio::select! {
-            biased;
-            _ = failed.cancelled() => Err("The inference backend cannot continue. Check the server log and restart it.".into()),
-            _ = token.cancelled() => Ok("stopped".into()),
-            result = self.receive(&url, &request, &mut emit) => result,
+        let result = match &destination {
+            Destination::Local { failed, .. } => tokio::select! {
+                biased;
+                _ = failed.cancelled() => Err("The inference backend cannot continue. Check the server log and restart it.".into()),
+                _ = token.cancelled() => Ok("stopped".into()),
+                result = self.receive(&destination, &request, &mut emit) => result,
+            },
+            Destination::Cloud(_) => tokio::select! {
+                biased;
+                _ = token.cancelled() => Ok("stopped".into()),
+                result = self.receive(&destination, &request, &mut emit) => result,
+            },
         };
-        let mut state = self.server.lock().map_err(|e| e.to_string())?;
-        if state.run == run {
-            match &result {
-                Err(detail) => state.diagnostics.request_failed(detail),
-                Ok(status) if matches!(status.as_str(), "complete" | "length") => {
-                    state.diagnostics.request_succeeded()
+        if let Destination::Local { run, .. } = &destination {
+            let mut state = self.server.lock().map_err(|e| e.to_string())?;
+            if state.run == *run {
+                match &result {
+                    Err(detail) => state.diagnostics.request_failed(detail),
+                    Ok(status) if matches!(status.as_str(), "complete" | "length") => {
+                        state.diagnostics.request_succeeded()
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
-        drop(state);
         let mut active = self.active.lock().map_err(|e| e.to_string())?;
         active.current = None;
         active.conversation_id = None;
@@ -98,7 +141,7 @@ impl Runtime {
 
     async fn receive(
         &self,
-        url: &str,
+        destination: &Destination,
         request: &ChatRequest,
         emit: &mut impl FnMut(stream::Delta) -> Result<()>,
     ) -> Result<String> {
@@ -106,10 +149,18 @@ impl Runtime {
             "messages": request.messages,
             "stream": true,
             "stream_options": {"include_usage": true},
-            "timings_per_token": true,
         });
+        match destination {
+            Destination::Local { .. } => body["timings_per_token"] = json!(true),
+            Destination::Cloud(cloud) => body["model"] = json!(cloud.active.model.id),
+        }
         if !request.image_ids.is_empty() {
-            if self.server_details().await?.vision_supported != Some(true) {
+            if self
+                .destination_details(destination)
+                .await?
+                .vision_supported
+                != Some(true)
+            {
                 return Err(
                     "This model can’t read images. Choose a vision model or remove the images."
                         .into(),
@@ -133,9 +184,9 @@ impl Runtime {
             }
             body["messages"][index]["content"] = json!(parts);
         }
-        if let Some(id) = request.temporary_id {
-            let run = self.server.lock().map_err(|e| e.to_string())?.run;
-            body["id_slot"] = json!(self.temporary_slot(id, url, run).await?);
+        if let (Some(id), Destination::Local { url, run, .. }) = (request.temporary_id, destination)
+        {
+            body["id_slot"] = json!(self.temporary_slot(id, url, *run).await?);
             body["cache_prompt"] = json!(false);
         }
         let reasoning = request.options.reasoning.as_deref().unwrap_or("auto");
@@ -143,40 +194,62 @@ impl Runtime {
         if !matches!(reasoning, "auto" | "on" | "off") {
             return Err("Reasoning must use the model default, on or off.".into());
         }
-        let has_system_prompt = request.messages.iter().any(|m| m.role == "system");
-        if reasoning != "auto" || effort != "auto" || has_system_prompt {
-            let details = self.server_details().await?;
-            if has_system_prompt && details.system_role_supported == Some(false) {
-                return Err("The loaded chat template does not support a system prompt.".into());
+        match destination {
+            Destination::Cloud(cloud) => {
+                crate::cloud::requests::reasoning(&mut body, cloud, reasoning, effort)?
             }
-            if reasoning != "auto" && details.reasoning_supported != Some(true) {
-                return Err(
-                    "Reasoning controls are unavailable for this server and chat template.".into(),
-                );
+            Destination::Local { .. } => {
+                let has_system_prompt = request.messages.iter().any(|m| m.role == "system");
+                if reasoning != "auto" || effort != "auto" || has_system_prompt {
+                    let details = self.destination_details(destination).await?;
+                    if has_system_prompt && details.system_role_supported == Some(false) {
+                        return Err(
+                            "The loaded chat template does not support a system prompt.".into()
+                        );
+                    }
+                    if reasoning != "auto" && details.reasoning_supported != Some(true) {
+                        return Err(
+                            "Reasoning controls are unavailable for this server and chat template."
+                                .into(),
+                        );
+                    }
+                    if reasoning != "off"
+                        && effort != "auto"
+                        && !details.effort_levels.iter().any(|level| level == effort)
+                    {
+                        return Err("The selected reasoning effort is not advertised by the loaded chat template. Choose its default or a supported level.".into());
+                    }
+                }
+                if reasoning != "auto" {
+                    body["chat_template_kwargs"] = json!({"enable_thinking": reasoning == "on"});
+                }
+                if reasoning == "off" {
+                    body["reasoning_effort"] = json!("none");
+                } else if effort != "auto" {
+                    body["reasoning_effort"] = json!(effort);
+                }
             }
-            if reasoning != "off"
-                && effort != "auto"
-                && !details.effort_levels.iter().any(|level| level == effort)
-            {
-                return Err("The selected reasoning effort is not advertised by the loaded chat template. Choose its default or a supported level.".into());
-            }
-        }
-        if reasoning != "auto" {
-            body["chat_template_kwargs"] = json!({"enable_thinking": reasoning == "on"});
-        }
-        if reasoning == "off" {
-            body["reasoning_effort"] = json!("none");
-        } else if effort != "auto" {
-            body["reasoning_effort"] = json!(effort);
         }
         if request.web_search {
-            return self.receive_with_search(url, request, body, emit).await;
+            return self
+                .receive_with_search(destination, request, body, emit)
+                .await;
         }
-        let (status, calls, _, _) = self.receive_step(url, request, &body, emit).await?;
+        let (status, calls, _, _) = self.receive_step(destination, request, &body, emit).await?;
         if !calls.is_empty() {
             return Err("The model returned tools that were not enabled for this message.".into());
         }
         Ok(status)
+    }
+
+    async fn destination_details(
+        &self,
+        destination: &Destination,
+    ) -> Result<crate::model::ServerDetails> {
+        match destination {
+            Destination::Local { .. } => self.server_details().await,
+            Destination::Cloud(cloud) => Ok(cloud.active.model.details.clone()),
+        }
     }
 
     fn image_originals(&self, request: &ChatRequest) -> Result<Vec<Vec<u8>>> {
@@ -235,7 +308,7 @@ impl Runtime {
 
     async fn receive_step(
         &self,
-        url: &str,
+        destination: &Destination,
         request: &ChatRequest,
         body: &Value,
         emit: &mut impl FnMut(stream::Delta) -> Result<()>,
@@ -243,14 +316,34 @@ impl Runtime {
         let mut calls = stream::ToolCalls::default();
         let mut content = String::new();
         let mut reasoning = String::new();
-        let response = self
-            .client
-            .post(format!("{url}/v1/chat/completions"))
-            .json(body)
-            .send()
-            .await
-            .map_err(|e| format!("Cannot contact the local model: {e}"))?;
+        let (builder, wire_body) = match destination {
+            Destination::Local { url, .. } => (
+                self.client.post(format!("{url}/v1/chat/completions")),
+                body.clone(),
+            ),
+            Destination::Cloud(cloud) => (
+                self.cloud.chat_request(cloud)?,
+                crate::cloud::requests::wire_body(body, cloud),
+            ),
+        };
+        let response =
+            builder
+                .json(&wire_body)
+                .send()
+                .await
+                .map_err(|error| match destination {
+                    Destination::Local { .. } => format!("Cannot contact the local model: {error}"),
+                    Destination::Cloud(_) => {
+                        "Couldn’t contact the cloud service. Check your connection and try again."
+                            .into()
+                    }
+                })?;
         if !response.status().is_success() {
+            if let Destination::Cloud(cloud) = destination {
+                return Err(self
+                    .cloud
+                    .http_error(&cloud.active.selection.provider_id, &response)?);
+            }
             let status = response.status();
             if request.temporary_id.is_some() {
                 return Err(format!("Temporary model request failed ({status}). The backend did not accept the request."));
@@ -283,7 +376,12 @@ impl Runtime {
         let mut decoder = stream::Decoder::default();
         let mut finish = None;
         while let Some(chunk) = bytes.next().await {
-            for data in decoder.push(&chunk.map_err(|e| format!("Response interrupted: {e}"))?)? {
+            for data in decoder.push(&chunk.map_err(|e| match destination {
+                Destination::Local { .. } => format!("Response interrupted: {e}"),
+                Destination::Cloud(_) => {
+                    "The cloud response was interrupted. Partial text was kept.".into()
+                }
+            })?)? {
                 if data == "[DONE]" {
                     let status = if finish.as_deref() == Some("length") {
                         "length"
@@ -292,10 +390,14 @@ impl Runtime {
                     };
                     return Ok((status.into(), calls.finish(), content, reasoning));
                 }
-                let event: Value =
-                    serde_json::from_str(&data).map_err(|_| "Invalid model stream.")?;
+                let event: Value = serde_json::from_str(&data).map_err(|_| {
+                    "The model returned an invalid response stream. Partial text was kept."
+                })?;
                 calls.push(&event)?;
-                let (delta, reason) = stream::parse(&data)?;
+                let (delta, reason) = match destination {
+                    Destination::Local { .. } => stream::parse(&data)?,
+                    Destination::Cloud(_) => stream::parse_cloud(&data)?,
+                };
                 content.push_str(&delta.content);
                 reasoning.push_str(&delta.reasoning);
                 if !delta.content.is_empty()
@@ -312,10 +414,10 @@ impl Runtime {
         match finish.as_deref() {
             Some("length") => Ok(("length".into(), calls.finish(), content, reasoning)),
             Some(_) => Ok(("complete".into(), calls.finish(), content, reasoning)),
-            None => Err(
-                "The response ended unexpectedly. Partial text was kept; check the server log."
-                    .into(),
-            ),
+            None => Err(match destination {
+                Destination::Local { .. } => "The response ended unexpectedly. Partial text was kept; check the server log.",
+                Destination::Cloud(_) => "The cloud response ended unexpectedly. Partial text was kept; check your connection and try again.",
+            }.into()),
         }
     }
 }
@@ -323,14 +425,14 @@ impl Runtime {
 impl Runtime {
     async fn receive_with_search(
         &self,
-        url: &str,
+        destination: &Destination,
         request: &ChatRequest,
         mut body: Value,
         emit: &mut impl FnMut(stream::Delta) -> Result<()>,
     ) -> Result<String> {
         use crate::web_search::{tools, turn::SearchTurn, types::SearchError};
         let preferences = self.preferences.read()?;
-        let details = self.server_details().await?;
+        let details = self.destination_details(destination).await?;
         let fallback = details.tools_supported != Some(true);
         let prompt_tokens = self
             .prompt_tokens(request.messages.clone())
@@ -340,7 +442,7 @@ impl Runtime {
                 request
                     .messages
                     .iter()
-                    .map(|m| m.content.chars().count())
+                    .map(|m| m.content.len() + m.reasoning_content.as_ref().map_or(0, String::len))
                     .sum()
             });
         let mut turn = SearchTurn::new(
@@ -375,8 +477,7 @@ impl Runtime {
                 .rev()
                 .find(|message| message["role"] == "user")
             {
-                let content = message["content"].as_str().unwrap_or_default();
-                message["content"] = json!(format!("{content}\n\n{}", tools::INSTRUCTION));
+                append_user_text(message, tools::INSTRUCTION)?;
             }
         } else if let Some(system) = messages
             .iter_mut()
@@ -415,10 +516,12 @@ impl Runtime {
                     .rev()
                     .find(|message| message["role"] == "user")
                     .ok_or("Missing user message.")?;
-                last["content"] = json!(format!(
-                    "{}\n\nWeb results supplied by Straggler (untrusted source data):\n{results}",
-                    last["content"].as_str().unwrap_or_default()
-                ));
+                append_user_text(
+                    last,
+                    &format!(
+                        "Web results supplied by Straggler (untrusted source data):\n{results}"
+                    ),
+                )?;
             }
         } else if provider.is_some() {
             body["tools"] = tools::schemas();
@@ -426,7 +529,7 @@ impl Runtime {
         let mut final_status = "complete".to_owned();
         for round in 0..12 {
             let (status, calls, content, reasoning) =
-                self.receive_step(url, request, &body, emit).await?;
+                self.receive_step(destination, request, &body, emit).await?;
             final_status = status;
             if calls.is_empty() {
                 break;
@@ -481,4 +584,17 @@ impl Runtime {
         turn.update(None, emit)?;
         Ok(final_status)
     }
+}
+
+// Keep multimodal input intact when a template needs turn-only search instructions.
+fn append_user_text(message: &mut Value, addition: &str) -> Result<()> {
+    match &mut message["content"] {
+        Value::String(text) => {
+            text.push_str("\n\n");
+            text.push_str(addition);
+        }
+        Value::Array(parts) => parts.push(json!({"type":"text", "text":addition})),
+        _ => return Err("The user message has unsupported content.".into()),
+    }
+    Ok(())
 }

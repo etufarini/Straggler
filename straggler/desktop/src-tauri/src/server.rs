@@ -68,6 +68,7 @@ impl Runtime {
         }
         read_log(self.server.clone(), run, stdout);
         read_log(self.server.clone(), run, stderr);
+        self.cloud.clear_active()?;
         Ok(())
     }
 

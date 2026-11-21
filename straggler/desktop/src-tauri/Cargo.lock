@@ -4824,6 +4824,7 @@ dependencies = [
  "dom_smoothie",
  "encoding_rs",
  "futures-util",
+ "httpdate",
  "image",
  "keyring-core",
  "libc",

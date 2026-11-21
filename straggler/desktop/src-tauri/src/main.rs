@@ -203,6 +203,68 @@ async fn models_folder_info(
 }
 
 #[tauri::command]
+async fn cloud_status(
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::cloud::CloudStatus> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.cloud.status())
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn cloud_add_provider(
+    name: String,
+    base_url: String,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::cloud::CloudStatus> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.cloud.add_custom(name, base_url))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn cloud_models_show(
+    provider_id: String,
+    shown: Vec<String>,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::cloud::CloudStatus> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.cloud.show_models(&provider_id, shown))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn cloud_key_save(
+    provider_id: String,
+    key: Option<String>,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::cloud::CloudStatus> {
+    runtime(&state)?.cloud.save_key(&provider_id, key).await
+}
+
+#[tauri::command]
+async fn cloud_models_refresh(
+    provider_id: String,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::cloud::CloudStatus> {
+    runtime(&state)?.cloud.refresh(&provider_id).await
+}
+
+#[tauri::command]
+async fn cloud_use_model(
+    selection: straggler_desktop::cloud::Selection,
+    state: State<'_, Application>,
+) -> Result<straggler_desktop::cloud::CloudStatus> {
+    let runtime = runtime(&state)?;
+    tauri::async_runtime::spawn_blocking(move || runtime.choose_cloud_model(selection))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn web_search_status(
     refresh: bool,
     state: State<'_, Application>,
@@ -924,6 +986,12 @@ fn main() {
             choose_model_file,
             create_models_folder,
             models_folder_info,
+            cloud_status,
+            cloud_add_provider,
+            cloud_models_show,
+            cloud_key_save,
+            cloud_models_refresh,
+            cloud_use_model,
             web_search_status,
             web_search_key_save,
             open_web_url,
