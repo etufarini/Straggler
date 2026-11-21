@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Cloud, Check } from 'lucide-react';
 import type { WorkspaceController } from '../../app/useWorkspace';
 import type { CloudSelection } from '../../domain/cloudModels';
-import { cloudCapabilities } from '../../domain/cloudModels';
+import { cloudCapabilities, shownCloudModels } from '../../domain/cloudModels';
 import Feedback from '../../components/Feedback';
 
 export default function CloudModels({ controller }: { controller: WorkspaceController }) {
@@ -40,33 +40,31 @@ export default function CloudModels({ controller }: { controller: WorkspaceContr
             </div>
             {provider.saved ? (
               <>
-                {provider.models
-                  .filter((model) => provider.shown.includes(model.id))
-                  .map((model) => {
-                    const selected =
-                      selection?.providerId === provider.id && selection.modelId === model.id;
-                    const capabilities = cloudCapabilities(model);
-                    return (
-                      <button
-                        key={model.id}
-                        className={`model-option${selected ? ' chosen' : ''}`}
-                        disabled={unavailable}
-                        onClick={() => setSelection({ providerId: provider.id, modelId: model.id })}
-                      >
-                        <Cloud size={19} />
-                        <span>
-                          {model.name}
-                          <small>
-                            {capabilities.length
-                              ? capabilities.join(' · ')
-                              : 'Capabilities not listed'}
-                          </small>
-                        </span>
-                        {selected && <Check size={17} />}
-                      </button>
-                    );
-                  })}
-                {!provider.models.some((model) => provider.shown.includes(model.id)) && (
+                {shownCloudModels(provider).map((model) => {
+                  const selected =
+                    selection?.providerId === provider.id && selection.modelId === model.id;
+                  const capabilities = cloudCapabilities(model);
+                  return (
+                    <button
+                      key={model.id}
+                      className={`model-option${selected ? ' chosen' : ''}`}
+                      disabled={unavailable}
+                      onClick={() => setSelection({ providerId: provider.id, modelId: model.id })}
+                    >
+                      <Cloud size={19} />
+                      <span>
+                        {model.name}
+                        <small>
+                          {capabilities.length
+                            ? capabilities.join(' · ')
+                            : 'Capabilities not listed'}
+                        </small>
+                      </span>
+                      {selected && <Check size={17} />}
+                    </button>
+                  );
+                })}
+                {!shownCloudModels(provider).length && (
                   <p className="field-help">Choose models to show in Settings.</p>
                 )}
               </>

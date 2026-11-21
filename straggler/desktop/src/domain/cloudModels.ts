@@ -42,3 +42,7 @@ export function cloudCapabilities(model: CloudModel): string[] {
     details.reasoningSupported === true ? 'Reasoning' : '',
   ].filter(Boolean);
 }
+
+export function shownCloudModels(provider: Pick<CloudProvider, 'models' | 'shown'>): CloudModel[] {
+  return provider.models.filter((model) => provider.shown.includes(model.id));
+}
