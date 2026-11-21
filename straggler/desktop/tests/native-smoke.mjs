@@ -510,8 +510,14 @@ try {
     await fillField('[aria-label="Search Hugging Face"]', 'publisher/repository');
     await evaluate('document.querySelector(".hf-search").requestSubmit()');
     await until(
-      () => evaluate('!!document.querySelector(".hf-variants input")'),
-      'native Hub repository metadata',
+      () =>
+        evaluate(`(() => {
+          const selected = document.querySelector('.hf-variants input:checked');
+          const download = Array.from(document.querySelectorAll('.hf-browser button'))
+            .find(button => button.textContent === 'Download selected files');
+          return !!selected && !!download && !download.disabled;
+        })()`),
+      'selected native Hub variant and enabled download',
     );
     await evaluate(
       'Array.from(document.querySelectorAll(".hf-browser button")).find(button => button.textContent === "Download selected files").click()',
