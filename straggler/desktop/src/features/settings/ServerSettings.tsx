@@ -17,6 +17,10 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
     stopListeners,
     fieldError,
   } = controller;
+  const occupied = config.portStatus.includes('IN USE');
+  const processDetails =
+    config.portStatus.split('\n').slice(1).join('\n') ||
+    config.listeners.map((listener) => listener.details).join('\n');
   return (
     <>
       <NumberField
@@ -28,27 +32,29 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
         onChange={(value) => change('port', value)}
         hint="1–65535. Only this computer (127.0.0.1) can connect."
       />
-      <button
-        className="text-button"
-        disabled={busy || !native}
-        onClick={() =>
-          void run(async () => {
-            await apply();
-          })
-        }
-      >
-        <RefreshCw size={14} />
-        Check again
-      </button>
-      <StatusChip live tone={config.portStatus.includes('IN USE') ? 'attention' : 'positive'}>
-        {config.portStatus
-          .split('\n')[0]
-          .replace(/Port (\d+): FREE/, 'Port $1 is free')
-          .replace(/Port (\d+): IN USE/, 'Port $1 is in use')}
-      </StatusChip>
-      {config.portStatus.includes('IN USE') && (
+      <div className="row-actions port-status-row">
+        <StatusChip live tone={config.portStatus.includes('IN USE') ? 'attention' : 'positive'}>
+          {config.portStatus
+            .split('\n')[0]
+            .replace(/Port (\d+): FREE/, 'Port $1 is free')
+            .replace(/Port (\d+): IN USE/, 'Port $1 is in use')}
+        </StatusChip>
+        <button
+          className="text-button"
+          disabled={busy || !native}
+          onClick={() =>
+            void run(async () => {
+              await apply();
+            })
+          }
+        >
+          <RefreshCw size={14} />
+          Check again
+        </button>
+      </div>
+      {occupied && (
         <>
-          <pre className="process-details">{config.portStatus}</pre>
+          {processDetails && <pre className="process-details">{processDetails}</pre>}
           <div className="settings-note-group">
             <div className="row-actions">
               <button
