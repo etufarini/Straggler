@@ -1,3 +1,5 @@
+import { useLayoutEffect, useState } from 'react';
+import { ArrowLeft, Save, CircleAlert } from 'lucide-react';
 import type { Section } from './sections';
 import ChatDefaults from './ChatDefaults';
 import useChatDefaults from './useChatDefaults';
@@ -8,46 +10,39 @@ import { settingsForModel } from '../../domain/types';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import WebSearchSettings from '../websearch/WebSearchSettings';
 import type { WebSearchController } from '../websearch/useWebSearch';
-import { ArrowLeft, Save } from 'lucide-react';
 import FolderBrowser from '../../components/FolderBrowser';
 import { useSettings } from './useSettings';
 import type { SettingsProps } from './useSettings';
-import ModelSettings from './ModelSettings';
-import PerformanceSettings from './PerformanceSettings';
-import ServerSettings from './ServerSettings';
 import SavedConfigurations from './SavedConfigurations';
 import FolderSettings from './FolderSettings';
 import LlamaSettings from '../llama/LlamaSettings';
 import HuggingFaceSettings from '../huggingface/HuggingFaceSettings';
+import useHubTokenStatus from '../huggingface/useHubTokenStatus';
 import Feedback from '../../components/Feedback';
-const sectionGroups: { label: string; sections: [Section, string][] }[] = [
-  {
-    label: 'All models',
-    sections: [
-      ['chat-defaults', 'Chat defaults'],
-      ['prompts', 'System prompts'],
-    ],
-  },
-  {
-    label: 'On this computer',
-    sections: [
-      ['model', 'Model settings'],
-      ['performance', 'Performance'],
-      ['server', 'Server & port'],
-      ['profiles', 'Saved configurations'],
-      ['folders', 'Folders'],
-      ['llama', 'llama.cpp'],
-      ['huggingface', 'Hugging Face'],
-    ],
-  },
-  {
-    label: 'Cloud and web',
-    sections: [
-      ['cloud', 'Cloud models'],
-      ['websearch', 'Web search'],
-    ],
-  },
-];
+import StatusChip from '../../components/StatusChip';
+import Select from '../../components/Select';
+import SettingsHeader from './SettingsHeader';
+import SettingsOverview from './SettingsOverview';
+import UnifiedModelSettings, { focusSettingsTarget } from './UnifiedModelSettings';
+import { ChangedSettingsContext } from './ChangedSetting';
+import { loadConfiguration } from './configurations';
+import { overviewEntry, sectionGroups } from './settingsNavigation';
+
+const scopes: Partial<Record<Section, string>> = {
+  overview: 'What Straggler uses now. Select a card to change it.',
+  'chat-defaults':
+    'For every model, on this computer and in the cloud. A chat can change its system prompt and reasoning from the message box.',
+  prompts:
+    'Reusable system prompts for every model. Insert a copy in chat defaults, a project or a chat.',
+  model: 'For the model on this computer. Changes apply when the server restarts.',
+  llama: 'The llama.cpp backend on this computer. Stop the server before changing its build.',
+  'model-files':
+    'Model files on this computer. Folders are saved after you accept and validate them.',
+  cloud:
+    'Optional services for chatting with models hosted elsewhere. Messages leave this computer only when you choose a cloud model and send.',
+  websearch:
+    'Optional web search. Search queries and page addresses go to the service only when you turn on web search.',
+};
 
 export default function Settings({
   webSearch,
@@ -61,6 +56,8 @@ export default function Settings({
 }) {
   const controller = useSettings(props);
   const defaults = useChatDefaults(controller);
+  const tokenStatus = useHubTokenStatus();
+  const [manage, setManage] = useState(false);
   const {
     config,
     draft,
@@ -84,87 +81,81 @@ export default function Settings({
     operation,
     failure,
   } = controller;
-  const hasApplyAction = ['model', 'performance', 'server'].includes(section);
   usePagePrimaryAction(
-    hasApplyAction ? !busy && native : section === 'websearch' ? null : false,
+    section === 'model' ? !busy && native : section === 'websearch' ? null : false,
     onPrimaryActionChange,
   );
-  const title = sectionGroups
-    .flatMap((group) => group.sections)
-    .find(([key]) => key === section)?.[1];
-  const scope = {
-    'chat-defaults':
-      'For every model, on this computer and in the cloud. A chat can change its system prompt and reasoning from the message box.',
-    prompts:
-      'Reusable system prompts for every model. Insert a copy in chat defaults, a project or a chat.',
-    model: 'For the model on this computer. Changes apply when the server restarts.',
-    performance: 'For the model on this computer. Changes apply when the server restarts.',
-    server: 'For the model on this computer. Changes apply when the server restarts.',
-    profiles:
-      'Saves the model, its settings on this computer and your chat defaults. Folders and chats aren’t included.',
-    folders:
-      'Folders for models and llama.cpp on this computer. Changes are saved after you accept and validate a folder.',
-    llama: 'The llama.cpp backend on this computer. Stop the server before changing its build.',
-    huggingface: 'Download models to this computer. Nothing is sent until you search or download.',
-    cloud:
-      'Optional services for chatting with models hosted elsewhere. Messages leave this computer only when you choose a cloud model and send.',
-    websearch:
-      'Optional services. Messages go to them only when you choose a cloud model or turn on web search.',
-  }[section];
+  const group = sectionGroups.find((group) => group.sections.some((entry) => entry.id === section));
+  const entry = group?.sections.find((entry) => entry.id === section) ?? overviewEntry;
+  useLayoutEffect(() => {
+    const target = controller.target;
+    if (!target) return;
+    const frame = requestAnimationFrame(() => focusSettingsTarget(target));
+    return () => cancelAnimationFrame(frame);
+  }, [section, controller.target]);
+  function navEntry(item: typeof overviewEntry) {
+    const unavailable =
+      item.id === 'model'
+        ? !config.models.some((model) => model.path === draft.model)
+        : item.id === 'llama' && !config.serverAvailable;
+    return (
+      <button
+        key={item.id}
+        className={section === item.id ? 'selected' : ''}
+        aria-label={item.label}
+        aria-current={section === item.id ? 'page' : undefined}
+        onClick={() => {
+          setSection(item.id);
+          document.querySelector('.settings-page')?.scrollTo({ top: 0 });
+        }}
+      >
+        <item.icon size={16} aria-hidden="true" />
+        {item.label}
+        {item.id === 'model' && dirty && (
+          <span className="settings-dirty-dot" role="img" aria-label="Unapplied changes" />
+        )}
+        {unavailable && (
+          <CircleAlert size={14} role="img" aria-label={`${item.label} unavailable`} />
+        )}
+      </button>
+    );
+  }
   return (
     <section className="settings-page" aria-label="Settings">
-      <div className="settings-heading">
-        <button className="text-button" onClick={onBack}>
-          <ArrowLeft size={16} />
-          Back to chat
-        </button>
-        <h1>Settings</h1>
-      </div>
       <div className="settings-layout">
-        <nav className="settings-nav" aria-label="Settings sections">
-          {sectionGroups.map((group) => (
-            <div
-              key={group.label}
-              className="settings-nav-group"
-              role="group"
-              aria-label={group.label}
-            >
-              <span className="settings-nav-heading">{group.label}</span>
-              {group.sections.map(([key, label]) => (
-                <button
-                  key={key}
-                  className={section === key ? 'selected' : ''}
-                  aria-current={section === key ? 'page' : undefined}
-                  onClick={() => setSection(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ))}
-        </nav>
-        <div className="settings-content">
-          {failure && !failure.field && failure.section === section && (
-            <Feedback
-              title={
-                section === 'llama'
-                  ? 'Couldn’t complete the llama.cpp action'
-                  : 'Couldn’t update settings'
-              }
-              details={failure.message}
-            >
-              Check the details and try again. Your edits are kept.
-            </Feedback>
-          )}
+        <aside className="settings-sidebar">
+          <div className="settings-heading">
+            <button className="text-button" onClick={onBack}>
+              <ArrowLeft size={16} />
+              Back to chat
+            </button>
+            <h1>Settings</h1>
+          </div>
+          <nav className="settings-nav" aria-label="Settings sections">
+            {navEntry(overviewEntry)}
+            {sectionGroups.map((group) => (
+              <div
+                key={group.label}
+                className="settings-nav-group"
+                role="group"
+                aria-label={group.label}
+              >
+                <span className="settings-nav-heading">
+                  <group.icon size={14} aria-hidden="true" />
+                  <span>{group.label}</span>
+                </span>
+                {group.sections.map(navEntry)}
+              </div>
+            ))}
+          </nav>
+        </aside>
+        <div className="settings-content" key={section}>
           <fieldset className="settings-fields" disabled={busy || !native}>
-            {busy && (
-              <p role="status" className="field-help">
-                Loading…
-              </p>
-            )}
-            <header className="settings-section-heading">
-              <h2>{title}</h2>
-              <p className="settings-scope field-help">{scope}</p>
+            <SettingsHeader
+              title={entry.label}
+              scope={scopes[section] ?? scopes.overview!}
+              group={group}
+            >
               {section === 'chat-defaults' && (
                 <p className="autosave-note">
                   Changes are saved automatically and apply from the next message.
@@ -176,38 +167,54 @@ export default function Settings({
                   service doesn’t accept aren’t sent.
                 </p>
               )}
-              {hasApplyAction && (
+              {['prompts', 'websearch'].includes(section) && (
+                <p className="autosave-note">Changes are saved automatically.</p>
+              )}
+              {section === 'model' && (
                 <div className="configuration-heading">
-                  <span>
-                    {config.currentProfile || 'Custom settings'}
-                    {modified && (
-                      <b
-                        role="note"
-                        title="Differs from the saved configuration. Save it to keep these values."
-                        aria-label="Modified. Differs from the saved configuration. Save it to keep these values."
-                      >
-                        Modified
-                      </b>
-                    )}
-                    {dirty && (
-                      <b
-                        role="note"
-                        title="Select Apply changes to use these values."
-                        aria-label="Unapplied changes. Select Apply changes to use these values."
-                      >
-                        Unapplied changes
-                      </b>
-                    )}
-                    {active && restart && (
-                      <b
-                        role="note"
-                        title="Stop and launch the server to use the new values."
-                        aria-label="Restart required. Stop and launch the server to use the new values."
-                      >
-                        Restart required
-                      </b>
-                    )}
-                  </span>
+                  <div className="configuration-choice">
+                    <Select
+                      aria-label="Configuration"
+                      value={config.currentProfile || ''}
+                      options={[
+                        { value: '', label: 'Custom settings' },
+                        ...config.profiles.map((value) => ({ value, label: value })),
+                      ]}
+                      onChange={(value) => {
+                        if (value)
+                          void run(() => loadConfiguration(controller, value, defaults.reset));
+                      }}
+                    />
+                    <span>
+                      {modified && (
+                        <b
+                          role="note"
+                          title="Differs from the saved configuration. Save it to keep these values."
+                          aria-label="Modified. Differs from the saved configuration. Save it to keep these values."
+                        >
+                          Modified
+                        </b>
+                      )}
+                      {dirty && (
+                        <b
+                          role="note"
+                          title="Select Apply changes to use these values."
+                          aria-label="Unapplied changes. Select Apply changes to use these values."
+                        >
+                          Unapplied changes
+                        </b>
+                      )}
+                      {active && restart && (
+                        <b
+                          role="note"
+                          title="Stop and launch the server to use the new values."
+                          aria-label="Restart required. Stop and launch the server to use the new values."
+                        >
+                          Restart required
+                        </b>
+                      )}
+                    </span>
+                  </div>
                   <button
                     className="primary-button"
                     disabled={busy || !native}
@@ -223,25 +230,54 @@ export default function Settings({
                   </button>
                 </div>
               )}
-            </header>
+            </SettingsHeader>
             <div className="settings-section">
-              {message && (
-                <p role="status" className="success-message">
-                  {message}
+              {busy && (
+                <p role="status" className="field-help">
+                  Loading…
                 </p>
+              )}
+              {failure && !failure.field && failure.section === props.section && (
+                <Feedback
+                  title={
+                    section === 'llama'
+                      ? 'Couldn’t complete the llama.cpp action'
+                      : 'Couldn’t update settings'
+                  }
+                  details={failure.message}
+                >
+                  Check the details and try again. Your edits are kept.
+                </Feedback>
+              )}
+              {message && (
+                <StatusChip live tone="positive">
+                  {message}
+                </StatusChip>
+              )}
+              {section === 'overview' && (
+                <SettingsOverview
+                  controller={controller}
+                  cloud={cloud}
+                  webSearch={webSearch}
+                  tokenStatus={tokenStatus.status}
+                />
               )}
               {section === 'cloud' && <CloudSettings controller={cloud} />}
               {section === 'prompts' && <SystemPromptsSettings confirm={props.confirm} />}
               {section === 'chat-defaults' && (
                 <ChatDefaults controller={controller} cloud={cloud} defaults={defaults} />
               )}
-              {section === 'model' && <ModelSettings controller={controller} />}
-              {section === 'performance' && <PerformanceSettings controller={controller} />}
-              {section === 'server' && <ServerSettings controller={controller} />}
-              {section === 'profiles' && (
-                <SavedConfigurations controller={controller} onDefaultsLoaded={defaults.reset} />
+              {section === 'model' && (
+                <ChangedSettingsContext.Provider value={{ draft, saved: config.savedSettings }}>
+                  <UnifiedModelSettings controller={controller} onManage={() => setManage(true)} />
+                </ChangedSettingsContext.Provider>
               )}
-              {section === 'folders' && <FolderSettings controller={controller} />}
+              {section === 'model-files' && (
+                <>
+                  <FolderSettings controller={controller} />
+                  <HuggingFaceSettings tokenStatus={tokenStatus} />
+                </>
+              )}
               {section === 'llama' && <LlamaSettings controller={controller} />}
               {section === 'websearch' && (
                 <WebSearchSettings
@@ -249,11 +285,11 @@ export default function Settings({
                   onPrimaryActionChange={onPrimaryActionChange}
                 />
               )}
-              {section === 'huggingface' && <HuggingFaceSettings controller={controller} />}
             </div>
           </fieldset>
         </div>
       </div>
+      {manage && <SavedConfigurations controller={controller} onClose={() => setManage(false)} />}
       {folder && (
         <FolderBrowser
           initial={folder === 'llama' ? config.llamaDir : config.modelsDir}

@@ -7,6 +7,7 @@ import {
   serverActive,
 } from '../../domain/types';
 import type { SettingsFailure } from '../../domain/errors';
+import { settingsDestination } from './sections';
 import type { Section } from './sections';
 import type {
   ServerDetails,
@@ -31,6 +32,7 @@ export function useSettings({
   failure,
   onClearError,
   serverDetails,
+  target,
 }: {
   config: Configuration;
   serverDetails: ServerDetails | null;
@@ -42,6 +44,7 @@ export function useSettings({
   confirm: (value: Confirmation) => void;
   onError: (error: unknown) => void;
   onBack: () => void;
+  target?: string;
   section: Section;
   setSection: (section: Section) => void;
   failure: SettingsFailure | null;
@@ -179,7 +182,8 @@ export function useSettings({
     confirm,
     onError,
     onBack,
-    section,
+    section: settingsDestination(section).section,
+    target: target ?? settingsDestination(section).target,
     setSection,
     busy,
     message,

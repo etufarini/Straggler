@@ -76,7 +76,7 @@ export function useWorkspace() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [settingsFailure, setSettingsFailure] = useState<SettingsFailure | null>(null);
-  const [settingsSection, setSettingsSection] = useState<Section>('chat-defaults');
+  const [settingsSection, setSettingsSection] = useState<Section>('overview');
   const mounted = useRef(true);
   const closeAction = useRef<() => void>(() => {});
   const native = isTauri();
@@ -396,10 +396,12 @@ export function useWorkspace() {
     });
   }
 
+  const [settingsTarget, setSettingsTarget] = useState<string | undefined>();
+
   function reviewSettings(section: Section, field?: string) {
+    setSettingsTarget(field);
     setSettingsSection(section);
     setPanel('settings');
-    if (field) requestAnimationFrame(() => document.getElementById(field)?.focus());
   }
 
   function reportSettingsError(error: unknown) {
@@ -423,7 +425,7 @@ export function useWorkspace() {
       if (firstConfiguration.current) {
         firstConfiguration.current = false;
         if (!value.serverAvailable || !value.modelsDir) {
-          setSettingsSection(!value.serverAvailable ? 'llama' : 'folders');
+          setSettingsSection('overview');
           setPanel('settings');
         }
       }
@@ -757,7 +759,11 @@ export function useWorkspace() {
     requestStop,
     reviewSettings,
     settingsSection,
-    setSettingsSection,
+    settingsTarget,
+    setSettingsSection: (section: Section) => {
+      setSettingsTarget(undefined);
+      setSettingsSection(section);
+    },
     settingsFailure,
     setSettingsFailure,
     reportSettingsError,

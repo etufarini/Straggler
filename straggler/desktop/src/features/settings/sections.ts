@@ -1,6 +1,8 @@
 import type { Settings } from '../../domain/types';
 
 export type Section =
+  | 'overview'
+  | 'model-files'
   | 'chat-defaults'
   | 'cloud'
   | 'prompts'
@@ -48,4 +50,24 @@ export function fieldSection(field?: keyof Settings): Section {
   )
     return 'performance';
   return 'model';
+}
+
+// Legacy destinations stay at the UI boundary; persisted Settings are unchanged.
+export function settingsDestination(section: Section): { section: Section; target?: string } {
+  switch (section) {
+    case 'performance':
+      return { section: 'model', target: 'model-speed' };
+    case 'server':
+      return { section: 'model', target: 'model-server' };
+    case 'profiles':
+      return { section: 'model', target: 'manage-configurations' };
+    case 'folders':
+    case 'huggingface':
+      return {
+        section: 'model-files',
+        target: section === 'huggingface' ? 'hf-token' : 'models-folder',
+      };
+    default:
+      return { section };
+  }
 }
