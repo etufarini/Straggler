@@ -28,13 +28,11 @@ test('setup verifies explicitly, rejected replacement preserves the key and only
   await provider.getByRole('checkbox', { name: /Example cloud model/ }).check();
   await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
   await page.getByRole('button', { name: /^Choose model ·/ }).click();
-  await page.getByRole('tab', { name: 'Cloud', exact: true }).click();
-  await expect(
-    page.getByText(
-      'Using a cloud model stops the local server and frees its memory. Choose a model on this computer to load it again.',
-    ),
-  ).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Cloud · OpenRouter', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /Example cloud model/ }).click();
+  await expect(page.locator('.model-consequence')).toHaveText(
+    'Stops the local server and frees its memory.',
+  );
   await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.getByText('Cloud · OpenRouter', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Stop server', exact: true })).toHaveCount(0);

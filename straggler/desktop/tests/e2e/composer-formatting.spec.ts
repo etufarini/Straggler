@@ -22,7 +22,7 @@ async function moveToBlockStart(page: Page, text: string) {
 async function start(page: Page) {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await message(page).focus();
 }

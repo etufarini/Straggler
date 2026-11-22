@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'react';
 import PresencePanel from '../features/presence/PresencePanel';
 import { assistantState } from '../domain/presence';
-import { Cpu, ChevronDown, Square, Terminal, Eclipse, Cloud } from 'lucide-react';
+import { HardDrive, ChevronDown, Square, Terminal, Eclipse, Cloud } from 'lucide-react';
 import { fileName, equalSettings, sameServerConfiguration } from '../domain/types';
 import { statusLabel } from '../components/statusLabels';
 import { isFixture } from '../services/desktop';
@@ -119,21 +119,27 @@ export default function App() {
             aria-label={`Choose model · ${modelName}`}
             title={modelName}
             aria-expanded={panel === 'models'}
-            onClick={() => setPanel('models')}
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              setPanel('models');
+            }}
           >
             <span className="model-icon">
-              {cloudActive ? <Cloud size={17} /> : <Cpu size={17} />}
+              {cloudActive ? <Cloud size={17} /> : <HardDrive size={17} />}
             </span>
             <span className="model-label">
               <span className="model-name">{modelName}</span>
-              {panel !== 'settings' && (
-                <small>
-                  {cloudActive
-                    ? `${cloudActive.providerName} · Cloud model`
-                    : config?.currentProfile || 'Custom settings'}
-                  {!cloudActive && modified ? ' · Modified' : ''}
-                </small>
-              )}
+              <small
+                title={
+                  cloudActive
+                    ? 'Cloud model'
+                    : `On this computer · ${config?.currentProfile || 'Custom settings'}${modified ? ' · Modified' : ''}`
+                }
+              >
+                {cloudActive
+                  ? 'Cloud model'
+                  : `On this computer · ${config?.currentProfile || 'Custom settings'}${modified ? ' · Modified' : ''}`}
+              </small>
             </span>
             {controller.visionSupported ? (
               <span className="vision-badge">Vision</span>

@@ -136,7 +136,7 @@ async function seed(
 
 async function loadModel(page: Page) {
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Server log · Ready', exact: true })).toBeVisible();
 }
 

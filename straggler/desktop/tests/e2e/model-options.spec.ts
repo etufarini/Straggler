@@ -75,7 +75,7 @@ test('template and MTP are restored together by profiles and require restart whe
   await expect(page.getByText('custom.jinja', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Performance', exact: true }).click();

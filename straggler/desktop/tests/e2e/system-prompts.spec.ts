@@ -48,7 +48,7 @@ test('presets are copied into chat, can be saved from the prompt editor and roun
   await expect(page.getByRole('heading', { name: 'Clear answers (2)', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await page.getByRole('button', { name: 'System prompt', exact: true }).click();
   const prompt = page.getByRole('dialog', { name: 'System prompt', exact: true });
   await prompt.getByRole('radio', { name: 'This chat Custom text' }).check();

@@ -46,3 +46,5 @@ export function cloudCapabilities(model: CloudModel): string[] {
 export function shownCloudModels(provider: Pick<CloudProvider, 'models' | 'shown'>): CloudModel[] {
   return provider.models.filter((model) => provider.shown.includes(model.id));
 }
+
+export type ModelSelection = { kind: 'local'; path: string } | ({ kind: 'cloud' } & CloudSelection);
