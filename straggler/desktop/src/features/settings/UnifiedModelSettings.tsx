@@ -41,12 +41,19 @@ export default function UnifiedModelSettings({
     function updateCurrent() {
       const header = page?.querySelector('.settings-section-heading')?.getBoundingClientRect();
       let visible = blocks[0].id;
+      let largestVisibleHeight = 0;
       for (const block of blocks) {
-        if (
-          (document.getElementById(block.id)?.getBoundingClientRect().top ?? Infinity) <=
-          (header?.bottom ?? 0) + 48
-        )
+        const bounds = document.getElementById(block.id)?.getBoundingClientRect();
+        if (!bounds || !page) continue;
+        const visibleHeight = Math.max(
+          0,
+          Math.min(bounds.bottom, page.getBoundingClientRect().bottom) -
+            Math.max(bounds.top, header?.bottom ?? 0),
+        );
+        if (visibleHeight > largestVisibleHeight) {
+          largestVisibleHeight = visibleHeight;
           visible = block.id;
+        }
       }
       setCurrent(visible);
     }
