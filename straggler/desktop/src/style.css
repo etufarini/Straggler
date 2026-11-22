@@ -550,7 +550,10 @@ input:disabled {
     letter-spacing: 0.06em;
   }
   .settings-page {
-    padding: var(--ui-space-6) var(--ui-gutter) var(--ui-space-8);
+    padding: var(--ui-space-4) var(--ui-gutter) var(--ui-space-8);
+  }
+  .settings-heading {
+    margin-block-end: var(--ui-space-2);
   }
   .settings-layout {
     grid-template-columns: 1fr;

@@ -238,7 +238,7 @@ export default function Settings({
                   Loading…
                 </p>
               )}
-              {failure && !failure.field && failure.section === props.section && (
+              {failure && !manage && !failure.field && failure.section === props.section && (
                 <Feedback
                   title={
                     section === 'llama'

@@ -104,8 +104,11 @@ export default function SettingsOverview({
         <section className="overview-attention" aria-label="Needs attention">
           <h3>Needs attention</h3>
           {missingModel && (
-            <button className="text-button" onClick={() => setSection('model-files')}>
-              Choose a models folder
+            <button
+              className="text-button"
+              onClick={() => setSection(config.models.length ? 'model' : 'model-files')}
+            >
+              {config.models.length ? 'Choose a model' : 'Choose a models folder'}
             </button>
           )}
           {!config.serverAvailable && (

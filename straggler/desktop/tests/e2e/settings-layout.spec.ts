@@ -168,3 +168,24 @@ test('service provenance is separate from setup and field errors retain linked h
   await expect(page.locator(`[id=${JSON.stringify(ids[0])}]`)).toContainText('Auto or a number');
   await expect(page.locator(`[id=${JSON.stringify(ids[1])}] svg`)).toBeVisible();
 });
+
+test('configuration storage failure remains visible inside management and retry keeps the edited name', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await manageConfigurations(page);
+  const dialog = page.getByRole('dialog', { name: 'Manage configurations', exact: true });
+  const name = dialog.getByRole('textbox', { name: 'New configuration name', exact: true });
+  await name.fill('Keep my edits');
+  await page.evaluate(() => localStorage.setItem('straggler-fixture-profile-write-error', 'true'));
+  await dialog.getByRole('button', { name: 'Save as new configuration', exact: true }).click();
+  const failure = dialog.getByRole('alert');
+  await expect(failure).toContainText('Couldn’t update configurations');
+  await failure.getByText('Technical details', { exact: true }).click();
+  await expect(failure.locator('pre')).toHaveText('Configuration folder is not writable.');
+  await expect(name).toHaveValue('Keep my edits');
+  await page.evaluate(() => localStorage.removeItem('straggler-fixture-profile-write-error'));
+  await dialog.getByRole('button', { name: 'Save as new configuration', exact: true }).click();
+  await expect(dialog.getByRole('status')).toHaveText('Configuration saved.');
+});

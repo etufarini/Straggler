@@ -78,33 +78,35 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
           The llama.cpp folder must contain llama-server, in bin or build/bin.
         </p>
       </div>
-      {!config.appStore && (
-        <div className="row-actions">
-          <button disabled={busy || active || !native} onClick={() => setFolder('llama')}>
-            Choose external build…
-          </button>
-          <button
-            disabled={busy || active || !native || !config.bundledAvailable || bundled}
-            onClick={() =>
-              confirm({
-                title: 'Use the bundled version?',
-                actionLabel: 'Use bundled version',
-                text: 'Model settings and saved configurations are kept.',
-                action: async () => {
-                  accept(await operation('use-bundled'));
-                },
-              })
-            }
-          >
-            Use bundled version
-          </button>
-        </div>
-      )}
-      <p className="field-help">
-        {config.appStore
-          ? 'This edition uses the backend included with the app. Updates arrive through the App Store.'
-          : 'Select an existing build or use the version included with the app.'}
-      </p>
+      <div className="settings-note-group">
+        {!config.appStore && (
+          <div className="row-actions">
+            <button disabled={busy || active || !native} onClick={() => setFolder('llama')}>
+              Choose external build…
+            </button>
+            <button
+              disabled={busy || active || !native || !config.bundledAvailable || bundled}
+              onClick={() =>
+                confirm({
+                  title: 'Use the bundled version?',
+                  actionLabel: 'Use bundled version',
+                  text: 'Model settings and saved configurations are kept.',
+                  action: async () => {
+                    accept(await operation('use-bundled'));
+                  },
+                })
+              }
+            >
+              Use bundled version
+            </button>
+          </div>
+        )}
+        <p className="field-help">
+          {config.appStore
+            ? 'This edition uses the backend included with the app. Updates arrive through the App Store.'
+            : 'Select an existing build or use the version included with the app.'}
+        </p>
+      </div>
     </>
   );
 }

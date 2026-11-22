@@ -1,3 +1,5 @@
+import Feedback from '../../components/Feedback';
+import { focusSettingsTarget } from './UnifiedModelSettings';
 import { createPortal } from 'react-dom';
 import { ConfirmationFrame } from '../../app/ConfirmationDialog';
 import { PresetDialogFocus } from '../prompts/PromptPresets';
@@ -39,6 +41,31 @@ export default function SavedConfigurations({
           Saves the model, its settings on this computer and your chat defaults. Folders and chats
           aren’t included.
         </p>
+        {controller.failure && (
+          <Feedback
+            title="Couldn’t update configurations"
+            details={controller.failure.message}
+            actions={
+              controller.failure.field ? (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    const field = controller.failure?.field;
+                    onClose();
+                    if (field)
+                      requestAnimationFrame(() =>
+                        focusSettingsTarget(`setting-${field === 'mtp_file' ? 'mtp' : field}`),
+                      );
+                  }}
+                >
+                  Review model settings
+                </button>
+              ) : undefined
+            }
+          >
+            Your edits and saved configurations are kept. Check the details and try again.
+          </Feedback>
+        )}
         {controller.message && (
           <StatusChip live tone="positive">
             {controller.message}

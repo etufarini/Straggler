@@ -341,7 +341,9 @@ test('PROJ-03 and PROJ-05 switch between full context and project search across 
   await control(page, 'button-review-files').click();
   await expect(page.getByRole('heading', { name: 'Files', exact: true })).toBeFocused();
   await control(page, 'button-change-context-size').click();
-  await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Settings sections', exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Model settings', exact: true })).toHaveAttribute(
     'aria-current',
     'page',
