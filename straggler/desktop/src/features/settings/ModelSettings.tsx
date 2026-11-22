@@ -25,7 +25,7 @@ export default function ModelSettings({ controller }: { controller: SettingsCont
   ];
   return (
     <>
-      <label className="setting-field">
+      <label id="setting-model" className="setting-field">
         <span>Model</span>
         <Select
           aria-label="Model"

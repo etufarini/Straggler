@@ -8,8 +8,11 @@ import type { SettingsController } from './useSettings';
 export function focusSettingsTarget(id: string) {
   const element = document.getElementById(id);
   if (!element) return;
-  const details = element.closest('details');
-  if (details) details.open = true;
+  let ancestor = element.parentElement;
+  while (ancestor) {
+    if (ancestor instanceof HTMLDetailsElement) ancestor.open = true;
+    ancestor = ancestor.parentElement;
+  }
   const control = element.matches('input, button, textarea, select')
     ? element
     : element.querySelector<HTMLElement>('input, button, textarea, select');
@@ -73,7 +76,12 @@ export default function UnifiedModelSettings({
       </nav>
       {blocks.map(({ id, label, Component }) => (
         <section key={id} id={id} className="model-settings-block" aria-label={label} tabIndex={-1}>
-          <h3>{label}</h3>
+          <div className="settings-note-group">
+            <h3>{label}</h3>
+            {id === 'model-speed' && (
+              <p className="field-help">Auto lets llama.cpp choose for your hardware.</p>
+            )}
+          </div>
           <Component controller={controller} />
         </section>
       ))}

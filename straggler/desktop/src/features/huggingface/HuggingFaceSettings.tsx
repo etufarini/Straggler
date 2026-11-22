@@ -36,12 +36,14 @@ export default function HuggingFaceSettings({
   }
   return (
     <>
-      <h3>
-        Hugging Face token <small>Optional</small>
-      </h3>
-      <p className="field-help">
-        Only needed for gated or private repositories you’ve been granted access to.
-      </p>
+      <div className="settings-note-group">
+        <h3>
+          Hugging Face token <small>Optional</small>
+        </h3>
+        <p className="field-help">
+          Only needed for gated or private repositories you’ve been granted access to.
+        </p>
+      </div>
       <StatusChip live tone={status?.saved ? 'positive' : 'neutral'}>
         {status?.available === false
           ? 'Token status unavailable.'

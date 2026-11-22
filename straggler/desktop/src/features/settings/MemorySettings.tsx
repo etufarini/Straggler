@@ -9,7 +9,7 @@ export default function MemorySettings({ controller }: { controller: SettingsCon
   return (
     <>
       <div className="field-grid related-fields">
-        <label className="setting-field">
+        <label id="setting-context" className="setting-field">
           <span>Context size</span>
           <Select
             id="context-size"
@@ -53,13 +53,15 @@ export default function MemorySettings({ controller }: { controller: SettingsCon
           hint="How much of the chat the model remembers. Auto, a token count, or 0 for the maximum."
         />
       </div>
-      <h3>
-        Memory format <code className="tech-term">KV cache</code>
-      </h3>
-      <p className="field-help">
-        Smaller formats save memory at a slight cost in quality. Compressed values may need Flash
-        Attention.
-      </p>
+      <div className="settings-note-group">
+        <h3>
+          Memory format <code className="tech-term">KV cache</code>
+        </h3>
+        <p className="field-help">
+          Smaller formats save memory at a slight cost in quality. Compressed values may need Flash
+          Attention.
+        </p>
+      </div>
       <div className="field-grid related-fields">
         {(['k', 'v'] as const).map((kind) => {
           const key = `cache_type_${kind}` as 'cache_type_k' | 'cache_type_v';
@@ -109,7 +111,7 @@ export default function MemorySettings({ controller }: { controller: SettingsCon
             ? 'Ignored: CPU only always disables GPU layers.'
             : 'Layers on the GPU: Auto, All, or a number. All may not fit in memory.'
         }
-      />{' '}
+      />
       <div className="memory-summary">
         <h3>Memory</h3>
         <span>

@@ -30,7 +30,7 @@ export default function SettingsField({
       .filter(Boolean)
       .join(' ') || undefined;
   return (
-    <label className="setting-field">
+    <label id={field ? `setting-${field}` : undefined} className="setting-field">
       <span>{label}</span>
       {children({ 'aria-describedby': description, 'aria-invalid': error ? true : undefined })}
       {hint && <small id={`${id}-hint`}>{hint}</small>}

@@ -407,7 +407,11 @@ export function useWorkspace() {
   function reportSettingsError(error: unknown) {
     const failure = describeSettingsFailure(error, draft);
     setSettingsFailure({ ...failure, section: settingsSection });
-    if (failure.field) reviewSettings(fieldSection(failure.field));
+    if (failure.field)
+      reviewSettings(
+        fieldSection(failure.field),
+        `setting-${failure.field === 'mtp_file' ? 'mtp' : failure.field}`,
+      );
   }
 
   const loadConfiguration = useCallback(async () => {

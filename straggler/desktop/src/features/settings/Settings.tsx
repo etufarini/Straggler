@@ -174,6 +174,7 @@ export default function Settings({
                 <div className="configuration-heading">
                   <div className="configuration-choice">
                     <Select
+                      allowReselect
                       aria-label="Configuration"
                       value={config.currentProfile || ''}
                       options={[
@@ -249,7 +250,7 @@ export default function Settings({
                   Check the details and try again. Your edits are kept.
                 </Feedback>
               )}
-              {message && (
+              {message && !manage && (
                 <StatusChip live tone="positive">
                   {message}
                 </StatusChip>

@@ -11,7 +11,7 @@ export default function MtpSettings({ controller }: { controller: SettingsContro
   const externalSupported = supported && config.capabilities.mtpFile;
   const error = fieldError('mtp') || fieldError('mtp_file');
   return (
-    <div className="setting-field">
+    <div id="setting-mtp" className="setting-field">
       <label htmlFor="mtp">Multi-token prediction (MTP)</label>
       <Select
         id="mtp"

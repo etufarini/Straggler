@@ -63,26 +63,28 @@ export default function ChatDefaults({
         </small>
         <FieldError id={`${id}-prompt-error`} message={errors.chat_system_prompt} />
       </label>
-      <fieldset className="choice-group" aria-describedby={`${id}-reasoning-help`}>
-        <legend>Reasoning</legend>
-        <div className="segmented">
-          {(['auto', 'on', 'off'] as const).map((value) => (
-            <label key={value}>
-              <input
-                type="radio"
-                name={`${id}-reasoning`}
-                checked={values.chat_reasoning === value}
-                onChange={() => change({ chat_reasoning: value }, true)}
-              />
-              <span>{value === 'auto' ? 'Model default' : value === 'on' ? 'On' : 'Off'}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <p id={`${id}-reasoning-help`} className="field-help">
-        Applies where the model supports it. Choose the effort per chat, or set a default for the
-        model on this computer in Model settings.
-      </p>
+      <div className="settings-note-group">
+        <fieldset className="choice-group" aria-describedby={`${id}-reasoning-help`}>
+          <legend>Reasoning</legend>
+          <div className="segmented">
+            {(['auto', 'on', 'off'] as const).map((value) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name={`${id}-reasoning`}
+                  checked={values.chat_reasoning === value}
+                  onChange={() => change({ chat_reasoning: value }, true)}
+                />
+                <span>{value === 'auto' ? 'Model default' : value === 'on' ? 'On' : 'Off'}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <p id={`${id}-reasoning-help`} className="field-help">
+          Applies where the model supports it. Choose the effort per chat, or set a default for the
+          model on this computer in Model settings.
+        </p>
+      </div>
       <h3>Replies</h3>
       <label className="setting-field">
         <span>

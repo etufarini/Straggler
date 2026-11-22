@@ -11,7 +11,7 @@ export default function TemplateSettings({ controller }: { controller: SettingsC
   const candidate = config.models.find((model) => model.path === draft.model)?.template;
   const error = fieldError('chat_template_file');
   return (
-    <div className="setting-field">
+    <div id="setting-chat_template_file" className="setting-field">
       <label htmlFor="chat-template">Chat template</label>
       <Select
         id="chat-template"

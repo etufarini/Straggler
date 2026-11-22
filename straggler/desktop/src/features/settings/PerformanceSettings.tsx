@@ -9,8 +9,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
   const { config, draft, change, fieldError } = controller;
   return (
     <>
-      <p className="field-help">Auto lets llama.cpp choose for your hardware.</p>
-      <label className="setting-field">
+      <label id="setting-device" className="setting-field">
         <span>Device</span>
         <Select
           aria-label="Device"
@@ -45,7 +44,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
         hint="Auto or a number. More is not always faster."
       />
 
-      <label className="setting-field">
+      <label id="setting-prompt_processing" className="setting-field">
         <span>
           Reading your message <code className="tech-term">Prompt processing</code>
         </span>
@@ -99,7 +98,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
             <ChangedSetting field="device" />
             <FieldError id="device-names-error" message={fieldError('device')} />
           </label>
-          <label className="setting-field">
+          <label id="setting-split_mode" className="setting-field">
             <span>
               How to split the model <code className="tech-term">Split mode</code>
             </span>

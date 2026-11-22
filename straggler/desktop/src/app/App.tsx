@@ -235,9 +235,17 @@ export default function App() {
               <>
                 <button
                   className="local-badge"
-                  aria-label={`Server log · ${statusLabel[server.phase]}${restartRequired ? ' · Restart required' : ''}`}
+                  aria-label={
+                    config?.portStatus.includes('IN USE') && !active
+                      ? `Port ${config.port} is in use · Review server settings`
+                      : `Server log · ${statusLabel[server.phase]}${restartRequired ? ' · Restart required' : ''}`
+                  }
                   aria-expanded={panel === 'logs'}
-                  onClick={() => setPanel('logs')}
+                  onClick={() => {
+                    if (config?.portStatus.includes('IN USE') && !active)
+                      controller.reviewSettings('server');
+                    else setPanel('logs');
+                  }}
                 >
                   <span className={`status-dot ${server.phase}`} />
                   {statusLabel[server.phase]}

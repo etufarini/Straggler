@@ -17,6 +17,7 @@ interface SelectProps extends Omit<
   value: string;
   options: readonly SelectOption[];
   onChange: (value: string) => void;
+  allowReselect?: boolean;
 }
 
 interface Position {
@@ -27,7 +28,13 @@ interface Position {
   upward: boolean;
 }
 
-export default function Select({ value, options, onChange, ...props }: SelectProps) {
+export default function Select({
+  value,
+  options,
+  onChange,
+  allowReselect = false,
+  ...props
+}: SelectProps) {
   const generatedId = useId();
   const id = props.id ?? generatedId;
   const listId = `${id}-list`;
@@ -88,7 +95,7 @@ export default function Select({ value, options, onChange, ...props }: SelectPro
 
   function choose(index: number) {
     const option = options[index];
-    if (option && !option.disabled && String(option.value) !== value)
+    if (option && !option.disabled && (allowReselect || String(option.value) !== value))
       onChange(String(option.value));
     hide();
   }

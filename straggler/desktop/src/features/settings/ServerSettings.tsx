@@ -49,29 +49,31 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
       {config.portStatus.includes('IN USE') && (
         <>
           <pre className="process-details">{config.portStatus}</pre>
-          <div className="row-actions">
-            <button
-              disabled={
-                busy || active || draft.port !== config.settings.port || !config.listeners.length
-              }
-              onClick={() => stopListeners(false)}
-            >
-              Close programs using it
-            </button>
-            <button
-              className="danger-button"
-              disabled={
-                busy || active || draft.port !== config.settings.port || !forceTargets.length
-              }
-              onClick={() => stopListeners(true)}
-            >
-              Force quit
-            </button>
+          <div className="settings-note-group">
+            <div className="row-actions">
+              <button
+                disabled={
+                  busy || active || draft.port !== config.settings.port || !config.listeners.length
+                }
+                onClick={() => stopListeners(false)}
+              >
+                Close programs using it
+              </button>
+              <button
+                className="danger-button"
+                disabled={
+                  busy || active || draft.port !== config.settings.port || !forceTargets.length
+                }
+                onClick={() => stopListeners(true)}
+              >
+                Force quit
+              </button>
+            </div>
+            <p className="field-help">
+              Straggler asks before stopping or force-quitting anything. Unidentified programs still
+              block the launch.
+            </p>{' '}
           </div>
-          <p className="field-help">
-            Straggler asks before stopping or force-quitting anything. Unidentified programs still
-            block the launch.
-          </p>
         </>
       )}
     </>
