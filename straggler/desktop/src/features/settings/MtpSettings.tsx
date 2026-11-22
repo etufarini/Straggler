@@ -1,3 +1,4 @@
+import ChangedSetting from './ChangedSetting';
 import type { SettingsController } from './useSettings';
 import Select from '../../components/Select';
 import FieldError from '../../components/FieldError';
@@ -57,6 +58,8 @@ export default function MtpSettings({ controller }: { controller: SettingsContro
           </button>
         </div>
       )}
+      <ChangedSetting field="mtp" />
+      <ChangedSetting field="mtp_file" />
       <FieldError id="mtp-error" message={error} />
     </div>
   );

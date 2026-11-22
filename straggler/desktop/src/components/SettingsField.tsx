@@ -1,3 +1,5 @@
+import ChangedSetting from '../features/settings/ChangedSetting';
+import type { Settings } from '../domain/types';
 import { useId } from 'react';
 import type { ReactNode } from 'react';
 import FieldError from './FieldError';
@@ -9,11 +11,13 @@ type FieldAccessibility = {
 
 export default function SettingsField({
   label,
+  field,
   hint,
   scope,
   error,
   children,
 }: {
+  field?: keyof Settings;
   label: ReactNode;
   hint?: ReactNode;
   scope?: string;
@@ -35,6 +39,7 @@ export default function SettingsField({
           {scope}
         </small>
       )}
+      <ChangedSetting field={field} />
       <FieldError id={`${id}-error`} message={error} />
     </label>
   );

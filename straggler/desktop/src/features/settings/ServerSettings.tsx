@@ -1,3 +1,4 @@
+import StatusChip from '../../components/StatusChip';
 import type { SettingsController } from './useSettings';
 import NumberField from '../../components/NumberField';
 import { RefreshCw } from 'lucide-react';
@@ -19,6 +20,7 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
   return (
     <>
       <NumberField
+        field="port"
         label="Port"
         term="TCP"
         value={draft.port}
@@ -36,34 +38,42 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
         }
       >
         <RefreshCw size={14} />
-        Check port again
+        Check again
       </button>
-      <pre className="process-details">
+      <StatusChip live tone={config.portStatus.includes('IN USE') ? 'attention' : 'positive'}>
         {config.portStatus
+          .split('\n')[0]
           .replace(/Port (\d+): FREE/, 'Port $1 is free')
           .replace(/Port (\d+): IN USE/, 'Port $1 is in use')}
-      </pre>
-      <div className="row-actions">
-        <button
-          disabled={
-            busy || active || draft.port !== config.settings.port || !config.listeners.length
-          }
-          onClick={() => stopListeners(false)}
-        >
-          Close programs using it
-        </button>
-        <button
-          className="danger-button"
-          disabled={busy || active || draft.port !== config.settings.port || !forceTargets.length}
-          onClick={() => stopListeners(true)}
-        >
-          Force quit
-        </button>
-      </div>
-      <p className="field-help">
-        Straggler asks before stopping or force-quitting anything. Unidentified programs still block
-        the launch.
-      </p>
+      </StatusChip>
+      {config.portStatus.includes('IN USE') && (
+        <>
+          <pre className="process-details">{config.portStatus}</pre>
+          <div className="row-actions">
+            <button
+              disabled={
+                busy || active || draft.port !== config.settings.port || !config.listeners.length
+              }
+              onClick={() => stopListeners(false)}
+            >
+              Close programs using it
+            </button>
+            <button
+              className="danger-button"
+              disabled={
+                busy || active || draft.port !== config.settings.port || !forceTargets.length
+              }
+              onClick={() => stopListeners(true)}
+            >
+              Force quit
+            </button>
+          </div>
+          <p className="field-help">
+            Straggler asks before stopping or force-quitting anything. Unidentified programs still
+            block the launch.
+          </p>
+        </>
+      )}
     </>
   );
 }

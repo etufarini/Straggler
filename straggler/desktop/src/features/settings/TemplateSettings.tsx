@@ -1,3 +1,4 @@
+import ChangedSetting from './ChangedSetting';
 import type { SettingsController } from './useSettings';
 import Select from '../../components/Select';
 import FieldError from '../../components/FieldError';
@@ -55,6 +56,7 @@ export default function TemplateSettings({ controller }: { controller: SettingsC
           <button onClick={() => change('chat_template_file', candidate)}>Use this file</button>
         </div>
       )}
+      <ChangedSetting field="chat_template_file" />
       <FieldError id="chat-template-error" message={error} />
     </div>
   );

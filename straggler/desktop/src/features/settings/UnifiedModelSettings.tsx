@@ -1,0 +1,82 @@
+import { useEffect, useRef, useState } from 'react';
+import ModelSettings from './ModelSettings';
+import MemorySettings from './MemorySettings';
+import PerformanceSettings from './PerformanceSettings';
+import ServerSettings from './ServerSettings';
+import type { SettingsController } from './useSettings';
+
+export function focusSettingsTarget(id: string) {
+  const element = document.getElementById(id);
+  if (!element) return;
+  const details = element.closest('details');
+  if (details) details.open = true;
+  const control = element.matches('input, button, textarea, select')
+    ? element
+    : element.querySelector<HTMLElement>('input, button, textarea, select');
+  (control ?? element).focus({ preventScroll: true });
+  element.scrollIntoView({ block: 'start' });
+}
+
+const blocks = [
+  { id: 'model-model', label: 'Model', Component: ModelSettings },
+  { id: 'model-memory', label: 'Memory', Component: MemorySettings },
+  { id: 'model-speed', label: 'Speed', Component: PerformanceSettings },
+  { id: 'model-server', label: 'Server', Component: ServerSettings },
+];
+export default function UnifiedModelSettings({
+  controller,
+  onManage,
+}: {
+  controller: SettingsController;
+  onManage: () => void;
+}) {
+  const root = useRef<HTMLDivElement>(null);
+  const [current, setCurrent] = useState(blocks[0].id);
+  useEffect(() => {
+    const page = root.current?.closest('.settings-page');
+    if (!page) return;
+    function updateCurrent() {
+      const header = page?.querySelector('.settings-section-heading')?.getBoundingClientRect();
+      let visible = blocks[0].id;
+      for (const block of blocks) {
+        if (
+          (document.getElementById(block.id)?.getBoundingClientRect().top ?? Infinity) <=
+          (header?.bottom ?? 0) + 48
+        )
+          visible = block.id;
+      }
+      setCurrent(visible);
+    }
+    page.addEventListener('scroll', updateCurrent, { passive: true });
+    updateCurrent();
+    return () => page.removeEventListener('scroll', updateCurrent);
+  }, []);
+  return (
+    <div ref={root} className="unified-model-settings">
+      <nav className="model-settings-index" aria-label="Model settings sections">
+        {blocks.map((block) => (
+          <a
+            key={block.id}
+            href={`#${block.id}`}
+            aria-current={current === block.id ? 'location' : undefined}
+            onClick={(event) => {
+              event.preventDefault();
+              focusSettingsTarget(block.id);
+            }}
+          >
+            {block.label}
+          </a>
+        ))}
+        <button id="manage-configurations" className="text-button" onClick={onManage}>
+          Manage configurations…
+        </button>
+      </nav>
+      {blocks.map(({ id, label, Component }) => (
+        <section key={id} id={id} className="model-settings-block" aria-label={label} tabIndex={-1}>
+          <h3>{label}</h3>
+          <Component controller={controller} />
+        </section>
+      ))}
+    </div>
+  );
+}
