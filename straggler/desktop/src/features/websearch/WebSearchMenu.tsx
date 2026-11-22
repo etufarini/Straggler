@@ -54,7 +54,7 @@ export default function WebSearchMenu({ controller }: { controller: WorkspaceCon
                 className="primary-button"
                 onClick={() => {
                   close();
-                  controller.reviewSettings('websearch');
+                  controller.reviewSettings('websearch', 'web-search-key');
                 }}
               >
                 Add API key

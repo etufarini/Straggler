@@ -1,10 +1,11 @@
+import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import backendManifest from '../../packaging/llama-runtime.json' with { type: 'json' };
 
 async function openBackend(page: Page) {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
+  await settingsSection(page, 'llama.cpp');
 }
 
 test('only opening llama.cpp requests a release date and reports the verified publication', async ({
@@ -27,7 +28,7 @@ test('pending release lookups do not block settings navigation or server startup
   await page.evaluate(() => localStorage.setItem('straggler-fixture-release-paused', 'true'));
   await openBackend(page);
   await expect(page.getByText('Checking GitHub…', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(page.getByRole('combobox', { name: 'Context size', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Back to chat' }).click();
   await page.getByRole('button', { name: /^Choose model · / }).click();

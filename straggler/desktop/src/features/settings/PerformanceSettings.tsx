@@ -1,3 +1,4 @@
+import ChangedSetting from './ChangedSetting';
 import MtpSettings from './MtpSettings';
 import type { SettingsController } from './useSettings';
 import NumberField from '../../components/NumberField';
@@ -8,8 +9,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
   const { config, draft, change, fieldError } = controller;
   return (
     <>
-      <p className="field-help">Auto lets llama.cpp choose for your hardware.</p>
-      <label className="setting-field">
+      <label id="setting-device" className="setting-field">
         <span>Device</span>
         <Select
           aria-label="Device"
@@ -31,31 +31,20 @@ export default function PerformanceSettings({ controller }: { controller: Settin
             })),
           ]}
         />
+        <ChangedSetting field="device" />
         <FieldError id="device-error" message={fieldError('device')} />
       </label>
-      <div className="field-grid">
-        <NumberField
-          label="CPU threads"
-          value={draft.threads}
-          error={fieldError('threads')}
-          onChange={(value) => change('threads', value)}
-          hint="Auto or a number. More is not always faster."
-        />
-        <NumberField
-          label="Model on the GPU"
-          term="GPU layers"
-          value={draft.gpu_layers}
-          error={fieldError('gpu_layers')}
-          disabled={draft.device === 'none'}
-          onChange={(value) => change('gpu_layers', value)}
-          hint={
-            draft.device === 'none'
-              ? 'Ignored: CPU only always disables GPU layers.'
-              : 'Layers on the GPU: Auto, All, or a number. All may not fit in memory.'
-          }
-        />
-      </div>
-      <label className="setting-field">
+
+      <NumberField
+        field="threads"
+        label="CPU threads"
+        value={draft.threads}
+        error={fieldError('threads')}
+        onChange={(value) => change('threads', value)}
+        hint="Auto or a number. More is not always faster."
+      />
+
+      <label id="setting-prompt_processing" className="setting-field">
         <span>
           Reading your message <code className="tech-term">Prompt processing</code>
         </span>
@@ -74,6 +63,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
         <small id="prompt-processing-help">
           Larger values read long messages faster but use more memory. Replies aren’t faster.
         </small>
+        <ChangedSetting field="prompt_processing" />
         <FieldError id="prompt-processing-error" message={fieldError('prompt_processing')} />
       </label>
       <MtpSettings controller={controller} />
@@ -91,7 +81,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
               : undefined
           }
         >
-          <summary>Advanced: several devices</summary>
+          <summary>Advanced: several devices · 4 settings</summary>
           <p className="field-help">
             Values follow the device order. Margins are targets, not guarantees.
           </p>
@@ -105,9 +95,10 @@ export default function PerformanceSettings({ controller }: { controller: Settin
               onChange={(event) => change('device', event.target.value)}
             />
             <small id="device-names-help">Auto, none, or device names separated by commas.</small>
+            <ChangedSetting field="device" />
             <FieldError id="device-names-error" message={fieldError('device')} />
           </label>
-          <label className="setting-field">
+          <label id="setting-split_mode" className="setting-field">
             <span>
               How to split the model <code className="tech-term">Split mode</code>
             </span>
@@ -124,9 +115,11 @@ export default function PerformanceSettings({ controller }: { controller: Settin
                 label: mode === 'tensor' ? 'tensor (experimental)' : mode,
               }))}
             />
+            <ChangedSetting field="split_mode" />
             <FieldError id="split-mode-error" message={fieldError('split_mode')} />
           </label>
           <NumberField
+            field="tensor_split"
             label="Device proportions"
             value={draft.tensor_split}
             error={fieldError('tensor_split')}
@@ -134,6 +127,7 @@ export default function PerformanceSettings({ controller }: { controller: Settin
             hint="Share of the model per device, for example 2,1. Empty is Auto."
           />
           <NumberField
+            field="fit_target"
             label="Memory margins (MiB)"
             term="Fitting margins"
             value={draft.fit_target}

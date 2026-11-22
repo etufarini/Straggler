@@ -23,7 +23,7 @@ export default function Feedback({
       className={`feedback ${severity}`}
       role={announce ? (severity === 'error' ? 'alert' : 'status') : undefined}
     >
-      <CircleAlert size={18} className="feedback-icon" aria-hidden="true" />
+      <CircleAlert size={16} className="feedback-icon" aria-hidden="true" />
       <div className="feedback-content">
         <strong>{title}</strong>
         <div className="feedback-body">{children}</div>

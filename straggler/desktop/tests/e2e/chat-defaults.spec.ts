@@ -1,3 +1,4 @@
+import { loadSelectedConfiguration, manageConfigurations, settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 import { selectValue } from './select';
 import type { Page } from '@playwright/test';
@@ -13,6 +14,7 @@ async function saved(page: Page, scenario = 'normal') {
 async function defaults(page: Page, scenario = 'normal') {
   await page.goto(`/?scenario=${scenario}`);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await expect(page.getByRole('button', { name: 'Chat defaults', exact: true })).toHaveAttribute(
     'aria-current',
     'page',
@@ -24,10 +26,10 @@ test('chat defaults auto-save choices, debounce text, reject invalid values and 
 }) => {
   await defaults(page);
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(page.getByRole('combobox', { name: 'Reply style' })).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }).fill('8192');
-  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await selectValue(page.getByRole('combobox', { name: 'Reply style' }), 'focused');
   await expect.poll(async () => (await saved(page)).temperature).toBe('0.6');
   await page.getByText('Fine-tune reply style', { exact: true }).click();
@@ -40,7 +42,7 @@ test('chat defaults auto-save choices, debounce text, reject invalid values and 
   await expect(temperature).toHaveValue('invalid');
   expect((await saved(page)).temperature).toBe('0.8');
   await expect(page.getByText('Restart required', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(
     page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }),
   ).toHaveValue('8192');
@@ -233,25 +235,26 @@ test('late default saves preserve newer text and profile replacement compares th
   await resume(true);
   await expect.poll(async () => (await saved(page)).seed).toBe('43');
 
-  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await manageConfigurations(page);
   await page
     .getByRole('textbox', { name: 'New configuration name', exact: true })
     .fill('Queued defaults');
   await page.getByRole('button', { name: 'Save as new configuration', exact: true }).click();
   await expect(page.getByText('Configuration saved.', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await pause();
   await seed.fill('44');
   await seed.blur();
   await expect.poll(started).toBe('3');
-  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await manageConfigurations(page);
   await selectValue(
-    page.getByRole('combobox', { name: 'Configuration', exact: true }),
+    page
+      .getByRole('dialog', { name: 'Manage configurations', exact: true })
+      .getByRole('combobox', { name: 'Configuration', exact: true }),
     'Queued defaults',
   );
-  const load = page.getByRole('button', { name: 'Load configuration', exact: true });
-  await load.click();
-  await expect(load).toBeDisabled();
+  await loadSelectedConfiguration(page);
+  await expect(page.getByRole('combobox', { name: 'Configuration', exact: true })).toBeDisabled();
   await resume(true);
   await expect(page.getByRole('alertdialog')).toContainText('Also replaces your chat defaults.');
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -262,9 +265,9 @@ test('launch waits for an in-flight default save and preserves the reviewed loca
   page,
 }) => {
   await defaults(page);
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }).fill('8192');
-  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await page.evaluate(() =>
     localStorage.setItem('straggler-fixture-chat-defaults-save-paused', 'true'),
   );

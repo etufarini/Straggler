@@ -7,6 +7,7 @@ import {
   serverActive,
 } from '../../domain/types';
 import type { SettingsFailure } from '../../domain/errors';
+import { settingsDestination } from './sections';
 import type { Section } from './sections';
 import type {
   ServerDetails,
@@ -31,6 +32,7 @@ export function useSettings({
   failure,
   onClearError,
   serverDetails,
+  target,
 }: {
   config: Configuration;
   serverDetails: ServerDetails | null;
@@ -42,6 +44,7 @@ export function useSettings({
   confirm: (value: Confirmation) => void;
   onError: (error: unknown) => void;
   onBack: () => void;
+  target?: string;
   section: Section;
   setSection: (section: Section) => void;
   failure: SettingsFailure | null;
@@ -51,7 +54,7 @@ export function useSettings({
   const [message, setMessage] = useState('');
   const [profile, setProfile] = useState(config.currentProfile || config.profiles[0] || '');
   const [name, setName] = useState('');
-  const [folder, setFolderDialog] = useState<'llama' | 'models' | null>(null);
+  const [folder, setFolder] = useState(false);
   const [forceTargets, setForceTargets] = useState<Listener[]>([]);
   useEffect(() => {
     setForceTargets([]);
@@ -104,21 +107,6 @@ export function useSettings({
 
   async function operation(action: string, args: string[] = [], targets: Listener[] = []) {
     return invoke<Configuration>('workspace_action', { action, arguments: args, targets });
-  }
-
-  function setFolder(kind: 'llama' | 'models' | null) {
-    if (!kind || !config.appStore) {
-      setFolderDialog(kind);
-      return;
-    }
-    if (kind !== 'models') return;
-    void run(async () => {
-      const value = await invoke<Configuration | null>('choose_models_folder');
-      if (value) {
-        accept(value);
-        setDraft(settingsForModel(draft, value.settings.model));
-      }
-    });
   }
 
   async function saveProfile(profileName: string, replace: boolean) {
@@ -179,7 +167,8 @@ export function useSettings({
     confirm,
     onError,
     onBack,
-    section,
+    section: settingsDestination(section).section,
+    target: target ?? settingsDestination(section).target,
     setSection,
     busy,
     message,

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- R008/R009: add a read-only Settings Overview, eight navigation destinations, unified model/memory/speed/server controls and configuration management beside Apply changes. Group backend and model folders with their related controls, clarify service status, align text actions and feedback, and use consistent form spacing. Settings, profiles, paths, environment controls and conversation formats are unchanged.
+
 - R006: send generation defaults per message to local and supported cloud services without restarting; add isolated automatic Chat defaults persistence, local Model settings and configuration-load confirmation for defaults. Limit prose/settings width, order field help and errors accessibly, and show attachment drop/count feedback in the composer.
 
 - R005: unify local/cloud model selection with search and a Download models view, group Settings by destination, identify response destinations and soften cloud colors and decorative effects.

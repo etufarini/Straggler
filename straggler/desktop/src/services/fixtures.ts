@@ -489,6 +489,8 @@ export function createFixture(scenario: Scenario) {
         const name = values[0];
         switch (action) {
           case 'save-profile':
+            if (localStorage.getItem('straggler-fixture-profile-write-error'))
+              throw new Error('Configuration folder is not writable.');
             profiles.set(name, structuredClone(settings));
             currentProfile = name;
             savedSettings = structuredClone(settings);

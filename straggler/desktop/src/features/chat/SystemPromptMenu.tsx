@@ -109,7 +109,7 @@ function SystemPromptEditor({
           className="text-button"
           onClick={() => {
             close();
-            reviewSettings('model');
+            reviewSettings('chat-defaults');
           }}
         >
           Edit default

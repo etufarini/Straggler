@@ -1,3 +1,4 @@
+import StatusChip from '../../components/StatusChip';
 import type { SettingsController } from './useSettings';
 import NumberField from '../../components/NumberField';
 import { RefreshCw } from 'lucide-react';
@@ -16,9 +17,14 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
     stopListeners,
     fieldError,
   } = controller;
+  const occupied = config.portStatus.includes('IN USE');
+  const processDetails =
+    config.portStatus.split('\n').slice(1).join('\n') ||
+    config.listeners.map((listener) => listener.details).join('\n');
   return (
     <>
       <NumberField
+        field="port"
         label="Port"
         term="TCP"
         value={draft.port}
@@ -26,44 +32,56 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
         onChange={(value) => change('port', value)}
         hint="1–65535. Only this computer (127.0.0.1) can connect."
       />
-      <button
-        className="text-button"
-        disabled={busy || !native}
-        onClick={() =>
-          void run(async () => {
-            await apply();
-          })
-        }
-      >
-        <RefreshCw size={14} />
-        Check port again
-      </button>
-      <pre className="process-details">
-        {config.portStatus
-          .replace(/Port (\d+): FREE/, 'Port $1 is free')
-          .replace(/Port (\d+): IN USE/, 'Port $1 is in use')}
-      </pre>
-      <div className="row-actions">
+      <div className="row-actions port-status-row">
+        <StatusChip live tone={config.portStatus.includes('IN USE') ? 'attention' : 'positive'}>
+          {config.portStatus
+            .split('\n')[0]
+            .replace(/Port (\d+): FREE/, 'Port $1 is free')
+            .replace(/Port (\d+): IN USE/, 'Port $1 is in use')}
+        </StatusChip>
         <button
-          disabled={
-            busy || active || draft.port !== config.settings.port || !config.listeners.length
+          className="text-button"
+          disabled={busy || !native}
+          onClick={() =>
+            void run(async () => {
+              await apply();
+            })
           }
-          onClick={() => stopListeners(false)}
         >
-          Close programs using it
-        </button>
-        <button
-          className="danger-button"
-          disabled={busy || active || draft.port !== config.settings.port || !forceTargets.length}
-          onClick={() => stopListeners(true)}
-        >
-          Force quit
+          <RefreshCw size={14} />
+          Check again
         </button>
       </div>
-      <p className="field-help">
-        Straggler asks before stopping or force-quitting anything. Unidentified programs still block
-        the launch.
-      </p>
+      {occupied && (
+        <>
+          {processDetails && <pre className="process-details">{processDetails}</pre>}
+          <div className="settings-note-group">
+            <div className="row-actions">
+              <button
+                disabled={
+                  busy || active || draft.port !== config.settings.port || !config.listeners.length
+                }
+                onClick={() => stopListeners(false)}
+              >
+                Close programs using it
+              </button>
+              <button
+                className="danger-button"
+                disabled={
+                  busy || active || draft.port !== config.settings.port || !forceTargets.length
+                }
+                onClick={() => stopListeners(true)}
+              >
+                Force quit
+              </button>
+            </div>
+            <p className="field-help">
+              Straggler asks before stopping or force-quitting anything. Unidentified programs still
+              block the launch.
+            </p>{' '}
+          </div>
+        </>
+      )}
     </>
   );
 }

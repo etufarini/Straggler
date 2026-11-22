@@ -1,3 +1,4 @@
+import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 
 async function requests(page: import('@playwright/test').Page) {
@@ -13,7 +14,7 @@ test('setup verifies explicitly, rejected replacement preserves the key and only
   expect(await requests(page)).toEqual([]);
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Cloud models', exact: true }).click();
+  await settingsSection(page, 'Cloud models');
   const provider = page
     .locator('.cloud-provider')
     .filter({ has: page.getByText('OpenRouter', { exact: true }) });

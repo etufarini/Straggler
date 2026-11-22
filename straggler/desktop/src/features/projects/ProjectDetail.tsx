@@ -156,7 +156,7 @@ export default function ProjectDetail({
             <ProjectLimitFeedback
               context={context}
               onReviewFiles={reviewFiles}
-              onChangeContext={() => controller.reviewSettings('model')}
+              onChangeContext={() => controller.reviewSettings('model', 'context-size')}
             />
           )}
           <form
@@ -351,7 +351,7 @@ export default function ProjectDetail({
               <ProjectLimitFeedback
                 context={context}
                 onReviewFiles={reviewFiles}
-                onChangeContext={() => controller.reviewSettings('model')}
+                onChangeContext={() => controller.reviewSettings('model', 'context-size')}
               />
             )}
             {context.level === 'high' && !project.archived && (

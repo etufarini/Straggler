@@ -1,3 +1,4 @@
+import StatusChip from '../../components/StatusChip';
 import usePagePrimaryAction from '../../app/usePagePrimaryAction';
 import Select from '../../components/Select';
 import { useEffect, useState } from 'react';
@@ -61,15 +62,14 @@ export default function WebSearchSettings({
         {provider?.name ?? 'Loading service…'} <small>{provider?.planDescription}</small>
       </p>
       <h3>API key</h3>
-      <p role="status">
-        {status?.saved
-          ? 'A key is stored in the system keychain.'
-          : 'No key yet. Web search stays off until you add one.'}
-      </p>
+      <StatusChip live tone={status?.saved ? 'positive' : 'neutral'}>
+        {status?.saved ? 'Key saved' : 'No key yet. Web search stays off until you add one.'}
+      </StatusChip>
       <label className="setting-field">
         <span>{provider?.name} API key</span>
         <input
           aria-label={`${provider?.name ?? 'Web search'} API key`}
+          id="web-search-key"
           type="password"
           autoComplete="off"
           spellCheck={false}
@@ -176,7 +176,6 @@ export default function WebSearchSettings({
         </div>
       </fieldset>
       <p className="field-help">Maximum searches per message. Fewer searches use fewer credits.</p>
-      <p className="field-help">Changes are saved automatically.</p>
     </>
   );
 }

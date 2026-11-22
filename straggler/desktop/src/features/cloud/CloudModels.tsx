@@ -92,7 +92,7 @@ export default function CloudModels({
             <button
               key={provider.id}
               className="text-button"
-              onClick={() => controller.reviewSettings('cloud')}
+              onClick={() => controller.reviewSettings('cloud', `cloud-provider-${provider.id}`)}
             >
               Set up {provider.name} in Settings
             </button>

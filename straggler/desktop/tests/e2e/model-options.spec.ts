@@ -1,3 +1,4 @@
+import { loadSelectedConfiguration, manageConfigurations, settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 import { selectValue } from './select';
 
@@ -13,7 +14,7 @@ test('template suggestion needs activation and picker cancellation preserves sel
   });
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   const template = page.getByRole('combobox', { name: 'Chat template', exact: true });
   await expect(template).toHaveText('Default');
   await selectValue(template, 'custom');
@@ -45,9 +46,9 @@ test('template and MTP are restored together by profiles and require restart whe
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(page.getByRole('combobox', { name: 'Chat template', exact: true }), 'custom');
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   const mtp = page.getByRole('combobox', { name: 'Multi-token prediction (MTP)', exact: true });
   await page.evaluate(() => localStorage.setItem('straggler-fixture-mtp-choice', 'cancel'));
   await selectValue(mtp, 'file');
@@ -59,29 +60,33 @@ test('template and MTP are restored together by profiles and require restart whe
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-mtp-choice'));
   await selectValue(mtp, 'file');
   await expect(page.getByText('mtp.gguf', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await manageConfigurations(page);
   await page
     .getByRole('textbox', { name: 'New configuration name', exact: true })
     .fill('MTP setup');
   await page.getByRole('button', { name: 'Save as new configuration', exact: true }).click();
   await expect(page.getByText('Configuration saved.', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(mtp, 'off');
   await expect(page.getByText('Modified', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
-  await page.getByRole('button', { name: 'Load configuration', exact: true }).click();
+  await manageConfigurations(page);
+  await loadSelectedConfiguration(page);
+  await expect(page.getByRole('alertdialog')).toContainText('Replaces your unapplied changes.');
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Load configuration', exact: true })
+    .click();
   await expect(page.locator('.local-badge')).toHaveText('Stopped');
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(mtp).toHaveText('Use external MTP file…');
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(page.getByText('custom.jinja', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
   await page.getByRole('button', { name: /^Choose model · / }).click();
   await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(mtp, 'off');
   await expect(
     page
@@ -93,20 +98,20 @@ test('template and MTP are restored together by profiles and require restart whe
 test('changing the model clears its template and MTP choices', async ({ page }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(page.getByRole('combobox', { name: 'Chat template', exact: true }), 'custom');
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(
     page.getByRole('combobox', { name: 'Multi-token prediction (MTP)', exact: true }),
     'file',
   );
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(page.getByRole('combobox', { name: 'Model', exact: true }), '');
   await expect(page.getByRole('combobox', { name: 'Chat template', exact: true })).toHaveText(
     'Default',
   );
   await expect(page.getByText('Chat template and MTP reset for the selected model.')).toBeVisible();
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(
     page.getByRole('combobox', { name: 'Multi-token prediction (MTP)', exact: true }),
   ).toHaveText('Off');
@@ -121,7 +126,7 @@ test('unsupported options and native overrides explain why activation is unavail
   );
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(
     page.getByText('This backend does not advertise custom chat template support.'),
   ).toBeVisible();
@@ -131,7 +136,7 @@ test('unsupported options and native overrides explain why activation is unavail
     'true',
   );
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(page.getByText('This backend does not advertise MTP support.')).toBeVisible();
   await page.getByRole('combobox', { name: 'Multi-token prediction (MTP)', exact: true }).click();
   await expect(page.getByRole('option', { name: "Use model's MTP" })).toHaveAttribute(
@@ -145,12 +150,12 @@ test('unsupported options and native overrides explain why activation is unavail
   });
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(page.getByRole('combobox', { name: 'Chat template', exact: true })).toBeDisabled();
   await expect(
     page.getByText('Native environment overrides this setting: LLAMA_ARG_CHAT_TEMPLATE.'),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(
     page.getByRole('combobox', { name: 'Multi-token prediction (MTP)', exact: true }),
   ).toBeDisabled();

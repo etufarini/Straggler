@@ -34,7 +34,10 @@ export default function ServerFeedback({ controller }: { controller: WorkspaceCo
                 {server.phase === 'stopping' ? 'Stopping…' : 'Stop server'}
               </button>
             ) : (
-              <button className="primary-button" onClick={() => reviewSettings('model')}>
+              <button
+                className="primary-button"
+                onClick={() => reviewSettings('model', memory ? 'model-memory' : 'model-model')}
+              >
                 Review settings
               </button>
             )}

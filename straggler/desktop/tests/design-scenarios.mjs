@@ -52,6 +52,45 @@ export const reviewScreens = [
 ];
 
 export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.0.1:1420') {
+  const settingsScreens = {
+    'R008-OVERVIEW': 'Overview',
+    'R008-DEFAULTS': 'Chat defaults',
+    'R008-PROMPTS': 'System prompts',
+    'R008-MODEL': 'Model settings',
+    'R008-LLAMA': 'llama.cpp',
+    'R008-FILES': 'Model files',
+    'R008-CLOUD': 'Cloud models',
+    'R008-WEB': 'Web search',
+  };
+  if (settingsScreens[screen] || ['DS-FIRST', 'DS-OOM', 'DS-PROMPT'].includes(screen)) {
+    await page.goto(
+      `${baseUrl}/?scenario=${screen === 'DS-FIRST' ? 'empty' : screen === 'DS-OOM' ? 'oom' : 'normal'}`,
+    );
+    if (screen === 'DS-FIRST') {
+      await expect(
+        page.getByRole('heading', { name: 'Needs attention', exact: true }),
+      ).toBeVisible();
+    } else if (screen === 'DS-OOM' || screen === 'DS-PROMPT') {
+      await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+      await expect(page.locator('.local-badge')).toHaveText('Ready');
+      if (screen === 'DS-PROMPT')
+        await page.getByRole('button', { name: 'System prompt', exact: true }).click();
+      else {
+        await page
+          .getByRole('textbox', { name: 'Message', exact: true })
+          .fill('Explain memory use');
+        await page.getByRole('button', { name: 'Send message', exact: true }).click();
+        await expect(page.getByText('Not enough memory', { exact: true })).toBeVisible();
+      }
+    } else {
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page
+        .getByRole('navigation', { name: 'Settings sections' })
+        .getByRole('button', { name: settingsScreens[screen], exact: true })
+        .click();
+    }
+    return;
+  }
   const derived = {
     'SET-01C': 'SET-01B',
     'SET-01D': 'SET-01B',
@@ -79,7 +118,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
         .evaluate((element) => element.scrollIntoView({ block: 'start' }));
     if (screen === 'SET-02C')
       await page
-        .getByText('Advanced: several devices', { exact: true })
+        .getByText('Advanced: several devices · 4 settings', { exact: true })
         .evaluate((element) => element.scrollIntoView({ block: 'start' }));
     if (screen === 'FOLDER-02') {
       await button('.hidden').click();
@@ -230,23 +269,30 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     'CHAT-DEFAULTS-REPLIES': 'Chat defaults',
     'SET-01': 'Model settings',
     'SET-01B': 'Chat defaults',
-    'SET-02': 'Performance',
-    'SET-02B': 'Performance',
-    'SET-03': 'Server & port',
-    'SET-03B': 'Server & port',
-    'DIALOG-03': 'Server & port',
-    'DIALOG-04': 'Server & port',
-    'SET-04': 'Saved configurations',
-    'DIALOG-01': 'Saved configurations',
-    'STATE-01': 'Saved configurations',
-    'SET-05': 'Folders',
-    'FOLDER-01': 'Folders',
+    'SET-02': 'Model settings',
+    'SET-02B': 'Model settings',
+    'SET-03': 'Model settings',
+    'SET-03B': 'Model settings',
+    'DIALOG-03': 'Model settings',
+    'DIALOG-04': 'Model settings',
+    'SET-04': 'Model settings',
+    'DIALOG-01': 'Model settings',
+    'STATE-01': 'Model settings',
+    'SET-05': 'Model files',
+    'FOLDER-01': 'Model files',
     'SET-06': 'llama.cpp',
     'BUILD-01': 'llama.cpp',
   };
   if (sections[screen]) {
     await button('Settings').click();
     await button(sections[screen]).click();
+    if (['SET-02', 'SET-02B', 'SET-03', 'SET-03B', 'DIALOG-03', 'DIALOG-04'].includes(screen)) {
+      await page
+        .getByRole('link', { name: screen.includes('02') ? 'Speed' : 'Server', exact: true })
+        .click();
+    }
+    if (['SET-04', 'DIALOG-01', 'STATE-01'].includes(screen))
+      await button('Manage configurations…').click();
   }
   if (['SET-01B', 'CHAT-DEFAULTS-REPLIES'].includes(screen)) {
     await page.getByText('Fine-tune reply style', { exact: true }).click();
@@ -254,7 +300,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
   }
   if (screen === 'SET-02') {
     await button('Collapse sidebar').click();
-    await page.getByText('Advanced: several devices', { exact: true }).click();
+    await page.getByText('Advanced: several devices · 4 settings', { exact: true }).click();
   }
   if (['DIALOG-03', 'DIALOG-04'].includes(screen)) {
     await button('Close programs using it').click();
@@ -274,6 +320,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     await expect(page.getByText('Configuration saved.', { exact: true })).toBeVisible();
     if (screen === 'DIALOG-01') await button('Delete configuration').click();
     if (screen === 'STATE-01') {
+      await button('Done').click();
       await button('Launch server').click();
       await button('Settings').click();
       await button('Model settings').click();
@@ -284,11 +331,8 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     }
   }
   if (screen === 'FOLDER-01') {
-    await page
-      .locator('.folder-setting')
-      .filter({ hasText: 'Models folder' })
-      .getByRole('button', { name: 'Choose folder' })
-      .click();
+    await button('llama.cpp').click();
+    await button('Choose external build…').click();
     await page.getByRole('checkbox', { name: 'Show hidden folders' }).check();
     await expect(page.getByRole('button', { name: '.hidden' })).toBeVisible();
   }

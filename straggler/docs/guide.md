@@ -67,7 +67,7 @@ libraries, including WebKitGTK and GTK. Models and GPU drivers remain separate.
    `build/bin/llama-server` or `bin/llama-server`. Packaged builds normally use
    their included backend. If that backend is unavailable, follow
    [troubleshooting](#other-common-problems).
-2. In **Folders**, select **Choose existing folder** for your GGUF files, or
+2. In **Model files**, select **Choose existing folder** for your GGUF files, or
    **Create models folder** to create a folder in the Tauri app data directory.
    The system picker saves the selection only when you accept it; cancellation
    keeps the previous folder. Straggler searches two subfolder levels. An empty
@@ -194,6 +194,8 @@ RAM prompt cache from retaining data; disabling cache RAM and ending the process
 are therefore required.
 
 ### Use an optional cloud model
+
+Cloud service status chips distinguish **Not set up**, **Key saved** and **Couldn’t read key**. **Tested with Straggler** is a tooltip for built-in integrations, not verification of your account or its current connectivity.
 
 Local chat works offline. To use a cloud service, open **Settings → Cloud models**,
 enter your own API key and choose **Save and verify**. This explicitly requests the
@@ -407,11 +409,12 @@ metadata. To keep an entire project and its files, use a
 
 ## Settings reference
 
-Settings has three groups, in this order:
+Settings opens **Overview** the first time and reopens the last section used during the session. Overview shows the current applied setup using already known application state. Its cards open the matching section; **Needs attention** identifies a missing local model or backend. Opening Overview does not contact external services.
+
+After Overview, Settings has three groups, in this order:
 
 - **All models:** Chat defaults and System prompts.
-- **On this computer:** Model settings, Performance, Server & port, Saved
-  configurations, Folders, llama.cpp and Hugging Face.
+- **On this computer:** Model settings, llama.cpp and Model files.
 - **Cloud and web:** Cloud models and Web search.
 
 The **Models** panel has one searchable list, grouped by destination. Search filters
@@ -451,6 +454,9 @@ returns to **Model settings** for review; start the server when you are ready.
 Folders are saved separately after you accept and validate a directory.
 
 ### Model settings
+
+One draft and one **Apply changes** row cover **Model**, **Memory**, **Speed** and **Server**. The page index opens each group and focuses its first control. The navigation dot identifies unapplied changes. A changed saved field also says **Changed · was ‹value›** beside an amber margin marker. The sticky header stays visible while scrolling; anchor targets remain below it.
+
 
 Choose the GGUF, chat template, context size, K/V memory format and default
 reasoning effort for the model on this computer in this section. A supported model can still exceed available memory or use a
@@ -570,7 +576,7 @@ token is selected:
 | Presence penalty | Positive values discourage tokens that have already appeared. | Signed decimal; `0` is neutral |
 | Frequency penalty | Positive values penalize tokens more as they recur. | Signed decimal; `0` is neutral |
 
-### Performance
+### Speed and performance in Model settings
 
 **Auto** omits the corresponding launch override so llama.cpp can choose. Flash
 Attention is automatic. Device names come from `llama-server --list-devices`;
@@ -607,7 +613,7 @@ not establish hardware identity or guarantee a model will fit.
 
 #### Multi-token prediction (MTP)
 
-Under **Performance**, **Multi-token prediction (MTP)** offers:
+Under **Model settings → Speed**, **Multi-token prediction (MTP)** offers:
 
 | Choice | Behavior |
 | --- | --- |
@@ -631,13 +637,13 @@ and is disabled while they are present. Custom draft tuning variables continue
 through to llama.cpp unchanged. The application does not download an MTP file
 or template automatically.
 
-### Server & port
+### Server in Model settings
 
 The default port is **9931**; valid ports range from 1 to 65535. Supervised servers
 listen on `127.0.0.1`, so connections stay on this computer, and starting a server
 does not open a browser.
 
-To change the port, enter a value and select **Check port again** to apply settings
+To change the port, enter a value and select **Check again** to apply settings
 and refresh listener details. If the server is running, restart it to use the new
 port. Any occupied port blocks startup, even when its listener cannot be
 identified. See [Resolve an occupied port](#resolve-an-occupied-port) before
@@ -651,11 +657,11 @@ its settings on this computer and your chat defaults. It does not contain folder
 To save a new configuration:
 
 1. Review your edited settings.
-2. Open **Saved configurations** and enter a **New configuration name**.
+2. In **Model settings**, open **Manage configurations…** and enter a **New configuration name**.
 3. Select **Save as new configuration**. If the name already exists, review the
    overwrite confirmation before replacing it.
 
-To reuse a configuration, select it and choose **Load configuration**. This opens
+To reuse a configuration, choose its name from the configuration menu beside **Apply changes**. Confirm replacement when there are unapplied changes. This opens
 **Model settings** for review without starting or applying a server. When loading
 would change chat defaults, the confirmation says **Also replaces your chat defaults.**
 After confirmation, those defaults save immediately; server fields remain in the
@@ -668,9 +674,9 @@ dots, underscores and hyphens, up to 80 characters. Failed writes preserve the
 previous file and saved association. See [Profile compatibility](#profile-compatibility)
 for older files and missing-field defaults.
 
-### Folders
+### Model files and folders
 
-For models, **Create models folder** creates `models/` beneath Tauri’s app data
+In **Model files**, the models folder precedes the optional Hugging Face token. **Create models folder** creates `models/` beneath Tauri’s app data
 directory for bundle identifier `io.github.etufarini.straggler`. The UI shows the
 resolved path before creation. This is separate from conversation storage. The
 regular Linux path is `${XDG_DATA_HOME:-$HOME/.local/share}/io.github.etufarini.straggler/models`;
@@ -683,7 +689,7 @@ Discovery searches the selected folder and two nested directory levels. Existing
 root-level GGUF files still work. Split models appear once, using the first part;
 all numbered parts must be present. Empty folders are valid.
 
-For an external llama.cpp build, **Choose folder** opens the existing folder
+In **llama.cpp**, **Choose external build…** opens the existing folder
 browser. Browse without saving, then accept with **Use this folder**. Hidden
 folders can be shown or opened by path. A backend folder must contain executable
 `build/bin/llama-server` or `bin/llama-server`; source builds take precedence.
@@ -692,7 +698,7 @@ included backend and retains model permissions through security-scoped bookmarks
 
 ### Hugging Face
 
-A token is optional. In **Settings → Hugging Face**, save or remove a read token
+A token is optional. In **Settings → Model files**, save or remove a read token
 in the operating system keychain: Secret Service on Linux, Keychain on macOS.
 It is never saved in settings, browser storage or the download journal. If the
 keychain is unavailable or locked, public access remains available and the UI
@@ -806,9 +812,9 @@ server. If saving fails, keep the window open and use the recovery controls belo
 
 ### Resolve an occupied port
 
-1. Open **Settings → Server & port** and inspect the available listener details.
+1. Open **Settings → Model settings → Server** and inspect the available listener details.
 2. Prefer another available port if the existing program needs to keep running.
-   Enter the new port and select **Check port again**.
+   Enter the new port and select **Check again**.
 3. If you intend to stop the unrelated program, select **Close programs using it**
    and review the confirmation. This requests normal shutdown with SIGTERM.
 4. If it remains after that attempt, **Force quit…** requires a separate

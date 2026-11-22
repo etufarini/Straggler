@@ -1,7 +1,9 @@
+import type { Settings } from '../domain/types';
 import SettingsField from './SettingsField';
 
 export default function NumberField({
   label,
+  field,
   term,
   value,
   onChange,
@@ -11,6 +13,7 @@ export default function NumberField({
   scope,
   onBlur,
 }: {
+  field?: keyof Settings;
   label: string;
   term?: string;
   value: string;
@@ -23,6 +26,7 @@ export default function NumberField({
 }) {
   return (
     <SettingsField
+      field={field}
       label={
         <>
           {label}

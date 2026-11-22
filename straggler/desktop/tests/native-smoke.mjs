@@ -308,14 +308,14 @@ try {
     );
     await until(() => evaluate('!!document.querySelector(".settings-nav")'), 'settings navigation');
     await evaluate(
-      'Array.from(document.querySelectorAll(".settings-nav button")).find(button => button.textContent === "Performance").click()',
+      'Array.from(document.querySelectorAll(".settings-nav button")).find(button => button.textContent.trim() === "Model settings").click()',
     );
     await until(
       () => evaluate('!!document.querySelector("input[aria-label^=CPU]")'),
       'performance fields',
     );
     await fillField('input[aria-label="CPU threads"]', '0');
-    await evaluate('document.querySelector(".configuration-heading button").click()');
+    await evaluate('document.querySelector(".configuration-heading .primary-button").click()');
     await until(
       () =>
         evaluate(
@@ -328,10 +328,12 @@ try {
       /positive integer/,
     );
     await fillField('input[aria-label="CPU threads"]', '2');
-    await evaluate('document.querySelector(".configuration-heading button").click()');
+    await evaluate('document.querySelector(".configuration-heading .primary-button").click()');
     await until(
       () =>
-        evaluate('document.querySelector(".success-message")?.textContent === "Settings applied."'),
+        evaluate(
+          'Array.from(document.querySelectorAll(".status-chip")).some(chip => chip.textContent.trim() === "Settings applied.")',
+        ),
       'corrected settings',
     );
     await evaluate('document.querySelector(".settings-heading button").click()');

@@ -1,3 +1,4 @@
+import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { selectValue } from './select';
@@ -86,7 +87,7 @@ test('models folder is created only on request and native-picker cancellation pr
   page,
 }) => {
   await page.goto('/?scenario=empty');
-  await page.getByRole('button', { name: 'Folders', exact: true }).click();
+  await settingsSection(page, 'Model files');
   const folder = page.locator('.folder-setting').last();
   await expect(folder.locator(':scope > code')).toHaveText('Not configured');
   await page.getByRole('button', { name: 'Create models folder', exact: true }).click();

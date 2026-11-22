@@ -103,6 +103,46 @@ export default function App() {
   );
   const modelName =
     cloudActive?.model.name ?? (displayModel ? fileName(displayModel) : 'Choose a local model');
+  const workspaceFeedback = (
+    <>
+      {!cloudActive && <ServerFeedback controller={controller} />}
+      {controller.preferenceError && (
+        <div className="workspace-feedback">
+          <Feedback title="Couldn’t save preferences" details={controller.preferenceError}>
+            Changes last until you close the app.
+          </Feedback>
+        </div>
+      )}
+
+      {error && (
+        <div className="workspace-feedback">
+          <Feedback
+            title="Couldn’t complete the action"
+            details={error}
+            onDismiss={() => setError('')}
+          >
+            Check the details and try again.
+          </Feedback>
+        </div>
+      )}
+      {controller.projects.error && (
+        <div className="workspace-feedback">
+          <Feedback
+            title="Couldn’t load or save project data"
+            details={controller.projects.error}
+            actions={
+              <button className="text-button" onClick={() => void controller.projects.load()}>
+                Retry loading projects
+              </button>
+            }
+          >
+            Project changes remain available for review. Retry the action or reload the saved
+            projects.
+          </Feedback>
+        </div>
+      )}
+    </>
+  );
   return (
     <div className="app-shell">
       <Sidebar controller={controller} />
@@ -195,9 +235,17 @@ export default function App() {
               <>
                 <button
                   className="local-badge"
-                  aria-label={`Server log · ${statusLabel[server.phase]}${restartRequired ? ' · Restart required' : ''}`}
+                  aria-label={
+                    config?.portStatus.includes('IN USE') && !active
+                      ? `Port ${config.port} is in use · Review server settings`
+                      : `Server log · ${statusLabel[server.phase]}${restartRequired ? ' · Restart required' : ''}`
+                  }
                   aria-expanded={panel === 'logs'}
-                  onClick={() => setPanel('logs')}
+                  onClick={() => {
+                    if (config?.portStatus.includes('IN USE') && !active)
+                      controller.reviewSettings('server');
+                    else setPanel('logs');
+                  }}
                 >
                   <span className={`status-dot ${server.phase}`} />
                   {statusLabel[server.phase]}
@@ -235,42 +283,8 @@ export default function App() {
             This is the interface preview. Open the Straggler desktop app to use local models.
           </div>
         )}
-        {!cloudActive && <ServerFeedback controller={controller} />}
-        {controller.preferenceError && (
-          <div className="workspace-feedback">
-            <Feedback title="Couldn’t save preferences" details={controller.preferenceError}>
-              Changes last until you close the app.
-            </Feedback>
-          </div>
-        )}
+        {(panel === 'settings' || controller.view !== 'chat') && workspaceFeedback}
 
-        {error && (
-          <div className="workspace-feedback">
-            <Feedback
-              title="Couldn’t complete the action"
-              details={error}
-              onDismiss={() => setError('')}
-            >
-              Check the details and try again.
-            </Feedback>
-          </div>
-        )}
-        {controller.projects.error && (
-          <div className="workspace-feedback">
-            <Feedback
-              title="Couldn’t load or save project data"
-              details={controller.projects.error}
-              actions={
-                <button className="text-button" onClick={() => void controller.projects.load()}>
-                  Retry loading projects
-                </button>
-              }
-            >
-              Project changes remain available for review. Retry the action or reload the saved
-              projects.
-            </Feedback>
-          </div>
-        )}
         {(storageError ||
           controller.fileError ||
           controller.fileNotice ||
@@ -298,6 +312,7 @@ export default function App() {
             onClearError={() => setSettingsFailure(null)}
             failure={settingsFailure}
             section={settingsSection}
+            target={controller.settingsTarget}
             setSection={setSettingsSection}
             onBack={() => setPanel(null)}
           />
@@ -329,6 +344,7 @@ export default function App() {
         ) : (
           <div className="chat-body">
             <div className="chat-main">
+              {workspaceFeedback}
               <ChatPanel controller={controller} onProjectSource={setProjectSource} />
             </div>
             <PresencePanel

@@ -1,3 +1,4 @@
+import StatusChip from '../../components/StatusChip';
 import { useState } from 'react';
 import { Cloud, ChevronDown, Plus } from 'lucide-react';
 import type { CloudController } from './useCloudModels';
@@ -112,20 +113,27 @@ function ProviderSettings({
     }
   }
   return (
-    <details className="cloud-provider">
+    <details
+      className="cloud-provider"
+      title={provider.kind === 'custom' ? 'Not tested by Straggler' : 'Tested with Straggler'}
+    >
       <summary>
         <Cloud size={17} />
         <span>
           <strong>{provider.name}</strong>
           <small>
             {provider.saved
-              ? `Key verified · ${visibleCount} ${visibleCount === 1 ? 'model' : 'models'} shown`
-              : 'Not configured'}
+              ? `Key saved · ${visibleCount} ${visibleCount === 1 ? 'model' : 'models'} shown`
+              : provider.keyError
+                ? 'Couldn’t read key'
+                : 'Not set up'}
           </small>
         </span>
-        <span className="cloud-verified">
-          {provider.kind === 'custom' ? 'Not tested by Straggler' : 'Verified'}
-        </span>
+        <StatusChip
+          tone={provider.keyError ? 'attention' : provider.saved ? 'positive' : 'neutral'}
+        >
+          {provider.keyError ? 'Couldn’t read key' : provider.saved ? 'Key saved' : 'Not set up'}
+        </StatusChip>
         <ChevronDown size={14} />
       </summary>
       <div className="cloud-provider-content">
@@ -140,6 +148,7 @@ function ProviderSettings({
         <label className="setting-field">
           <span>{provider.name} API key</span>
           <input
+            id={`cloud-provider-${provider.id}`}
             type="password"
             autoComplete="off"
             spellCheck={false}
