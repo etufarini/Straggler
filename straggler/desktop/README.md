@@ -264,11 +264,16 @@ Run these commands from `straggler/desktop` with Vite running:
 | Command | Output |
 | --- | --- |
 | `node tests/design-review.mjs final` | Browser fixture captures under `test-results/design/` |
-| `node tests/design-review.mjs r001` | Captures including project scenarios; reference views need the separately supplied design dossier |
+| `node tests/design-review.mjs r001` | Captures including project scenarios |
 | `node tests/r001-copy-review.mjs [path/to/ui-design.html]` | D004/D005: 18 Compare proposals and live fixture views at 1200×820 and 760×620, plus the expanded compact overlay |
 | `node tests/d006-review.mjs` | D006: empty/message pairs at 760×620 and 1200×820, compact active Temporary, long model and geometry in `test-results/design/d006/` |
 
-The copy/presence review reads the local, Git-excluded
+Both `design-review.mjs` phases compare the live interface with a separately
+supplied dossier at `straggler/docs/new-design/mir-ui-design.html`. That file is
+not included in the checkout; neither phase runs without it. Both phases use
+Playwright Chromium and WebKit.
+
+The copy/presence review (`r001-copy-review.mjs`) reads the local, Git-excluded
 `straggler/docs/design/to-be-implemented/ui-design.html` by default and writes
 screenshots, `comparison.html` and `checks.json` to `test-results/design/r001-copy/`.
 The input dossier stays unchanged. `STRAGGLER_REVIEW_URL` selects an existing

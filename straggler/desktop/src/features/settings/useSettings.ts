@@ -165,7 +165,6 @@ export function useSettings({
     accept,
     acceptChatDefaults,
     confirm,
-    onError,
     onBack,
     section: settingsDestination(section).section,
     target: target ?? settingsDestination(section).target,

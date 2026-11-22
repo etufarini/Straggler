@@ -97,6 +97,5 @@ export function useContextEstimate(
     includesImages,
     capacity,
     overflow: !!capacity && estimate.tokens > capacity,
-    unavailable,
   };
 }

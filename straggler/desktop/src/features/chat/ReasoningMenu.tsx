@@ -39,7 +39,6 @@ export default function ReasoningMenu({ controller }: { controller: WorkspaceCon
         <>
           <ReasoningControls
             disabled={chatOptionsDisabled || !!controller.currentProject?.archived}
-            effortPresentation="segments"
             reasoning={options.reasoning}
             effort={options.effort}
             details={serverDetails}

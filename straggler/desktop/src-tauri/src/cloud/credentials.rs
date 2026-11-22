@@ -1,27 +1,20 @@
-use crate::{huggingface::credentials::TokenStore, Result};
-use keyring_core::Error;
+use crate::{credentials, huggingface::credentials::TokenStore, Result};
 use std::sync::Arc;
 
 struct CloudTokenStore(String);
 impl TokenStore for CloudTokenStore {
     fn read(&self) -> Result<Option<String>> {
-        match crate::credentials::entry(&format!("straggler.cloud.{}", self.0))?.get_password() {
-            Ok(value) => Ok(Some(value)),
-            Err(Error::NoEntry) => Ok(None),
-            Err(_) => Err("The system keychain could not read the cloud key.".into()),
-        }
+        credentials::read_password(
+            &credentials::entry(&format!("straggler.cloud.{}", self.0))?,
+            "The system keychain could not read the cloud key.",
+        )
     }
     fn write(&self, key: Option<&str>) -> Result<()> {
-        let entry = crate::credentials::entry(&format!("straggler.cloud.{}", self.0))?;
-        let result = match key {
-            Some(key) => entry.set_password(key),
-            None => entry.delete_credential(),
-        };
-        match result {
-            Ok(()) => Ok(()),
-            Err(Error::NoEntry) if key.is_none() => Ok(()),
-            Err(_) => Err("The system keychain did not confirm the cloud key update.".into()),
-        }
+        credentials::write_password(
+            &credentials::entry(&format!("straggler.cloud.{}", self.0))?,
+            key,
+            "The system keychain did not confirm the cloud key update.",
+        )
     }
 }
 

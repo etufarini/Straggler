@@ -1065,7 +1065,6 @@ export function useConversation(
     generating,
     chatRef,
     sendPromise,
-    saveQueue,
     messageList,
     follow,
     composerInput,

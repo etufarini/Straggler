@@ -48,7 +48,10 @@ export default function Sources({
               <button
                 type="button"
                 className="text-button project-source-link"
-                onClick={() => onProjectSource?.(source)}
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  onProjectSource?.(source);
+                }}
               >
                 {source.name} · section {source.section}
               </button>
