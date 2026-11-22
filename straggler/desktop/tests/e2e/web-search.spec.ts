@@ -1,3 +1,4 @@
+import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -149,6 +150,7 @@ test('fallback and quota settings remain explicit and persist only preferences',
   await page.locator('.web-search-activity summary').click();
   await expect(page.locator('.web-search-activity')).toContainText('This model can’t call tools');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await chip(page).click();
   await page.getByRole('radio', { name: '5', exact: true }).check();
   const preferences = await page.evaluate(() =>
@@ -160,9 +162,7 @@ test('fallback and quota settings remain explicit and persist only preferences',
     .fill('rejected-secret');
   await page.getByRole('button', { name: 'Save and verify', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('didn’t accept');
-  await expect(
-    page.getByText('A key is stored in the system keychain.', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('Key saved', { exact: true })).toBeVisible();
 });
 
 test('temporary chat permits search without browser conversation persistence', async ({ page }) => {
@@ -179,6 +179,7 @@ test('temporary chat permits search without browser conversation persistence', a
 test('low quota is visible with an accessible usage meter', async ({ page }) => {
   await ready(page, 'web-low');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await chip(page).click();
   await expect(page.getByRole('meter', { name: 'Credits used this month' })).toHaveAttribute(
     'value',

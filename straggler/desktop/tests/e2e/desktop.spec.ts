@@ -1,3 +1,4 @@
+import { loadSelectedConfiguration, manageConfigurations, settingsSection } from './settings';
 import { selectValue } from './select';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -262,8 +263,10 @@ test('empty setup gives a usable message and keeps launch disabled', async ({ pa
   await mockDesktop(page, 'empty');
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Needs attention', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Select a llama.cpp build', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Choose external build…' })).toBeVisible();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(page.getByText('No GGUF models found', { exact: true })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Launch server', exact: true }).last(),
@@ -276,29 +279,34 @@ test('settings retain generation and performance values through profile operatio
   await mockDesktop(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await page.getByRole('textbox', { name: /^Seed/ }).fill('42');
   await page.getByRole('textbox', { name: /^Longest reply/ }).fill('512');
   await selectValue(page.getByRole('combobox', { name: 'Reply style' }), 'focused');
   await expect(page.getByRole('textbox', { name: /^Seed/ })).toHaveValue('42');
   await expect(page.getByRole('textbox', { name: /^Longest reply/ })).toHaveValue('512');
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(page.getByRole('combobox', { name: /^Device/ }), 'none');
   await expect(page.getByRole('textbox', { name: 'Model on the GPU', exact: true })).toBeDisabled();
   await page.getByRole('textbox', { name: /^CPU threads/ }).fill('3');
-  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await manageConfigurations(page);
   await page.getByRole('textbox', { name: 'New configuration name', exact: true }).fill('Writing');
   await page.getByRole('button', { name: 'Save as new configuration', exact: true }).click();
   await expect(page.getByText('Configuration saved.', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await page.getByRole('textbox', { name: /^CPU threads/ }).fill('4');
   await expect(page.getByText('Modified', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
-  await page.getByRole('button', { name: 'Load configuration', exact: true }).click();
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await manageConfigurations(page);
+  await loadSelectedConfiguration(page);
+  await expect(page.getByRole('alertdialog')).toContainText('Replaces your unapplied changes.');
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Load configuration', exact: true })
+    .click();
+  await settingsSection(page, 'Model settings');
   await expect(page.getByRole('textbox', { name: /^CPU threads/ })).toHaveValue('3');
   await expect(page.locator('.local-badge')).toHaveText('Stopped');
-  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await expect(page.getByRole('textbox', { name: /^Seed/ })).toHaveValue('42');
   await expect(page.getByRole('combobox', { name: 'Reply style' })).toHaveText('Focused');
 });
@@ -309,9 +317,10 @@ test('folder selection separates browsing, hidden directories, cancel and confir
   await mockDesktop(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Folders', exact: true }).click();
-  await page.getByRole('button', { name: 'Choose folder', exact: true }).first().click();
+  await settingsSection(page, 'Chat defaults');
+  await settingsSection(page, 'Model settings');
+  await settingsSection(page, 'llama.cpp');
+  await page.getByRole('button', { name: 'Choose external build…', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Choose folder' })).toBeVisible();
   await page.getByRole('checkbox', { name: 'Show hidden folders' }).check();
   await expect(page.getByRole('button', { name: '.hidden', exact: true })).toBeVisible();
@@ -321,7 +330,7 @@ test('folder selection separates browsing, hidden directories, cancel and confir
   await expect(page.locator('.folder-setting').first().locator('code')).toHaveText(
     '/fixture/llama.cpp',
   );
-  await page.getByRole('button', { name: 'Choose folder', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Choose external build…', exact: true }).click();
   await page.getByRole('textbox', { name: 'Folder path' }).fill('/fixture/new backend');
   await page.getByRole('button', { name: 'Open', exact: true }).click();
   await page.getByRole('button', { name: 'Use this folder', exact: true }).click();
@@ -334,8 +343,8 @@ test('invalid settings preserve the draft and display validation feedback', asyn
   await mockDesktop(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
+  await settingsSection(page, 'Model settings');
   await page.getByRole('textbox', { name: /^CPU threads/ }).fill('0');
   await page.getByRole('button', { name: 'Apply changes', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('CPU threads must be positive');
@@ -399,7 +408,7 @@ test('fatal OOM stays visible through polling, preserves partial text and suppor
   await expect(failure).toContainText('Server stopped after a memory error');
   await failure.getByRole('button', { name: 'Review settings' }).click();
   await selectValue(page.getByRole('combobox', { name: 'Context size', exact: true }), '4096');
-  await page.getByRole('button', { name: 'Performance', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(page.getByRole('combobox', { name: /^Reading your message/ }), 'low-memory');
   await page.getByRole('button', { name: 'Launch server', exact: true }).last().click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
@@ -479,8 +488,9 @@ test('history and backend errors use their own context and recovery actions', as
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.goto('/?scenario=backend-error');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
-  await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
+  await settingsSection(page, 'Model settings');
+  await settingsSection(page, 'llama.cpp');
   await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
   await page
     .getByRole('alertdialog')
@@ -503,18 +513,22 @@ test('hardware scenarios preserve generic controls and unknown memory', async ({
   for (const scenario of ['cpu', 'multiple', 'unknown-memory']) {
     await page.goto(`/?scenario=${scenario}`);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Model settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Performance', exact: true }).click();
+    await settingsSection(page, 'Chat defaults');
+    await settingsSection(page, 'Model settings');
     await expect(
       page.getByText('Auto lets llama.cpp choose for your hardware.', { exact: false }),
     ).toBeVisible();
     if (scenario === 'multiple') {
-      await expect(page.getByText('Advanced: several devices', { exact: true })).toBeVisible();
+      await expect(
+        page.getByText('Advanced: several devices · 4 settings', { exact: true }),
+      ).toBeVisible();
     } else {
-      await expect(page.getByText('Advanced: several devices', { exact: true })).toHaveCount(0);
+      await expect(
+        page.getByText('Advanced: several devices · 4 settings', { exact: true }),
+      ).toHaveCount(0);
     }
     if (scenario === 'unknown-memory') {
-      await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+      await settingsSection(page, 'Model settings');
       await expect(page.getByText('Available RAM: Unavailable')).toBeVisible();
     }
   }
@@ -523,8 +537,8 @@ test('hardware scenarios preserve generic controls and unknown memory', async ({
 test('occupying listeners require separate normal and force confirmations', async ({ page }) => {
   await page.goto('/?scenario=occupied');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Server & port', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
+  await settingsSection(page, 'Model settings');
   await expect(page.getByRole('button', { name: 'Force quit', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Close programs using it', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('SIGTERM');

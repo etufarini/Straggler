@@ -1,3 +1,4 @@
+import { loadSelectedConfiguration, manageConfigurations, settingsSection } from './settings';
 import { selectValue } from './select';
 import { observeOrb } from './orb';
 import { expect, test } from '@playwright/test';
@@ -29,7 +30,8 @@ test('restart indication remains accessible after returning to chat', async ({ p
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await expect(page.locator('.local-badge')).toContainText('Ready');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
+  await settingsSection(page, 'Model settings');
   await page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }).fill('8192');
   await page.getByRole('button', { name: 'Back to chat' }).click();
   await expect(page.locator('.local-badge')).toContainText('Restart required');
@@ -41,7 +43,8 @@ test('settings keep the server save action visible and per-item pages have their
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
+  await settingsSection(page, 'Model settings');
   await page.locator('.settings-page').evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
@@ -50,14 +53,14 @@ test('settings keep the server save action visible and per-item pages have their
     'aria-current',
     'page',
   );
-  await page.getByRole('button', { name: 'Folders', exact: true }).click();
+  await settingsSection(page, 'Model files');
   await expect(
     page.getByText(
-      'Folders for models and llama.cpp on this computer. Changes are saved after you accept and validate a folder.',
+      'Model files on this computer. Folders are saved after you accept and validate them.',
     ),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
+  await settingsSection(page, 'llama.cpp');
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
   await expect(
@@ -71,6 +74,7 @@ test('chat defaults save with profiles and only server fields require restart', 
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   const prompt = page.getByRole('textbox', { name: 'Default system prompt', exact: true });
   await prompt.fill('Default instructions\nLiteral $(touch unsafe)');
   await prompt.blur();
@@ -84,13 +88,13 @@ test('chat defaults save with profiles and only server fields require restart', 
     )
     .toBe('Default instructions\nLiteral $(touch unsafe)');
   await expect(page.locator('.local-badge')).not.toContainText('Restart required');
-  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
+  await manageConfigurations(page);
   await page
     .getByRole('textbox', { name: 'New configuration name', exact: true })
     .fill('Chat defaults');
   await page.getByRole('button', { name: 'Save as new configuration' }).click();
   await expect(page.getByText('Configuration saved.', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await prompt.fill('Changed');
   await prompt.blur();
   await expect
@@ -102,17 +106,17 @@ test('chat defaults save with profiles and only server fields require restart', 
       ),
     )
     .toBe('Changed');
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await expect(page.getByText('Modified', { exact: true })).toBeVisible();
   await expect(page.locator('.local-badge')).not.toContainText('Restart required');
-  await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
-  await page.getByRole('button', { name: 'Load configuration', exact: true }).click();
+  await manageConfigurations(page);
+  await loadSelectedConfiguration(page);
   await expect(page.getByRole('alertdialog')).toContainText('Also replaces your chat defaults.');
   await page
     .getByRole('alertdialog')
     .getByRole('button', { name: 'Load configuration', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await expect(prompt).toHaveValue('Default instructions\nLiteral $(touch unsafe)');
 });
 
@@ -206,8 +210,9 @@ test('reasoning uses advertised efforts and request-time overrides without a res
   await expect(effort.getByRole('radio').first()).toBeDisabled();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await page.getByRole('radio', { name: 'On', exact: true }).check();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   await selectValue(
     page.getByRole('combobox', { name: 'Default effort for this model' }),
     'minimal',
@@ -292,6 +297,7 @@ test('reduced-motion presence draws a still and destroys the renderer in Setting
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'stopped');
   await expect(page.locator('.presence-caption')).toContainText('Stopped');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await expect(page.locator('.presence-stage canvas')).toHaveCount(0);
   const frames = await page.evaluate(() => window.__stragglerOrbMeasurement.frames.length);
   await page.waitForTimeout(1100);

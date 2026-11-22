@@ -1,3 +1,4 @@
+import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 import { contrastRatio } from '../designColors';
 
@@ -7,8 +8,10 @@ test('text, primary actions, links and focus meet AA on the actual theme surface
   await page.goto('/?scenario=web-normal');
   for (const area of ['chat', 'cloud', 'settings']) {
     if (area === 'cloud') await page.goto('/?scenario=cloud-ready');
-    if (area === 'settings')
+    if (area === 'settings') {
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await settingsSection(page, 'Chat defaults');
+    }
     const palette = await page.locator('body').evaluate((node) => {
       const style = getComputedStyle(node);
       const value = (name: string) => style.getPropertyValue(name).trim();
@@ -56,7 +59,7 @@ test('text, primary actions, links and focus meet AA on the actual theme surface
       ).toBeGreaterThanOrEqual(3);
     }
   }
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   const apply = page.getByRole('button', { name: 'Apply changes', exact: true });
   for (const hovered of [false, true]) {
     if (hovered) await apply.hover();
@@ -92,6 +95,7 @@ test('sampling shares its default hint while retaining each field description', 
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   await page.getByText('Fine-tune reply style', { exact: true }).click();
   const group = page.locator('.sampling-details');
   await expect(group.locator('summary + .field-help')).toHaveText(
@@ -135,4 +139,40 @@ test('destructive confirmation retains AA text contrast while hovered', async ({
     });
     expect(contrastRatio(colors.text, colors.surface)).toBeGreaterThanOrEqual(4.5);
   }
+});
+
+test('Overview, unified settings and configuration management retain named targets and keyboard focus', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toHaveCount(1);
+  for (const section of ['Overview', 'Model settings']) {
+    await settingsSection(page, section);
+    const shortTargets = await page
+      .locator('.settings-page button, .settings-page a')
+      .evaluateAll((controls) =>
+        controls
+          .filter((control) => {
+            const rect = control.getBoundingClientRect();
+            return rect.width && rect.height && rect.height < 24;
+          })
+          .map((control) => control.textContent),
+      );
+    expect(shortTargets).toEqual([]);
+  }
+  const manage = page.getByRole('button', { name: 'Manage configurations…', exact: true });
+  await manage.focus();
+  await manage.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Manage configurations', exact: true });
+  await expect(dialog).toHaveAttribute('aria-modal', 'true');
+  await expect(
+    dialog.getByRole('button', { name: 'Delete configuration', exact: true }),
+  ).not.toBeFocused();
+  await dialog.getByRole('button', { name: 'Done', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('combobox', { name: 'Configuration', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(manage).toBeFocused();
 });

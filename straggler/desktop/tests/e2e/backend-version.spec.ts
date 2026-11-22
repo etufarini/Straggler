@@ -1,3 +1,4 @@
+import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 import manifest from '../../packaging/llama-runtime.json' with { type: 'json' };
 
@@ -7,7 +8,8 @@ test('external backend keeps version information when no upstream release is pub
   await page.goto('/?scenario=normal');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-release-status', 'notFound'));
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
+  await settingsSection(page, 'llama.cpp');
   const summary = page.locator('.build-summary');
   await expect(summary).toContainText('0.9.0-fixture');
   await expect(summary).toContainText('b42');

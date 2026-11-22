@@ -1,3 +1,4 @@
+import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 
 test('one picker filters local and cloud models without network and restores download focus @platform', async ({
@@ -88,6 +89,7 @@ test('settings destination groups retain accessible names and the approved order
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   const nav = page.getByRole('navigation', { name: 'Settings sections' });
   expect(
     await nav
@@ -99,13 +101,5 @@ test('settings destination groups retain accessible names and the approved order
   ).toHaveText(['Chat defaults', 'System prompts']);
   await expect(
     nav.getByRole('group', { name: 'On this computer', exact: true }).getByRole('button'),
-  ).toHaveText([
-    'Model settings',
-    'Performance',
-    'Server & port',
-    'Saved configurations',
-    'Folders',
-    'llama.cpp',
-    'Hugging Face',
-  ]);
+  ).toHaveText(['Model settings', 'llama.cpp', 'Model files']);
 });

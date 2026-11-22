@@ -1,9 +1,11 @@
+import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
+  await settingsSection(page, 'Model settings');
 });
 
 test(
@@ -43,7 +45,7 @@ test(
 );
 
 test('typeahead cycles repeated initials and selects a full prefix', async ({ page }) => {
-  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
   const style = page.getByRole('combobox', { name: 'Reply style', exact: true });
   await style.focus();
   await style.press('m');
@@ -55,7 +57,7 @@ test('typeahead cycles repeated initials and selects a full prefix', async ({ pa
   await style.press('f');
   await style.press('Enter');
   await expect(style).toHaveText('Focused');
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await settingsSection(page, 'Model settings');
   const context = page.getByRole('combobox', { name: 'Context size', exact: true });
   await context.press('Home');
   await context.press('2');
