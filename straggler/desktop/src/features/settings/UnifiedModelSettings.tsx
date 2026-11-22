@@ -36,19 +36,18 @@ export default function UnifiedModelSettings({
   const root = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(blocks[0].id);
   useEffect(() => {
-    const page = root.current?.closest('.settings-page');
-    if (!page) return;
-    function updateCurrent() {
-      const header = page?.querySelector('.settings-section-heading')?.getBoundingClientRect();
+    const viewport = root.current?.closest('.settings-section');
+    if (!viewport) return;
+    const updateCurrent = () => {
+      const viewportBounds = viewport.getBoundingClientRect();
       let visible = blocks[0].id;
       let largestVisibleHeight = 0;
       for (const block of blocks) {
         const bounds = document.getElementById(block.id)?.getBoundingClientRect();
-        if (!bounds || !page) continue;
+        if (!bounds) continue;
         const visibleHeight = Math.max(
           0,
-          Math.min(bounds.bottom, page.getBoundingClientRect().bottom) -
-            Math.max(bounds.top, header?.bottom ?? 0),
+          Math.min(bounds.bottom, viewportBounds.bottom) - Math.max(bounds.top, viewportBounds.top),
         );
         if (visibleHeight > largestVisibleHeight) {
           largestVisibleHeight = visibleHeight;
@@ -56,10 +55,15 @@ export default function UnifiedModelSettings({
         }
       }
       setCurrent(visible);
-    }
-    page.addEventListener('scroll', updateCurrent, { passive: true });
+    };
+    viewport.addEventListener('scroll', updateCurrent, { passive: true });
+    const resize = new ResizeObserver(updateCurrent);
+    resize.observe(viewport);
     updateCurrent();
-    return () => page.removeEventListener('scroll', updateCurrent);
+    return () => {
+      viewport.removeEventListener('scroll', updateCurrent);
+      resize.disconnect();
+    };
   }, []);
   return (
     <div ref={root} className="unified-model-settings">

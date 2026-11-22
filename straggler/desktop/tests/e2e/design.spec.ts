@@ -43,9 +43,12 @@ test('settings keep the server save action visible and per-item pages have their
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await settingsSection(page, 'Model settings');
-  await page.locator('.settings-page').evaluate((element) => {
+  await page.locator('.settings-section').evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
+  await expect
+    .poll(() => page.locator('.settings-section').evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Model settings', exact: true })).toHaveAttribute(
     'aria-current',

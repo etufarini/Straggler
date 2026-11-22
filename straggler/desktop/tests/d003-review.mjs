@@ -192,7 +192,7 @@ try {
       await prepare(page, screen);
       // Match the dossier's initial scroll position after fixture setup interactions.
       if (screen !== 'SELECT-CONTEXT')
-        await page.locator('.settings-page').evaluateAll((nodes) =>
+        await page.locator('.settings-section').evaluateAll((nodes) =>
           nodes.forEach((node) => {
             node.scrollTop = 0;
           }),
