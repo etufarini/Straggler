@@ -43,13 +43,14 @@ Memory estimates cannot guarantee that a model will fit.
 
 ### Open the app
 
-**No desktop release has been published yet.** To try the current app, follow
-[Local development](#local-development), which opens the native window from source.
-Source sessions have no bundled backend unless one has been explicitly prepared.
+Check [GitHub Releases](https://github.com/etufarini/Straggler/releases) for published
+Straggler desktop packages. Download a package for your platform and architecture,
+its `SHA256SUMS` file and the release notes. Local builds and Actions artifacts
+are candidates until they are attached to an approved release. GitHub's automatic
+source archives are not desktop installers. See [Published downloads](#published-downloads)
+for verification and signing status.
 
-The packaging tools produce macOS application bundles/disk images and Ubuntu
-Debian packages with a pinned llama.cpp backend. If you are testing a locally
-built package, open it as follows:
+Packages include a pinned llama.cpp backend. Install and open them as follows:
 
 | Platform | Install and open |
 | --- | --- |
@@ -59,6 +60,9 @@ built package, open it as follows:
 Installed startup does not compile code or download tools. Packages need no Bash,
 Python, Node.js or Rust toolchain at runtime. Linux packages depend on system
 libraries, including WebKitGTK and GTK. Models and GPU drivers remain separate.
+
+To run from source, follow [Local development](#local-development). Source sessions
+have no bundled backend unless one has been explicitly prepared.
 
 ### Configure your first chat
 
@@ -1274,6 +1278,66 @@ hardware inventory is a release gate.
 Use semantic versions. The exact version, full candidate SHA and release notes
 require explicit approval before tagging or publishing. Never move a published
 tag or delete a remote branch without approval.
+
+### Published downloads
+
+GitHub Releases hosts the desktop packages, release notes and `SHA256SUMS`.
+Use versioned filenames so an approved package is identifiable independently of
+the release page. The first Straggler desktop candidate uses this asset layout:
+
+| Target | Asset name |
+| --- | --- |
+| macOS Apple Silicon | `Straggler-1.0.0-macos-arm64.dmg` |
+| macOS Intel | `Straggler-1.0.0-macos-x86_64.dmg` |
+| Ubuntu amd64 | `straggler_1.0.0_amd64.deb` |
+| Ubuntu ARM64 | `straggler_1.0.0_arm64.deb` |
+
+Only assets actually attached to a release are published. A failed or unfinished
+packaging job does not establish availability for that target. Record the exact
+source commit, successful check and packaging runs, backend pin, supported targets,
+signing status and any unverified boundaries in the release notes. Keep the checksum
+file beside the packages and never replace a published binary with different bytes
+under the same versioned name.
+
+On macOS, verify a download with:
+
+```bash
+shasum -a 256 Straggler-1.0.0-macos-arm64.dmg
+```
+
+Compare the result with the matching line in `SHA256SUMS`. Open the disk image,
+drag Straggler to Applications and launch it there. Close the old app before
+replacing it. Ad hoc signing verifies the local bundle's integrity but does not
+identify a Developer ID publisher or provide notarization. A release containing
+such a candidate must say so explicitly; do not describe it as notarized or as an
+App Store build. Direct-distribution signing and notarization are described above.
+
+On Ubuntu 24.04+ amd64, verify and install with:
+
+```bash
+sha256sum straggler_1.0.0_amd64.deb
+sudo apt install ./straggler_1.0.0_amd64.deb
+```
+
+Compare the digest with `SHA256SUMS` before installing. On ARM64 use the `_arm64.deb`
+asset. Using `apt` installs the declared system dependencies; opening the installed
+app does not install tools or packages. The `.deb` format alone does not establish
+compatibility with every Debian-derived distribution. The supported package baseline
+is Ubuntu 24.04+ with glibc 2.39 and the declared GUI libraries. Start Straggler from
+the application menu. Models and any external GPU-enabled backend remain separate.
+
+### Replacing the Mir release listing
+
+The historical `v1.0.0` tag belongs to Mir.cpp and must remain at its original commit.
+Removing the old GitHub release listing does not require deleting or moving that
+tag. Straggler desktop 1.0.0 uses the distinct proposed tag `straggler-v1.0.0`.
+
+Prepare and verify the new packages and notes before replacing the listing. Archive
+the old release metadata, obtain approval for the exact Straggler version, source
+SHA and notes, then remove only the Mir release record and publish the approved
+Straggler release. Retain Git history and earlier settings/conversation compatibility.
+Keep successful and failed check runs under normal GitHub retention. Neither the
+packaging workflow nor a merge publishes a release automatically.
 
 ### System prompt presets
 

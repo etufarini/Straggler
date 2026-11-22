@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 — release candidate
+
+The first Straggler desktop candidate targets Linux and macOS with a pinned
+llama.cpp backend. Proposed tag: `straggler-v1.0.0`; the historical Mir.cpp
+`v1.0.0` tag remains unchanged. A candidate build is not a published release.
+
+- Prepare application version 1.0.0 consistently across npm, Cargo, Tauri and the
+  sidebar. Keep dependencies, profile formats and conversation exports unchanged.
+- Keep Settings headers outside the scrolling fields viewport and preserve full
+  control visibility after status notes resize it, including short WebKit viewports.
+- Share native credential operations without changing account names, validation
+  or service-specific errors. Remove the unused renderer factory and controller paths.
+- Restore focus after project/attachment source dialogs close through Escape or Close.
+- Document GitHub Releases, versioned DMG/DEB assets, checksums, installation,
+  signing limits and replacement of the old release listing without retagging history.
 
 - R008/R009: add a read-only Settings Overview, eight navigation destinations, unified model/memory/speed/server controls and configuration management beside Apply changes. Group backend and model folders with their related controls, clarify service status, align text actions and feedback, and use consistent form spacing. Settings, profiles, paths, environment controls and conversation formats are unchanged.
 
@@ -22,7 +36,7 @@
 
 - Add reusable system prompt presets with atomic native storage, import previews, export and copy-based insertion into chat, default and project instructions.
 
-Desktop development changes; no package release or tag is implied.
+The following entries describe the desktop functionality included in the candidate.
 
 - D003: static globular-cluster and starfield assets, translucent surfaces and warm
   star accents, preserving the existing palette and hologram.
@@ -48,8 +62,9 @@ Desktop development changes; no package release or tag is implied.
   superseded by D003.
 
 Validation uses synthetic local HTTP/backend fixtures without weights or inference.
-Linux checks passed for formatting, lint, types/build, unit/runtime contracts,
-Chromium and the actual Tauri window. Browser WebKit could not launch on the local
-host because `libavif16` and `libmanette-0.2-0` are absent. Live system keychain,
-Flatpak portal permissions and signed macOS Store bookmark/child access still need
-platform integration verification; macOS CI was not run in this session.
+The required workflow covers frontend/browser checks on Linux and native Linux/macOS
+contracts, windows and process lifecycle. Release notes identify the successful runs
+for the exact candidate and its package checks. Live system keychain, Flatpak portal
+permissions, distribution signing/notarization and real inference are separate
+integration checks; fixture and CI results do not establish those permissions or
+hardware support.
