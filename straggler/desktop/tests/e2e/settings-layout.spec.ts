@@ -189,3 +189,24 @@ test('configuration storage failure remains visible inside management and retry 
   await dialog.getByRole('button', { name: 'Save as new configuration', exact: true }).click();
   await expect(dialog.getByRole('status')).toHaveText('Configuration saved.');
 });
+
+test('workspace feedback shares the composer width when the assistant panel expands or collapses', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?scenario=oom-startup');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  const feedback = page.locator('.chat-main > .workspace-feedback .feedback');
+  await expect(feedback).toContainText('Not enough memory');
+  const expand = page.getByRole('button', { name: 'Expand assistant panel', exact: true });
+  if (await expand.isVisible()) await expand.click();
+  for (const expanded of [true, false]) {
+    if (!expanded)
+      await page.getByRole('button', { name: 'Collapse assistant panel', exact: true }).click();
+    const warning = (await feedback.boundingBox())!;
+    const composer = (await page.locator('.composer').boundingBox())!;
+    expect(Math.abs(warning.x - composer.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(warning.width - composer.width)).toBeLessThanOrEqual(1);
+  }
+});

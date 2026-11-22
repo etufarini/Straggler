@@ -73,6 +73,7 @@
   --ui-accent: #2f63f2;
   --ui-border: #33437a;
   --ui-measure: 36em;
+  --ui-chat-width: 770px;
   --ui-radius-xs: 4px;
   --ui-radius-sm: 6px;
   --ui-radius: 8px;
@@ -913,7 +914,7 @@ h1 {
   flex-shrink: 0;
 }
 .composer {
-  width: min(770px, 100%);
+  width: min(var(--ui-chat-width), 100%);
   margin: 0 auto;
   background:
     linear-gradient(var(--ui-composer-surface), var(--ui-composer-surface)) padding-box,
@@ -1026,6 +1027,10 @@ textarea:disabled {
 .workspace-feedback {
   margin: 12px var(--ui-gutter) 0;
 }
+.chat-main > .workspace-feedback {
+  width: min(var(--ui-chat-width), calc(100% - 2 * var(--ui-gutter)));
+  margin-inline: auto;
+}
 .workspace.has-feedback {
   overflow-y: auto;
 }
@@ -1134,7 +1139,7 @@ textarea:disabled {
   background: var(--ui-warning);
 }
 .message-column {
-  max-width: 770px;
+  max-width: var(--ui-chat-width);
   margin: 0 auto;
   padding: 25px 0 10px;
 }
