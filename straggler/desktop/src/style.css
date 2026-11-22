@@ -2192,7 +2192,9 @@ summary:focus-visible,
 input:focus-visible {
   outline-color: var(--ui-focus);
 }
-.model-switch,
+.model-switch {
+  margin-left: -1px;
+}
 .assistant .message-avatar {
   border: 1px solid transparent;
   background:
