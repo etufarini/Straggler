@@ -1,0 +1,1073 @@
+[
+  {
+    "screen": "SET-01",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Model",
+        "to": "Modelexample.gguf",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Modelexample.gguf",
+        "to": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "to": "Default effort for this modelTemplate defaultLevels come from the model’s chat t",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "SET-02B",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Keys format KQ4_0Values format VQ4_0",
+        "to": "Model on the GPUGPU layersLayers on the GPU: Auto, All, or a number. All may not",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Model on the GPUGPU layersLayers on the GPU: Auto, All, or a number. All may not",
+        "to": "MemoryAvailable RAM: UnavailableEstimate. llama.cpp confirms it at launch.",
+        "gap": 45,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "SpeedAuto lets llama.cpp choose for your hardware.",
+        "to": "DeviceAuto (llama.cpp chooses)",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "DeviceAuto (llama.cpp chooses)",
+        "to": "CPU threadsAuto or a number. More is not always faster.",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "CPU threadsAuto or a number. More is not always faster.",
+        "to": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "to": "Multi-token prediction (MTP)OffMay speed up replies with a compatible model. Cha",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "SET-03B",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "CPU threadsAuto or a number. More is not always faster.",
+        "to": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "to": "Multi-token prediction (MTP)OffMay speed up replies with a compatible model. Cha",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Server",
+        "to": "PortTCP1–65535. Only this computer (127.0.0.1) can connect.",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "PortTCP1–65535. Only this computer (127.0.0.1) can connect.",
+        "to": "Port 9931 is in useCheck again",
+        "gap": 34,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Port 9931 is in useCheck again",
+        "to": "12345 fixture Example listener",
+        "gap": 31,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "12345 fixture Example listener",
+        "to": "Close programs using itForce quitStraggler asks before stopping or force-quittin",
+        "gap": 24,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "CHAT-06",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": []
+  },
+  {
+    "screen": "CHAT-07",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": []
+  },
+  {
+    "screen": "MODEL-01",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Models",
+        "to": "",
+        "gap": 28,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "",
+        "to": "On this computer",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "On this computer",
+        "to": "Set up cloud models",
+        "gap": 39,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Set up cloud models",
+        "to": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "gap": 22,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "to": "Use model",
+        "gap": 27,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "DIALOG-01",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Model",
+        "to": "Modelexample.gguf",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Modelexample.gguf",
+        "to": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "to": "Default effort for this modelTemplate defaultLevels come from the model’s chat t",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Manage configurations",
+        "to": "Saves the model, its settings on this computer and your chat defaults. Folders a",
+        "gap": 34,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Saves the model, its settings on this computer and your chat defaults. Folders a",
+        "to": "Configuration saved.",
+        "gap": 22,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Configuration saved.",
+        "to": "ConfigurationDesign example",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "ConfigurationDesign example",
+        "to": "Save to selectedNew configuration nameSave as new configurationDelete configurat",
+        "gap": 16,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Save to selectedNew configuration nameSave as new configurationDelete configurat",
+        "to": "Done",
+        "gap": 24,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "SET-01",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Model",
+        "to": "Modelexample.gguf",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Modelexample.gguf",
+        "to": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "to": "Default effort for this modelTemplate defaultLevels come from the model’s chat t",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Memory",
+        "to": "Context sizeAutoCustom size (tokens)How much of the chat the model remembers. Au",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "SET-02B",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Keys format KQ4_0Values format VQ4_0",
+        "to": "Model on the GPUGPU layersLayers on the GPU: Auto, All, or a number. All may not",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Model on the GPUGPU layersLayers on the GPU: Auto, All, or a number. All may not",
+        "to": "MemoryAvailable RAM: UnavailableEstimate. llama.cpp confirms it at launch.",
+        "gap": 45,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "SpeedAuto lets llama.cpp choose for your hardware.",
+        "to": "DeviceAuto (llama.cpp chooses)",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "DeviceAuto (llama.cpp chooses)",
+        "to": "CPU threadsAuto or a number. More is not always faster.",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "CPU threadsAuto or a number. More is not always faster.",
+        "to": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "to": "Multi-token prediction (MTP)OffMay speed up replies with a compatible model. Cha",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "SET-03B",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "DeviceAuto (llama.cpp chooses)",
+        "to": "CPU threadsAuto or a number. More is not always faster.",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "CPU threadsAuto or a number. More is not always faster.",
+        "to": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "to": "Multi-token prediction (MTP)OffMay speed up replies with a compatible model. Cha",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Server",
+        "to": "PortTCP1–65535. Only this computer (127.0.0.1) can connect.",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "PortTCP1–65535. Only this computer (127.0.0.1) can connect.",
+        "to": "Port 9931 is in useCheck again",
+        "gap": 34,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Port 9931 is in useCheck again",
+        "to": "12345 fixture Example listener",
+        "gap": 31,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "12345 fixture Example listener",
+        "to": "Close programs using itForce quitStraggler asks before stopping or force-quittin",
+        "gap": 24,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "CHAT-06",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": []
+  },
+  {
+    "screen": "CHAT-07",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": []
+  },
+  {
+    "screen": "MODEL-01",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Models",
+        "to": "",
+        "gap": 28,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "",
+        "to": "On this computer",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "On this computer",
+        "to": "Set up cloud models",
+        "gap": 39,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Set up cloud models",
+        "to": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "gap": 22,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "to": "Use model",
+        "gap": 27,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "DIALOG-01",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Model",
+        "to": "Modelexample.gguf",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Modelexample.gguf",
+        "to": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "to": "Default effort for this modelTemplate defaultLevels come from the model’s chat t",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Memory",
+        "to": "Context sizeAutoCustom size (tokens)How much of the chat the model remembers. Au",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Manage configurations",
+        "to": "Saves the model, its settings on this computer and your chat defaults. Folders a",
+        "gap": 34,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Saves the model, its settings on this computer and your chat defaults. Folders a",
+        "to": "Configuration saved.",
+        "gap": 22,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Configuration saved.",
+        "to": "ConfigurationDesign example",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "ConfigurationDesign example",
+        "to": "Save to selectedNew configuration nameSave as new configurationDelete configurat",
+        "gap": 16,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Save to selectedNew configuration nameSave as new configurationDelete configurat",
+        "to": "Done",
+        "gap": 24,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "SET-01",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": []
+  },
+  {
+    "screen": "SET-02B",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Keys format KQ4_0Values format VQ4_0",
+        "to": "Model on the GPUGPU layersLayers on the GPU: Auto, All, or a number. All may not",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Model on the GPUGPU layersLayers on the GPU: Auto, All, or a number. All may not",
+        "to": "MemoryAvailable RAM: UnavailableEstimate. llama.cpp confirms it at launch.",
+        "gap": 45,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "SpeedAuto lets llama.cpp choose for your hardware.",
+        "to": "DeviceAuto (llama.cpp chooses)",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "DeviceAuto (llama.cpp chooses)",
+        "to": "CPU threadsAuto or a number. More is not always faster.",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "SET-03B",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "CPU threadsAuto or a number. More is not always faster.",
+        "to": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "to": "Multi-token prediction (MTP)OffMay speed up replies with a compatible model. Cha",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Server",
+        "to": "PortTCP1–65535. Only this computer (127.0.0.1) can connect.",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "PortTCP1–65535. Only this computer (127.0.0.1) can connect.",
+        "to": "Port 9931 is in useCheck again",
+        "gap": 34,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "CHAT-06",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": []
+  },
+  {
+    "screen": "CHAT-07",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": []
+  },
+  {
+    "screen": "MODEL-01",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Models",
+        "to": "",
+        "gap": 28,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "",
+        "to": "On this computer",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "On this computer",
+        "to": "Set up cloud models",
+        "gap": 39,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Set up cloud models",
+        "to": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "gap": 22,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "to": "Use model",
+        "gap": 27,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "DIALOG-01",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Manage configurations",
+        "to": "Saves the model, its settings on this computer and your chat defaults. Folders a",
+        "gap": 34,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Saves the model, its settings on this computer and your chat defaults. Folders a",
+        "to": "Configuration saved.",
+        "gap": 22,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Configuration saved.",
+        "to": "ConfigurationDesign example",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "ConfigurationDesign example",
+        "to": "Save to selectedNew configuration nameSave as new configurationDelete configurat",
+        "gap": 16,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Save to selectedNew configuration nameSave as new configurationDelete configurat",
+        "to": "Done",
+        "gap": 24,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  }
+]

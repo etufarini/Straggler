@@ -1,0 +1,841 @@
+[
+  {
+    "screen": "SET-01",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Modelexample.gguf",
+        "to": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "to": "Context sizeAutoCustom size (tokens)How much of the chat the model remembers. Au",
+        "gap": 53,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "SET-02B",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Auto lets llama.cpp choose for your hardware.",
+        "to": "DeviceAuto (llama.cpp chooses)",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "DeviceAuto (llama.cpp chooses)",
+        "to": "CPU threadsAuto or a number. More is not always faster.Model on the GPUGPU layer",
+        "gap": 50,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "SET-03B",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      },
+      {
+        "element": "Check port again",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "PortTCP1–65535. Only this computer (127.0.0.1) can connect.",
+        "to": "Check port again",
+        "gap": 37,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Check port again",
+        "to": "Port 9931 is in use",
+        "gap": 23,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Port 9931 is in use",
+        "to": "Close programs using itForce quit",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Close programs using itForce quit",
+        "to": "Straggler asks before stopping or force-quitting anything. Unidentified programs",
+        "gap": 20,
+        "kind": "note",
+        "band": [
+          8,
+          12
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "CHAT-06",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [
+      {
+        "element": "Retry saving",
+        "delta": 13
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Retry saving",
+        "inset": 13
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "CHAT-07",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [
+      {
+        "element": "Review settings",
+        "delta": 15
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Review settings",
+        "inset": 15
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "MODEL-01",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [
+      {
+        "element": "Download models…Refresh models",
+        "delta": 15
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Download models…",
+        "inset": 15
+      },
+      {
+        "element": "Refresh models",
+        "inset": 15
+      },
+      {
+        "element": "Set up cloud models",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Models",
+        "to": "",
+        "gap": 28,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "",
+        "to": "On this computer",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "On this computer",
+        "to": "Set up cloud models",
+        "gap": 37,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Set up cloud models",
+        "to": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "gap": 21,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "to": "Use model",
+        "gap": 27,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "DIALOG-01",
+    "size": [
+      1200,
+      820
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Configuration saved.",
+        "to": "ConfigurationDesign example",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "ConfigurationDesign example",
+        "to": "Load configurationSave to selectedNew configuration nameSave as new configuratio",
+        "gap": 24,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "SET-01",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Modelexample.gguf",
+        "to": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "gap": 26,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "Chat templateDefaultDefault uses the model template. A custom file replaces it a",
+        "to": "Context sizeAutoCustom size (tokens)How much of the chat the model remembers. Au",
+        "gap": 53,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Context sizeAutoCustom size (tokens)How much of the chat the model remembers. Au",
+        "to": "Memory format KV cache",
+        "gap": 62,
+        "kind": "section",
+        "band": [
+          40,
+          48
+        ],
+        "outside": true
+      },
+      {
+        "from": "Memory format KV cache",
+        "to": "Smaller formats save memory at a slight cost in quality. Compressed values may n",
+        "gap": 18,
+        "kind": "note",
+        "band": [
+          8,
+          12
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "SET-02B",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Auto lets llama.cpp choose for your hardware.",
+        "to": "DeviceAuto (llama.cpp chooses)",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "DeviceAuto (llama.cpp chooses)",
+        "to": "CPU threadsAuto or a number. More is not always faster.Model on the GPUGPU layer",
+        "gap": 50,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "CPU threadsAuto or a number. More is not always faster.Model on the GPUGPU layer",
+        "to": "Reading your message Prompt processingDefaultLarger values read long messages fa",
+        "gap": 53,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "SET-03B",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      },
+      {
+        "element": "Check port again",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "PortTCP1–65535. Only this computer (127.0.0.1) can connect.",
+        "to": "Check port again",
+        "gap": 37,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Check port again",
+        "to": "Port 9931 is in use",
+        "gap": 23,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Port 9931 is in use",
+        "to": "Close programs using itForce quit",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": true
+      },
+      {
+        "from": "Close programs using itForce quit",
+        "to": "Straggler asks before stopping or force-quitting anything. Unidentified programs",
+        "gap": 20,
+        "kind": "note",
+        "band": [
+          8,
+          12
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "CHAT-06",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [
+      {
+        "element": "Retry saving",
+        "delta": 13
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Retry saving",
+        "inset": 13
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "CHAT-07",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [
+      {
+        "element": "Review settings",
+        "delta": 15
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Review settings",
+        "inset": 15
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "MODEL-01",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [
+      {
+        "element": "Download models…Refresh models",
+        "delta": 15
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Download models…",
+        "inset": 15
+      },
+      {
+        "element": "Refresh models",
+        "inset": 15
+      },
+      {
+        "element": "Set up cloud models",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Models",
+        "to": "",
+        "gap": 28,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "",
+        "to": "On this computer",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "On this computer",
+        "to": "Set up cloud models",
+        "gap": 37,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Set up cloud models",
+        "to": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "gap": 21,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "to": "Use model",
+        "gap": 27,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "DIALOG-01",
+    "size": [
+      1440,
+      900
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Configuration saved.",
+        "to": "ConfigurationDesign example",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "ConfigurationDesign example",
+        "to": "Load configurationSave to selectedNew configuration nameSave as new configuratio",
+        "gap": 24,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  },
+  {
+    "screen": "SET-01",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "SET-02B",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "SET-03B",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [
+      {
+        "element": "Back to chat",
+        "inset": 15
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "CHAT-06",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [
+      {
+        "element": "Retry saving",
+        "delta": 13
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Retry saving",
+        "inset": 13
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "CHAT-07",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [
+      {
+        "element": "Review settings",
+        "delta": 15
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Review settings",
+        "inset": 15
+      }
+    ],
+    "gaps": []
+  },
+  {
+    "screen": "MODEL-01",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [
+      {
+        "element": "Download models…Refresh models",
+        "delta": 15
+      }
+    ],
+    "buttons": [
+      {
+        "element": "Download models…",
+        "inset": 15
+      },
+      {
+        "element": "Refresh models",
+        "inset": 15
+      },
+      {
+        "element": "Set up cloud models",
+        "inset": 15
+      }
+    ],
+    "gaps": [
+      {
+        "from": "Models",
+        "to": "",
+        "gap": 28,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "",
+        "to": "On this computer",
+        "gap": 18,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "On this computer",
+        "to": "Set up cloud models",
+        "gap": 37,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      },
+      {
+        "from": "Set up cloud models",
+        "to": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "gap": 21,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": false
+      },
+      {
+        "from": "Estimate from the file size and detected memory; llama.cpp makes the final fit w",
+        "to": "Use model",
+        "gap": 27,
+        "kind": "field",
+        "band": [
+          16,
+          22
+        ],
+        "outside": true
+      }
+    ]
+  },
+  {
+    "screen": "DIALOG-01",
+    "size": [
+      760,
+      560
+    ],
+    "alignments": [],
+    "buttons": [],
+    "gaps": [
+      {
+        "from": "Configuration saved.",
+        "to": "ConfigurationDesign example",
+        "gap": 29,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      },
+      {
+        "from": "ConfigurationDesign example",
+        "to": "Load configurationSave to selectedNew configuration nameSave as new configuratio",
+        "gap": 24,
+        "kind": "field",
+        "band": [
+          24,
+          30
+        ],
+        "outside": false
+      }
+    ]
+  }
+]
