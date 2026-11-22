@@ -415,7 +415,7 @@ export default function ChatPanel({
                             <button
                               className="text-button"
                               data-control-id="button-change-context-size"
-                              onClick={() => reviewSettings('model')}
+                              onClick={() => reviewSettings('model', 'context-size')}
                             >
                               Change context size in Settings
                             </button>
@@ -596,7 +596,7 @@ export default function ChatPanel({
                 chat
                 context={projectContext}
                 onReviewFiles={() => controller.openProject(project.id, true)}
-                onChangeContext={() => reviewSettings('model')}
+                onChangeContext={() => reviewSettings('model', 'context-size')}
               />
             )
           ))}

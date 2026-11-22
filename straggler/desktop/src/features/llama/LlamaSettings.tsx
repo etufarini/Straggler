@@ -81,7 +81,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
       <div className="settings-note-group">
         {!config.appStore && (
           <div className="row-actions">
-            <button disabled={busy || active || !native} onClick={() => setFolder('llama')}>
+            <button disabled={busy || active || !native} onClick={() => setFolder(true)}>
               Choose external build…
             </button>
             <button

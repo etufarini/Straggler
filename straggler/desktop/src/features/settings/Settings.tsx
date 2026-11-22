@@ -293,10 +293,10 @@ export default function Settings({
       {manage && <SavedConfigurations controller={controller} onClose={() => setManage(false)} />}
       {folder && (
         <FolderBrowser
-          initial={folder === 'llama' ? config.llamaDir : config.modelsDir}
-          onClose={() => setFolder(null)}
+          initial={config.llamaDir}
+          onClose={() => setFolder(false)}
           onSelect={async (path) => {
-            const value = await operation('set-path', [folder, path]);
+            const value = await operation('set-path', ['llama', path]);
             accept(value);
             setDraft(settingsForModel(draft, value.settings.model));
           }}
