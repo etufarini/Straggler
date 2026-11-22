@@ -1,3 +1,4 @@
+import StatusChip from '../../components/StatusChip';
 import type { SettingsController } from '../settings/useSettings';
 import ExternalReleaseDate from './ExternalReleaseDate';
 
@@ -6,7 +7,14 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
   const bundled = !config.llamaDir && config.serverAvailable;
   return (
     <>
-      <p>A version tested with Straggler, updated with the app.</p>
+      <p className="field-help">
+        {bundled
+          ? 'A version tested with Straggler, updated with the app.'
+          : 'External builds may support different features.'}
+      </p>
+      <StatusChip live tone={config.serverAvailable ? 'positive' : 'attention'}>
+        {config.serverAvailable ? 'Found' : 'Unavailable'}
+      </StatusChip>
       <div className="build-summary">
         <strong>
           {config.serverAvailable
@@ -60,6 +68,16 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
             : 'This installation has no bundled backend. Select an existing llama.cpp build.'}
         </p>
       )}
+      <div className="folder-setting">
+        <h3>llama.cpp folder</h3>
+        <code>
+          {config.llamaDir ||
+            (config.bundledAvailable ? 'Bundled with Straggler' : 'Not configured')}
+        </code>
+        <p className="field-help">
+          The llama.cpp folder must contain llama-server, in bin or build/bin.
+        </p>
+      </div>
       {!config.appStore && (
         <div className="row-actions">
           <button disabled={busy || active || !native} onClick={() => setFolder('llama')}>
@@ -85,7 +103,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
       <p className="field-help">
         {config.appStore
           ? 'This edition uses the backend included with the app. Updates arrive through the App Store.'
-          : 'Stop the server before changing the backend. External builds may support different features.'}
+          : 'Select an existing build or use the version included with the app.'}
       </p>
     </>
   );
