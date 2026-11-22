@@ -12,11 +12,22 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { memo, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { citationPlugin } from '../../domain/citations';
 import type { ProjectPassage } from '../../domain/types';
 import type { WebSource } from '../../domain/webSearch';
 import WebLink from '../websearch/WebLink';
 import type { Components } from 'react-markdown';
+
+function AssistantLink({ href, children }: { href?: string; children?: ReactNode }) {
+  return href && /^mailto:/i.test(href) ? (
+    <WebLink url={href}>{children}</WebLink>
+  ) : (
+    <span className="message-link" title={href}>
+      {children}
+    </span>
+  );
+}
 
 // Component identities stay stable during status polling and streamed updates.
 // Generated content stays inside the app without remote loads or navigation.
@@ -28,14 +39,7 @@ const components: Components = {
     ) : (
       <span {...props}>{children}</span>
     ),
-  a: ({ children, href }) =>
-    /^mailto:/i.test(href ?? '') ? (
-      <WebLink url={href!}>{children}</WebLink>
-    ) : (
-      <span className="message-link" title={href}>
-        {children}
-      </span>
-    ),
+  a: AssistantLink,
   img: ({ alt }) => <span className="image-placeholder">[Image: {alt || 'not loaded'}]</span>,
 };
 const plugins: PluggableList = [
@@ -114,12 +118,8 @@ export default memo(function Markdown({
                 >
                   {children}
                 </WebLink>
-              ) : /^mailto:/i.test(href ?? '') ? (
-                <WebLink url={href!}>{children}</WebLink>
               ) : (
-                <span className="message-link" title={href}>
-                  {children}
-                </span>
+                <AssistantLink href={href}>{children}</AssistantLink>
               );
             },
           }
