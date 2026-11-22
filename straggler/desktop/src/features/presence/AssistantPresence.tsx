@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPresenceRenderer } from './createRenderer';
+import { OrbRenderer } from './renderers/OrbRenderer';
 import type { PresenceRenderer } from './renderer';
 import type { PresenceState } from '../../domain/presence';
 import type { GenerationMetrics } from '../../domain/types';
@@ -27,7 +27,7 @@ export default function AssistantPresence({
   useEffect(() => {
     const host = stage.current;
     if (!host) return;
-    const visual = createPresenceRenderer();
+    const visual = new OrbRenderer();
     renderer.current = visual;
     let windowVisible = true;
     let disposed = false;

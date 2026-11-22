@@ -101,7 +101,10 @@ export default memo(function Markdown({
                     type="button"
                     className="web-citation"
                     aria-label={`${passage.projectId ? 'Project' : 'Attachment'} source ${passage.n}: ${passage.name} · section ${passage.section}`}
-                    onClick={() => onProjectSource(passage)}
+                    onClick={(event) => {
+                      event.currentTarget.focus({ preventScroll: true });
+                      onProjectSource(passage);
+                    }}
                   >
                     {children}
                   </button>
