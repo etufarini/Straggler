@@ -360,7 +360,7 @@ test('PROJ-03 and PROJ-05 switch between full context and project search across 
   await expect(control(page, 'switch-include-extra-txt')).toHaveAttribute('aria-checked', 'false');
 });
 
-test('D011 sends only selected passages, preserves drafts on search failure and opens saved sources', async ({
+test('D011 sends only selected passages, preserves drafts on search failure and opens saved sources @platform', async ({
   page,
 }) => {
   const values = projects();
@@ -412,6 +412,14 @@ test('D011 sends only selected passages, preserves drafts on search failure and 
   await page.keyboard.press('Escape');
   await expect(viewer).toHaveCount(0);
   await expect(source).toBeFocused();
+  const sourceEntry = page
+    .getByRole('region', { name: 'Latest response sources' })
+    .getByRole('button', { name: 'notes.md · section 1', exact: true });
+  await sourceEntry.click();
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(viewer).toHaveCount(0);
+  await expect(sourceEntry).toBeFocused();
 });
 
 test('PROJ-03 starts a member chat with stable project prefix and sidebar New chat stays outside', async ({

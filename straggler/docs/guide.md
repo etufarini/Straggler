@@ -1134,8 +1134,26 @@ native executable or resource directory, independently of the working directory.
 Frontend modules separate app composition, features, shared controls and domain
 logic. All Tauri IPC passes through `src/services/desktop.ts`. Native defaults in
 `src-tauri/src/configuration/defaults.json` are also imported by development fixtures.
-Assistant presence uses a replaceable renderer with reduced-motion, visibility
-and cleanup handling; its animation is presentation rather than inference telemetry.
+Assistant presence instantiates `OrbRenderer` directly. The adapter owns reduced-motion,
+visibility and cleanup handling through the renderer contract; animation is
+presentation rather than inference telemetry.
+
+| Responsibility | Owning modules and flow |
+| --- | --- |
+| UI and edited state | `src/app/useWorkspace.ts` composes feature hooks; `src/domain/` owns pure rules. Edited settings, saved settings and active server settings remain separate. |
+| Native interface | `src/services/desktop.ts` owns IPC commands, channels, dialogs and development fixture dispatch; `src-tauri/src/main.rs` registers commands and delegates to the runtime. Fixture modules are excluded from production transport. |
+| Configuration and server | Rust `configuration/` validates and serializes profiles, environment controls and backend capabilities; `workspace.rs` coordinates settings; `server.rs` supervises loopback processes through `platform/`. |
+| Requests and persistence | `chat.rs`, `stream.rs` and `tokens.rs` handle requests, cancellation and SSE. `history.rs`, `projects.rs`, `temporary.rs` and frontend storage queues preserve save ordering, recovery and partial responses. |
+| Optional remote services | Rust `cloud/`, `web_search/` and `huggingface/` own provider requests. `credentials.rs` owns native keychain access and shared password operations; each service retains its account names, validation and error messages. |
+| Development and distribution | `straggler/tests/run.sh` selects checks; `tests/` and `src-tauri/tests/` supply isolated fixtures. `packaging/` prepares the pinned backend and native packages; these utilities are not application runtime dependencies. |
+
+React and TipTap/ProseMirror own rendering and editing; the Markdown/math/highlighting
+packages own message presentation. Tauri supplies the native bridge. Rust delegates
+HTTP to reqwest, asynchronous work to Tokio, search indexing to Tantivy, document
+and image extraction to format libraries, and credentials to platform keychain stores.
+These dependencies have active callers; optional features, dynamic CSS classes,
+legacy readers and explicit diagnostics must not be removed solely because they
+are absent from a static application import graph.
 
 ## Packaging and releases
 

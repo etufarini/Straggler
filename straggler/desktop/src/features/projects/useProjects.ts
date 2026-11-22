@@ -232,7 +232,6 @@ export function useProjects(
     setNotice,
     load,
     flush: () => flushStorage(queue, pendingWork.current),
-    accept,
     update,
     addFiles,
     replaceFile: (projectId: string, fileId: string) =>

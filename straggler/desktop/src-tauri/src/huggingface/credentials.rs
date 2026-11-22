@@ -1,5 +1,5 @@
-use crate::Result;
-use keyring_core::{Entry, Error};
+use crate::{credentials, Result};
+use keyring_core::Entry;
 
 pub trait TokenStore: Send + Sync {
     fn read(&self) -> Result<Option<String>>;
@@ -16,30 +16,21 @@ impl SystemTokenStore {
 
 impl TokenStore for SystemTokenStore {
     fn read(&self) -> Result<Option<String>> {
-        match Self::entry()?.get_password() {
-            Ok(token) => Ok(Some(token)),
-            Err(Error::NoEntry) => Ok(None),
-            Err(_) => Err("The system keychain could not read the Hugging Face token.".into()),
-        }
+        credentials::read_password(
+            &Self::entry()?,
+            "The system keychain could not read the Hugging Face token.",
+        )
     }
 
     fn write(&self, token: Option<&str>) -> Result<()> {
         if let Some(token) = token {
             validate_token(token)?;
         }
-        let entry = Self::entry()?;
-        let result = match token {
-            Some(value) => entry.set_password(value),
-            None => entry.delete_credential(),
-        };
-        match result {
-            Ok(()) | Err(Error::NoEntry) if token.is_none() => Ok(()),
-            Ok(()) => Ok(()),
-            Err(_) => Err(
-                "The system keychain did not confirm the token update. Unlock it and try again."
-                    .into(),
-            ),
-        }
+        credentials::write_password(
+            &Self::entry()?,
+            token,
+            "The system keychain did not confirm the token update. Unlock it and try again.",
+        )
     }
 }
 

@@ -107,7 +107,6 @@ export function useCloudModels(
     busy,
     error,
     reload,
-    run,
     notice,
     noticeBusy,
     noticeError,
