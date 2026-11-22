@@ -2,7 +2,7 @@
   "repository": "ggml-org/llama.cpp",
   "tag": "b12248",
   "commit": "3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8",
-  "purpose": "Pinned backend for Straggler development; no desktop release has been published",
+  "purpose": "Pinned llama.cpp backend bundled with Straggler desktop packages",
   "artifacts": {
     "aarch64-apple-darwin": {
       "name": "llama-b12248-bin-macos-arm64.tar.gz",

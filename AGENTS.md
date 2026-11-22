@@ -46,9 +46,9 @@ Start supervised desktop servers on loopback without opening a browser. Check po
 
 ## Development and distribution
 
-Use existing Node/npm, Rust and platform development dependencies. Document explicit setup with npm ci; do not download private toolchains or compile during installed startup. Ship the pinned backend and its required libraries, licenses and provenance with native packages. Model files and GPU drivers remain external requirements. Backend updates arrive through application updates; the regular desktop may select an existing external build.
+Use existing Node/npm, Rust and platform development dependencies. Document explicit setup with npm ci; do not download private toolchains or compile during installed startup. Ship the pinned backend and its required libraries, licenses and provenance with native packages. Model files and GPU drivers remain external requirements. Backend updates arrive through application updates; the desktop may select an existing external build.
 
-Keep macOS GUI packaging the default; sandbox diagnostics and the App Store variant are explicit options. Keep signing and sandbox entitlements appropriate to each variant. Verify extracted Debian payloads, native resource paths, dynamic dependencies and the pinned backend identity. Build packages on matching target architectures. Local ad hoc signing is not distribution signing or notarization. Preparing packages does not publish a release.
+Keep macOS GUI packaging the default and sandbox checks as explicit diagnostics. Document published desktop packages as the user installation path. Keep signing and entitlements appropriate to each build. Verify extracted Debian payloads, native resource paths, dynamic dependencies and the pinned backend identity. Build packages on matching target architectures. Local ad hoc signing is not distribution signing or notarization. Preparing packages does not publish a release.
 
 ## Verification
 
@@ -68,7 +68,7 @@ Treat GitHub Actions as a merge gate: require successful frontend and Linux/macO
 
 ## Documentation and releases
 
-Keep README.md concise and practical: local desktop chat, package availability, requirements, native application startup, first configuration and one link to straggler/docs/guide.md. Include the human-maintainer principle. Keep settings, data compatibility, development, packaging and troubleshooting in the guide. Keep the developer README focused on commands and upstream fixture contracts. Remove obsolete installation paths, launcher instructions and duplicated historical records. Use real interface screenshots without fabricated readiness, inference or private paths.
+Keep README.md concise and practical: local desktop chat, published downloads and requirements, native application startup, first configuration and one link to straggler/docs/guide.md. Put the user installation and first-chat path before source development. Distinguish published package architectures from build targets. Include the human-maintainer principle. Keep detailed GPU setup, settings, data compatibility, development, packaging and troubleshooting in the guide. Keep the developer README focused on commands and upstream fixture contracts. Remove obsolete installation paths, launcher instructions and duplicated historical records. Use real interface screenshots without fabricated readiness, inference or private paths.
 
 main is development, and merging does not publish a release. Do not advertise desktop packages as published before they exist. Never move published tags. Use semantic versions and obtain approval for the exact version, candidate SHA and notes before tagging or publishing. Do not delete remote branches without approval.
 
