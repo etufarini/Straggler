@@ -5,7 +5,6 @@ import backendManifest from '../../packaging/llama-runtime.json' with { type: 'j
 
 async function openBackend(page: Page) {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'llama.cpp');
 }
 

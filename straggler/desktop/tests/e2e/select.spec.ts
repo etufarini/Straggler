@@ -4,7 +4,6 @@ import { expect, test } from '@playwright/test';
 test.beforeEach(async ({ page }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
 });
 

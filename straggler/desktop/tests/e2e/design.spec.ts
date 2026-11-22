@@ -30,7 +30,6 @@ test('restart indication remains accessible after returning to chat', async ({ p
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await expect(page.locator('.local-badge')).toContainText('Ready');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }).fill('8192');
   await page.getByRole('button', { name: 'Back to chat' }).click();
@@ -43,7 +42,6 @@ test('settings keep the server save action visible and per-item pages have their
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await page.locator('.settings-page').evaluate((element) => {
     element.scrollTop = element.scrollHeight;

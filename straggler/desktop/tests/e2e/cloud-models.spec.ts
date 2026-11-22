@@ -14,7 +14,6 @@ test('setup verifies explicitly, rejected replacement preserves the key and only
   expect(await requests(page)).toEqual([]);
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Cloud models');
   const provider = page
     .locator('.cloud-provider')

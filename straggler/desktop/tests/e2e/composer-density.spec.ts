@@ -1,4 +1,3 @@
-import { settingsSection } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 
 const projectId = '10000000-0000-4000-8000-000000000001';
@@ -56,7 +55,7 @@ async function prepare(page: Page, web: string, reasoning: boolean) {
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Check composer controls');
-  if (web === 'on') await settingsSection(page, 'Web search');
+  if (web === 'on') await page.getByRole('button', { name: 'Web search', exact: true }).click();
 }
 
 async function inspectControls(page: Page) {

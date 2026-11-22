@@ -317,7 +317,6 @@ test('folder selection separates browsing, hidden directories, cancel and confir
   await mockDesktop(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await settingsSection(page, 'llama.cpp');
   await page.getByRole('button', { name: 'Choose external build…', exact: true }).click();
@@ -343,7 +342,6 @@ test('invalid settings preserve the draft and display validation feedback', asyn
   await mockDesktop(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await page.getByRole('textbox', { name: /^CPU threads/ }).fill('0');
   await page.getByRole('button', { name: 'Apply changes', exact: true }).click();
@@ -488,7 +486,6 @@ test('history and backend errors use their own context and recovery actions', as
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.goto('/?scenario=backend-error');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await settingsSection(page, 'llama.cpp');
   await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
@@ -537,7 +534,6 @@ test('hardware scenarios preserve generic controls and unknown memory', async ({
 test('occupying listeners require separate normal and force confirmations', async ({ page }) => {
   await page.goto('/?scenario=occupied');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await expect(page.getByRole('button', { name: 'Force quit', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Close programs using it', exact: true }).click();

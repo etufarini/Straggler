@@ -8,7 +8,6 @@ test('external backend keeps version information when no upstream release is pub
   await page.goto('/?scenario=normal');
   await page.evaluate(() => localStorage.setItem('straggler-fixture-release-status', 'notFound'));
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'llama.cpp');
   const summary = page.locator('.build-summary');
   await expect(summary).toContainText('0.9.0-fixture');

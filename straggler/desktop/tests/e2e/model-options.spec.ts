@@ -14,7 +14,6 @@ test('template suggestion needs activation and picker cancellation preserves sel
   });
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   const template = page.getByRole('combobox', { name: 'Chat template', exact: true });
   await expect(template).toHaveText('Default');
@@ -47,7 +46,6 @@ test('template and MTP are restored together by profiles and require restart whe
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await selectValue(page.getByRole('combobox', { name: 'Chat template', exact: true }), 'custom');
   await settingsSection(page, 'Model settings');
@@ -88,7 +86,6 @@ test('template and MTP are restored together by profiles and require restart whe
   await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await selectValue(mtp, 'off');
   await expect(
@@ -101,7 +98,6 @@ test('template and MTP are restored together by profiles and require restart whe
 test('changing the model clears its template and MTP choices', async ({ page }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await selectValue(page.getByRole('combobox', { name: 'Chat template', exact: true }), 'custom');
   await settingsSection(page, 'Model settings');
@@ -130,7 +126,6 @@ test('unsupported options and native overrides explain why activation is unavail
   );
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await expect(
     page.getByText('This backend does not advertise custom chat template support.'),
@@ -155,7 +150,6 @@ test('unsupported options and native overrides explain why activation is unavail
   });
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'Model settings');
   await expect(page.getByRole('combobox', { name: 'Chat template', exact: true })).toBeDisabled();
   await expect(

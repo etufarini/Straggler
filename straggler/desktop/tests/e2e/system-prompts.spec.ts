@@ -7,7 +7,6 @@ test('presets are copied into chat, can be saved from the prompt editor and roun
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'System prompts');
   await expect(
     page.getByText('Save prompts you use often and reuse them in any chat.'),
@@ -98,7 +97,6 @@ test('storage failure preserves edits and deleting a preset requires confirmatio
   );
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   await settingsSection(page, 'System prompts');
   await page.getByRole('button', { name: 'Options for Keep', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();

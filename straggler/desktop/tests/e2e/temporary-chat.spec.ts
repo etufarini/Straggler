@@ -1,4 +1,3 @@
-import { settingsSection } from './settings';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -60,7 +59,6 @@ test('leaving a draft for Settings or another chat requires confirmation and Can
   await ready(page);
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Private draft');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await settingsSection(page, 'Chat defaults');
   const dialog = page.getByRole('alertdialog', { name: 'Erase this temporary chat?' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
