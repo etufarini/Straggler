@@ -1034,11 +1034,11 @@ textarea:disabled {
 .feedback {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--ui-space-3);
   border: 1px solid #65413e;
   background: #292126;
   border-radius: var(--ui-radius);
-  padding: 13px 15px;
+  padding: var(--ui-space-4);
   color: #edb8b2;
   font-size: var(--ui-fs-meta);
   overflow-wrap: anywhere;
@@ -1063,21 +1063,29 @@ textarea:disabled {
 }
 .feedback-body {
   color: #c6ccd8;
-  margin-top: 3px;
+  margin-top: var(--ui-space-1);
 }
 .feedback-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 15px;
-  margin-top: 10px;
+  gap: var(--ui-space-4);
+  margin-top: var(--ui-space-3);
 }
 .feedback-actions button,
 .feedback-dismiss {
   font-size: var(--ui-fs-badge);
 }
+.feedback-actions button:not(.primary-button, .secondary-button, .danger-button) {
+  padding-inline: 0;
+  min-height: 24px;
+  order: 1;
+}
+.feedback-actions button:focus-visible {
+  outline-offset: 4px;
+}
 .feedback-dismiss {
-  padding: 3px;
+  padding: var(--ui-space-1);
   flex-shrink: 0;
 }
 .feedback-details {
@@ -1102,11 +1110,24 @@ textarea:disabled {
   margin-bottom: 12px;
 }
 .field-error {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-1);
   color: #edb8b2;
   font-size: var(--ui-fs-meta);
 }
 [aria-invalid='true'] {
   border-color: #c7847a;
+}
+.field-error svg {
+  flex-shrink: 0;
+  align-self: center;
+}
+.setting-field > .field-error {
+  margin-block-start: -4px;
+}
+.feedback-details:not([open]) > :not(summary) {
+  display: none;
 }
 .status-dot.needs-restart {
   background: var(--ui-warning);
