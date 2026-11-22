@@ -108,7 +108,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
     await prepareDesignScreen(page, derived[screen], baseUrl);
     const button = (name) => page.getByRole('button', { name, exact: true });
     if (['SET-01C', 'SET-02D', 'BUILD-04'].includes(screen)) {
-      await page.locator('.settings-page').evaluate((element) => {
+      await page.locator('.settings-section').evaluate((element) => {
         element.scrollTop = element.scrollHeight;
       });
     }
@@ -325,7 +325,7 @@ export async function prepareDesignScreen(page, screen, baseUrl = 'http://127.0.
       await button('Settings').click();
       await button('Model settings').click();
       await page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }).fill('8192');
-      await page.locator('.settings-page').evaluate((element) => {
+      await page.locator('.settings-section').evaluate((element) => {
         element.scrollTop = 0;
       });
     }

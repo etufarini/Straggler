@@ -246,8 +246,10 @@ input:disabled {
 }
 .settings-page {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: var(--ui-space-6) var(--ui-gutter) var(--ui-space-8);
 }
 .settings-heading {
@@ -261,8 +263,11 @@ input:disabled {
   line-height: 1.2;
 }
 .settings-layout {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 184px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--ui-space-8);
   max-width: 1050px;
 }
@@ -271,8 +276,6 @@ input:disabled {
   flex-direction: column;
   align-self: start;
   gap: 4px;
-  position: sticky;
-  top: 0;
 }
 .settings-nav button {
   justify-content: flex-start;
@@ -292,8 +295,10 @@ input:disabled {
 }
 
 .settings-content {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding-bottom: 12px;
+  min-height: 0;
 }
 .settings-content h2 {
   font-size: var(--ui-fs-title-2);
@@ -554,14 +559,21 @@ input:disabled {
     padding: var(--ui-space-4) var(--ui-gutter) var(--ui-space-8);
   }
   .settings-heading {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--ui-space-4);
     margin-block-end: var(--ui-space-2);
+  }
+  .settings-heading h1 {
+    margin: 0;
   }
   .settings-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
     gap: var(--ui-space-4);
   }
   .settings-nav {
-    position: static;
     flex-direction: row;
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -1589,6 +1601,10 @@ input[type='checkbox'] {
 }
 
 .settings-fields {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   border: 0;
   margin: 0;
   padding: 0;
@@ -2140,29 +2156,6 @@ input[type='checkbox'] {
 .confirmation .danger-button:hover:not(:disabled) {
   background: var(--ui-danger);
   border-color: var(--ui-danger-hover);
-}
-@supports not (position: sticky) {
-  .settings-page,
-  .settings-fields {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .settings-layout,
-  .settings-fields {
-    flex: 1;
-    min-height: 0;
-  }
-  .settings-content {
-    display: flex;
-  }
-  .configuration-heading {
-    flex-shrink: 0;
-  }
-  .settings-section {
-    min-height: 0;
-    overflow: auto;
-  }
 }
 @media (max-width: 960px) {
   .header-controls {
@@ -4697,9 +4690,6 @@ body {
   .settings-nav-heading > span {
     display: none;
   }
-  .settings-sidebar {
-    position: static;
-  }
 }
 
 .response-destination {
@@ -4785,14 +4775,13 @@ body {
 }
 
 .settings-section-heading {
-  position: sticky;
-  top: 0;
-  z-index: 3;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   gap: var(--ui-space-2);
   padding-block: var(--ui-space-3);
   background: transparent;
+  border-bottom: 1px solid var(--gnd-line);
 }
 
 /* Form containers own their rhythm; fields never add a second outer margin. */
@@ -4808,6 +4797,9 @@ body {
 .settings-section details > *,
 .cloud-provider-content > * {
   margin-block: 0;
+}
+.settings-section > * {
+  flex-shrink: 0;
 }
 .settings-section > h3 {
   margin-block-start: var(--ui-space-2);
@@ -4862,8 +4854,8 @@ body {
 
 .settings-sidebar {
   align-self: start;
-  position: sticky;
-  top: 0;
+  max-height: 100%;
+  overflow-y: auto;
 }
 .settings-nav button {
   gap: var(--ui-space-2);
@@ -4897,22 +4889,16 @@ body {
   letter-spacing: 0.08em;
   color: var(--ui-text-3);
 }
-.settings-page {
-  scroll-padding-top: var(--settings-header-height, 200px);
-}
 .settings-section-heading > * {
   margin-block: 0;
 }
-.settings-section-heading.is-stuck {
-  background: color-mix(in srgb, var(--gnd-0) 92%, transparent);
-  box-shadow: 0 1px 0 var(--gnd-line);
-  backdrop-filter: blur(8px);
-}
-.settings-header-sentinel {
-  height: 1px;
-}
 .settings-section {
-  padding-block-start: var(--ui-space-6);
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scroll-padding-block: var(--ui-space-4);
+  padding: var(--ui-space-6) var(--ui-space-3);
+  margin-inline: calc(-1 * var(--ui-space-3));
 }
 .settings-overview,
 .overview-group {
@@ -5026,7 +5012,6 @@ body {
 }
 @media (max-width: 960px) {
   .settings-sidebar {
-    position: static;
     min-width: 0;
   }
 }

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, Save, CircleAlert } from 'lucide-react';
 import type { Section } from './sections';
 import ChatDefaults from './ChatDefaults';
@@ -58,6 +58,7 @@ export default function Settings({
   const defaults = useChatDefaults(controller);
   const tokenStatus = useHubTokenStatus();
   const [manage, setManage] = useState(false);
+  const fieldsViewport = useRef<HTMLDivElement>(null);
   const {
     config,
     draft,
@@ -88,6 +89,27 @@ export default function Settings({
   const group = sectionGroups.find((group) => group.sections.some((entry) => entry.id === section));
   const entry = group?.sections.find((entry) => entry.id === section) ?? overviewEntry;
   useLayoutEffect(() => {
+    const viewport = fieldsViewport.current;
+    if (!viewport) return;
+    // Status notes can grow the header after editing. Keep the focused control visible.
+    const resize = new ResizeObserver(() => {
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused !== viewport && viewport.contains(focused)) {
+        const bounds = focused.getBoundingClientRect();
+        const visibleTop = viewport.getBoundingClientRect().top + viewport.clientTop;
+        const visibleBottom = visibleTop + viewport.clientHeight;
+        // Scroll padding can exceed the room left around a field in a short viewport.
+        if (bounds.top < visibleTop) {
+          viewport.scrollTop += Math.floor(bounds.top - visibleTop);
+        } else if (bounds.bottom > visibleBottom) {
+          viewport.scrollTop += Math.ceil(bounds.bottom - visibleBottom);
+        }
+      }
+    });
+    resize.observe(viewport);
+    return () => resize.disconnect();
+  }, [section]);
+  useLayoutEffect(() => {
     const target = controller.target;
     if (!target) return;
     const frame = requestAnimationFrame(() => focusSettingsTarget(target));
@@ -106,7 +128,7 @@ export default function Settings({
         aria-current={section === item.id ? 'page' : undefined}
         onClick={() => {
           setSection(item.id);
-          document.querySelector('.settings-page')?.scrollTo({ top: 0 });
+          fieldsViewport.current?.scrollTo({ top: 0 });
         }}
       >
         <item.icon size={16} aria-hidden="true" />
@@ -232,7 +254,13 @@ export default function Settings({
                 </div>
               )}
             </SettingsHeader>
-            <div className="settings-section">
+            <div
+              ref={fieldsViewport}
+              className="settings-section"
+              role="region"
+              aria-label={entry.label}
+              tabIndex={0}
+            >
               {busy && (
                 <p role="status" className="field-help">
                   Loading…

@@ -135,7 +135,7 @@ try {
       page.on('pageerror', (error) => errors.push(error.message));
       await prepare(page, screen);
       if (settingsScroll !== null) {
-        await page.locator('.settings-page').evaluate((element, scrollTop) => {
+        await page.locator('.settings-section').evaluate((element, scrollTop) => {
           element.scrollTop = scrollTop;
         }, settingsScroll);
       }

@@ -119,7 +119,7 @@ test('one model draft retains changed-field notes, load review and configuration
   );
 });
 
-test('free ports hide stop actions and occupied port navigation focuses below the fixed header', async ({
+test('free ports hide stop actions and occupied port navigation focuses inside the fields viewport', async ({
   page,
 }) => {
   await page.goto('/?scenario=normal');
@@ -138,11 +138,83 @@ test('free ports hide stop actions and occupied port navigation focuses below th
   ).toBeVisible();
   const rect = await port.boundingBox();
   const header = await page.locator('.settings-section-heading').boundingBox();
+  const viewport = await page.locator('.settings-section').boundingBox();
   expect(rect!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
+  expect(rect!.y).toBeGreaterThanOrEqual(viewport!.y);
+  expect(rect!.y + rect!.height).toBeLessThanOrEqual(viewport!.y + viewport!.height);
   await expect(page.getByRole('link', { name: 'Server', exact: true })).toHaveAttribute(
     'aria-current',
     'location',
   );
+  const memory = page.getByRole('link', { name: 'Memory', exact: true });
+  await memory.focus();
+  await memory.press('Enter');
+  await expect(page.getByRole('combobox', { name: 'Context size', exact: true })).toBeFocused();
+  await expect(memory).toHaveAttribute('aria-current', 'location');
+  await page.locator('.settings-section').evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(page.getByRole('link', { name: 'Server', exact: true })).toHaveAttribute(
+    'aria-current',
+    'location',
+  );
+});
+
+test('settings fields scroll by keyboard below a stable header at the minimum window size @platform', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 760, height: 560 });
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await settingsSection(page, 'Chat defaults');
+  const viewport = page.getByRole('region', { name: 'Chat defaults', exact: true });
+  const header = page.locator('.settings-section-heading');
+  const headerBounds = await header.boundingBox();
+  await viewport.focus();
+  await viewport.press('End');
+  await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      viewport.evaluate(
+        (element) => element.scrollHeight - element.clientHeight - element.scrollTop,
+      ),
+    )
+    .toBeLessThanOrEqual(1);
+  expect(await header.boundingBox()).toEqual(headerBounds);
+  const viewportBounds = await viewport.boundingBox();
+  expect(viewportBounds!.y).toBeGreaterThanOrEqual(headerBounds!.y + headerBounds!.height);
+  expect(await page.locator('.settings-page').evaluate((element) => element.scrollTop)).toBe(0);
+  const lastField = page.getByRole('textbox', { name: 'Longest reply (tokens)', exact: true });
+  await lastField.focus();
+  await expect(lastField).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('textbox', { name: 'Seed', exact: true })).toBeFocused();
+  await expect(page.getByRole('textbox', { name: 'Seed', exact: true })).toBeInViewport({
+    ratio: 1,
+  });
+  await settingsSection(page, 'Model settings');
+  await settingsSection(page, 'Chat defaults');
+  expect(await viewport.evaluate((element) => element.scrollTop)).toBe(0);
+  await expect(page.getByRole('heading', { name: 'System prompt', exact: true })).toBeInViewport({
+    ratio: 1,
+  });
+  await settingsSection(page, 'Model settings');
+  const threads = page.getByRole('textbox', { name: 'CPU threads', exact: true });
+  await threads.fill('3');
+  await expect(threads).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toBeInViewport({
+    ratio: 1,
+  });
+  // Host font metrics and scrollbars can leave room for the control but not its scroll padding.
+  const modelViewport = page.getByRole('region', { name: 'Model settings', exact: true });
+  await modelViewport.evaluate(
+    (element, controlHeight) => {
+      element.style.flex = 'none';
+      element.style.height = `${controlHeight + 1}px`;
+    },
+    (await threads.boundingBox())!.height,
+  );
+  await expect(threads).toBeInViewport({ ratio: 1 });
 });
 
 test('service provenance is separate from setup and field errors retain linked help and an icon', async ({

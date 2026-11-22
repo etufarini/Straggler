@@ -455,7 +455,7 @@ Folders are saved separately after you accept and validate a directory.
 
 ### Model settings
 
-One draft and one **Apply changes** row cover **Model**, **Memory**, **Speed** and **Server**. The page index opens each group and focuses its first control. The navigation dot identifies unapplied changes. A changed saved field also says **Changed · was ‹value›** beside an amber margin marker. The sticky header stays visible while scrolling; anchor targets remain below it.
+One draft and one **Apply changes** row cover **Model**, **Memory**, **Speed** and **Server**. The page index opens each group and focuses its first control. The navigation dot identifies unapplied changes. A changed saved field also says **Changed · was ‹value›** beside an amber margin marker. The header stays visible with a consistent background while the fields scroll in a separate area below it; anchor targets remain visible in that area.
 
 
 Choose the GGUF, chat template, context size, K/V memory format and default
