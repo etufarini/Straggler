@@ -364,9 +364,9 @@ input:disabled {
 .setting-field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--ui-space-2);
   font-size: var(--ui-fs-label);
-  margin: var(--ui-space-6) 0;
+  margin: 0;
   min-width: 0;
 }
 .setting-field > span {
@@ -389,18 +389,18 @@ input:disabled {
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: var(--ui-space-4);
 }
 .sampling-details {
   border: 1px solid #34425c;
   border-radius: var(--ui-radius);
-  padding: 13px;
-  margin: 18px 0;
+  padding: var(--ui-space-4);
+  margin: 0;
   border-color: var(--ui-border);
   background: #18224a80;
 }
 [data-area='settings'] .sampling-details {
-  background: #1b223299;
+  background: var(--gnd-2);
   border-color: var(--gnd-line);
 }
 
@@ -421,13 +421,13 @@ input:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 18px 0;
+  margin: 0;
 }
 .profile-actions {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
-  gap: 10px;
+  gap: var(--ui-space-3);
   flex-wrap: wrap;
 }
 .profile-actions > button {
@@ -1751,7 +1751,13 @@ input[type='checkbox'] {
   line-height: 1.6;
 }
 .popover-actions {
-  margin-top: 12px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: var(--ui-space-4);
+  margin-top: var(--ui-space-6);
+}
+.popover-actions > :is(.primary-button, .danger-button):last-child {
+  margin-inline-start: auto;
 }
 .popover-actions button {
   font-size: var(--ui-fs-meta);
@@ -3166,7 +3172,7 @@ input:focus-visible {
   overflow: auto;
 }
 .project-dialog .setting-field {
-  margin: 14px 0;
+  margin: 0;
 }
 .project-dialog .setting-field small {
   display: block;
@@ -4774,4 +4780,53 @@ body {
   z-index: 3;
   padding-block: 12px;
   background: var(--ui-background);
+}
+
+/* Form containers own their rhythm; fields never add a second outer margin. */
+.settings-section,
+.settings-section details[open],
+.sampling-details[open],
+.cloud-provider-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-6);
+}
+.settings-section > *,
+.settings-section details > *,
+.cloud-provider-content > * {
+  margin-block: 0;
+}
+.settings-section > h3 {
+  margin-block-start: var(--ui-space-2);
+  padding-block-start: var(--ui-space-6);
+  border-top: 1px solid var(--ui-section-line);
+}
+.settings-section > .field-help,
+.cloud-provider-content > .field-help,
+.settings-section details > .field-help {
+  margin-block-start: -16px;
+}
+.settings-section > h3 + .field-help {
+  margin-block-start: -16px;
+}
+.sampling-details[open] {
+  gap: var(--ui-space-6);
+}
+.confirmation,
+.project-dialog form,
+.composer-popover form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+.confirmation > *,
+.project-dialog form > *,
+.composer-popover form > * {
+  margin-block: 0;
+}
+.confirmation .panel-actions {
+  margin-block-start: var(--ui-space-2);
+}
+.composer-popover > .setting-field + .setting-field {
+  margin-block-start: var(--ui-space-4);
 }
