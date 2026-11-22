@@ -297,22 +297,42 @@ impl CloudService {
         Ok(())
     }
     pub fn status(&self) -> Result<CloudStatus> {
+        Ok(Self::status_with_keys(
+            self.read(),
+            self.active()?,
+            self.keys.as_ref(),
+        ))
+    }
+    async fn status_async(&self) -> Result<CloudStatus> {
+        let providers = self.read();
         let active = self.active()?;
-        let providers = match self.read() {
+        let keys = self.keys.clone();
+        tokio::task::spawn_blocking(move || {
+            Self::status_with_keys(providers, active, keys.as_ref())
+        })
+        .await
+        .map_err(|_| "The system keychain task failed.".into())
+    }
+    fn status_with_keys(
+        providers: Result<Vec<Provider>>,
+        active: Option<ActiveCloud>,
+        keys: &dyn CloudKeys,
+    ) -> CloudStatus {
+        let providers = match providers {
             Ok(providers) => providers,
             Err(error) => {
-                return Ok(CloudStatus {
+                return CloudStatus {
                     generation_parameters: crate::generation::provider_parameters(),
                     providers: Vec::new(),
                     active,
                     error: Some(error),
-                })
+                }
             }
         };
         let providers = providers
             .into_iter()
             .map(|provider| {
-                let (saved, key_error) = match self.keys.store(&provider.id).read() {
+                let (saved, key_error) = match keys.store(&provider.id).read() {
                     Ok(key) => (key.is_some(), None),
                     Err(error) => (false, Some(error)),
                 };
@@ -323,12 +343,19 @@ impl CloudService {
                 }
             })
             .collect();
-        Ok(CloudStatus {
+        CloudStatus {
             generation_parameters: crate::generation::provider_parameters(),
             providers,
             active,
             error: None,
-        })
+        }
+    }
+    async fn read_key(&self, id: &str) -> Result<Option<String>> {
+        let keys = self.keys.store(id);
+        // Linux's synchronous keychain API drives a runtime of its own.
+        tokio::task::spawn_blocking(move || keys.read())
+            .await
+            .map_err(|_| "The system keychain task failed.")?
     }
     pub fn add_custom(&self, name: String, base_url: String) -> Result<CloudStatus> {
         let base_url = validate_base_url(&base_url)?;
@@ -365,16 +392,23 @@ impl CloudService {
     pub async fn save_key(&self, id: &str, key: Option<String>) -> Result<CloudStatus> {
         let _operation = self.operation.lock().await;
         let provider = self.provider(id)?;
-        let keys = self.keys.store(id);
-        if let Some(key) = key {
+        let models = if let Some(key) = &key {
             if key.is_empty() || key.len() > 8192 || key.chars().any(char::is_control) {
                 return Err("Enter a valid API key without control characters.".into());
             }
-            let models = self
-                .fetch_models(&provider, &key)
-                .await
-                .map_err(|error| format!("{error} The previous key was kept."))?;
-            keys.write(Some(&key))?;
+            Some(
+                self.fetch_models(&provider, key)
+                    .await
+                    .map_err(|error| format!("{error} The previous key was kept."))?,
+            )
+        } else {
+            None
+        };
+        let keys = self.keys.store(id);
+        tokio::task::spawn_blocking(move || keys.write(key.as_deref()))
+            .await
+            .map_err(|_| "The system keychain task failed.")??;
+        if let Some(models) = models {
             if self
                 .update(|providers| {
                     providers
@@ -388,18 +422,15 @@ impl CloudService {
             {
                 return Err("The key was verified and saved, but the model list could not be saved. Refresh the models after resolving the storage error.".into());
             }
-        } else {
-            keys.write(None)?;
         }
-        self.status()
+        self.status_async().await
     }
     pub async fn refresh(&self, id: &str) -> Result<CloudStatus> {
         let _operation = self.operation.lock().await;
         let provider = self.provider(id)?;
         let key = self
-            .keys
-            .store(id)
-            .read()?
+            .read_key(id)
+            .await?
             .ok_or("Save and verify a cloud API key first.")?;
         let models = self.fetch_models(&provider, &key).await?;
         self.update(|providers| {
@@ -410,7 +441,7 @@ impl CloudService {
                 .models = models;
             Ok(())
         })?;
-        self.status()
+        self.status_async().await
     }
     async fn fetch_models(&self, provider: &Provider, key: &str) -> Result<Vec<CloudModel>> {
         self.check_rate_limit(&provider.id)?;
@@ -461,16 +492,15 @@ impl CloudService {
             model,
         })
     }
-    pub(crate) fn destination(&self, selection: &Selection) -> Result<CloudDestination> {
+    pub(crate) async fn destination(&self, selection: &Selection) -> Result<CloudDestination> {
         let active = self
             .active()?
             .filter(|active| &active.selection == selection)
             .ok_or("Choose this cloud model before sending.")?;
         self.check_rate_limit(&selection.provider_id)?;
         let key = self
-            .keys
-            .store(&selection.provider_id)
-            .read()?
+            .read_key(&selection.provider_id)
+            .await?
             .ok_or("Save and verify this service’s API key first.")?;
         Ok(CloudDestination { active, key })
     }
