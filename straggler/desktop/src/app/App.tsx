@@ -64,7 +64,47 @@ export default function App() {
     document.body.dataset.area = area;
     if (cloudPalette) document.body.dataset.model = 'cloud';
     else delete document.body.dataset.model;
-    return () => {
+    const workspaceFeedback = (
+    <>
+        {!cloudActive && <ServerFeedback controller={controller} />}
+        {controller.preferenceError && (
+          <div className="workspace-feedback">
+            <Feedback title="Couldn’t save preferences" details={controller.preferenceError}>
+              Changes last until you close the app.
+            </Feedback>
+          </div>
+        )}
+
+        {error && (
+          <div className="workspace-feedback">
+            <Feedback
+              title="Couldn’t complete the action"
+              details={error}
+              onDismiss={() => setError('')}
+            >
+              Check the details and try again.
+            </Feedback>
+          </div>
+        )}
+        {controller.projects.error && (
+          <div className="workspace-feedback">
+            <Feedback
+              title="Couldn’t load or save project data"
+              details={controller.projects.error}
+              actions={
+                <button className="text-button" onClick={() => void controller.projects.load()}>
+                  Retry loading projects
+                </button>
+              }
+            >
+              Project changes remain available for review. Retry the action or reload the saved
+              projects.
+            </Feedback>
+          </div>
+        )}
+    </>
+  );
+  return () => {
       delete document.body.dataset.area;
       delete document.body.dataset.model;
     };
@@ -235,42 +275,8 @@ export default function App() {
             This is the interface preview. Open the Straggler desktop app to use local models.
           </div>
         )}
-        {!cloudActive && <ServerFeedback controller={controller} />}
-        {controller.preferenceError && (
-          <div className="workspace-feedback">
-            <Feedback title="Couldn’t save preferences" details={controller.preferenceError}>
-              Changes last until you close the app.
-            </Feedback>
-          </div>
-        )}
+        {(panel === 'settings' || controller.view !== 'chat') && workspaceFeedback}
 
-        {error && (
-          <div className="workspace-feedback">
-            <Feedback
-              title="Couldn’t complete the action"
-              details={error}
-              onDismiss={() => setError('')}
-            >
-              Check the details and try again.
-            </Feedback>
-          </div>
-        )}
-        {controller.projects.error && (
-          <div className="workspace-feedback">
-            <Feedback
-              title="Couldn’t load or save project data"
-              details={controller.projects.error}
-              actions={
-                <button className="text-button" onClick={() => void controller.projects.load()}>
-                  Retry loading projects
-                </button>
-              }
-            >
-              Project changes remain available for review. Retry the action or reload the saved
-              projects.
-            </Feedback>
-          </div>
-        )}
         {(storageError ||
           controller.fileError ||
           controller.fileNotice ||
@@ -329,6 +335,7 @@ export default function App() {
         ) : (
           <div className="chat-body">
             <div className="chat-main">
+              {workspaceFeedback}
               <ChatPanel controller={controller} onProjectSource={setProjectSource} />
             </div>
             <PresencePanel
