@@ -69,13 +69,13 @@ bash straggler/tests/run.sh frontend
 | `all` (default) | Common, frontend, runtime, browser and native checks | Combined prerequisites below; native checks may be skipped on headless Linux |
 | `common` | Runner boundaries, Bash syntax/ShellCheck and offline archive fixtures | Bash 3.2+, Python; ShellCheck is optional locally |
 | `frontend` | Formatting, lint, types, production assets and unit contracts | Node/npm and `npm ci` |
-| `runtime` | Rust formatting, Clippy, runtime tests and macOS Store boundaries | Rust with rustfmt/Clippy, Python and the host linker; no npm or native GUI libraries |
+| `runtime` | Rust formatting, Clippy, runtime tests and macOS sandbox boundaries | Rust with rustfmt/Clippy, Python and the host linker; no npm or native GUI libraries |
 | `browser` | Shared renderer interactions with WebKit | Node/npm, `npm ci`, Playwright WebKit and its system dependencies |
 | `browser-platform` | Keyboard, IME and focus regressions tagged `@platform` | Same setup as `browser`; repeated on macOS in CI |
 | `desktop` | Frontend, runtime and browser suites | Combined prerequisites for those three suites |
 | `isolation` | Compile the native desktop with only shared and host-platform inputs | Rust, Python and the host Tauri development dependencies |
 | `native` | Isolation, desktop Clippy and the actual native window | Native app setup, Python and a display or headless Linux tools |
-| `packaging` | Offline archive fixtures and native resource/backend boundaries; Store boundaries on macOS | Rust, Python and the host linker; no model or backend download |
+| `packaging` | Offline archive fixtures and native resource/backend boundaries; sandbox boundaries on macOS | Rust, Python and the host linker; no model or backend download |
 
 Install browser engines explicitly from `straggler/desktop` before browser checks:
 
@@ -233,7 +233,7 @@ accepts IPv4 loopback HTTP and uses a memory token store. It is absent in produc
 The browser Hub fixture uses explicit test controls documented by
 `tests/e2e/hugging-face.spec.ts`, including gated access and low-disk/interruption
 flags; these are development controls, not production preferences.
-Live OS keychain, Flatpak portal grants and signed macOS Store bookmark/child access
+Live OS keychain, Flatpak portal grants and signed macOS sandbox bookmark/child access
 remain platform integration checks; mocks do not establish those permissions.
 
 Web search fixtures follow the provider-neutral types in `src-tauri/src/web_search/`.
@@ -290,10 +290,11 @@ Run that command from the repository root. It creates
 `straggler/desktop/test-results/docs/review-001/` exclusively and refuses to overwrite
 an existing version. It opens the real app without a configured backend or model,
 captures chat and settings, then closes the window. Review captures there before
-replacing the two current README images, `desktop-chat.png` and
-`desktop-settings.png`. Keep `straggler/docs/screenshots/` flat with only those two
-files; temporary captures and historical design views stay under ignored test
-results. Keep the original dossier baseline immutable.
+replacing `desktop-chat.png` in the root README and `desktop-settings.png` in the
+guide. Preserve both images at 2400 × 1640 pixels and their 960-pixel display width.
+The current pair shows version 1.0.0. Keep `straggler/docs/screenshots/` flat with
+only those two files; temporary captures and historical design views stay under
+ignored test results. Keep the original dossier baseline immutable.
 
 Browser captures document simulated UI states, not inference results. From the
 repository root on Linux or macOS, run the optional animation measurement with:
@@ -345,10 +346,11 @@ ESLint's supported TypeScript range. Node types follow the Node 24 CI environmen
 ## Packaging commands
 
 Use the [packaging guide](../docs/guide.md#building-packages) for native GUI packages
-with the pinned backend, signing and release candidates. Plain `npm run bundle`
-builds the Tauri app without preparing that backend. Python, Node and Rust are
-build/test dependencies only. Local candidate builds do not publish releases or
-submit to an app store.
+with the pinned backend, signing and future release candidates. The published
+1.0.0 packages are macOS Apple Silicon and Ubuntu x86-64; other build targets do
+not imply published downloads. Plain `npm run bundle` builds the Tauri app without
+preparing that backend. Python, Node and Rust are
+build/test dependencies only. Local candidate builds do not publish releases.
 
 ## Branding assets
 

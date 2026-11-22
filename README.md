@@ -4,82 +4,68 @@
 
 # Straggler
 
-Chat with local GGUF models on Linux and macOS. Straggler starts and stops
-llama.cpp for you and keeps your conversations, files and model settings on your
-computer. Projects let you share instructions and documents across chats.
+Chat with local AI models on your Mac or Linux computer. Straggler manages
+llama.cpp from the desktop app. Projects let you share instructions and documents
+across chats.
 
-Straggler is written for humans to read, maintain, and improve.
+## Download
 
-[<img src="straggler/docs/screenshots/desktop-chat.png" alt="Straggler chat with the illuminated assistant orb" width="960">](straggler/docs/screenshots/desktop-chat.png)
+Straggler 1.0.0 is available for these platforms:
 
-## Availability and requirements
+| Platform | Download |
+| --- | --- |
+| macOS 13.5+ · Apple Silicon (ARM64) | [Download for Mac](https://github.com/etufarini/Straggler/releases/download/straggler-v1.0.0/Straggler-1.0.0-macos-arm64.dmg) |
+| Linux · Ubuntu 24.04+ · x86-64 (amd64) | [Download for Ubuntu](https://github.com/etufarini/Straggler/releases/download/straggler-v1.0.0/straggler_1.0.0_amd64.deb) |
 
-Check [GitHub Releases](https://github.com/etufarini/Straggler/releases) for desktop
-package availability, checksums and signing status. Published downloads are files
-attached to a Straggler desktop release; local builds and Actions artifacts are
-review candidates. Source archives alone do not install the desktop app.
+Verify your download against [SHA256SUMS](https://github.com/etufarini/Straggler/releases/download/straggler-v1.0.0/SHA256SUMS)
+using `shasum -a 256 <file>` on macOS or `sha256sum <file>` on Ubuntu.
+See the [release notes](https://github.com/etufarini/Straggler/releases/tag/straggler-v1.0.0)
+for package details. **The macOS download is ad hoc signed and is not notarized;
+Gatekeeper may block opening it.**
 
-Packages include a pinned llama.cpp backend: macOS disk images for Apple Silicon
-and Intel, and Ubuntu `.deb` packages for amd64 and ARM64. Choose the architecture
-listed in the release notes and verify the download against `SHA256SUMS`.
+On macOS, open the DMG, drag Straggler to Applications, then open it there. On
+Ubuntu, run `sudo apt install ./straggler_1.0.0_amd64.deb`, then open Straggler from
+the application menu.
 
-To chat, you need:
+llama.cpp is included. Models are separate: download a GGUF model in the app or
+choose one you already have. You need enough memory to load it. Installing the
+app requires no Node.js, Rust or compilation.
 
-- macOS 13.5+ or Ubuntu 24.04+ with a graphical session, on ARM64 or x86_64.
-- A local GGUF model supported by your selected llama.cpp backend and enough
-  memory to load it. Model files are supplied separately.
-- Any GPU drivers required by your backend. The bundled Ubuntu backend is CPU-only;
-  the regular desktop also accepts an existing external build with GPU support.
+[<img src="straggler/docs/screenshots/desktop-chat.png" alt="Straggler 1.0.0 chat before selecting a model" width="960">](straggler/docs/screenshots/desktop-chat.png)
 
-For macOS, drag Straggler from the disk image to Applications. Local ad hoc signed
-candidates are not notarized; consult the release's signing status before downloading.
-For Ubuntu, install the `.deb` with your package manager. Open
-**Straggler** from Applications or the desktop application menu. Packaged startup
-needs no Bash, Python, Node.js or Rust toolchain.
+## Your first chat
 
-## Run from source
+1. In **Settings → Model files**, select **Choose existing folder** for your GGUFs,
+   or **Create models folder**. To download a model, open **Models → Hugging Face**.
+2. In **Model settings**, choose a model and review its settings. Select **Apply
+   changes**, then **Back to chat**.
+3. Select **Launch server**, wait for **Ready**, then send a message.
 
-Install Node.js 22.13+, 24 or 26+, Rust 1.92+ and the platform's
-[Tauri development prerequisites](https://v2.tauri.app/start/prerequisites/).
-From the repository root, run:
+The model selector and server controls stay at the top of chat. **Stop response**
+keeps the text received so far; **Stop server** shuts down llama.cpp.
+
+## CPU and GPU support
+
+Both packages support CPU inference. The macOS Apple Silicon backend also includes
+Metal GPU support. The Ubuntu backend is CPU-only.
+
+For GPU acceleration on Linux, we recommend compiling an external llama.cpp build
+for your hardware: CUDA for a compatible NVIDIA GPU, or Vulkan for a GPU with
+compatible Vulkan drivers. Select it in **Settings → llama.cpp → Choose external
+build**. Available devices and options depend on that build; GPU drivers are
+installed separately. The guide below covers setup and switching back.
+
+## Development
+
+After installing the development prerequisites described in the guide, run from
+the repository root:
 
 ```bash
 npm --prefix straggler/desktop ci
 npm --prefix straggler/desktop run desktop
 ```
 
-The second command opens the native app; use it again for subsequent sessions.
-Source development has no bundled backend: in **Settings → llama.cpp**, select an
-existing llama.cpp folder containing `build/bin/llama-server` or `bin/llama-server`.
-You can open and develop the app without model weights or an inference service.
+Straggler is written for humans to read, maintain, and improve.
 
-After development, close the app and reclaim disk space by removing generated
-Rust build files:
-
-```bash
-npm --prefix straggler/desktop run clean
-```
-
-The next native startup recompiles these files.
-
-## First launch
-
-1. In **Settings → Model files**, use **Choose existing folder** for your GGUF files,
-   or **Create models folder** to create storage in the app data directory. The
-   **Models → Hugging Face** tab can search and download GGUFs on your request;
-   a token is optional and stays in the system keychain.
-2. In **Model settings**, choose a model and review the settings. Select **Apply
-   changes**, then **Back to chat**.
-3. Select **Launch server** and wait for **Ready**, then send a message.
-4. To reuse these settings, open **Model settings → Manage configurations…**.
-
-The model selector and server controls stay at the top of chat. **Stop response**
-keeps the text received so far; **Stop server** shuts down llama.cpp. Closing the
-app asks you to confirm saving and server shutdown. On a new chat, **Temporary**
-(or Ctrl/⌘+Shift+N) keeps messages and attachments in memory until you choose
-**Save chat**; leaving asks before erasing them.
-
-[<img src="straggler/docs/screenshots/desktop-settings.png" alt="Straggler native model settings before choosing a GGUF" width="960">](straggler/docs/screenshots/desktop-settings.png)
-
-See the [user and developer guide](straggler/docs/guide.md) for chat, files,
-projects, settings, backups, troubleshooting, development and packaging.
+See the [user and developer guide](straggler/docs/guide.md) for GPU setup, chat,
+files, projects, saved configurations, backups, troubleshooting and development.

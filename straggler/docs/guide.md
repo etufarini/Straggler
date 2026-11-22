@@ -8,6 +8,8 @@ For a first session, begin with [Getting started](#getting-started). For a speci
 question, use the sections below:
 
 - [Getting started](#getting-started): requirements, startup and your first chat.
+- [CPU and GPU support](#cpu-and-gpu-support): included backends and external
+  CUDA or Vulkan builds on Linux.
 - [Chat and conversations](#chat-and-conversations): prompts, reasoning, editing
   and conversation exports.
 - [Working with files and projects](#working-with-files-and-projects): document
@@ -20,35 +22,38 @@ question, use the sections below:
   backups, older settings and environment controls.
 - [Development and architecture](#development-and-architecture): local setup,
   checks and code responsibilities.
-- [Packaging and releases](#packaging-and-releases): native packages, signing and
-  release candidates.
+- [Packaging and releases](#packaging-and-releases): published downloads, native
+  package preparation and signing.
 
 ## Getting started
 
 ### What you need
 
-To use local chat, you need macOS 13.5+ or Ubuntu 24.04+ with a graphical session,
-on ARM64 or x86_64. Choose a package or build that matches your architecture.
-Windows is not a supported native target.
+Straggler 1.0.0 has published packages for macOS 13.5+ on Apple Silicon (ARM64)
+and Ubuntu 24.04+ on x86-64 (amd64), with a graphical session. The Ubuntu package
+requires glibc 2.39 and its declared GTK/WebKitGTK libraries; a DEB package does
+not imply compatibility with every Debian-based distribution. Other build targets
+are described under [Building packages](#building-packages). Windows is not a
+supported native target.
 
 You also need a GGUF model file supported by your selected llama.cpp backend and
 enough memory to load it. GGUF is the model file format Straggler looks for in
 your models folder. Model weights are supplied separately. You can open the app,
 review its settings and develop it without a model or a running inference service.
 
-GPU support depends on the backend and any drivers it requires. The bundled
-Ubuntu backend is CPU-only; the regular edition can use an existing external
-GPU-enabled build. Available devices and options come from the selected backend.
-Memory estimates cannot guarantee that a model will fit.
+Both published packages support CPU inference. The macOS Apple Silicon backend
+also includes Metal; the Ubuntu backend is CPU-only. GPU support depends on the
+selected backend and its drivers. See [CPU and GPU support](#cpu-and-gpu-support)
+for external builds on Linux. Memory estimates cannot guarantee that a model
+will fit.
 
 ### Open the app
 
-Check [GitHub Releases](https://github.com/etufarini/Straggler/releases) for published
-Straggler desktop packages. Download a package for your platform and architecture,
-its `SHA256SUMS` file and the release notes. Local builds and Actions artifacts
-are candidates until they are attached to an approved release. GitHub's automatic
-source archives are not desktop installers. See [Published downloads](#published-downloads)
-for verification and signing status.
+Download a package from [Straggler 1.0.0](https://github.com/etufarini/Straggler/releases/tag/straggler-v1.0.0)
+and verify it against the accompanying `SHA256SUMS`. The macOS download is ad hoc
+signed, without Developer ID signing or notarization; Gatekeeper may block opening
+it. See [Published downloads](#published-downloads) for direct links and verification.
+GitHub's automatic source archives are not desktop installers.
 
 Packages include a pinned llama.cpp backend. Install and open them as follows:
 
@@ -66,25 +71,26 @@ have no bundled backend unless one has been explicitly prepared.
 
 ### Configure your first chat
 
-1. Open **Settings → llama.cpp**. For a source session without a backend, select
-   **Choose external build** and choose an existing llama.cpp folder containing
-   `build/bin/llama-server` or `bin/llama-server`. Packaged builds normally use
-   their included backend. If that backend is unavailable, follow
-   [troubleshooting](#other-common-problems).
-2. In **Model files**, select **Choose existing folder** for your GGUF files, or
-   **Create models folder** to create a folder in the Tauri app data directory.
+1. In **Settings → Model files**, select **Choose existing folder** for your GGUF
+   files, or **Create models folder** to create a folder in the Tauri app data directory.
    The system picker saves the selection only when you accept it; cancellation
    keeps the previous folder. Straggler searches two subfolder levels. An empty
    folder is valid; use **Models → Hugging Face** to download a model explicitly.
-3. In **Model settings**, choose a model. Review context size, memory format and
-   server settings, then select **Apply changes**. Review **Chat defaults** separately for reply settings. The
-   [settings reference](#settings-reference) explains the controls.
-4. Select **Back to chat**, then **Launch server**. Wait for the status to change
+2. In **Model settings**, choose a model. Review context size, memory format and
+   server settings, then select **Apply changes**. Review **Chat defaults**
+   separately for reply settings. The [settings reference](#settings-reference)
+   explains the controls.
+3. Select **Back to chat**, then **Launch server**. Wait for the status to change
    from **Loading** to **Ready**. If startup fails, open the status badge for the
    log and follow [troubleshooting](#server-controls-and-troubleshooting).
-5. Type a message and select **Send message**. The response appears in the chat.
+4. Type a message and select **Send message**. The response appears in the chat.
    Select **Stop response** if you want to stop generation and keep the text
    received so far.
+
+Packages use their included backend by default. For a source session, choose an
+existing llama.cpp build in **Settings → llama.cpp** before launching the server;
+the folder must contain `build/bin/llama-server` or `bin/llama-server`. If a packaged
+backend is unavailable, follow [troubleshooting](#other-common-problems).
 
 Models use the system folder picker on both platforms. Hidden folders remain
 accessible through the picker’s hidden-file control or path entry. Flatpak uses
@@ -111,10 +117,107 @@ reduced-motion preference.
 ### Update or remove the app
 
 Close Straggler before replacing its package. Application updates include backend
-updates; you can also select an existing external build in the regular edition.
+updates; you can also select an existing external build in **Settings → llama.cpp**.
 Remove the app through the operating system. Personal settings, conversations,
 models and external backends are separate from the application payload. See
 [Back up your data](#back-up-your-data) before moving or removing personal files.
+
+## CPU and GPU support
+
+Straggler manages the backend process; llama.cpp discovers devices and performs
+inference. The published 1.0.0 packages include llama.cpp `b12248`, source commit
+`3837bf0bc02ea5d08f8ee3585fc8c7784a81bce8`.
+
+| Published package | Included backend | GPU setup |
+| --- | --- | --- |
+| macOS Apple Silicon | CPU and Metal | Metal support is included; select from the devices advertised by the backend. |
+| Ubuntu x86-64 | CPU-only | Select an existing external CUDA or Vulkan build for compatible hardware and drivers. |
+
+In **Model settings → Speed**, **CPU only** disables GPU layers.
+**Auto** lets llama.cpp choose from its available devices. Device availability,
+model compatibility and performance depend on the selected backend, model and
+hardware. Automated application and packaging checks verify contracts, resources
+and backend identity without model weights; they do not establish real inference
+or GPU performance on every computer.
+
+### Choose a Linux GPU backend
+
+For GPU acceleration on Linux, we recommend compiling llama.cpp for the hardware
+and drivers on that computer:
+
+- **CUDA:** use a supported NVIDIA GPU, compatible NVIDIA driver and CUDA Toolkit,
+  and a host compiler supported by that Toolkit. Follow the
+  [NVIDIA Linux installation guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/)
+  and [llama.cpp CUDA instructions](https://github.com/ggml-org/llama.cpp/blob/b12248/docs/build.md#cuda).
+  Choose versions that support your GPU; the newest Toolkit is not necessarily
+  appropriate for older hardware.
+- **Vulkan:** use a GPU and driver supported by llama.cpp's Vulkan backend. Follow
+  the [llama.cpp Vulkan instructions](https://github.com/ggml-org/llama.cpp/blob/b12248/docs/build.md#vulkan)
+  for the SDK or system development packages. On Ubuntu these include
+  `libvulkan-dev`, `glslc` and `spirv-headers`. Install `vulkan-tools` for
+  `vulkaninfo` and check that it reports the intended GPU before compiling.
+  A software Vulkan device does not provide GPU acceleration.
+
+These are optional backend development steps. They do not require rebuilding
+Straggler. The installed app does not install drivers, SDKs or compilers.
+
+### Compile an external llama.cpp backend
+
+Install Git, CMake and a C/C++ build toolchain, plus the prerequisites for the
+chosen backend. The [upstream build guide](https://github.com/ggml-org/llama.cpp/blob/b12248/docs/build.md)
+is the reference for platform dependencies. The examples below use the same
+`b12248` release as Straggler 1.0.0 and separate directories for each backend.
+Choose one example.
+
+For CUDA, after installing a compatible driver, Toolkit and compiler:
+
+```bash
+git clone --branch b12248 --depth 1 https://github.com/ggml-org/llama.cpp.git llama.cpp-cuda
+cmake -S llama.cpp-cuda -B llama.cpp-cuda/build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON
+cmake --build llama.cpp-cuda/build --config Release --target llama-server
+```
+
+For Vulkan, after installing its build dependencies and verifying `vulkaninfo`:
+
+```bash
+git clone --branch b12248 --depth 1 https://github.com/ggml-org/llama.cpp.git llama.cpp-vulkan
+cmake -S llama.cpp-vulkan -B llama.cpp-vulkan/build -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON
+cmake --build llama.cpp-vulkan/build --config Release --target llama-server
+```
+
+Keep the build directory and its libraries together. Do not copy only
+`llama-server` into another directory. You can inspect the resulting backend
+without a model by running, for the chosen build:
+
+```bash
+./llama.cpp-cuda/build/bin/llama-server --version
+./llama.cpp-cuda/build/bin/llama-server --list-devices
+```
+
+Replace `llama.cpp-cuda` with `llama.cpp-vulkan` for the Vulkan example. These
+commands inspect llama.cpp; start and stop chat servers from Straggler.
+
+Later llama.cpp releases can be selected as external builds. Follow the build
+instructions for that release and review its advertised capabilities; this
+example does not establish compatibility with every later version or model.
+
+### Select the backend in Straggler
+
+1. Stop the current server, then open **Settings → llama.cpp**.
+2. Select **Choose external build** and browse to `llama.cpp-cuda` or
+   `llama.cpp-vulkan`, then accept with **Use this folder**. Choose the root
+   folder containing `build/bin/llama-server`, rather than the executable itself.
+   A packaged external build containing `bin/llama-server` is also accepted.
+3. Review the backend details. In **Model settings**, choose from its advertised
+   devices and options, then select **Apply changes**.
+4. Return to chat and select **Launch server**. Read the server log if startup
+   fails or the expected device is unavailable.
+
+To use CPU inference with the selected backend, choose **CPU only** in Model
+settings and apply the change. To restore the package's original backend, stop
+the server and select **Use bundled version** in **Settings → llama.cpp**, confirm
+with **Use bundled version**, then review Model settings before restarting. The
+bundled Ubuntu backend is CPU-only.
 
 ## Chat and conversations
 
@@ -459,6 +562,8 @@ Folders are saved separately after you accept and validate a directory.
 
 ### Model settings
 
+[<img src="screenshots/desktop-settings.png" alt="Straggler 1.0.0 model settings before choosing a GGUF" width="960">](screenshots/desktop-settings.png)
+
 One draft and one **Apply changes** row cover **Model**, **Memory**, **Speed** and **Server**. The page index opens each group and focuses its first control. The navigation dot identifies unapplied changes. A changed saved field also says **Changed · was ‹value›** beside an amber margin marker. The header stays visible with a consistent background while the fields scroll in a separate area below it; anchor targets remain visible in that area.
 
 
@@ -683,9 +788,9 @@ for older files and missing-field defaults.
 In **Model files**, the models folder precedes the optional Hugging Face token. **Create models folder** creates `models/` beneath Tauri’s app data
 directory for bundle identifier `io.github.etufarini.straggler`. The UI shows the
 resolved path before creation. This is separate from conversation storage. The
-regular Linux path is `${XDG_DATA_HOME:-$HOME/.local/share}/io.github.etufarini.straggler/models`;
-on macOS it is `~/Library/Application Support/io.github.etufarini.straggler/models`
-inside the app container when sandboxed. **Choose existing folder** uses the system
+Linux path is `${XDG_DATA_HOME:-$HOME/.local/share}/io.github.etufarini.straggler/models`;
+on macOS it is `~/Library/Application Support/io.github.etufarini.straggler/models`.
+**Choose existing folder** uses the system
 picker; cancellation preserves the current folder. Flatpak uses FileChooser over
 D-Bus without an external helper fallback. A missing portal produces an error.
 
@@ -697,8 +802,9 @@ In **llama.cpp**, **Choose external build…** opens the existing folder
 browser. Browse without saving, then accept with **Use this folder**. Hidden
 folders can be shown or opened by path. A backend folder must contain executable
 `build/bin/llama-server` or `bin/llama-server`; source builds take precedence.
-Stop the server before changing its backend. The App Store edition uses only its
-included backend and retains model permissions through security-scoped bookmarks.
+Stop the server before changing its backend. See
+[Select the backend in Straggler](#select-the-backend-in-straggler) for GPU setup
+and returning to the included backend.
 
 ### Hugging Face
 
@@ -774,8 +880,8 @@ the service's rate limit. An unknown renewal date is displayed as unavailable.
 
 This section identifies the selected backend and displays available version,
 commit and build details. The bundled backend is pinned; its updates arrive with
-application updates. In the regular edition, use **Choose external build** to
-select an existing build or **Use bundled backend** to return to the included one.
+application updates. Use **Choose external build** to
+select an existing build or **Use bundled version** to return to the included one.
 Stop the server before switching. The included backend shows its version, build
 number and release date from packaged metadata, with no runtime release lookup.
 External version/build/commit come from `llama-server --version`, including its
@@ -796,7 +902,8 @@ lookup** action. Backend startup and chat remain available without this lookup.
 
 External builds can advertise different devices and options. Straggler discovers
 those capabilities rather than assuming that every build supports the same
-settings. The App Store variant always uses its included backend.
+settings. See [CPU and GPU support](#cpu-and-gpu-support) for the included backends
+and external CUDA/Vulkan builds.
 
 ## Server controls and troubleshooting
 
@@ -861,20 +968,19 @@ warnings alone do not block chat.
 | Symptom | What to check |
 | --- | --- |
 | No GGUF models found | Select a readable models folder containing supported GGUF files, then refresh models. Subfolders are searched; an empty folder is valid but offers no model to load. |
-| Backend unavailable | In source development, select an existing external build. For a package missing its included backend, reinstall the package or choose an external build in the regular edition. |
+| Backend unavailable | In source development, select an existing external build. For a package missing its included backend, reinstall the package or choose an external build. |
 | Unsupported option or device | Read the server log and review explicit settings against the selected backend's advertised capabilities. Different builds may support different options. |
 | Reasoning unavailable | Check the running template's advertised capabilities. Separate reasoning is shown only if the server returns it. |
 | Context full | Exclude or remove files, or apply a larger supported context and restart. See [context limits](#shared-files-and-context-limits). Content is never dropped automatically to fit. |
 | Native services unavailable | Open the native app. A plain browser preview cannot access the desktop services or run local chat. |
 | Source build fails | Check Node/Rust versions, Tauri prerequisites, dependency downloads and free disk space. Follow [Local development](#local-development) for setup. |
-| Store model access lost | Select the models folder again in the native picker to restore permission. |
 
 ## Data, backups and compatibility
 
 ### Storage locations
 
-Settings and conversations use separate directories. These paths apply to the
-regular edition on both Linux and macOS:
+Settings and conversations use separate directories. The published desktop
+packages use these paths on Linux and macOS:
 
 | Data | Location |
 | --- | --- |
@@ -980,20 +1086,6 @@ override server sampling defaults without changing another client's stored prefe
 Explicit STRAGGLER_*, MIR_* and legacy LLAMA_* generation controls retain their
 precedence at startup over the durable chat defaults, including explicit empty values.
 
-### App Store data and permissions
-
-The App Store edition keeps configuration and data beneath its sandbox home and
-ignores external HOME/XDG root overrides. It does not automatically import regular
-edition storage; use its own container when backing up or restoring data.
-
-Choose model folders, custom templates and external MTP files through the native
-picker. Persistent security-scoped bookmarks restore access after restart; if a
-grant is missing, select the affected file or folder again. Scopes remain active
-before launching the bundled child process. Access by that child must be checked
-in a signed, sandboxed macOS Store build; Linux checks cannot establish this
-platform permission behavior. Native Save panels grant export and download
-destinations. This edition uses only its included backend.
-
 ## Development and architecture
 
 Straggler is written for human maintainers. Keep changes readable and validate
@@ -1065,7 +1157,7 @@ On Linux, browser checks may also need Playwright system dependencies installed
 explicitly during development setup. The runner does not install system packages.
 The default suite checks common runner boundaries, frontend, runtime, browser and
 native-window behavior. Offline archive checks are included in common checks;
-`packaging` adds focused native resource/backend and Store boundary checks.
+`packaging` adds focused native resource/backend and macOS sandbox boundary checks.
 
 For focused work, append a suite name, for example:
 
@@ -1161,6 +1253,45 @@ are absent from a static application import graph.
 
 ## Packaging and releases
 
+### Published downloads
+
+[Straggler 1.0.0](https://github.com/etufarini/Straggler/releases/tag/straggler-v1.0.0)
+was published on November 22, 2026, with these desktop packages:
+
+| Platform | Download |
+| --- | --- |
+| macOS 13.5+ Apple Silicon (ARM64) | [Straggler-1.0.0-macos-arm64.dmg](https://github.com/etufarini/Straggler/releases/download/straggler-v1.0.0/Straggler-1.0.0-macos-arm64.dmg) |
+| Ubuntu 24.04+ x86-64 (amd64) | [straggler_1.0.0_amd64.deb](https://github.com/etufarini/Straggler/releases/download/straggler-v1.0.0/straggler_1.0.0_amd64.deb) |
+
+Download [SHA256SUMS](https://github.com/etufarini/Straggler/releases/download/straggler-v1.0.0/SHA256SUMS)
+and compare the digest for your package before installing. On macOS:
+
+```bash
+shasum -a 256 Straggler-1.0.0-macos-arm64.dmg
+```
+
+Open the disk image, drag Straggler to Applications and launch it there. Close
+an existing installation before replacing it. The 1.0.0 download is ad hoc signed;
+it is not Developer ID signed or notarized. Gatekeeper may block opening it.
+Ad hoc signing checks bundle integrity but does not identify a Developer ID
+publisher. Users who require a notarized publisher identity should wait for a
+signed distribution.
+
+On Ubuntu 24.04+ x86-64:
+
+```bash
+sha256sum straggler_1.0.0_amd64.deb
+sudo apt install ./straggler_1.0.0_amd64.deb
+```
+
+Using `apt` installs the declared system dependencies. Open Straggler from the
+application menu. Installed startup does not compile code or install tools.
+Models and any external GPU-enabled backend remain separate.
+
+There are no macOS Intel or Linux ARM64 desktop packages in the 1.0.0 release.
+The build targets below do not establish published download availability. GitHub's
+source archives and Actions artifacts are not published desktop installers.
+
 ### Building packages
 
 Run the commands below from `straggler/desktop`, after `npm ci` and the host
@@ -1174,13 +1305,13 @@ The release date is the GitHub `published_at` of the pinned `bNNNN` release,
 recorded during packaging rather than fetched by the installed app. To refresh
 metadata while deliberately updating a pin, run
 `python3 packaging/backend.py --refresh-release-metadata --version VERSION`
-from the desktop directory and review the changed JSON. Preparation verifies archives, copies only required
-executables/libraries, and includes both licenses and provenance. It rejects unsafe
-archive paths and unknown external dependencies. A failed preparation preserves
-the previous result. `prepare` and `bundle` accept `--archive /path/to/archive.tar.gz`
-for an existing official archive, still verified against the pinned digest.
-Without `--archive`, preparation downloads the pinned upstream archive. Model
-weights are never bundled or downloaded by these commands.
+from the desktop directory and review the changed JSON. Preparation verifies
+archives, copies only required executables/libraries, and includes both licenses
+and provenance. It rejects unsafe archive paths and unknown external dependencies.
+A failed preparation preserves the previous result. `prepare` and `bundle` accept
+`--archive /path/to/archive.tar.gz` for an existing official archive, still verified
+against the pinned digest. Without `--archive`, preparation downloads the pinned
+upstream archive. Model weights are never bundled or downloaded by these commands.
 
 #### macOS
 
@@ -1190,22 +1321,25 @@ Build on the matching Mac architecture with Xcode command line tools:
 python3 packaging/macos.py bundle --target aarch64-apple-darwin
 ```
 
-Use `x86_64-apple-darwin` on Intel. The default creates the regular GUI and a DMG
-with an Applications shortcut. Output is under
+The packager also accepts `x86_64-apple-darwin` on Intel. The default creates the
+GUI and a DMG with an Applications shortcut. Output is under
 `packaging/generated/build/<target>/release/bundle/macos/`. Libraries, helper and
 app are signed and checked; the DMG copies the signed app without rebuilding it.
-The default ad hoc signature is for local testing. For direct distribution use
+The default ad hoc signature is suitable for local checks and is the signature
+used by the published 1.0.0 package. For Developer ID distribution, use
 `--signing-identity "Developer ID Application: YOUR IDENTITY"`, then notarize and
 staple the candidate using Apple's tooling before publishing. The packager does
-not notarize, upload or publish. See [Tauri signing guidance](https://v2.tauri.app/distribute/sign/macos/).
+not notarize, upload or publish. See
+[Tauri signing guidance](https://v2.tauri.app/distribute/sign/macos/).
 
 `prepare` verifies and stages the backend without compiling. To stage only the
 backend, replace `bundle` with `prepare` in the platform's command. With `bundle`,
 `--probe` builds a separate sandbox diagnostic under `generated/build-probe/`,
-with no chat window. It checks backend version/help and writes an isolated report. Its
-`--select-model` runtime option performs an optional CPU loading check through the
-native picker; no model is downloaded. Loading diagnostics are separate from
-normal development and do not establish inference performance.
+with no chat window. It checks backend version/help and writes an isolated report.
+Its `--select-model` runtime option performs an optional CPU loading check through
+the native picker; no model is downloaded. Loading diagnostics are separate from
+normal development and do not establish inference performance. Sandboxed variants
+are development diagnostics, separate from the published desktop packages.
 
 #### Ubuntu
 
@@ -1213,15 +1347,15 @@ Build on Ubuntu 24.04+ with the matching architecture, Tauri prerequisites,
 `patchelf` and `dpkg-deb`:
 
 ```bash
-python3 packaging/ubuntu.py bundle --target aarch64-unknown-linux-gnu
+python3 packaging/ubuntu.py bundle --target x86_64-unknown-linux-gnu
 ```
 
-Use `x86_64-unknown-linux-gnu` on x64. Packages are under
+The packager also accepts `aarch64-unknown-linux-gnu` on ARM64. Packages are under
 `packaging/generated/build-ubuntu/<target>/release/bundle/deb/`. Install with
 `sudo apt install ./<package>.deb` and open Straggler from the application menu.
-The native executable is `/usr/bin/straggler-desktop`; private backend files live under
-`/usr/lib/straggler/backend/`, and licenses/provenance under `/usr/share/doc/straggler/`.
-There is no public launcher command or direct-model CLI.
+The native executable is `/usr/bin/straggler-desktop`; private backend files live
+under `/usr/lib/straggler/backend/`, and licenses/provenance under
+`/usr/share/doc/straggler/`. There is no public launcher command or direct-model CLI.
 
 The packager patches backend library lookup to `$ORIGIN`, extracts the actual
 DEB into temporary storage, compares its backend/resources, verifies dynamic
@@ -1229,40 +1363,10 @@ loaders and checks the GUI's embedded assets and backend version/help. No model
 is loaded. Runtime dependencies include glibc 2.39+, WebKitGTK 4.1, GTK 3,
 libstdc++, OpenMP and OpenSSL 3; older distributions are not claimed compatible.
 
-#### App Store variant
-
-`--app-store` builds the sandboxed GUI with persistent model-folder permissions.
-Use a separate test application/container for local native checks:
-
-```bash
-python3 packaging/macos.py bundle --app-store --store-check --debug --target aarch64-apple-darwin
-STRAGGLER_PACKAGE_TEST_BINARY="$PWD/packaging/generated/build-app-store-check/aarch64-apple-darwin/debug/bundle/macos/Straggler Store Check.app/Contents/MacOS/straggler-desktop" node tests/package-smoke.mjs
-```
-
-The check verifies backend discovery, attachment storage and persistence across
-relaunches. Native picker cancellation, folder selection, restored access, file
-import and export still need manual checks on each target Mac. Tiny invalid GGUFs
-can check file access without weights or inference.
-
-To prepare a certificate-signed Store candidate:
-
-```bash
-python3 packaging/macos.py bundle --app-store --target aarch64-apple-darwin \
-  --signing-identity "3rd Party Mac Developer Application: YOUR IDENTITY" \
-  --provisioning-profile /absolute/path/Straggler.provisionprofile \
-  --pkg-signing-identity "3rd Party Mac Developer Installer: YOUR IDENTITY"
-```
-
-The packager validates the profile, identifier, Team ID and signing certificate,
-embeds the profile, signs parent/helper with their distinct entitlements and
-verifies the optional `.pkg`. Output is under `generated/build-app-store/`.
-Without a certificate/profile the output is an ad hoc local app. These commands
-do not submit to Apple. See [Tauri's Store procedure](https://v2.tauri.app/distribute/app-store/).
-
 ### Release candidates and approval
 
-The optional packaging workflow builds macOS GUI/diagnostic/Store candidates and
-Ubuntu DEBs on native ARM64/x64 runners. It retains packages and test evidence as
+The optional packaging workflow builds macOS GUI and sandbox diagnostics, plus
+Ubuntu DEBs, on native ARM64/x64 runners. It retains packages and test evidence as
 Actions artifacts. Trigger it from a branch with:
 
 ```bash
@@ -1276,68 +1380,19 @@ notices and signing/notarization on each supported platform. No GPU workload or
 hardware inventory is a release gate.
 
 Use semantic versions. The exact version, full candidate SHA and release notes
-require explicit approval before tagging or publishing. Never move a published
-tag or delete a remote branch without approval.
+require explicit approval before tagging or publishing. Record the source commit,
+successful check and packaging runs, backend pin, published targets, signing status
+and unverified boundaries in the release notes. Keep `SHA256SUMS` beside the
+versioned packages. Never replace a published binary with different bytes under
+the same filename, move a published tag or delete a remote branch without approval.
+Keep successful and failed check runs under normal GitHub retention.
 
-### Published downloads
+### Release history and compatibility
 
-GitHub Releases hosts the desktop packages, release notes and `SHA256SUMS`.
-Use versioned filenames so an approved package is identifiable independently of
-the release page. The first Straggler desktop candidate uses this asset layout:
-
-| Target | Asset name |
-| --- | --- |
-| macOS Apple Silicon | `Straggler-1.0.0-macos-arm64.dmg` |
-| macOS Intel | `Straggler-1.0.0-macos-x86_64.dmg` |
-| Ubuntu amd64 | `straggler_1.0.0_amd64.deb` |
-| Ubuntu ARM64 | `straggler_1.0.0_arm64.deb` |
-
-Only assets actually attached to a release are published. A failed or unfinished
-packaging job does not establish availability for that target. Record the exact
-source commit, successful check and packaging runs, backend pin, supported targets,
-signing status and any unverified boundaries in the release notes. Keep the checksum
-file beside the packages and never replace a published binary with different bytes
-under the same versioned name.
-
-On macOS, verify a download with:
-
-```bash
-shasum -a 256 Straggler-1.0.0-macos-arm64.dmg
-```
-
-Compare the result with the matching line in `SHA256SUMS`. Open the disk image,
-drag Straggler to Applications and launch it there. Close the old app before
-replacing it. Ad hoc signing verifies the local bundle's integrity but does not
-identify a Developer ID publisher or provide notarization. A release containing
-such a candidate must say so explicitly; do not describe it as notarized or as an
-App Store build. Direct-distribution signing and notarization are described above.
-
-On Ubuntu 24.04+ amd64, verify and install with:
-
-```bash
-sha256sum straggler_1.0.0_amd64.deb
-sudo apt install ./straggler_1.0.0_amd64.deb
-```
-
-Compare the digest with `SHA256SUMS` before installing. On ARM64 use the `_arm64.deb`
-asset. Using `apt` installs the declared system dependencies; opening the installed
-app does not install tools or packages. The `.deb` format alone does not establish
-compatibility with every Debian-derived distribution. The supported package baseline
-is Ubuntu 24.04+ with glibc 2.39 and the declared GUI libraries. Start Straggler from
-the application menu. Models and any external GPU-enabled backend remain separate.
-
-### Replacing the Mir release listing
-
-The historical `v1.0.0` tag belongs to Mir.cpp and must remain at its original commit.
-Removing the old GitHub release listing does not require deleting or moving that
-tag. Straggler desktop 1.0.0 uses the distinct proposed tag `straggler-v1.0.0`.
-
-Prepare and verify the new packages and notes before replacing the listing. Archive
-the old release metadata, obtain approval for the exact Straggler version, source
-SHA and notes, then remove only the Mir release record and publish the approved
-Straggler release. Retain Git history and earlier settings/conversation compatibility.
-Keep successful and failed check runs under normal GitHub retention. Neither the
-packaging workflow nor a merge publishes a release automatically.
+Straggler desktop 1.0.0 uses tag `straggler-v1.0.0`, at source commit
+`58329a1f0ce35d388c76e8a87208ba481f27fe4f`. The historical Mir.cpp `v1.0.0` tag
+remains at its original commit. Existing settings and conversation compatibility
+are described under [Earlier Mir.cpp installations](#earlier-mircpp-installations).
 
 ### System prompt presets
 
