@@ -105,6 +105,12 @@ export function PresetDialogFocus({ close, children }: { close: () => void; chil
     const previous = document.activeElement as HTMLElement | null;
     container.current?.querySelector<HTMLElement>('[data-initial-focus], input, button')?.focus();
     function keydown(event: KeyboardEvent) {
+      // A destructive confirmation owns focus while this editor remains underneath it.
+      if (
+        document.querySelector('[role="alertdialog"]') &&
+        !container.current?.querySelector('[role="alertdialog"]')
+      )
+        return;
       if (event.key === 'Escape') {
         if (document.activeElement?.matches('[role="combobox"][aria-expanded="true"]')) return;
         event.preventDefault();
