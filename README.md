@@ -14,10 +14,14 @@ Straggler is written for humans to read, maintain, and improve.
 
 ## Availability and requirements
 
-**No desktop release has been published yet.** You can run the current app from
-source using the commands below. Desktop packages are being prepared as a macOS
-disk image and an Ubuntu Debian package, with a pinned llama.cpp backend included.
-The older v1.0.0 terminal release does not install this desktop app.
+Check [GitHub Releases](https://github.com/etufarini/Straggler/releases) for desktop
+package availability, checksums and signing status. Published downloads are files
+attached to a Straggler desktop release; local builds and Actions artifacts are
+review candidates. Source archives alone do not install the desktop app.
+
+Packages include a pinned llama.cpp backend: macOS disk images for Apple Silicon
+and Intel, and Ubuntu `.deb` packages for amd64 and ARM64. Choose the architecture
+listed in the release notes and verify the download against `SHA256SUMS`.
 
 To chat, you need:
 
@@ -27,8 +31,9 @@ To chat, you need:
 - Any GPU drivers required by your backend. The bundled Ubuntu backend is CPU-only;
   the regular desktop also accepts an existing external build with GPU support.
 
-Once packages are available, drag Straggler from the macOS disk image to
-Applications, or install the Ubuntu `.deb` with your package manager. Open
+For macOS, drag Straggler from the disk image to Applications. Local ad hoc signed
+candidates are not notarized; consult the release's signing status before downloading.
+For Ubuntu, install the `.deb` with your package manager. Open
 **Straggler** from Applications or the desktop application menu. Packaged startup
 needs no Bash, Python, Node.js or Rust toolchain.
 
@@ -59,14 +64,14 @@ The next native startup recompiles these files.
 
 ## First launch
 
-1. In **Settings → Folders**, use **Choose existing folder** for your GGUF files,
+1. In **Settings → Model files**, use **Choose existing folder** for your GGUF files,
    or **Create models folder** to create storage in the app data directory. The
    **Models → Hugging Face** tab can search and download GGUFs on your request;
    a token is optional and stays in the system keychain.
 2. In **Model settings**, choose a model and review the settings. Select **Apply
    changes**, then **Back to chat**.
 3. Select **Launch server** and wait for **Ready**, then send a message.
-4. To reuse these settings, save them in **Settings → Saved configurations**.
+4. To reuse these settings, open **Model settings → Manage configurations…**.
 
 The model selector and server controls stay at the top of chat. **Stop response**
 keeps the text received so far; **Stop server** shuts down llama.cpp. Closing the
