@@ -264,7 +264,7 @@ export default function ChatPanel({
                     <WebSearchActivity
                       message={message}
                       search={controller.webSearch}
-                      onSettings={() => reviewSettings('websearch')}
+                      onSettings={() => reviewSettings('websearch', 'web-search-key')}
                     />
                   )}
                   {message.projectSources && (
