@@ -9,7 +9,7 @@ export default function MemorySettings({ controller }: { controller: SettingsCon
   return (
     <>
       <div className="field-grid related-fields">
-        <label id="setting-context" className="setting-field">
+        <label className="setting-field">
           <span>Context size</span>
           <Select
             id="context-size"

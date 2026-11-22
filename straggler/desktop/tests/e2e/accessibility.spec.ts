@@ -149,6 +149,10 @@ test('Overview, unified settings and configuration management retain named targe
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toHaveCount(1);
   for (const section of ['Overview', 'Model settings']) {
     await settingsSection(page, section);
+    const ids = await page
+      .locator('.settings-page [id]')
+      .evaluateAll((elements) => elements.map((element) => element.id));
+    expect(new Set(ids).size).toBe(ids.length);
     const shortTargets = await page
       .locator('.settings-page button, .settings-page a')
       .evaluateAll((controls) =>
