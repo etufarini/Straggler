@@ -1051,6 +1051,8 @@ recognized keys or malformed lines reject the entire load, leaving the current
 settings available.
 Loading does not rewrite older profiles. Saving writes current fields; prompts
 are JSON-encoded on one line to preserve multiline Unicode text as data.
+When changing profile fields, keep saved-configuration comparisons consistent
+with profile serialization so **Modified** reflects the values that will be saved.
 
 ### Environment controls
 
@@ -1215,6 +1217,11 @@ the [desktop README](../desktop/README.md#upstream-fixture-contracts).
 
 ### Architecture
 
+The visible repository root is limited to `README.md`, `AGENTS.md`, `LICENSE`
+and `straggler/`. Desktop code lives in `straggler/desktop/`, the development test
+runner in `straggler/tests/run.sh`, and documentation in `straggler/docs/`.
+Hidden repository and development configuration remains at the root where needed.
+
 ```text
 React features → typed desktop service → Tauri commands → Rust configuration and storage
                                                        → native OS services
@@ -1226,6 +1233,7 @@ process identity, shutdown, chat streaming, history and project storage. Linux
 uses procfs/pidfd; macOS uses libproc. The app does not invoke shell/Python helpers
 or system inspection commands. Bundled resources are resolved relative to the
 native executable or resource directory, independently of the working directory.
+Keep Linux builds independent of macOS files and Homebrew.
 
 Frontend modules separate app composition, features, shared controls and domain
 logic. All Tauri IPC passes through `src/services/desktop.ts`. Native defaults in
