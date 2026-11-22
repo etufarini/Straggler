@@ -5,6 +5,7 @@ With the fixture renderer running (`npm --prefix straggler/desktop run dev`):
 ```sh
 node straggler/docs/ui-design-dossier/scripts/layout-audit.mjs before
 node straggler/docs/ui-design-dossier/scripts/layout-audit.mjs after
+node straggler/docs/ui-design-dossier/scripts/layout-audit.mjs review --review
 ```
 
 Pass frozen capture HTML paths after the report name to inspect a saved dossier instead. Relative CSS/resources must remain beside those captures. Reports and screenshots go to `straggler/desktop/test-results/layout/<name>/`.

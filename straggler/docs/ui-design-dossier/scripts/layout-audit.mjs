@@ -151,7 +151,9 @@ export function measureLayout() {
 }
 
 async function run() {
-  const [phase = "after", ...files] = process.argv.slice(2);
+  const [phase = "after", ...inputs] = process.argv.slice(2);
+  const review = inputs.includes("--review");
+  const files = inputs.filter((input) => input !== "--review");
   const output = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "../../../desktop/test-results/layout",
@@ -166,17 +168,35 @@ async function run() {
       [1440, 900],
       [760, 560],
     ]) {
-      const screens = files.length
-        ? files
-        : [
-            "SET-01",
-            "SET-02B",
-            "SET-03B",
+      const screens = review
+        ? [
+            "R008-OVERVIEW",
+            "R008-DEFAULTS",
+            "R008-PROMPTS",
+            "R008-MODEL",
+            "R008-LLAMA",
+            "R008-FILES",
+            "R008-CLOUD",
+            "R008-WEB",
+            "DS-FIRST",
+            "DS-OOM",
+            "DS-PROMPT",
             "CHAT-06",
             "CHAT-07",
             "MODEL-01",
             "DIALOG-01",
-          ];
+          ]
+        : files.length
+          ? files
+          : [
+              "SET-01",
+              "SET-02B",
+              "SET-03B",
+              "CHAT-06",
+              "CHAT-07",
+              "MODEL-01",
+              "DIALOG-01",
+            ];
       for (const screen of screens) {
         const context = await browser.newContext({
           viewport: { width: size[0], height: size[1] },
