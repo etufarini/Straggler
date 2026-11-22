@@ -1,3 +1,4 @@
+import { chatDefaults } from '../domain/chatDefaults';
 import { currentContext } from '../domain/chat';
 import { useCloudModels } from '../features/cloud/useCloudModels';
 import type { CloudSelection } from '../domain/cloudModels';
@@ -15,7 +16,7 @@ import { newConversation } from '../domain/types';
 import { ownSystemPrompt } from '../domain/projects';
 import { serializeStorage } from '../domain/storageQueue';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
+import { applySettings, invoke, isTauri, getCurrentWindow, listen } from '../services/desktop';
 import { equalSettings, emptyServer, serverActive, settingsForModel } from '../domain/types';
 import { errorDetail, settingsFailure as describeSettingsFailure } from '../domain/errors';
 import type { SettingsFailure } from '../domain/errors';
@@ -46,6 +47,13 @@ export function useWorkspace() {
     setConfig(value);
     setDraft(value.settings);
   }
+  function acceptChatDefaults(value: Configuration) {
+    configRef.current = value;
+    setConfig(value);
+    setDraft((current) =>
+      current ? { ...current, ...chatDefaults(value.settings) } : value.settings,
+    );
+  }
   const [panel, updatePanel] = useState<Panel>(null);
   const [view, setView] = useState<'chat' | 'projects' | 'project'>('chat');
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -68,7 +76,7 @@ export function useWorkspace() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [settingsFailure, setSettingsFailure] = useState<SettingsFailure | null>(null);
-  const [settingsSection, setSettingsSection] = useState<Section>('model');
+  const [settingsSection, setSettingsSection] = useState<Section>('chat-defaults');
   const mounted = useRef(true);
   const closeAction = useRef<() => void>(() => {});
   const native = isTauri();
@@ -544,7 +552,7 @@ export function useWorkspace() {
     setBusy(true);
     setError('');
     try {
-      const applied = await invoke<Configuration>('apply_settings', { settings: draft });
+      const applied = await applySettings(draft);
       acceptConfiguration(applied);
       await invoke('start_server', { model: selected });
       await cloud.reload();
@@ -731,6 +739,7 @@ export function useWorkspace() {
     draft,
     setDraft,
     acceptConfiguration,
+    acceptChatDefaults,
     confirm,
     follow,
     composerInput,

@@ -96,7 +96,7 @@ test('settings destination groups retain accessible names and the approved order
   ).toEqual(['All models', 'On this computer', 'Cloud and web']);
   await expect(
     nav.getByRole('group', { name: 'All models', exact: true }).getByRole('button'),
-  ).toHaveText(['System prompts']);
+  ).toHaveText(['Chat defaults', 'System prompts']);
   await expect(
     nav.getByRole('group', { name: 'On this computer', exact: true }).getByRole('button'),
   ).toHaveText([

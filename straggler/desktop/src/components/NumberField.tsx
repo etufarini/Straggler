@@ -1,5 +1,4 @@
-import { useId } from 'react';
-import FieldError from './FieldError';
+import SettingsField from './SettingsField';
 
 export default function NumberField({
   label,
@@ -9,6 +8,8 @@ export default function NumberField({
   disabled = false,
   hint = '',
   error,
+  scope,
+  onBlur,
 }: {
   label: string;
   term?: string;
@@ -17,26 +18,33 @@ export default function NumberField({
   disabled?: boolean;
   hint?: string;
   error?: string;
+  scope?: string;
+  onBlur?: () => void;
 }) {
-  const id = useId();
   return (
-    <label className="setting-field">
-      <span>
-        {label}
-        {term && <code className="tech-term">{term}</code>}
-      </span>
-      <input
-        disabled={disabled}
-        aria-label={label}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
-        inputMode="decimal"
-        placeholder="Auto"
-        value={value === 'auto' ? '' : value}
-        onChange={(event) => onChange(event.target.value || 'auto')}
-      />
-      <small id={`${id}-hint`}>{hint || 'Leave empty for the native default.'}</small>
-      <FieldError id={`${id}-error`} message={error} />
-    </label>
+    <SettingsField
+      label={
+        <>
+          {label}
+          {term && <code className="tech-term">{term}</code>}
+        </>
+      }
+      hint={hint || 'Leave empty for the native default.'}
+      scope={scope}
+      error={error}
+    >
+      {(accessibility) => (
+        <input
+          {...accessibility}
+          disabled={disabled}
+          aria-label={label}
+          inputMode="decimal"
+          placeholder="Auto"
+          value={value === 'auto' ? '' : value}
+          onChange={(event) => onChange(event.target.value || 'auto')}
+          onBlur={onBlur}
+        />
+      )}
+    </SettingsField>
   );
 }

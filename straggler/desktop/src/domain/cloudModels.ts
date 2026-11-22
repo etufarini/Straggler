@@ -1,3 +1,4 @@
+import type { GenerationKey } from './chatDefaults';
 import type { ServerDetails } from './types';
 
 export type CloudKind = 'deepseek' | 'openrouter' | 'mistral' | 'custom';
@@ -31,6 +32,7 @@ export interface CloudStatus {
   providers: CloudProvider[];
   active: ActiveCloud | null;
   error: string | null;
+  generationParameters: Partial<Record<CloudKind, GenerationKey[]>>;
 }
 
 export function cloudCapabilities(model: CloudModel): string[] {

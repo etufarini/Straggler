@@ -6,10 +6,7 @@ import type { WorkspaceController } from '../../app/useWorkspace';
 
 export default function ReasoningMenu({ controller }: { controller: WorkspaceController }) {
   const { chat, config, serverDetails, chatOptionsDisabled, setChatOptions } = controller;
-  const options = resolveChatOptions(
-    chat.options,
-    controller.cloud.active ? undefined : config?.settings,
-  );
+  const options = resolveChatOptions(chat.options, config?.settings, !!controller.cloud.active);
   const available = serverDetails?.reasoningSupported === true;
   const label = !available
     ? controller.cloud.active

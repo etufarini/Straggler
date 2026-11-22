@@ -87,6 +87,13 @@ pub fn parse(kind: ProviderKind, body: Value) -> Result<Vec<CloudModel>> {
                 .unwrap_or(id)
                 .into(),
             details,
+            supported_parameters: entry["supported_parameters"].as_array().map(|values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect()
+            }),
         });
     }
     Ok(models)

@@ -43,11 +43,6 @@ export default function HuggingFaceSettings({ controller }: { controller: Settin
   }
   return (
     <>
-      <h2>Hugging Face</h2>
-      <p className="field-help">
-        Search and download GGUF models from the Models panel. Nothing is sent until you search or
-        download.
-      </p>
       <h3>
         Access token <small>Optional</small>
       </h3>

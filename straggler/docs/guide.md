@@ -73,7 +73,7 @@ libraries, including WebKitGTK and GTK. Models and GPU drivers remain separate.
    keeps the previous folder. Straggler searches two subfolder levels. An empty
    folder is valid; use **Models → Hugging Face** to download a model explicitly.
 3. In **Model settings**, choose a model. Review context size, memory format and
-   reply settings, then select **Apply changes**. The
+   server settings, then select **Apply changes**. Review **Chat defaults** separately for reply settings. The
    [settings reference](#settings-reference) explains the controls.
 4. Select **Back to chat**, then **Launch server**. Wait for the status to change
    from **Loading** to **Ready**. If startup fails, open the status badge for the
@@ -208,7 +208,7 @@ In the model selector, select a model under **Cloud · ‹service›** and choos
 model**. This stops only the llama.cpp process owned by Straggler and frees its
 memory. Choose **On this computer → Use model** to return to local inference.
 Selection lasts for this app session; provider setup and visible models are saved.
-Sampling settings apply only to local models. Capabilities and context capacity
+Chat defaults also apply to cloud models; unsupported generation parameters are omitted. Capabilities and context capacity
 appear only when the service declares them; missing capabilities remain unknown.
 
 Before the first message to each service, **Continue** acknowledges that the chat
@@ -262,6 +262,12 @@ The reasoning and effort controls beside the message box depend on what the
 running model's chat template advertises. Unsupported requests are reported
 explicitly. Separate reasoning appears only when the server returns it; it may
 not be available for every model or backend. Changes apply to the next message.
+
+Dragging files into the window highlights the composer with **Drop to attach**, as
+well as the existing right-panel dropzone. The composer remains visible when that
+panel is collapsed. **Attach · 2** shows the number of attached files in the chat;
+failed or still-reading uploads are not counted as attached. Accepted formats,
+size limits and validation remain unchanged.
 
 ### Edit or regenerate a response
 
@@ -403,7 +409,7 @@ metadata. To keep an entire project and its files, use a
 
 Settings has three groups, in this order:
 
-- **All models:** System prompts.
+- **All models:** Chat defaults and System prompts.
 - **On this computer:** Model settings, Performance, Server & port, Saved
   configurations, Folders, llama.cpp and Hugging Face.
 - **Cloud and web:** Cloud models and Web search.
@@ -439,15 +445,15 @@ The status tooltips explain the next action:
 - **Restart required:** “Stop and launch the server to use the new values.”
 
 **Apply changes** does not save a named configuration or restart the server.
-Saving a configuration also applies the edited values. Chat defaults take effect
-after Apply or a successful save, without restarting. Loading a configuration
+Saving a configuration also applies the edited server values. Chat defaults save
+automatically and apply from the next message, without restarting. Loading a configuration
 returns to **Model settings** for review; start the server when you are ready.
 Folders are saved separately after you accept and validate a directory.
 
 ### Model settings
 
-Choose the GGUF to load, context size, memory format, reply style and chat defaults
-in this section. A supported model can still exceed available memory or use a
+Choose the GGUF, chat template, context size, K/V memory format and default
+reasoning effort for the model on this computer in this section. A supported model can still exceed available memory or use a
 chat template unsupported by the backend. Straggler does not infer model support
 from filenames.
 
@@ -483,10 +489,59 @@ environment through unchanged.
 | --- | --- |
 | Context size | **Auto** lets llama.cpp choose. **Largest the model supports** stores `0` and requests full model context. A positive token count requests an explicit size. Input and output share the context. |
 | Keys format / Values format | K/V cache formats default to `q4_0`. Choices come from the selected server's help. Quantized V may require Flash Attention; llama.cpp reports model/backend restrictions. |
-| Reply style | Sampling preset; **Default** leaves sampling values to the backend. Use **Fine-tune reply style** for individual controls. |
-| Seed | **Auto**, `-1` for random, or an unsigned 32-bit integer. A fixed seed does not promise identical output across devices. |
-| Longest reply (tokens) | **Auto**, `-1` for no fixed limit, `0` for input evaluation only, or a positive output token count. |
-| Chat defaults | Default system prompt, reasoning and effort settings. The initial prompt is empty; reasoning and effort start at **Auto**. Chats can override these defaults. |
+| Default effort for this model | Levels come from the loaded model’s chat template. The default is **Template default**. Apply changes saves this local default without requiring restart; a chat can override it from the message box. Cloud effort is chosen per chat. |
+
+### Chat defaults
+
+This is the first section in **All models**. System prompt, reasoning, reply style,
+seven sampling values, seed and longest reply apply to models on this computer and
+in the cloud. New chats inherit the default system prompt; chats can override
+system prompt and reasoning from the message box. Reasoning applies only when the
+model advertises it. Default reasoning effort remains local in **Model settings**.
+
+Choices save immediately. Text and numeric fields save when they lose focus and
+after 600ms without typing. Invalid text stays visible with its validation error
+and is not saved. Storage failures keep the edit and provide **Technical details**.
+Auto-save writes only chat defaults; it preserves unapplied model, performance and
+port changes and never restarts or modifies the running server configuration.
+
+**Reply style** selects a preset; **Fine-tune reply style** exposes individual
+values in one column. **Seed** accepts Auto, -1 (random where supported), or an
+unsigned 32-bit integer. A fixed seed does not guarantee identical output across
+devices or services. **Longest reply** accepts Auto, -1 (no explicit limit), 0
+(local prompt evaluation only), or a positive token count. Cloud requests omit
+nonpositive token limits so the service can choose its default.
+
+Straggler sends non-Auto numeric generation values with every request. They are
+not llama-server launch arguments and do not require restart. A compaction request’s
+output limit takes precedence over the default. Unsupported fields are omitted:
+
+| Parameter | Local llama.cpp | OpenRouter | DeepSeek | Mistral | Custom service |
+| --- | --- | --- | --- | --- | --- |
+| temperature, top_p, presence_penalty, frequency_penalty | Yes | Yes | Yes | Yes | Yes |
+| top_k | Yes | Yes | No | Yes | No |
+| min_p | Yes | Yes | No | No | No |
+| repeat_penalty | Yes | repetition_penalty | No | No | No |
+| seed | Yes | Yes | No | random_seed | Yes |
+| max_tokens | Yes | Yes | Yes | Yes | Yes |
+
+For OpenRouter, an advertised `supported_parameters` list further restricts the
+request; without a list, the service table applies. Missing or unknown telemetry
+does not imply support. DeepSeek ignores temperature and penalties while thinking;
+its current endpoint documentation also deprecates penalties. Services may impose
+additional value ranges. Custom-service support follows the OpenAI-compatible
+contract and must be verified with the selected service.
+
+The contract was checked against the pinned llama.cpp **b12248** API parser and
+request task source, [Mistral Chat Completion](https://docs.mistral.ai/api/endpoint/chat)
+(including `top_k`), [OpenRouter parameters](https://openrouter.ai/docs/api/reference/parameters)
+and [DeepSeek thinking mode](https://api-docs.deepseek.com/guides/thinking_mode/).
+No inference service is contacted by automated checks.
+
+A field shows an exception note only when a configured service does not accept it:
+**This computer only**, **Not sent to ‹service›**, or the shorter supported-service
+list. No configured services means no exception notes. OpenRouter counts as
+supported here; its per-model filter is applied when sending.
 
 The sampling presets are starting points, not guarantees about a model's responses:
 
@@ -502,7 +557,7 @@ penalty 1 and presence/frequency penalties 0. Changing presets preserves seed,
 output length, context, cache and performance settings.
 
 Use **Fine-tune reply style** to adjust individual sampling controls. **Auto** or
-an empty field uses the backend default. These controls influence how the next
+an empty field uses the model’s default. These controls influence how the next
 token is selected:
 
 | Control | Effect | Accepted explicit values |
@@ -590,8 +645,8 @@ stopping another program.
 
 ### Saved configurations
 
-A saved configuration, also called a profile in the file format, stores model,
-reply and server settings. It does not contain folders or conversations.
+A saved configuration, also called a profile in the file format, stores the model,
+its settings on this computer and your chat defaults. It does not contain folders or conversations.
 
 To save a new configuration:
 
@@ -601,7 +656,10 @@ To save a new configuration:
    overwrite confirmation before replacing it.
 
 To reuse a configuration, select it and choose **Load configuration**. This opens
-**Model settings** for review without starting a server. Use **Save to selected**
+**Model settings** for review without starting or applying a server. When loading
+would change chat defaults, the confirmation says **Also replaces your chat defaults.**
+After confirmation, those defaults save immediately; server fields remain in the
+draft for **Apply changes**. Use **Save to selected**
 to replace a selected configuration after confirmation. **Delete configuration**
 also requires confirmation; current settings and conversations remain available.
 
@@ -811,6 +869,7 @@ regular edition on both Linux and macOS:
 | Data | Location |
 | --- | --- |
 | Saved folders | `${XDG_CONFIG_HOME:-$HOME/.config}/straggler/paths.conf` |
+| Chat defaults | `${XDG_CONFIG_HOME:-$HOME/.config}/straggler/chat-defaults.conf` |
 | Saved configurations | `${XDG_CONFIG_HOME:-$HOME/.config}/straggler/profiles/*.conf` |
 | Hub download journal (no token; restores paused) | `${XDG_DATA_HOME:-$HOME/.local/share}/straggler/desktop/huggingface/downloads.json` |
 | Conversations, attachments, projects, preferences and session lock | `${XDG_DATA_HOME:-$HOME/.local/share}/straggler/desktop/` |
@@ -908,6 +967,8 @@ Native `LLAMA_ARG_*` variables pass through unchanged. Template and MTP native
 overrides disable their GUI controls as described above; other explicit GUI
 launch arguments take precedence according to llama.cpp's parser. Requests can
 override server sampling defaults without changing another client's stored preferences.
+Explicit STRAGGLER_*, MIR_* and legacy LLAMA_* generation controls retain their
+precedence at startup over the durable chat defaults, including explicit empty values.
 
 ### App Store data and permissions
 

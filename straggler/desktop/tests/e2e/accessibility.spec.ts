@@ -56,6 +56,7 @@ test('text, primary actions, links and focus meet AA on the actual theme surface
       ).toBeGreaterThanOrEqual(3);
     }
   }
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   const apply = page.getByRole('button', { name: 'Apply changes', exact: true });
   for (const hovered of [false, true]) {
     if (hovered) await apply.hover();
@@ -94,10 +95,10 @@ test('sampling shares its default hint while retaining each field description', 
   await page.getByText('Fine-tune reply style', { exact: true }).click();
   const group = page.locator('.sampling-details');
   await expect(group.locator('summary + .field-help')).toHaveText(
-    'Leave a field empty to use the llama.cpp default.',
+    'Leave a field empty to use the model’s default.',
   );
   await expect(
-    group.getByText('Leave a field empty to use the llama.cpp default.', { exact: true }),
+    group.getByText('Leave a field empty to use the model’s default.', { exact: true }),
   ).toHaveCount(1);
   const descriptions = await group.locator('input').evaluateAll((inputs) =>
     inputs.map((input) => {
@@ -108,7 +109,7 @@ test('sampling shares its default hint while retaining each field description', 
   expect(descriptions).toHaveLength(7);
   for (const description of descriptions) {
     expect(description.length).toBeGreaterThan(0);
-    expect(description).not.toContain('llama.cpp default');
+    expect(description).not.toContain('model’s default');
   }
 });
 

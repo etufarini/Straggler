@@ -6,7 +6,6 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
   const bundled = !config.llamaDir && config.serverAvailable;
   return (
     <>
-      <h2>llama.cpp</h2>
       <p>A version tested with Straggler, updated with the app.</p>
       <div className="build-summary">
         <strong>

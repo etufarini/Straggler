@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- R006: send generation defaults per message to local and supported cloud services without restarting; add isolated automatic Chat defaults persistence, local Model settings and configuration-load confirmation for defaults. Limit prose/settings width, order field help and errors accessibly, and show attachment drop/count feedback in the composer.
+
 - R005: unify local/cloud model selection with search and a Download models view, group Settings by destination, identify response destinations and soften cloud colors and decorative effects.
 
 - R004: unify UI typography, radii, action hierarchy, semantic colors, dark native controls and minimum pointer targets; clarify interface copy without changing workflows.

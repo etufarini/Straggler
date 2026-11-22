@@ -150,12 +150,22 @@ impl Runtime {
             "stream": true,
             "stream_options": {"include_usage": true},
         });
-        if let Some(limit) = request.max_output_tokens {
-            if limit == 0 {
-                return Err("The response token limit must be positive.".into());
-            }
-            body["max_tokens"] = json!(limit);
-        }
+        let settings = self.generation_settings()?;
+        let (provider, supported) = match destination {
+            Destination::Local { .. } => (None, None),
+            Destination::Cloud(cloud) => (
+                Some(cloud.active.kind),
+                cloud.active.model.supported_parameters.as_deref(),
+            ),
+        };
+        body.as_object_mut()
+            .expect("Chat bodies are objects")
+            .extend(crate::generation::parameters(
+                &settings,
+                provider,
+                supported,
+                request.max_output_tokens,
+            )?);
         match destination {
             Destination::Local { .. } => body["timings_per_token"] = json!(true),
             Destination::Cloud(cloud) => body["model"] = json!(cloud.active.model.id),
