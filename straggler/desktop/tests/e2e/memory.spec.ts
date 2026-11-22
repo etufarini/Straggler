@@ -7,12 +7,12 @@ test('memory summary uses actual context and opens the context setting', async (
   await expect(
     page.getByText('Estimate from the file size and detected memory;', { exact: false }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.locator('.local-badge').click();
   const memory = page.getByRole('region', { name: 'Memory', exact: true });
   await expect(memory).toContainText('4,096');
-  await expect(memory).toContainText('Layers on GPU');
+  await expect(memory).toContainText('Layers on the GPU');
   await memory.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Context size', exact: true })).toBeFocused();
 });

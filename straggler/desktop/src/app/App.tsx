@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'react';
 import PresencePanel from '../features/presence/PresencePanel';
 import { assistantState } from '../domain/presence';
-import { Cpu, ChevronDown, Square, Terminal, Eclipse, Cloud } from 'lucide-react';
+import { HardDrive, ChevronDown, Square, Terminal, Eclipse, Cloud } from 'lucide-react';
 import { fileName, equalSettings, sameServerConfiguration } from '../domain/types';
 import { statusLabel } from '../components/statusLabels';
 import { isFixture } from '../services/desktop';
@@ -119,21 +119,27 @@ export default function App() {
             aria-label={`Choose model · ${modelName}`}
             title={modelName}
             aria-expanded={panel === 'models'}
-            onClick={() => setPanel('models')}
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              setPanel('models');
+            }}
           >
             <span className="model-icon">
-              {cloudActive ? <Cloud size={17} /> : <Cpu size={17} />}
+              {cloudActive ? <Cloud size={17} /> : <HardDrive size={17} />}
             </span>
             <span className="model-label">
               <span className="model-name">{modelName}</span>
-              {panel !== 'settings' && (
-                <small>
-                  {cloudActive
-                    ? `${cloudActive.providerName} · Cloud model`
-                    : config?.currentProfile || 'Unsaved configuration'}
-                  {!cloudActive && modified ? ' · Modified' : ''}
-                </small>
-              )}
+              <small
+                title={
+                  cloudActive
+                    ? 'Cloud model'
+                    : `On this computer · ${config?.currentProfile || 'Custom settings'}${modified ? ' · Modified' : ''}`
+                }
+              >
+                {cloudActive
+                  ? 'Cloud model'
+                  : `On this computer · ${config?.currentProfile || 'Custom settings'}${modified ? ' · Modified' : ''}`}
+              </small>
             </span>
             {controller.visionSupported ? (
               <span className="vision-badge">Vision</span>
@@ -232,11 +238,8 @@ export default function App() {
         {!cloudActive && <ServerFeedback controller={controller} />}
         {controller.preferenceError && (
           <div className="workspace-feedback">
-            <Feedback
-              title="Desktop preferences could not be saved"
-              details={controller.preferenceError}
-            >
-              Your layout remains usable for this session.
+            <Feedback title="Couldn’t save preferences" details={controller.preferenceError}>
+              Changes last until you close the app.
             </Feedback>
           </div>
         )}
@@ -255,7 +258,7 @@ export default function App() {
         {controller.projects.error && (
           <div className="workspace-feedback">
             <Feedback
-              title="Project data could not be saved or loaded"
+              title="Couldn’t load or save project data"
               details={controller.projects.error}
               actions={
                 <button className="text-button" onClick={() => void controller.projects.load()}>
@@ -289,6 +292,7 @@ export default function App() {
             setDraft={setDraft}
             server={server}
             accept={acceptConfiguration}
+            acceptChatDefaults={controller.acceptChatDefaults}
             confirm={setConfirmation}
             onError={reportSettingsError}
             onClearError={() => setSettingsFailure(null)}

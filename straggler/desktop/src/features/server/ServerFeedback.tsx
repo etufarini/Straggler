@@ -6,8 +6,8 @@ export default function ServerFeedback({ controller }: { controller: WorkspaceCo
   if (!server.issue && !server.error) return null;
   const memory = server.issue?.kind === 'memory';
   const stopped = !active;
-  let title = 'The local server stopped unexpectedly';
-  let description = 'Your chat remains available. Review the server log before trying again.';
+  let title = 'The server stopped unexpectedly';
+  let description = 'Your chat is kept. Check the server log and try again.';
   if (server.issue && stopped) {
     title = memory ? 'Server stopped after a memory error' : 'Server stopped after a backend error';
     description = memory

@@ -13,6 +13,7 @@ test('template suggestion needs activation and picker cancellation preserves sel
   });
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   const template = page.getByRole('combobox', { name: 'Chat template', exact: true });
   await expect(template).toHaveText('Default');
   await selectValue(template, 'custom');
@@ -44,6 +45,7 @@ test('template and MTP are restored together by profiles and require restart whe
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await selectValue(page.getByRole('combobox', { name: 'Chat template', exact: true }), 'custom');
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
   const mtp = page.getByRole('combobox', { name: 'Multi-token prediction (MTP)', exact: true });
@@ -75,9 +77,10 @@ test('template and MTP are restored together by profiles and require restart whe
   await expect(page.getByText('custom.jinja', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to chat', exact: true }).click();
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
   await selectValue(mtp, 'off');
   await expect(
@@ -90,6 +93,7 @@ test('template and MTP are restored together by profiles and require restart whe
 test('changing the model clears its template and MTP choices', async ({ page }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await selectValue(page.getByRole('combobox', { name: 'Chat template', exact: true }), 'custom');
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
   await selectValue(
@@ -117,6 +121,7 @@ test('unsupported options and native overrides explain why activation is unavail
   );
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(
     page.getByText('This backend does not advertise custom chat template support.'),
   ).toBeVisible();
@@ -140,6 +145,7 @@ test('unsupported options and native overrides explain why activation is unavail
   });
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Chat template', exact: true })).toBeDisabled();
   await expect(
     page.getByText('Native environment overrides this setting: LLAMA_ARG_CHAT_TEMPLATE.'),

@@ -50,11 +50,18 @@ impl Settings {
     }
 
     pub fn same_server_configuration(&self, other: &Self) -> bool {
-        let mut candidate = self.clone();
-        candidate.chat_system_prompt = other.chat_system_prompt.clone();
-        candidate.chat_reasoning = other.chat_reasoning.clone();
-        candidate.chat_reasoning_effort = other.chat_reasoning_effort.clone();
-        candidate == *other
+        let left = self.fields();
+        let right = other.fields();
+        left.iter().all(|(field, value)| {
+            [
+                "chat_system_prompt",
+                "chat_reasoning",
+                "chat_reasoning_effort",
+            ]
+            .contains(&field.as_str())
+                || crate::generation::fields().any(|key| key == field)
+                || right.get(field) == Some(value)
+        })
     }
 }
 
@@ -192,6 +199,60 @@ impl Runtime {
         )
     }
 
+    pub(crate) fn generation_settings(&self) -> Result<Settings> {
+        let workspace = self.workspace.lock().map_err(|error| error.to_string())?;
+        match &workspace.configuration {
+            Some(configuration) => Ok(configuration.settings.clone()),
+            None => self.native.store.initial_settings(),
+        }
+    }
+
+    pub fn save_chat_defaults(&self, patch: BTreeMap<String, String>) -> Result<Configuration> {
+        let mut workspace = self.workspace.lock().map_err(|error| error.to_string())?;
+        let mut configuration = workspace
+            .configuration
+            .clone()
+            .ok_or("Load Settings before saving chat defaults.")?;
+        let settings = crate::configuration::chat_defaults::merge(&configuration.settings, patch)?;
+        self.native.store.save_chat_defaults(&settings)?;
+        configuration.settings = settings;
+        configuration.generation_preset = configuration.settings.generation_preset();
+        configuration.modified = workspace
+            .saved
+            .as_ref()
+            .is_some_and(|saved| saved != &configuration.settings);
+        workspace.configuration = Some(configuration.clone());
+        Ok(configuration)
+    }
+
+    pub fn review_profile(&self, name: &str) -> Result<Configuration> {
+        let profile = self.native.store.load_profile(name)?;
+        let mut workspace = self.workspace.lock().map_err(|error| error.to_string())?;
+        let mut next = workspace
+            .configuration
+            .clone()
+            .ok_or("Load Settings before reviewing a configuration.")?;
+        let fields = profile.fields();
+        let patch = crate::generation::chat_default_fields()
+            .map(|field| (field.into(), fields[field].clone()))
+            .collect();
+        let settings = crate::configuration::chat_defaults::merge(&next.settings, patch)?;
+        self.native.store.save_chat_defaults(&settings)?;
+        next.settings = settings;
+        next.generation_preset = next.settings.generation_preset();
+        workspace.profile = Some(name.into());
+        workspace.saved = Some(profile.clone());
+        next.current_profile = workspace.profile.clone();
+        next.saved_settings = Some(profile);
+        next.modified = next.saved_settings.as_ref() != Some(&next.settings);
+        workspace.configuration = Some(next.clone());
+        Ok(next)
+    }
+
+    pub fn preview_profile(&self, name: &str) -> Result<Settings> {
+        self.native.store.load_profile(name)
+    }
+
     pub fn inspect(&self) -> Result<Configuration> {
         self.configure_action("inspect", &[], None)
     }
@@ -207,6 +268,12 @@ impl Runtime {
         targets: Vec<Listener>,
     ) -> Result<Value> {
         match action {
+            "review-profile" => {
+                let [name] = arguments.as_slice() else {
+                    return Err("Choose a saved configuration.".into());
+                };
+                serde_json::to_value(self.review_profile(name)?).map_err(|error| error.to_string())
+            }
             "load-profile" | "save-profile" | "delete-profile" | "set-path" | "use-bundled" => {
                 if (action == "use-bundled"
                     || (action == "set-path"
@@ -299,7 +366,7 @@ impl Runtime {
                 .map(|configuration| configuration.settings.clone())
         }) {
             Some(settings) => settings.validated()?,
-            None => Settings::from_environment(&self.native.store.environment)?,
+            None => self.native.store.initial_settings()?,
         };
         match action {
             "inspect" => {

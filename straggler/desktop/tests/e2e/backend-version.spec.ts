@@ -12,10 +12,10 @@ test('external backend keeps version information when no upstream release is pub
   await expect(summary).toContainText('0.9.0-fixture');
   await expect(summary).toContainText('b42');
   await expect(summary.locator('dd').last()).toHaveText('No published release found');
-  await page.getByRole('button', { name: 'Use bundled backend', exact: true }).click();
+  await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: 'Use bundled backend', exact: true })
+    .getByRole('button', { name: 'Use bundled version', exact: true })
     .click();
   await expect(summary).toContainText('Bundled backend');
   await expect(summary).toContainText(manifest.version);

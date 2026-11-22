@@ -12,14 +12,6 @@ export default function CloudSettings({ controller }: { controller: CloudControl
   const [url, setUrl] = useState('');
   return (
     <>
-      <h2>Cloud models</h2>
-      <p className="field-help">
-        Optional services for chatting with models hosted elsewhere. Messages leave this computer
-        only when you choose a cloud model and send.
-      </p>
-      <p className="field-help">
-        Changes are saved automatically. Sampling settings apply to models on this computer only.
-      </p>
       {controller.error && (
         <Feedback title="Couldn’t update cloud models" details={controller.error}>
           Local models remain available.{' '}
@@ -139,7 +131,7 @@ function ProviderSettings({
       <div className="cloud-provider-content">
         <p className="field-help">{provider.baseUrl}</p>
         {signup && <WebLink url={signup}>Get a key from {provider.name}</WebLink>}
-        <p className="field-help">The API key is stored only in your system keychain.</p>
+        <p className="field-help">Stored only in the system keychain and never shown again.</p>
         {provider.keyError && (
           <Feedback title="Couldn’t read the API key" details={provider.keyError}>
             Unlock your system keychain and try again.

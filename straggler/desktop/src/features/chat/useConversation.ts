@@ -349,7 +349,7 @@ export function useConversation(
         { ...assistant },
       ],
     };
-    const options = resolveChatOptions(current.options, cloud ? undefined : settings);
+    const options = resolveChatOptions(current.options, settings, !!cloud);
     const includeReasoning =
       cloud?.kind === 'deepseek' && useWebSearch && cloud.model.details.toolsSupported === true;
     const history = current.messages.slice(0, -1);
@@ -591,7 +591,7 @@ export function useConversation(
     if (editor) return 'Finish or cancel the current edit before compacting.';
     if (value.id !== chatRef.current.id) return 'Open this chat before compacting it.';
     if (requestRef.current || mutation.current || generating || editingBusy || importBusy)
-      return 'Available when the current chat operation finishes or is stopped.';
+      return 'Available when the current operation ends.';
     if (!cloud && server.phase !== 'ready')
       return 'Load a local model or choose a cloud model first.';
     if (value.messages.length < 4) return 'At least four messages are needed to compact a chat.';

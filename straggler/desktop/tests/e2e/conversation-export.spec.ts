@@ -5,7 +5,7 @@ test('both exports open save directly, cancellation is silent and write errors u
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('A chat to export');
   await page.getByRole('button', { name: 'Send message' }).click();
   const menu = page.getByRole('button', { name: 'Options for A chat to export' });
@@ -39,7 +39,9 @@ test('both exports open save directly, cancellation is silent and write errors u
   });
   await menu.click();
   await page.getByRole('menuitem', { name: 'Export chat…', exact: true }).click();
-  await expect(page.locator('.composer-wrap').getByRole('alert')).toContainText('Export failed');
+  await expect(page.locator('.composer-wrap').getByRole('alert')).toContainText(
+    'Couldn’t export the chat',
+  );
 });
 
 test('reasoning export stays focusable but unavailable with an explanation when no reasoning exists', async ({

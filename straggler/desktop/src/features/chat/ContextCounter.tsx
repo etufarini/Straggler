@@ -42,7 +42,7 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
         <>
           {estimate.includesImages && estimated && (
             <p className="popover-note" role="status">
-              Includes images · estimate. Image tokens are reported after the response.
+              Includes images (estimate). Image tokens are counted after the response.
             </p>
           )}
           <p className="popover-note">How much of the model’s working memory this chat uses.</p>
@@ -101,7 +101,7 @@ export default function ContextCounter({ controller }: { controller: WorkspaceCo
               'Window size is advertised by the cloud service'
             ) : (
               <>
-                Window size comes from the running server <code>n_ctx</code>
+                Context size comes from the running server. <code>n_ctx</code>
               </>
             )}
             {controller.serverDetails?.contextSize

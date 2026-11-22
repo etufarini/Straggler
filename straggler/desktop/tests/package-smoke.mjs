@@ -166,7 +166,7 @@ try {
   );
   assert.equal(
     await evaluate(
-      `Array.from(document.querySelectorAll('button')).some(button => button.textContent.trim() === 'Choose external build')`,
+      `Array.from(document.querySelectorAll('button')).some(button => button.textContent.trim() === 'Choose external build…')`,
     ),
     !store,
   );

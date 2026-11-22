@@ -109,12 +109,16 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
   const groups =
     searching && query.trim()
       ? [
-          { label: 'Chats', chats: filtered.filter((value) => !value.projectId) },
-          { label: 'In projects', chats: filtered.filter((value) => value.projectId) },
+          { key: 'chats', label: 'Chats', chats: filtered.filter((value) => !value.projectId) },
+          {
+            key: 'projects',
+            label: 'In projects',
+            chats: filtered.filter((value) => value.projectId),
+          },
         ]
       : [
-          { label: 'STARRED', chats: filtered.filter((value) => value.starred) },
-          { label: 'CHATS', chats: filtered.filter((value) => !value.starred) },
+          { key: 'starred', label: 'Starred', chats: filtered.filter((value) => value.starred) },
+          { key: 'chats', label: 'Chats', chats: filtered.filter((value) => !value.starred) },
         ];
   return (
     <aside id="sidebar" className={`sidebar ${preferences.sidebarCollapsed ? 'is-compact' : ''}`}>
@@ -152,12 +156,12 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
       </button>
       <div className="sidebar-projects">
         <div className="section-label has-action">
-          <span>PROJECTS</span>
+          <span>Projects</span>
           <button
             type="button"
             className="section-action"
             aria-label="New project"
-            title="Create a project"
+            title="New project"
             data-control-id="button-new-project"
             disabled={!controller.native || !projects.ready || projects.busy}
             onClick={(event) =>
@@ -210,13 +214,13 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
       </div>
       <div className="section-label has-action">
         <span>
-          {!query.trim() && conversations.some((value) => value.starred) ? 'STARRED' : 'CHATS'}
+          {!query.trim() && conversations.some((value) => value.starred) ? 'Starred' : 'Chats'}
         </span>
         <button
           ref={searchButton}
           className="section-action"
           aria-label="Search chats"
-          title="Search chats (Ctrl/⌘+K)"
+          title="Search chats (Ctrl/⌘ + K)"
           onClick={openSearch}
         >
           <Search size={13} />
@@ -290,9 +294,9 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         {groups.map(
           (group) =>
             group.chats.length > 0 && (
-              <div key={group.label}>
-                {(group.label === 'In projects' ||
-                  (group.label === 'CHATS' && groups[0].chats.length > 0)) && (
+              <div key={group.key}>
+                {(group.key === 'projects' ||
+                  (group.key === 'chats' && groups[0].chats.length > 0)) && (
                   <div className="section-label">{group.label}</div>
                 )}
                 {group.chats.map((value) => (

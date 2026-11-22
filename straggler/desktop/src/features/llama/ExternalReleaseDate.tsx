@@ -40,9 +40,9 @@ export default function ExternalReleaseDate({ native }: { native: boolean }) {
     case 'notFound':
       return <>No published release found</>;
     case 'commitMismatch':
-      return <>No matching release: the build reports a different commit</>;
+      return <>No release matches this build’s commit</>;
     case 'unidentified':
-      return <>Build identity unavailable; the release date cannot be verified</>;
+      return <>Can’t verify the release date: build identity unavailable</>;
     case 'error':
       return (
         <div className="release-date-result">

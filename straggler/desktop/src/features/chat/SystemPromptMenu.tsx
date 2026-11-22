@@ -31,7 +31,7 @@ function SystemPromptEditor({
   return (
     <>
       <p className="popover-note">
-        Instructions the assistant follows in this chat. Applies from your next message.
+        Instructions the assistant follows in this chat. Changes apply from the next message.
       </p>
       <fieldset className="choice-group">
         <legend>Source</legend>
@@ -250,8 +250,8 @@ function ProjectInstructionsEditor({
         <p className="popover-note">Changes apply from the next message.</p>
       )}
       {failure && (
-        <Feedback title="Project instructions could not be saved" details={failure}>
-          Your edits remain available. Try saving again.
+        <Feedback title="Couldn’t save the instructions" details={failure}>
+          Your edits are kept. Try again.
         </Feedback>
       )}
       <div className="popover-actions">

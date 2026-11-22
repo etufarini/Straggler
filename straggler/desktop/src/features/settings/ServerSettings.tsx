@@ -18,7 +18,6 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
   } = controller;
   return (
     <>
-      <h2>Server & port</h2>
       <NumberField
         label="Port"
         term="TCP"
@@ -58,7 +57,7 @@ export default function ServerSettings({ controller }: { controller: SettingsCon
           disabled={busy || active || draft.port !== config.settings.port || !forceTargets.length}
           onClick={() => stopListeners(true)}
         >
-          Force quit…
+          Force quit
         </button>
       </div>
       <p className="field-help">

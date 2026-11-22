@@ -1,7 +1,16 @@
+import { invoke, previewProfile, waitForChatDefaults } from '../../services/desktop';
+import { chatDefaultKeys } from '../../domain/chatDefaults';
+import type { Configuration, Settings } from '../../domain/types';
 import type { SettingsController } from './useSettings';
 import Select from '../../components/Select';
 
-export default function SavedConfigurations({ controller }: { controller: SettingsController }) {
+export default function SavedConfigurations({
+  controller,
+  onDefaultsLoaded,
+}: {
+  controller: SettingsController;
+  onDefaultsLoaded: (settings: Settings) => void;
+}) {
   const {
     config,
     draft,
@@ -21,12 +30,30 @@ export default function SavedConfigurations({ controller }: { controller: Settin
     saveProfile,
     requestSave,
   } = controller;
+  async function requestLoad() {
+    await waitForChatDefaults();
+    const current = await invoke<Configuration>('configuration');
+    const values = await previewProfile(profile);
+    const replacesDefaults = chatDefaultKeys.some((key) => values[key] !== current.settings[key]);
+    async function load() {
+      const reviewed = await operation('review-profile', [profile]);
+      accept(reviewed);
+      setDraft(values);
+      onDefaultsLoaded(values);
+      setSection('model');
+      setMessage('Configuration loaded for review. The server was not started.');
+    }
+    if (replacesDefaults)
+      confirm({
+        title: 'Load configuration?',
+        actionLabel: 'Load configuration',
+        text: `Load “${profile}” for review? The server won’t start. Also replaces your chat defaults.`,
+        action: load,
+      });
+    else await load();
+  }
   return (
     <>
-      <h2>Saved configurations</h2>
-      <p className="field-help">
-        Saves model, reply and server settings. Folders and chats aren’t included.
-      </p>
       <label className="setting-field">
         <span>Configuration</span>
         <Select
@@ -40,17 +67,7 @@ export default function SavedConfigurations({ controller }: { controller: Settin
         />
       </label>
       <div className="profile-actions">
-        <button
-          disabled={!profile || busy || !native}
-          onClick={() =>
-            void run(async () => {
-              const value = await operation('load-profile', [profile]);
-              accept(value);
-              setSection('model');
-              setMessage('Configuration loaded for review. The server was not started.');
-            })
-          }
-        >
+        <button disabled={!profile || busy || !native} onClick={() => void run(requestLoad)}>
           Load configuration
         </button>
         <button

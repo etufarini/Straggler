@@ -11,7 +11,7 @@ async function mockDesktop(page: Page, mode = 'normal') {
 
 async function loadModel(page: Page) {
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model' }).click();
+  await page.getByRole('button', { name: 'Use model' }).click();
   await expect(page.locator('.local-badge')).toContainText('Ready');
 }
 
@@ -214,7 +214,7 @@ test('clipboard failure stays beside its response without blocking chat', async 
   );
   await copy.click();
   await expect(page.locator('.message.assistant').getByRole('alert')).toContainText(
-    'Text could not be copied',
+    'Couldn’t copy the text',
   );
   await expect(page.locator('.workspace-feedback')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeEnabled();
@@ -262,7 +262,7 @@ test('empty setup gives a usable message and keeps launch disabled', async ({ pa
   await mockDesktop(page, 'empty');
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Choose external build' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose external build…' })).toBeVisible();
   await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await expect(page.getByText('No GGUF models found', { exact: true })).toBeVisible();
   await expect(
@@ -276,6 +276,7 @@ test('settings retain generation and performance values through profile operatio
   await mockDesktop(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
   await page.getByRole('textbox', { name: /^Seed/ }).fill('42');
   await page.getByRole('textbox', { name: /^Longest reply/ }).fill('512');
   await selectValue(page.getByRole('combobox', { name: 'Reply style' }), 'focused');
@@ -297,7 +298,7 @@ test('settings retain generation and performance values through profile operatio
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^CPU threads/ })).toHaveValue('3');
   await expect(page.locator('.local-badge')).toHaveText('Stopped');
-  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
   await expect(page.getByRole('textbox', { name: /^Seed/ })).toHaveValue('42');
   await expect(page.getByRole('combobox', { name: 'Reply style' })).toHaveText('Focused');
 });
@@ -308,6 +309,7 @@ test('folder selection separates browsing, hidden directories, cancel and confir
   await mockDesktop(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await page.getByRole('button', { name: 'Folders', exact: true }).click();
   await page.getByRole('button', { name: 'Choose folder', exact: true }).first().click();
   await expect(page.getByRole('dialog', { name: 'Choose folder' })).toBeVisible();
@@ -332,6 +334,7 @@ test('invalid settings preserve the draft and display validation feedback', asyn
   await mockDesktop(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
   await page.getByRole('textbox', { name: /^CPU threads/ }).fill('0');
   await page.getByRole('button', { name: 'Apply changes', exact: true }).click();
@@ -418,7 +421,7 @@ test('startup OOM is persistent without opening a modal or accepting new request
   await mockDesktop(page, 'oom-startup');
   await page.goto('/');
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Needs restart');
   await expect(page.getByRole('alert')).toContainText('Not enough memory');
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
@@ -476,11 +479,12 @@ test('history and backend errors use their own context and recovery actions', as
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.goto('/?scenario=backend-error');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
-  await page.getByRole('button', { name: 'Use bundled backend', exact: true }).click();
+  await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: 'Use bundled backend', exact: true })
+    .getByRole('button', { name: 'Use bundled version', exact: true })
     .click();
   const confirmation = page.getByRole('alertdialog');
   await expect(confirmation.getByRole('alert')).toContainText('Couldn’t complete the action');
@@ -490,7 +494,7 @@ test('history and backend errors use their own context and recovery actions', as
   );
   await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: 'Use bundled backend', exact: true }),
+    page.getByRole('button', { name: 'Use bundled version', exact: true }),
   ).toBeEnabled();
   await expect(page.locator('.workspace-feedback')).toHaveCount(0);
 });
@@ -499,6 +503,7 @@ test('hardware scenarios preserve generic controls and unknown memory', async ({
   for (const scenario of ['cpu', 'multiple', 'unknown-memory']) {
     await page.goto(`/?scenario=${scenario}`);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Model settings', exact: true }).click();
     await page.getByRole('button', { name: 'Performance', exact: true }).click();
     await expect(
       page.getByText('Auto lets llama.cpp choose for your hardware.', { exact: false }),
@@ -508,23 +513,26 @@ test('hardware scenarios preserve generic controls and unknown memory', async ({
     } else {
       await expect(page.getByText('Advanced: several devices', { exact: true })).toHaveCount(0);
     }
-    if (scenario === 'unknown-memory')
+    if (scenario === 'unknown-memory') {
+      await page.getByRole('button', { name: 'Model settings', exact: true }).click();
       await expect(page.getByText('Available RAM: Unavailable')).toBeVisible();
+    }
   }
 });
 
 test('occupying listeners require separate normal and force confirmations', async ({ page }) => {
   await page.goto('/?scenario=occupied');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await page.getByRole('button', { name: 'Server & port', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Force quit…', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Force quit', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Close programs using it', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('SIGTERM');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Force quit…', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Force quit', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Close programs using it', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button').last().click();
-  await page.getByRole('button', { name: 'Force quit…', exact: true }).click();
+  await page.getByRole('button', { name: 'Force quit', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('SIGKILL');
   await page.getByRole('alertdialog').getByRole('button').last().click();
   await expect(page.getByText('Port 9931 is free')).toBeVisible();

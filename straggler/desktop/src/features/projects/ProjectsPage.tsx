@@ -15,7 +15,7 @@ export function projectActions(controller: WorkspaceController, project: Project
     project,
     busyReason:
       controller.generating && controller.chat.projectId === project.id
-        ? 'Available when the current response finishes or is stopped'
+        ? 'Available when the response ends.'
         : undefined,
     onEdit: () => setProjectDialog({ kind: 'edit', id: project.id }),
     onArchive: () => setProjectDialog({ kind: 'archive', id: project.id }),
@@ -112,7 +112,7 @@ export default function ProjectsPage({
             onClick={(event) => setProjectDialog({ kind: 'create' }, event.currentTarget)}
           >
             <Plus size={15} />
-            Create a project
+            New project
           </button>
         </div>
       ) : (
@@ -161,7 +161,7 @@ export default function ProjectsPage({
                 data-control-id="select-sort-projects"
                 onChange={setSort}
                 options={[
-                  { value: 'updated', label: 'Recently updated' },
+                  { value: 'updated', label: 'Recent' },
                   { value: 'name', label: 'Name' },
                 ]}
               />

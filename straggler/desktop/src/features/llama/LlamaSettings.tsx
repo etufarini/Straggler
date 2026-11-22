@@ -6,7 +6,6 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
   const bundled = !config.llamaDir && config.serverAvailable;
   return (
     <>
-      <h2>llama.cpp</h2>
       <p>A version tested with Straggler, updated with the app.</p>
       <div className="build-summary">
         <strong>
@@ -64,14 +63,14 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
       {!config.appStore && (
         <div className="row-actions">
           <button disabled={busy || active || !native} onClick={() => setFolder('llama')}>
-            Choose external build
+            Choose external build…
           </button>
           <button
             disabled={busy || active || !native || !config.bundledAvailable || bundled}
             onClick={() =>
               confirm({
-                title: 'Use the bundled backend?',
-                actionLabel: 'Use bundled backend',
+                title: 'Use the bundled version?',
+                actionLabel: 'Use bundled version',
                 text: 'Model settings and saved configurations are kept.',
                 action: async () => {
                   accept(await operation('use-bundled'));
@@ -79,7 +78,7 @@ export default function LlamaSettings({ controller }: { controller: SettingsCont
               })
             }
           >
-            Use bundled backend
+            Use bundled version
           </button>
         </div>
       )}

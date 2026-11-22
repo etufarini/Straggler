@@ -110,7 +110,7 @@ export default function AttachmentSection({ controller }: { controller: Attachme
       )}
       {controller.error && (
         <Feedback
-          title="Attachment action failed"
+          title="Couldn’t update the attachments"
           details={controller.error}
           onDismiss={() => controller.setError('')}
         >

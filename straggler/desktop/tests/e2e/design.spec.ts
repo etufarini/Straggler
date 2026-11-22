@@ -29,18 +29,19 @@ test('restart indication remains accessible after returning to chat', async ({ p
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await expect(page.locator('.local-badge')).toContainText('Ready');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await page.getByRole('textbox', { name: 'Custom size (tokens)', exact: true }).fill('8192');
   await page.getByRole('button', { name: 'Back to chat' }).click();
   await expect(page.locator('.local-badge')).toContainText('Restart required');
   await expect(page.locator('.configuration-strip, .settings-launch')).toHaveCount(0);
 });
 
-test('settings keep their save action visible and folders and backend selection have their own actions', async ({
+test('settings keep the server save action visible and per-item pages have their own actions', async ({
   page,
 }) => {
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByText('Fine-tune reply style', { exact: true }).click();
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
   await page.locator('.settings-page').evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
@@ -50,13 +51,17 @@ test('settings keep their save action visible and folders and backend selection 
     'page',
   );
   await page.getByRole('button', { name: 'Folders', exact: true }).click();
-  await expect(page.getByText('Saved once the folder is validated.')).toBeVisible();
+  await expect(
+    page.getByText(
+      'Folders for models and llama.cpp on this computer. Changes are saved after you accept and validate a folder.',
+    ),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'llama.cpp', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Use bundled backend', exact: true }).click();
+  await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
   await expect(
-    page.getByRole('alertdialog').getByRole('button', { name: 'Use bundled backend', exact: true }),
+    page.getByRole('alertdialog').getByRole('button', { name: 'Use bundled version', exact: true }),
   ).toBeVisible();
 });
 
@@ -66,9 +71,18 @@ test('chat defaults save with profiles and only server fields require restart', 
   await page.goto('/?scenario=normal');
   await page.getByRole('button', { name: 'Launch server', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page
-    .getByRole('textbox', { name: 'Default system prompt', exact: true })
-    .fill('Default instructions\nLiteral $(touch unsafe)');
+  const prompt = page.getByRole('textbox', { name: 'Default system prompt', exact: true });
+  await prompt.fill('Default instructions\nLiteral $(touch unsafe)');
+  await prompt.blur();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem('straggler-fixture-chat-defaults-normal') || '{}')
+            .chat_system_prompt,
+      ),
+    )
+    .toBe('Default instructions\nLiteral $(touch unsafe)');
   await expect(page.locator('.local-badge')).not.toContainText('Restart required');
   await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
   await page
@@ -76,15 +90,30 @@ test('chat defaults save with profiles and only server fields require restart', 
     .fill('Chat defaults');
   await page.getByRole('button', { name: 'Save as new configuration' }).click();
   await expect(page.getByText('Configuration saved.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await prompt.fill('Changed');
+  await prompt.blur();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem('straggler-fixture-chat-defaults-normal') || '{}')
+            .chat_system_prompt,
+      ),
+    )
+    .toBe('Changed');
   await page.getByRole('button', { name: 'Model settings', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Default system prompt', exact: true }).fill('Changed');
   await expect(page.getByText('Modified', { exact: true })).toBeVisible();
   await expect(page.locator('.local-badge')).not.toContainText('Restart required');
   await page.getByRole('button', { name: 'Saved configurations', exact: true }).click();
-  await page.getByRole('button', { name: 'Load configuration' }).click();
-  await expect(
-    page.getByRole('textbox', { name: 'Default system prompt', exact: true }),
-  ).toHaveValue('Default instructions\nLiteral $(touch unsafe)');
+  await page.getByRole('button', { name: 'Load configuration', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('Also replaces your chat defaults.');
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Load configuration', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Chat defaults', exact: true }).click();
+  await expect(prompt).toHaveValue('Default instructions\nLiteral $(touch unsafe)');
 });
 
 test('system prompt popover restores focus, dismisses outside, and persists a chat override', async ({
@@ -178,7 +207,11 @@ test('reasoning uses advertised efforts and request-time overrides without a res
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('radio', { name: 'On', exact: true }).check();
-  await selectValue(page.getByRole('combobox', { name: 'Reasoning effort' }), 'minimal');
+  await page.getByRole('button', { name: 'Model settings', exact: true }).click();
+  await selectValue(
+    page.getByRole('combobox', { name: 'Default effort for this model' }),
+    'minimal',
+  );
   await page.getByRole('button', { name: 'Apply changes', exact: true }).click();
   await expect(page.locator('.local-badge')).not.toContainText('Restart required');
   await page.goto('/?scenario=no-reasoning');
@@ -257,7 +290,7 @@ test('reduced-motion presence draws a still and destroys the renderer in Setting
   );
   await page.getByRole('button', { name: 'Stop response' }).click();
   await expect(page.locator('.assistant-presence')).toHaveAttribute('data-state', 'stopped');
-  await expect(page.locator('.presence-caption')).toContainText('Stopped by you');
+  await expect(page.locator('.presence-caption')).toContainText('Stopped');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.locator('.presence-stage canvas')).toHaveCount(0);
   const frames = await page.evaluate(() => window.__stragglerOrbMeasurement.frames.length);

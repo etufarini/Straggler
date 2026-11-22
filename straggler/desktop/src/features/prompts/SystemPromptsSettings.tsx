@@ -34,8 +34,6 @@ export default function SystemPromptsSettings({
   }
   return (
     <>
-      <h2>System prompts</h2>
-      <p className="field-help">Changes are saved automatically.</p>
       <div className="preset-toolbar">
         <button className="primary-button" disabled={!ready} onClick={() => controller.edit()}>
           New preset
@@ -236,7 +234,7 @@ function ImportPreview({
         </div>
         {error && (
           <Feedback title="Couldn’t import presets" details={error}>
-            Your saved presets are kept. Review the file and try again.
+            Your saved presets are kept. Check the file and try again.
           </Feedback>
         )}
         <div className="panel-actions">

@@ -31,7 +31,7 @@ test('pending release lookups do not block settings navigation or server startup
   await expect(page.getByRole('combobox', { name: 'Context size', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Back to chat' }).click();
   await page.getByRole('button', { name: /^Choose model · / }).click();
-  await page.getByRole('button', { name: 'Load model', exact: true }).click();
+  await page.getByRole('button', { name: 'Use model', exact: true }).click();
   await expect(page.locator('.local-badge')).toHaveText('Ready');
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-release-paused'));
   await openBackend(page);
@@ -39,8 +39,8 @@ test('pending release lookups do not block settings navigation or server startup
 });
 
 for (const [status, explanation] of [
-  ['commitMismatch', 'No matching release: the build reports a different commit'],
-  ['unidentified', 'Build identity unavailable; the release date cannot be verified'],
+  ['commitMismatch', 'No release matches this build’s commit'],
+  ['unidentified', 'Can’t verify the release date: build identity unavailable'],
 ]) {
   test(`external release lookup explains ${status} without showing a date`, async ({ page }) => {
     await page.goto('/?scenario=normal');
@@ -51,7 +51,7 @@ for (const [status, explanation] of [
     await openBackend(page);
     await expect(page.getByText(explanation, { exact: true })).toBeVisible();
     await expect(page.locator('.build-version time')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Choose external build' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Choose external build…' })).toBeEnabled();
   });
 }
 
@@ -63,7 +63,7 @@ test('network failures offer an explicit retry without losing backend settings',
   await openBackend(page);
   await expect(page.getByText('Release date unavailable', { exact: true })).toBeVisible();
   await expect(page.getByText(/fixture network unavailable/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Choose external build' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Choose external build…' })).toBeEnabled();
   await expect(page.locator('.build-summary')).toContainText('/fixture/llama.cpp');
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-release-error'));
   await page.getByRole('button', { name: 'Retry lookup', exact: true }).click();
@@ -75,10 +75,10 @@ test('switching to bundled metadata ignores an outstanding external lookup', asy
   await page.evaluate(() => localStorage.setItem('straggler-fixture-release-paused', 'true'));
   await openBackend(page);
   await expect(page.getByText('Checking GitHub…', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Use bundled backend', exact: true }).click();
+  await page.getByRole('button', { name: 'Use bundled version', exact: true }).click();
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: 'Use bundled backend', exact: true })
+    .getByRole('button', { name: 'Use bundled version', exact: true })
     .click();
   await expect(page.locator('.build-summary')).toContainText('Bundled backend');
   await page.evaluate(() => localStorage.removeItem('straggler-fixture-release-paused'));

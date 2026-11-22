@@ -11,11 +11,12 @@ import type {
 export function resolveChatOptions(
   options: ChatOptions | undefined,
   settings: Settings | undefined,
+  cloud = false,
 ) {
   return {
     systemPrompt: options?.systemPrompt ?? settings?.chat_system_prompt ?? '',
     reasoning: options?.reasoning ?? settings?.chat_reasoning ?? 'auto',
-    effort: options?.effort ?? settings?.chat_reasoning_effort ?? 'auto',
+    effort: options?.effort ?? (cloud ? 'auto' : settings?.chat_reasoning_effort) ?? 'auto',
   };
 }
 

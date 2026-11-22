@@ -7,8 +7,6 @@ export default function FolderSettings({ controller }: { controller: SettingsCon
   const { config, setSection, busy, setFolder, native, active } = controller;
   return (
     <>
-      <h2>Folders</h2>
-      <p className="autosave-note">Saved once the folder is validated.</p>
       {[
         ['llama', 'llama.cpp folder', config.llamaDir],
         ['models', 'Models folder', config.modelsDir],

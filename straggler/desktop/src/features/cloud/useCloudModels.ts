@@ -9,7 +9,12 @@ export function useCloudModels(
   preferences: UiPreferences,
   onPreferences: (patch: Partial<UiPreferences>) => Promise<void>,
 ) {
-  const [status, setStatus] = useState<CloudStatus>({ providers: [], active: null, error: null });
+  const [status, setStatus] = useState<CloudStatus>({
+    providers: [],
+    active: null,
+    error: null,
+    generationParameters: {},
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<ActiveCloud | null>(null);

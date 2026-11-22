@@ -1030,15 +1030,15 @@ async fn project_storage_and_generation_use_identity_and_immutable_request_snaps
     assert!(runtime
         .move_project_chat(active.id, None)
         .unwrap_err()
-        .contains("current response"));
+        .contains("Available when the response ends."));
     assert!(runtime
         .delete_conversation(active.id)
         .unwrap_err()
-        .contains("current response"));
+        .contains("Available when the response ends."));
     assert!(runtime
         .delete_project(project.id, false)
         .unwrap_err()
-        .contains("current response"));
+        .contains("Available when the response ends."));
     project = runtime
         .projects
         .list(&runtime.history)
@@ -1049,7 +1049,7 @@ async fn project_storage_and_generation_use_identity_and_immutable_request_snaps
     assert!(runtime
         .save_project(project)
         .unwrap_err()
-        .contains("current response"));
+        .contains("Available when the response ends."));
     runtime.move_project_chat(other.id, None).unwrap();
     let recorded: serde_json::Value =
         serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
@@ -1488,4 +1488,79 @@ async fn adjacent_projector_is_passed_to_the_supervised_server() {
     assert!(launch["ctx_size"].is_null());
     assert!(launch["gpu_layers"].is_null());
     runtime.stop().unwrap();
+}
+
+#[tokio::test]
+async fn saved_chat_defaults_reach_requests_without_restarting_or_applying_server_fields() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    fixture.ready(&runtime).await;
+    let before = runtime.status().await.unwrap();
+    let accepted = runtime.inspect().unwrap().settings;
+    let mut patch = std::collections::BTreeMap::from([
+        ("chat_system_prompt".into(), "A saved default".into()),
+        ("chat_reasoning".into(), "off".into()),
+    ]);
+    for field in straggler_desktop::generation::fields() {
+        patch.insert(field.into(), "1".into());
+    }
+    let saved = runtime.save_chat_defaults(patch).unwrap();
+    assert_eq!(saved.settings.context, accepted.context);
+    assert_eq!(saved.settings.threads, accepted.threads);
+    assert_eq!(saved.settings.port, accepted.port);
+    assert_eq!(
+        saved.settings.chat_reasoning_effort,
+        accepted.chat_reasoning_effort
+    );
+    assert!(!saved.restart_required);
+    assert!(runtime
+        .save_chat_defaults(std::collections::BTreeMap::from([(
+            "port".into(),
+            "1".into()
+        )]))
+        .is_err());
+    let mut message = request(Uuid::new_v4(), "generation defaults");
+    message.max_output_tokens = Some(32);
+    runtime.generate(message, |_| Ok(())).await.unwrap();
+    let recorded: serde_json::Value =
+        serde_json::from_slice(&fs::read(&fixture.record).unwrap()).unwrap();
+    for field in straggler_desktop::generation::fields() {
+        assert_eq!(recorded[field], if field == "max_tokens" { 32 } else { 1 });
+    }
+    let after = runtime.status().await.unwrap();
+    assert_eq!(before.run_id, after.run_id);
+    assert_eq!(before.running_settings, after.running_settings);
+    runtime.stop().unwrap();
+}
+
+#[test]
+fn reviewing_a_profile_saves_only_chat_defaults_and_preserves_the_server_review() {
+    let fixture = Fixture::new();
+    let runtime = fixture.runtime();
+    let initial = runtime.inspect().unwrap().settings;
+    let profile = straggler_desktop::Settings {
+        context: "8192".into(),
+        temperature: "0.7".into(),
+        chat_system_prompt: "Profile default".into(),
+        ..initial.clone()
+    };
+    runtime.configure(profile.clone()).unwrap();
+    runtime
+        .workspace_action(
+            "save-profile",
+            vec!["Review example".into(), "new".into()],
+            vec![],
+        )
+        .unwrap();
+    runtime.configure(initial.clone()).unwrap();
+    let reviewed = runtime.review_profile("Review example").unwrap();
+    assert_eq!(reviewed.settings.context, initial.context);
+    assert_eq!(reviewed.settings.temperature, profile.temperature);
+    assert_eq!(
+        reviewed.settings.chat_system_prompt,
+        profile.chat_system_prompt
+    );
+    assert_eq!(reviewed.saved_settings, Some(profile.clone()));
+    assert_eq!(runtime.preview_profile("Review example").unwrap(), profile);
+    assert_eq!(runtime.inspect().unwrap().settings.context, initial.context);
 }

@@ -20,7 +20,7 @@ export async function startCloudFixture() {
               name: 'Cloud fixture',
               context_length: 8192,
               architecture: { input_modalities: ['text'] },
-              supported_parameters: [],
+              supported_parameters: ['max_tokens'],
             },
           ],
         }),
@@ -100,12 +100,11 @@ export async function exerciseNativeCloud({
   );
   await evaluate('document.querySelector(".settings-heading button").click()');
   await evaluate('document.querySelector(".model-switch").click()');
-  await evaluate('document.querySelector("#models-tab-cloud").click()');
   await until(
-    () => evaluate('!!document.querySelector(".cloud-model-group .model-option")'),
+    () => evaluate('!!document.querySelector(".model-group.is-cloud .model-option")'),
     'cloud model picker',
   );
-  await evaluate('document.querySelector(".cloud-model-group .model-option").click()');
+  await evaluate('document.querySelector(".model-group.is-cloud .model-option").click()');
   await evaluate('document.querySelector(".panel .primary-button").click()');
   await until(
     () => evaluate('document.body.dataset.model === "cloud" && !document.querySelector(".panel")'),
@@ -134,8 +133,34 @@ export async function exerciseNativeCloud({
   assert.equal(chat.messages[1].metrics.cost, 0.01);
   assert.equal(
     await evaluate('getComputedStyle(document.body).getPropertyValue("--ui-background").trim()'),
-    '#2f152a',
+    '#231b26',
   );
+  const localIdentity = (await invokeNative('server_status', {})).runId;
+  await evaluate(`document.querySelector('.sidebar-bottom [aria-label="Settings"]').click()`);
+  await until(
+    () => evaluate('!!document.querySelector(".settings-nav")'),
+    'chat default settings navigation',
+  );
+  await evaluate(
+    'Array.from(document.querySelectorAll(".settings-nav button")).find(button => button.textContent === "Chat defaults").click()',
+  );
+  await until(
+    () => evaluate(`!!document.querySelector('input[aria-label="Seed"]')`),
+    'chat default Seed field',
+  );
+  await fillField('input[aria-label="Seed"]', '42');
+  await until(
+    async () => (await invokeNative('configuration', {})).settings.seed === '42',
+    'native partial chat-default auto-save',
+  );
+  assert.equal((await invokeNative('server_status', {})).runId, localIdentity);
+  assert.equal((await invokeNative('configuration', {})).restartRequired, false);
+  await fillField('input[aria-label="Seed"]', '');
+  await until(
+    async () => (await invokeNative('configuration', {})).settings.seed === 'auto',
+    'native chat-default reset',
+  );
+  await evaluate('document.querySelector(".settings-heading button").click()');
   await fillField('.rich-composer-field', 'Keep these details too.');
   await evaluate('document.querySelector(".composer").requestSubmit()');
   await until(
@@ -170,7 +195,9 @@ export async function exerciseNativeCloud({
   assert.ok(fixture.requests.some((request) => request.maxOutputTokens > 0));
   await writeFile(output, Buffer.from(await screenshot(), 'base64'));
   await evaluate('document.querySelector(".model-switch").click()');
-  await evaluate('document.querySelector("#models-tab-local").click()');
+  await evaluate(
+    `document.querySelector('.model-group[aria-label="On this computer"] .model-option').click()`,
+  );
   await evaluate('document.querySelector(".panel .primary-button").click()');
   await until(
     () =>
