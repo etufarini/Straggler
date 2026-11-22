@@ -1,28 +1,21 @@
-import { settingsForModel } from '../../domain/types';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { invoke } from '../../services/desktop';
 import { errorDetail } from '../../domain/errors';
 import type { HubTokenStatus } from '../../domain/huggingFace';
-import type { SettingsController } from '../settings/useSettings';
-import ModelsFolderActions from './ModelsFolderActions';
+import type useHubTokenStatus from './useHubTokenStatus';
+import StatusChip from '../../components/StatusChip';
 import Feedback from '../../components/Feedback';
 
-export default function HuggingFaceSettings({ controller }: { controller: SettingsController }) {
-  const [status, setStatus] = useState<HubTokenStatus | null>(null);
+export default function HuggingFaceSettings({
+  tokenStatus,
+}: {
+  tokenStatus: ReturnType<typeof useHubTokenStatus>;
+}) {
+  const { status, setStatus, readStatus } = tokenStatus;
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  async function readStatus() {
-    try {
-      setStatus(await invoke<HubTokenStatus>('hf_token_status'));
-    } catch (failure) {
-      setError(errorDetail(failure).message);
-    }
-  }
-  useEffect(() => {
-    void readStatus();
-  }, []);
   async function save(remove: boolean) {
     setBusy(true);
     setError('');
@@ -44,21 +37,22 @@ export default function HuggingFaceSettings({ controller }: { controller: Settin
   return (
     <>
       <h3>
-        Access token <small>Optional</small>
+        Hugging Face token <small>Optional</small>
       </h3>
       <p className="field-help">
         Only needed for gated or private repositories you’ve been granted access to.
       </p>
-      <p role="status">
+      <StatusChip live tone={status?.saved ? 'positive' : 'neutral'}>
         {status?.available === false
           ? 'Token status unavailable.'
           : status?.saved
             ? 'A token is stored in the system keychain.'
-            : 'No saved token.'}
-      </p>
+            : 'No token saved (optional)'}
+      </StatusChip>
       <label className="setting-field">
         <span>Hugging Face token</span>
         <input
+          id="hf-token"
           type="password"
           autoComplete="off"
           spellCheck={false}
@@ -79,9 +73,12 @@ export default function HuggingFaceSettings({ controller }: { controller: Settin
           Check keychain
         </button>
       </div>
-      {(error || status?.error) && (
-        <Feedback title="System keychain unavailable" details={error || status?.error || ''}>
-          {error || status?.error} Public downloads remain available.
+      {(error || tokenStatus.error || status?.error) && (
+        <Feedback
+          title="System keychain unavailable"
+          details={error || tokenStatus.error || status?.error || ''}
+        >
+          {error || tokenStatus.error || status?.error} Public downloads remain available.
         </Feedback>
       )}
       {message && (
@@ -89,15 +86,6 @@ export default function HuggingFaceSettings({ controller }: { controller: Settin
           {message}
         </p>
       )}
-      <h3>Models folder</h3>
-      <code>{controller.config.modelsDir || 'Not configured'}</code>
-      <ModelsFolderActions
-        path={controller.config.modelsDir}
-        onConfigured={(value) => {
-          controller.accept(value);
-          controller.setDraft(settingsForModel(controller.draft, value.settings.model));
-        }}
-      />
     </>
   );
 }
