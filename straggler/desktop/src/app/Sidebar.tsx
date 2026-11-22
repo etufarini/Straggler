@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { version } from '../../package.json';
 import ChatHistoryRow from './ChatHistoryRow';
 import { searchChatMessages } from '../services/desktop';
 import { titleMatch } from '../domain/chatSearch';
@@ -324,7 +325,7 @@ export default function Sidebar({ controller }: { controller: WorkspaceControlle
         >
           <Settings2 size={17} /> <span className="sidebar-label">Settings</span>
         </button>
-        <span className="version">Desktop preview · 0.1</span>
+        <span className="version">Desktop · {version}</span>
       </div>
     </aside>
   );
