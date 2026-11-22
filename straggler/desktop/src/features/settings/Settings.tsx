@@ -95,7 +95,15 @@ export default function Settings({
     const resize = new ResizeObserver(() => {
       const focused = document.activeElement;
       if (focused instanceof HTMLElement && focused !== viewport && viewport.contains(focused)) {
-        focused.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        const bounds = focused.getBoundingClientRect();
+        const visibleTop = viewport.getBoundingClientRect().top + viewport.clientTop;
+        const visibleBottom = visibleTop + viewport.clientHeight;
+        // Scroll padding can exceed the room left around a field in a short viewport.
+        if (bounds.top < visibleTop) {
+          viewport.scrollTop += Math.floor(bounds.top - visibleTop);
+        } else if (bounds.bottom > visibleBottom) {
+          viewport.scrollTop += Math.ceil(bounds.bottom - visibleBottom);
+        }
       }
     });
     resize.observe(viewport);

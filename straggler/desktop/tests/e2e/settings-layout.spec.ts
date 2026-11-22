@@ -205,6 +205,16 @@ test('settings fields scroll by keyboard below a stable header at the minimum wi
   await expect(page.getByRole('button', { name: 'Apply changes', exact: true })).toBeInViewport({
     ratio: 1,
   });
+  // Host font metrics and scrollbars can leave room for the control but not its scroll padding.
+  const modelViewport = page.getByRole('region', { name: 'Model settings', exact: true });
+  await modelViewport.evaluate(
+    (element, controlHeight) => {
+      element.style.flex = 'none';
+      element.style.height = `${controlHeight + 1}px`;
+    },
+    (await threads.boundingBox())!.height,
+  );
+  await expect(threads).toBeInViewport({ ratio: 1 });
 });
 
 test('service provenance is separate from setup and field errors retain linked help and an icon', async ({
