@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Chat with local AI models on macOS and Ubuntu. Straggler manages llama.cpp from a native desktop app."
+    />
+    <title>Straggler — Local AI chat</title>
+    <link rel="icon" href="../desktop/src-tauri/icons/icon.png" type="image/png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body id="top">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="site-width header-inner">
+        <a class="brand" href="#top">
+          <img src="../desktop/src-tauri/icons/icon.png" alt="" width="32" height="32" />
+          Straggler
+        </a>
+        <nav class="link-row" aria-label="Main navigation">
+          <a href="https://github.com/etufarini/straggler">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="content" tabindex="-1">
+      <section class="hero site-width" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <h1 id="hero-title">Chat with local AI models.</h1>
+          <p>
+            Straggler runs llama.cpp on your Mac or Linux computer. Keep your conversations on your
+            device and organize related chats, files and instructions into projects.
+          </p>
+          <a class="button button-primary" href="#download">Download Straggler</a>
+        </div>
+        <figure class="video-placeholder">
+          <figcaption>
+            <span class="video-mark" aria-hidden="true"></span>
+            <strong>Straggler demo</strong>
+            <p>Video coming soon</p>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="section site-width" id="download" aria-labelledby="download-title">
+        <h2 id="download-title">Download Straggler</h2>
+        <p class="section-intro">
+          Version 1.0.0 includes llama.cpp. GGUF model files are separate.
+        </p>
+        <div class="packages">
+          <div class="package">
+            <h3>macOS</h3>
+            <p>macOS 13.5 or later · Apple Silicon (ARM64)</p>
+            <a
+              class="button button-secondary"
+              href="https://github.com/etufarini/straggler/releases/download/straggler-v1.0.0/Straggler-1.0.0-macos-arm64.dmg"
+            >
+              Download for macOS
+            </a>
+            <p class="package-note">
+              The app is ad hoc signed and has no Apple notarization. Gatekeeper may block it.
+            </p>
+          </div>
+          <div class="package">
+            <h3>Ubuntu</h3>
+            <p>Ubuntu 24.04 or later · x86-64 (amd64)</p>
+            <a
+              class="button button-secondary"
+              href="https://github.com/etufarini/straggler/releases/download/straggler-v1.0.0/straggler_1.0.0_amd64.deb"
+            >
+              Download for Ubuntu
+            </a>
+            <p class="package-note">The included Ubuntu backend runs on the CPU.</p>
+          </div>
+        </div>
+        <div class="link-row download-details">
+          <a
+            href="https://github.com/etufarini/straggler/releases/download/straggler-v1.0.0/SHA256SUMS"
+          >
+            SHA-256 checksums
+          </a>
+          <a href="https://github.com/etufarini/straggler/releases/tag/straggler-v1.0.0"
+            >Release notes</a
+          >
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <nav class="site-width link-row footer-inner" aria-label="Project resources">
+        <a href="https://github.com/etufarini/straggler/blob/main/straggler/docs/guide.md"
+          >User guide</a
+        >
+        <a href="https://github.com/etufarini/straggler/releases">All releases</a>
+        <a href="https://github.com/etufarini/straggler/blob/main/LICENSE">Apache 2.0 license</a>
+      </nav>
+    </footer>
+  </body>
+</html>
