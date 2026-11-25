@@ -374,13 +374,16 @@ twice with a smaller block and, where space allows, a larger output budget. Only
 completed blocks contribute to the saved summary.
 
 Once the summary is saved, choose **View summary** above the message box or
-in **Context** to read what the model will use alongside recent messages. The
-expandable **Earlier messages summarized** row stays in the chat after reopening.
+in **Context** to read what the model will use alongside recent messages. In
+each new prompt, Straggler quotes the summary as historical context at the
+start of the first retained user message. The expandable **Earlier messages
+summarized** row stays in the chat after reopening.
 **Context** shows the token difference for the latest compaction when available,
 using the same draft and files for both counts.
 An update moves the row after the last message it covers once the new summary
-is saved. If the comparison finds no savings, Straggler keeps the previous
-summary and reports **No measurable space freed**.
+is saved. Straggler applies a new or updated summary only when the comparison
+finds a token saving. Otherwise, it reports **No measurable space freed** and
+uses the previous context.
 
 **Stop summarizing** cancels the summary and keeps the chat and draft. Completed
 summaries are committed through normal atomic storage. Storage errors keep the

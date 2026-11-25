@@ -10,13 +10,11 @@ import { estimatePromptTokens } from '../../services/desktop';
 import type { TokenEstimate } from '../../services/desktop';
 import type { Conversation, ServerDetails, ServerStatus, Settings } from '../../domain/types';
 
-interface ContextCompaction {
+interface ContextCompaction extends CompactionReport {
   chatId: string;
-  summary: NonNullable<Conversation['summary']>;
+  summary: Conversation['summary'];
   backend: string | undefined;
   capacity: number | null;
-  applied: boolean;
-  result: CompactionResult | null;
 }
 
 function useLocalPromptCount(key: string | null, run: string | undefined, enabled: boolean) {
@@ -74,7 +72,6 @@ export function useContextEstimate(
       searchFiles ? [] : undefined,
       searchFiles ? [] : undefined,
       searchWeb && cloud?.kind === 'deepseek' && details?.toolsSupported === true,
-      details?.systemRoleSupported,
     );
   }
   const messages = unavailable ? [] : promptFor(chat);
@@ -143,12 +140,11 @@ export function useContextEstimate(
   const summary = chat.summary;
   const compaction =
     available &&
-    summary &&
     lastCompaction?.chatId === chat.id &&
     lastCompaction.backend === backend &&
-    lastCompaction.summary.createdAt === summary.createdAt &&
-    lastCompaction.summary.throughMessageId === summary.throughMessageId &&
-    lastCompaction.summary.text === summary.text
+    lastCompaction.summary?.createdAt === summary?.createdAt &&
+    lastCompaction.summary?.throughMessageId === summary?.throughMessageId &&
+    lastCompaction.summary?.text === summary?.text
       ? lastCompaction
       : null;
 
@@ -178,23 +174,15 @@ export function useContextEstimate(
     };
   }
 
-  function recordCompaction(before: Conversation, after: Conversation, report?: CompactionReport) {
-    if (!available || !after.summary) return;
-    const comparison: ContextCompaction = {
-      chatId: after.id,
-      summary: after.summary,
+  function recordCompaction(conversation: Conversation, report: CompactionReport) {
+    if (!available) return;
+    setLastCompaction({
+      ...report,
+      chatId: conversation.id,
+      summary: conversation.summary,
       backend,
       capacity,
-      applied: report?.applied ?? true,
-      result: report?.result ?? null,
-    };
-    setLastCompaction(comparison);
-    if (report) return;
-    void compareCompaction(before, after).then((result) =>
-      setLastCompaction((current) =>
-        current === comparison ? { ...comparison, result } : current,
-      ),
-    );
+    });
   }
 
   return {

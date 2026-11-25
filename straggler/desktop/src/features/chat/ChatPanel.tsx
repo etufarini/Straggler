@@ -47,13 +47,12 @@ export default function ChatPanel({
   const [composerMode, setComposerMode] = useState<ComposerContext>('text');
   const summaryDetails = useRef<HTMLDetailsElement>(null);
   const compaction = controller.contextEstimate.compaction;
-  const reportedSummary = compaction?.summary;
-  const [previousSummary, setPreviousSummary] = useState<typeof controller.chat.summary>();
+  const [previousCompaction, setPreviousCompaction] = useState<typeof compaction>(null);
   useEffect(() => {
-    if (controller.summarizing) setPreviousSummary(reportedSummary);
-  }, [controller.summarizing, reportedSummary]);
+    if (controller.summarizing) setPreviousCompaction(compaction);
+  }, [controller.summarizing, compaction]);
   const showSummaryResult =
-    !controller.summarizing && compaction && compaction.summary !== previousSummary;
+    !controller.summarizing && compaction && compaction !== previousCompaction;
   function viewSummary() {
     // Close the popover and let its focus restoration finish before moving to the summary.
     requestAnimationFrame(() => {
@@ -742,7 +741,7 @@ export default function ChatPanel({
               compactionResultLabel(compaction.result, compaction.applied)
             ) : null}
           </span>
-          {showSummaryResult && (
+          {showSummaryResult && chat.summary && (
             <button type="button" className="text-button" onClick={viewSummary}>
               View summary
             </button>
@@ -754,7 +753,7 @@ export default function ChatPanel({
           onSubmit={(event) => {
             event.preventDefault();
             if (canSend) {
-              setPreviousSummary(compaction?.summary);
+              setPreviousCompaction(compaction);
               const pending = send();
               sendPromise.current = pending;
               void pending;

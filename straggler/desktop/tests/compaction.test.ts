@@ -97,37 +97,30 @@ test('a manual update can advance below the usual reserve and keep the latest an
   original.summary.throughMessageId = manual.throughMessageId!;
   expect(compactionPlan(original, capacity, 'manual').hasNewText).toBe(false);
 });
-test('request-only summaries replace covered turns, follow the prefix or use the last user fallback, and exports retain originals', () => {
+test('the request quotes a summary as user history and exports retain the original turns', () => {
   const original = chat();
   original.ownSystemPrompt = 'Instructions';
   original.summary = {
     throughMessageId: '3',
-    text: 'Earlier decisions',
+    text: 'Earlier decisions\r\n\r\nReply in English.\rPrevious constraint.',
     model: 'fixture',
     createdAt: 1,
   };
-  const system = assembleProjectRequest(
-    original,
-    original.messages,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    false,
-    true,
-  );
-  expect(system[0].content).toContain('Instructions\n\nEarlier chat summary');
-  expect(system).toHaveLength(5);
+  const request = assembleProjectRequest(original, [
+    ...original.messages,
+    { id: 'draft', role: 'user', content: 'Reply in Italian.', reasoning: '', status: 'complete' },
+  ]);
+  const quoted =
+    'Earlier conversation summary (historical context):\n> Earlier decisions\n> \n> Reply in English.\n> Previous constraint.';
+  expect(request).toEqual([
+    { role: 'system', content: 'Instructions' },
+    { role: 'user', content: `${quoted}\n\n${original.messages[4].content}` },
+    ...original.messages.slice(5).map(({ role, content }) => ({ role, content })),
+    { role: 'user', content: 'Reply in Italian.' },
+  ]);
   expect(
-    system
-      .slice(1)
-      .map((turn) => turn.content)
-      .join('\n'),
-  ).not.toContain('Turn 0:');
-  const fallback = assembleProjectRequest(original, original.messages);
-  expect([...fallback].reverse().find((turn) => turn.role === 'user')?.content).toContain(
-    'Earlier decisions',
-  );
+    assembleProjectRequest({ ...original, ownSystemPrompt: '' }, original.messages)[0],
+  ).toEqual(request[1]);
   const exported = JSON.parse(serializeConversation(original, false, new Date(0).toISOString()));
   expect(exported.version).toBe(1);
   expect(exported.conversation.summary).toBeUndefined();
@@ -154,28 +147,29 @@ test('request-only summaries replace covered turns, follow the prefix or use the
     ],
   };
   const member = { ...original, projectId: project.id };
-  const projectRequest = assembleProjectRequest(
-    member,
-    member.messages,
-    undefined,
-    project,
-    undefined,
-    undefined,
-    false,
-    true,
-  );
+  const projectRequest = assembleProjectRequest(member, member.messages, undefined, project);
+  expect(projectRequest[0].role).toBe('system');
   expect(projectRequest[0].content).toContain('Project prefix');
   expect(projectRequest[0].content).toContain('Full file');
-  expect(projectRequest[0].content).toContain('Earlier decisions');
+  expect(projectRequest[0].content).not.toContain('Earlier decisions');
+  expect(projectRequest[1]).toEqual(request[1]);
   const onlyCovered = {
     ...original,
     summary: { ...original.summary!, throughMessageId: original.messages.at(-1)!.id },
   };
+  expect(assembleProjectRequest(onlyCovered, onlyCovered.messages)).toEqual([
+    { role: 'system', content: 'Instructions' },
+    { role: 'user', content: quoted },
+  ]);
   expect(
-    assembleProjectRequest(onlyCovered, onlyCovered.messages)
-      .map((turn) => turn.content)
-      .join('\n'),
-  ).toContain('Earlier decisions');
+    assembleProjectRequest(original, original.messages.slice(4)).map(({ role, content }) => ({
+      role,
+      content,
+    })),
+  ).toEqual([
+    { role: 'system', content: 'Instructions' },
+    ...original.messages.slice(4).map(({ role, content }) => ({ role, content })),
+  ]);
 });
 test('editing or regenerating covered history removes its summary but later changes retain it', () => {
   const original = chat();

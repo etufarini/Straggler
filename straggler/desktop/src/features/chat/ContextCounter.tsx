@@ -7,17 +7,11 @@ import type { WorkspaceController } from '../../app/useWorkspace';
 
 const formatNumber = (value: number) => value.toLocaleString('en-US');
 
-export function compactionResultLabel(result: CompactionResult | null, applied: boolean) {
+export function compactionResultLabel(result: CompactionResult, applied: boolean) {
   if (!applied) return 'No measurable space freed';
-  const label = 'Earlier messages summarized';
-  if (!result) return label;
   const { before, after, approximate } = result;
-  if (before === after)
-    return `${label} · ${approximate ? 'No measurable space freed' : 'No space freed'}`;
-  const difference = `${approximate ? '≈' : ''}${formatNumber(Math.abs(before - after))}`;
-  return before > after
-    ? `${label} · ${difference} tokens freed`
-    : `${label} · context grew by ${difference} tokens`;
+  const difference = `${approximate ? '≈' : ''}${formatNumber(before - after)}`;
+  return `Earlier messages summarized · ${difference} tokens freed`;
 }
 
 export default function ContextCounter({

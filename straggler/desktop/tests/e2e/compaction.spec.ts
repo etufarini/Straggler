@@ -33,6 +33,9 @@ async function seed(
                     : 'Keep these decisions.') +
                 (size === 'small-savings' && index < 2
                   ? ' Preserve the initial project goals.'
+                  : '') +
+                (size === 'short' && index < 2
+                  ? ' Preserve the project goals and the agreed acceptance criteria.'
                   : ''),
               reasoning: index % 2 ? 'Private reasoning omitted' : '',
               status: 'complete',
@@ -64,7 +67,7 @@ for (const size of ['long', 'small-savings'] as const) {
     page,
   }) => {
     await page.addInitScript((small) => {
-      localStorage.setItem('straggler-fixture-context-size', small ? '4096' : '5600');
+      localStorage.setItem('straggler-fixture-context-size', small ? '3600' : '5600');
       if (small) localStorage.setItem('straggler-fixture-summary-response', 'Kept.');
     }, size === 'small-savings');
     await seed(page, 'normal', size);
@@ -112,6 +115,35 @@ for (const size of ['long', 'small-savings'] as const) {
     await popover.getByRole('button', { name: 'View summary' }).click();
     await expect(page.locator('.chat-summary details')).toHaveAttribute('open', '');
     await expect(page.locator('.chat-summary summary')).toBeFocused();
+  });
+}
+
+for (const size of ['equal', 'larger'] as const) {
+  test(`a first summary that leaves the context ${size} is discarded`, async ({ page }) => {
+    await page.addInitScript((result) => {
+      if (result === 'equal') localStorage.setItem('straggler-fixture-prompt-tokens', '200');
+      else
+        localStorage.setItem(
+          'straggler-fixture-summary-response',
+          'Redundant summary. '.repeat(40),
+        );
+    }, size);
+    await seed(page);
+    const original = await saved(page);
+    const draft = 'Keep this draft.';
+    const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    await composer.fill(draft);
+    await menuCompact(page);
+    const status = page.locator('.compaction-status');
+    await expect(status.getByRole('status')).toHaveText('No measurable space freed');
+    await expect(status.getByRole('button', { name: 'View summary' })).toHaveCount(0);
+    await expect(page.locator('.chat-summary')).toHaveCount(0);
+    await expect(composer).toHaveText(draft);
+    expect(await saved(page)).toEqual(original);
+    await page.getByRole('button', { name: 'Context', exact: true }).click();
+    const context = page.getByRole('dialog', { name: 'Context' });
+    await expect(context).toContainText('No measurable space freed');
+    await expect(context.getByRole('button', { name: 'View summary' })).toHaveCount(0);
   });
 }
 
@@ -366,7 +398,7 @@ test('Context compaction removes the summary after an earlier response is edited
   await page.getByRole('button', { name: 'Context', exact: true }).click();
   await page.getByRole('button', { name: 'Summarize earlier messages', exact: true }).click();
   await expect(page.locator('.chat-summary')).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: 'context grew by' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'tokens freed' })).toBeVisible();
   await page.getByRole('button', { name: 'Edit response', exact: true }).first().click();
   await page
     .getByRole('textbox', { name: 'Edit response', exact: true })
@@ -423,9 +455,20 @@ test('full context compacts in bounded blocks and continues the preserved draft'
   const request = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('straggler-fixture-request')!),
   );
-  expect(request.messages.map((turn: { content: string }) => turn.content).join('\n')).toContain(
-    'Goals and decisions retained.',
+  const firstUser = request.messages.find((turn: { role: string }) => turn.role === 'user');
+  expect(firstUser.content).toMatch(
+    /^Earlier conversation summary \(historical context\):\n> Goals and decisions retained\./,
   );
+  const systemMessages = request.messages.filter(
+    (turn: { role: string }) => turn.role === 'system',
+  );
+  expect(systemMessages.map((turn: { content: string }) => turn.content).join('\n')).not.toContain(
+    chat.summary.text,
+  );
+  expect(request.messages.at(-1)).toEqual({
+    role: 'user',
+    content: 'Continue with this exact draft.',
+  });
   expect(
     request.messages.map((turn: { content: string }) => turn.content).join('\n'),
   ).not.toContain('Turn 0.');
@@ -609,7 +652,9 @@ test('temporary cloud compaction keeps saved history unchanged', async ({ page }
   for (let index = 0; index < 2; index++) {
     await page
       .getByRole('textbox', { name: 'Message', exact: true })
-      .fill(`Temporary question ${index}`);
+      .fill(
+        `Temporary question ${index} about the project goals and the agreed acceptance criteria.`,
+      );
     await page.getByRole('button', { name: 'Send message', exact: true }).click();
     if (index === 0)
       await page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true }).click();

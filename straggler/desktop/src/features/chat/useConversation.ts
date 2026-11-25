@@ -60,17 +60,16 @@ import type {
 const summaryCanceled = 'Summary canceled.';
 type CompactionContext = {
   compareCompaction: (before: Conversation, after: Conversation) => Promise<CompactionResult>;
-  recordCompaction: (before: Conversation, after: Conversation, report?: CompactionReport) => void;
+  recordCompaction: (conversation: Conversation, report: CompactionReport) => void;
   measureCompactionBudget: (
     automatic: boolean,
   ) => Promise<{ initial: number; maximum: number } | null>;
 };
 type CompactionContinuation = 'draft' | 'automatic';
 type CompactedDraft = {
-  original: Conversation;
   chat: Conversation;
   recordCompaction: CompactionContext['recordCompaction'];
-  report?: CompactionReport;
+  report: CompactionReport;
 };
 
 export function useConversation(
@@ -317,7 +316,7 @@ export function useConversation(
     )
       return;
     if (cloud && !compacted && !(await ensureCloudConsent())) return;
-    if (requestRef.current || (compacted && compacted.original.id !== chatRef.current.id)) return;
+    if (requestRef.current || (compacted && compacted.chat.id !== chatRef.current.id)) return;
     const project = projectFor(chatRef.current);
     if (chatRef.current.projectId && (!projects.ready || projects.error || !project)) {
       setContextError({
@@ -412,7 +411,6 @@ export function useConversation(
       undefined,
       undefined,
       includeReasoning,
-      systemRoleSupported,
     );
     const query = replacement
       ? ([...history].reverse().find((message) => message.role === 'user')?.content ?? '')
@@ -453,7 +451,6 @@ export function useConversation(
             [],
             [],
             includeReasoning,
-            systemRoleSupported,
           );
           const baseCount = await estimatePromptTokens(base);
           const budgets = passageBudgets(
@@ -485,7 +482,6 @@ export function useConversation(
               projectPassages,
               attachmentPassages,
               includeReasoning,
-              systemRoleSupported,
             );
             const [resourceTokens, promptCount] = await Promise.all([
               estimateTextTokens(
@@ -608,8 +604,7 @@ export function useConversation(
       // Persist the user's message before asking the server to generate.
       await save(current);
       updateChat(current);
-      if (compacted)
-        compacted.recordCompaction(compacted.original, compacted.chat, compacted.report);
+      if (compacted) compacted.recordCompaction(compacted.chat, compacted.report);
       setEditor(null);
       generationStarted = true;
       if (replacement && summaryRemoved)
@@ -822,10 +817,10 @@ export function useConversation(
     setSummaryError(null);
     setGenerating(true);
     setGenerationPhase('waiting');
-    let compacted: Conversation | undefined;
-    let comparison: CompactionResult | undefined;
+    let compacted: CompactedDraft | undefined;
     let committing = false;
     let useOriginal = false;
+    let triedCompacting = false;
     function reportCompactionStopped() {
       setFileNotice(summaryCanceled);
     }
@@ -878,14 +873,13 @@ export function useConversation(
               createdAt: Date.now(),
             },
           };
-          if (original.summary) {
-            comparison = await compareCompaction(original, next);
-            if (cancelledRef.current === requestRef.current) return reportCompactionStopped();
-            if (draftChanged()) return;
-          }
-          if (comparison && comparison.after >= comparison.before) {
-            recordCompaction(original, original, { result: comparison, applied: false });
+          const comparison = await compareCompaction(original, next);
+          if (cancelledRef.current === requestRef.current) return reportCompactionStopped();
+          if (draftChanged()) return;
+          if (comparison.after >= comparison.before) {
+            recordCompaction(original, { result: comparison, applied: false });
             useOriginal = !!continuation;
+            triedCompacting = true;
           } else {
             if (!continuation) {
               // For a submitted draft, send checks the complete request before saving.
@@ -899,7 +893,11 @@ export function useConversation(
               updateChat(next);
               setContextError(null);
             }
-            compacted = next;
+            compacted = {
+              chat: next,
+              recordCompaction,
+              report: { result: comparison, applied: true },
+            };
           }
         }
       }
@@ -920,17 +918,13 @@ export function useConversation(
         setEditingBusy(false);
       }
     }
-    const report = comparison ? { result: comparison, applied: true } : undefined;
     if (!continuation) {
-      if (compacted) recordCompaction(original, compacted, report);
+      if (compacted) recordCompaction(compacted.chat, compacted.report);
       return;
     }
     if (draftChanged()) return;
-    if (compacted)
-      await send(undefined, draft, {
-        compacted: { original, chat: compacted, recordCompaction, report },
-      });
-    else if (useOriginal) await send(undefined, draft, { triedCompacting: !!comparison });
+    if (compacted) await send(undefined, draft, { compacted });
+    else if (useOriginal) await send(undefined, draft, { triedCompacting });
   }
   function compact(
     target: Conversation,

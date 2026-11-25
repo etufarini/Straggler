@@ -111,7 +111,9 @@ export async function exerciseNativeCloud({
     'native Aurora destination',
   );
   assert.equal((await invokeNative('server_status', {})).phase, 'stopped');
-  await fillField('.rich-composer-field', 'Native cloud question');
+  const firstQuestion =
+    'Native cloud question about keeping the agreed goals and project constraints.';
+  await fillField('.rich-composer-field', firstQuestion);
   await evaluate('document.querySelector(".composer").requestSubmit()');
   await until(
     () => evaluate('!!document.querySelector(".cloud-notice")'),
@@ -127,7 +129,7 @@ export async function exerciseNativeCloud({
     'native cloud stream',
   );
   const chat = (await invokeNative('history_list', {})).find(
-    (value) => value.title === 'Native cloud question',
+    (value) => value.title === firstQuestion,
   );
   assert.equal(chat.messages[1].cloud.providerId, 'openrouter');
   assert.equal(chat.messages[1].metrics.cost, 0.01);
@@ -214,11 +216,9 @@ export async function exerciseNativeCloud({
       ),
     'return to local palette and owned server',
   );
+  await evaluate(`document.querySelector('[aria-label="Options for ${firstQuestion}"]').click()`);
   await evaluate(
-    'document.querySelector(\'[aria-label="Options for Native cloud question"]\').click()',
-  );
-  await evaluate(
-    'document.querySelector(\'[role="menuitem"][aria-label="Delete Native cloud question"]\').click()',
+    `document.querySelector('[role="menuitem"][aria-label="Delete ${firstQuestion}"]').click()`,
   );
   await until(
     () => evaluate('!!document.querySelector(".confirmation .danger-button")'),

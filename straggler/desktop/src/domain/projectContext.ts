@@ -162,7 +162,6 @@ export function assembleProjectRequest(
   passages?: ProjectPassage[],
   attachmentPassages?: ProjectPassage[],
   includeReasoning = false,
-  systemRoleSupported: boolean | null = null,
 ) {
   const systemPrompt = resolveProjectSystemPrompt(conversation, settings, project);
   const prefix =
@@ -177,15 +176,14 @@ export function assembleProjectRequest(
     includeReasoning,
   );
   if (conversation.summary && retained !== messages) {
-    const summary = `Earlier chat summary (original messages are retained):\n${conversation.summary.text}`;
-    if (systemRoleSupported === true) {
-      if (turns[0]?.role === 'system') turns[0].content += `\n\n${summary}`;
-      else turns.unshift({ role: 'system', content: summary });
-    } else {
-      const lastUser = [...turns].reverse().find((message) => message.role === 'user');
-      if (lastUser) lastUser.content += `\n\n${summary}`;
-      else turns.push({ role: 'user', content: summary });
-    }
+    const quoted = conversation.summary.text
+      .split(/\r\n?|\n/)
+      .map((line) => `> ${line}`)
+      .join('\n');
+    const summary = `Earlier conversation summary (historical context):\n${quoted}`;
+    const firstUser = turns.find((message) => message.role === 'user');
+    if (firstUser) firstUser.content = `${summary}\n\n${firstUser.content}`;
+    else turns.splice(turns[0]?.role === 'system' ? 1 : 0, 0, { role: 'user', content: summary });
   }
   const context = passageContext(passages, attachmentPassages);
   if (context) {
