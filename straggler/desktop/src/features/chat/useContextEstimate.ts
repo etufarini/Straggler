@@ -47,20 +47,18 @@ export function useContextEstimate(
   settings: Settings | undefined,
   server: ServerStatus,
   details: ServerDetails | null,
-  project?: Project,
-  searchFiles = false,
-  cloud: ActiveCloud | null = null,
-  searchWeb = false,
+  contextSize: number | null | undefined,
+  project: Project | undefined,
+  searchFiles: boolean,
+  cloud: ActiveCloud | null,
+  searchWeb: boolean,
 ) {
   const unavailable = !!chat.projectId && project?.id !== chat.projectId;
   const available = !unavailable && (!!cloud || server.phase === 'ready');
   const backend = cloud
     ? JSON.stringify([cloud.selection.providerId, cloud.selection.modelId])
     : server.runId;
-  const capacity =
-    (cloud
-      ? cloud.model.details.contextSize
-      : details?.runId === server.runId && details?.contextSize) || null;
+  const capacity = contextSize || null;
   const draft = input.trim();
   function promptFor(conversation: Conversation) {
     return assembleProjectRequest(

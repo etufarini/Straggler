@@ -23,10 +23,9 @@ export const summaryInstruction =
 export function summaryTextError(text: string): string | undefined {
   return !text.trim() ? 'Write a summary before saving.' : systemPromptError(text);
 }
-export function summaryBoundary(chat: Conversation): number {
-  return chat.summary
-    ? chat.messages.findIndex((message) => message.id === chat.summary!.throughMessageId)
-    : -1;
+function summaryBoundary(chat: Conversation, messages = chat.messages): number {
+  const { summary } = chat;
+  return summary ? messages.findIndex((message) => message.id === summary.throughMessageId) : -1;
 }
 export function summaryAfterChange(chat: Conversation, messageId: string) {
   const changed = chat.messages.findIndex((message) => message.id === messageId);
@@ -174,8 +173,6 @@ export function summaryRequest(
 }
 
 export function summarizedMessages(chat: Conversation, messages: Message[]) {
-  const boundary = chat.summary
-    ? messages.findIndex((message) => message.id === chat.summary!.throughMessageId)
-    : -1;
+  const boundary = summaryBoundary(chat, messages);
   return boundary >= 0 ? messages.slice(boundary + 1) : messages;
 }

@@ -61,11 +61,11 @@ const summaryCanceled = 'Summary canceled.';
 type CompactionContext = {
   compareCompaction: (before: Conversation, after: Conversation) => Promise<CompactionResult>;
   recordCompaction: (before: Conversation, after: Conversation, report?: CompactionReport) => void;
+  measureCompactionBudget: (
+    automatic: boolean,
+  ) => Promise<{ initial: number; maximum: number } | null>;
 };
-type CompactionForSend = {
-  automatic: boolean;
-  measureBudget: () => Promise<{ initial: number; maximum: number } | null>;
-};
+type CompactionContinuation = 'draft' | 'automatic';
 type CompactedDraft = {
   original: Conversation;
   chat: Conversation;
@@ -75,19 +75,19 @@ type CompactedDraft = {
 
 export function useConversation(
   server: ServerStatus,
-  settings?: Settings,
-  contextSize?: number | null,
-  projects?: ProjectsController,
-  sharedQueue?: StorageQueue,
-  visionSupported = false,
-  cloud: ActiveCloud | null = null,
-  ensureCloudConsent: () => Promise<boolean> = async () => true,
-  serverDetails: ServerDetails | null = null,
+  settings: Settings | undefined,
+  contextSize: number | null | undefined,
+  projects: ProjectsController,
+  saveQueue: StorageQueue,
+  cloud: ActiveCloud | null,
+  ensureCloudConsent: () => Promise<boolean>,
+  serverDetails: ServerDetails | null,
 ) {
   const systemRoleSupported = serverDetails?.systemRoleSupported ?? null;
+  const visionSupported = serverDetails?.visionSupported === true;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chat, setChat] = useState<Conversation>(newConversation);
-  const resourceProject = projects?.projects.find((project) => project.id === chat.projectId);
+  const resourceProject = projects.projects.find((project) => project.id === chat.projectId);
   const resourcesAvailable = !chat.projectId || !!resourceProject;
   const resourceInstructions = resourcesAvailable
     ? resolveProjectSystemPrompt(chat, settings, resourceProject)
@@ -202,8 +202,6 @@ export function useConversation(
   const cancelledRef = useRef<string | null>(null);
   const sendPromise = useRef<Promise<void> | null>(null);
   const streamFrame = useRef<number | null>(null);
-  const localQueue = useRef<Promise<void>>(Promise.resolve());
-  const saveQueue = sharedQueue ?? localQueue;
   const rejectedDraft = useRef<{ chatId: string; userId: string } | null>(null);
   const mounted = useRef(true);
   const messageList = useRef<HTMLDivElement>(null);
@@ -223,8 +221,12 @@ export function useConversation(
     updateInput(value);
   }
 
+  function projectFor(value: Conversation) {
+    return projects.current.current.find((project) => project.id === value.projectId);
+  }
+
   async function flushSaves() {
-    await projects?.flush();
+    await projects.flush();
     await flushStorage(saveQueue);
     if (storageError && (chatRef.current.messages.length || chatRef.current.attachments?.length))
       throw new Error(storageError);
@@ -316,10 +318,8 @@ export function useConversation(
       return;
     if (cloud && !compacted && !(await ensureCloudConsent())) return;
     if (requestRef.current || (compacted && compacted.original.id !== chatRef.current.id)) return;
-    const project = projects?.current.current.find(
-      (value) => value.id === chatRef.current.projectId,
-    );
-    if (chatRef.current.projectId && (!projects?.ready || projects.error || !project)) {
+    const project = projectFor(chatRef.current);
+    if (chatRef.current.projectId && (!projects.ready || projects.error || !project)) {
       setContextError({
         message: 'Project data is unavailable. Retry loading projects before sending.',
         kind: 'other',
@@ -695,8 +695,8 @@ export function useConversation(
     if (!temporaryRef.current && (!historyReady || storageError))
       return 'Resolve the chat storage error to create a summary.';
     if (active.projectId) {
-      const project = projects?.current.current.find((item) => item.id === active.projectId);
-      if (!project || !projects?.ready || projects.error)
+      const project = projectFor(active);
+      if (!project || !projects.ready || projects.error)
         return 'Reload the project to create a summary.';
       if (project.archived) return 'Restore the project to summarize this chat.';
     }
@@ -801,8 +801,8 @@ export function useConversation(
 
   async function performCompaction(
     target: Conversation,
-    { compareCompaction, recordCompaction }: CompactionContext,
-    continuation?: CompactionForSend,
+    { compareCompaction, recordCompaction, measureCompactionBudget }: CompactionContext,
+    continuation?: CompactionContinuation,
   ) {
     if (compactReason(target)) return;
     const draft = input;
@@ -810,6 +810,7 @@ export function useConversation(
     if (cloud && !(await ensureCloudConsent())) return;
     if (compactReason(target) || (continuation && revision !== inputRevision.current)) return;
     const original = structuredClone(chatRef.current);
+    const automatic = continuation === 'automatic';
     const plan = compactionPlan(original, contextSize, continuation ? 'standard' : 'manual');
     if (!plan.hasNewText || !plan.throughMessageId) {
       setSummaryError({
@@ -840,12 +841,12 @@ export function useConversation(
       return true;
     }
     try {
-      const budget = await continuation?.measureBudget();
+      const budget = await (continuation ? measureCompactionBudget(automatic) : undefined);
       if (requestRef.current && cancelledRef.current === requestRef.current)
         return reportCompactionStopped();
       if (continuation && revision !== inputRevision.current) return;
       if (continuation && !budget) {
-        if (!continuation.automatic) {
+        if (!automatic) {
           reportDraftNeedsRoom();
           return;
         }
@@ -865,7 +866,7 @@ export function useConversation(
         if ('needsRoom' in result) return reportDraftNeedsRoom();
         if ('message' in result) {
           setSummaryError({ message: result.message });
-          useOriginal = !!continuation?.automatic;
+          useOriginal = automatic;
         } else {
           const next: Conversation = {
             ...original,
@@ -909,7 +910,7 @@ export function useConversation(
         message: 'Check the technical details and try again.',
         details: errorDetail(failure).message,
       });
-      useOriginal = !!continuation?.automatic;
+      useOriginal = automatic;
     } finally {
       requestRef.current = null;
       setSummarizing(false);
@@ -934,7 +935,7 @@ export function useConversation(
   function compact(
     target: Conversation,
     context: CompactionContext,
-    continuation?: CompactionForSend,
+    continuation?: CompactionContinuation,
   ) {
     const pending = performCompaction(target, context, continuation);
     sendPromise.current = pending;
@@ -943,11 +944,7 @@ export function useConversation(
   async function changeSummary(text: string | null) {
     if (requestRef.current || mutation.current || editingBusy) return;
     const original = chatRef.current;
-    if (
-      !original.summary ||
-      projects?.current.current.find((item) => item.id === original.projectId)?.archived
-    )
-      return;
+    if (!original.summary || projectFor(original)?.archived) return;
     if (text !== null) {
       const error = summaryTextError(text);
       if (error) throw new Error(error);
@@ -1096,7 +1093,7 @@ export function useConversation(
         includesReasoning,
         new Date().toISOString(),
         settings,
-        projects?.current.current.find((project) => project.id === snapshot.projectId),
+        projectFor(snapshot),
       );
       if (await saveConversationExport(exportFileName(snapshot.title), contents))
         setFileNotice('Chat exported.');
@@ -1106,13 +1103,7 @@ export function useConversation(
   }
 
   function beginEdit(message: Message) {
-    if (
-      requestRef.current ||
-      mutation.current ||
-      projects?.current.current.find((project) => project.id === chatRef.current.projectId)
-        ?.archived
-    )
-      return;
+    if (requestRef.current || mutation.current || projectFor(chatRef.current)?.archived) return;
     setEditor({ messageId: message.id, text: message.content });
   }
 
@@ -1127,11 +1118,7 @@ export function useConversation(
 
   async function saveEdit() {
     if (!editor || mutation.current || requestRef.current) return;
-    if (
-      projects?.current.current.find((project) => project.id === chatRef.current.projectId)
-        ?.archived
-    )
-      return;
+    if (projectFor(chatRef.current)?.archived) return;
     if (editor.messageId === 'summary') {
       await changeSummary(editor.text);
       setEditor(null);
@@ -1160,12 +1147,7 @@ export function useConversation(
   }
 
   function setChatOptions(patch: Partial<ChatOptions>) {
-    if (requestRef.current || mutation.current) return;
-    if (
-      projects?.current.current.find((project) => project.id === chatRef.current.projectId)
-        ?.archived
-    )
-      return;
+    if (requestRef.current || mutation.current || projectFor(chatRef.current)?.archived) return;
     const value = {
       ...chatRef.current,
       options: { ...inheritedChatOptions, ...chatRef.current.options, ...patch },
@@ -1231,7 +1213,7 @@ export function useConversation(
         requestRef.current ||
         mutation.current ||
         !chatRef.current.summary ||
-        projects?.current.current.find((item) => item.id === chatRef.current.projectId)?.archived
+        projectFor(chatRef.current)?.archived
       )
         return;
       // Native message identifiers are UUIDs, so this editor key cannot collide.

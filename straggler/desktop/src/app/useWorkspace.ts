@@ -86,6 +86,8 @@ export function useWorkspace() {
   });
   const localServerDetails = useServerDetails(server);
   const serverDetails = cloud.active?.model.details ?? localServerDetails;
+  const contextSize =
+    cloud.active || serverDetails?.runId === server.runId ? serverDetails?.contextSize : null;
   const modelReady = !!cloud.active || server.phase === 'ready';
   const visionSupported = serverDetails?.visionSupported === true;
   const projects = useProjects(
@@ -100,14 +102,9 @@ export function useWorkspace() {
   const conversation = useConversation(
     server,
     config?.settings,
-    cloud.active
-      ? serverDetails?.contextSize
-      : serverDetails?.runId === server.runId
-        ? serverDetails?.contextSize
-        : null,
+    contextSize,
     projects,
     storageQueue,
-    visionSupported,
     cloud.active,
     cloud.ensureConsent,
     serverDetails,
@@ -136,6 +133,7 @@ export function useWorkspace() {
     config?.settings,
     server,
     serverDetails,
+    contextSize,
     currentProject,
     conversation.resourceSearch,
     cloud.active,
@@ -623,16 +621,7 @@ export function useWorkspace() {
         return Promise.resolve();
       setView('chat');
       setPanel(null);
-      return conversation.compact(
-        target,
-        contextEstimate,
-        continueDraft
-          ? {
-              automatic: false,
-              measureBudget: () => contextEstimate.measureCompactionBudget(false),
-            }
-          : undefined,
-      );
+      return conversation.compact(target, contextEstimate, continueDraft ? 'draft' : undefined);
     },
     compactReason: conversation.compactReason,
     changeSummary: conversation.changeSummary,
@@ -738,10 +727,7 @@ export function useWorkspace() {
     canSend,
     send: () =>
       automaticCompaction && contextEstimate.shouldMeasureAutoCompaction
-        ? conversation.compact(chat, contextEstimate, {
-            automatic: true,
-            measureBudget: () => contextEstimate.measureCompactionBudget(true),
-          })
+        ? conversation.compact(chat, contextEstimate, 'automatic')
         : send(),
     sendPromise,
     input,
