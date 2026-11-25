@@ -143,6 +143,20 @@ h3 {
   font-weight: 550;
 }
 
+.header-links {
+  gap: 0 0.375rem;
+}
+
+.icon-link {
+  min-width: 2.75rem;
+  justify-content: center;
+  border-radius: 0.5rem;
+}
+
+.icon-link:hover {
+  background: var(--action-surface);
+}
+
 .header-inner nav a,
 .site-footer a {
   color: var(--muted);
@@ -170,62 +184,32 @@ h3 {
   font-size: clamp(1.0625rem, 1.4vw, 1.1875rem);
 }
 
-.video-placeholder,
+.demo-card,
 .package {
   border: 1px solid var(--outline);
   border-radius: 1rem;
-  backdrop-filter: blur(8px);
 }
 
-.video-placeholder {
+.demo-card {
+  position: relative;
   display: grid;
+  overflow: hidden;
   aspect-ratio: 16 / 9;
   place-items: center;
-  margin: 0;
   padding: 1rem;
-  background:
-    url('../desktop/src/assets/starfield.svg') center / 45rem,
-    radial-gradient(ellipse at 50% 40%, #4f86ff33, transparent 67%),
-    linear-gradient(155deg, #222e5ccc, #10182fe6);
-  box-shadow:
-    inset 0 1px 0 #ffffff18,
-    0 1.5rem 4rem #050a1f70;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1.5rem 4rem #050a1f70;
+  text-decoration: none;
 }
 
-.video-placeholder figcaption {
-  display: grid;
-  justify-items: center;
-  text-align: center;
-}
-
-.video-placeholder strong {
-  font-size: 1.25rem;
-}
-
-.video-placeholder p {
-  color: var(--muted);
-}
-
-.video-mark {
-  display: grid;
-  width: 3.25rem;
-  height: 3.25rem;
-  place-items: center;
-  margin-block-end: 0.65rem;
-  border: 1px solid #4f86ff66;
-  border-radius: 50%;
-  background: #4f86ff26;
-  color: var(--accent);
-  box-shadow: inset 0 1px 0 #ffffff26;
-}
-
-.video-mark::before {
-  width: 0.8rem;
-  height: 1rem;
-  margin-inline-start: 0.2rem;
-  background: currentColor;
-  clip-path: polygon(0 0, 100% 50%, 0 100%);
-  content: '';
+.demo-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
 }
 
 .button {
@@ -239,6 +223,25 @@ h3 {
   font-weight: 650;
   text-align: center;
   text-decoration: none;
+}
+
+.demo-action {
+  position: relative;
+  gap: 0.6rem;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.demo-card:hover .demo-action {
+  background: var(--action-surface);
+}
+
+.play-mark {
+  width: 0.75rem;
+  height: 0.875rem;
+  flex: none;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
 a.button-primary {
@@ -279,6 +282,7 @@ a.button-primary {
 
 .package {
   padding: clamp(1.1rem, 3vw, 1.75rem);
+  backdrop-filter: blur(8px);
   background-color: var(--surface);
   background-color: color-mix(in srgb, var(--raised) 72%, transparent);
   background-image: linear-gradient(180deg, #ffffff0d, transparent 70%);
