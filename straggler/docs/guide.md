@@ -602,7 +602,7 @@ environment through unchanged.
 
 | Control | Meaning and default |
 | --- | --- |
-| Context size | **Auto** lets llama.cpp choose. **Largest the model supports** stores `0` and requests full model context. A positive token count requests an explicit size. Input and output share the context. |
+| Context size | **Auto** lets llama.cpp choose. **Model maximum** stores `0` and requests full model context, which may need more memory. A positive token count requests an explicit size. The active server’s capacity and any change for the next launch appear separately. |
 | Keys format / Values format | K/V cache formats default to `q4_0`. Choices come from the selected server's help. Quantized V may require Flash Attention; llama.cpp reports model/backend restrictions. |
 | Default effort for this model | Levels come from the loaded model’s chat template. The default is **Template default**. Apply changes saves this local default without requiring restart; a chat can override it from the message box. Cloud effort is chosen per chat. |
 
