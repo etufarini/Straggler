@@ -11,7 +11,7 @@ pub fn fields() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn chat_default_fields() -> impl Iterator<Item = &'static str> {
-    ["chat_system_prompt", "chat_reasoning"]
+    ["chat_system_prompt", "chat_reasoning", "chat_auto_compact"]
         .into_iter()
         .chain(fields())
 }

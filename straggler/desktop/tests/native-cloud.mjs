@@ -174,12 +174,12 @@ export async function exerciseNativeCloud({
   await until(
     () =>
       evaluate(
-        '!!Array.from(document.querySelectorAll(".context-menu button")).find(button => button.textContent === "Compact chat" && !button.disabled)',
+        '!!Array.from(document.querySelectorAll(".context-menu button")).find(button => button.textContent === "Summarize earlier messages" && !button.disabled)',
       ),
     'native compaction action',
   );
   await evaluate(
-    'Array.from(document.querySelectorAll(".context-menu button")).find(button => button.textContent === "Compact chat").click()',
+    'Array.from(document.querySelectorAll(".context-menu button")).find(button => button.textContent === "Summarize earlier messages").click()',
   );
   await until(
     () =>
@@ -193,6 +193,14 @@ export async function exerciseNativeCloud({
   assert.equal(compacted.summary.text, 'Native cloud fixture answer.');
   assert.equal(compacted.summary.model, 'cloud-fixture');
   assert.ok(fixture.requests.some((request) => request.maxOutputTokens > 0));
+  await evaluate('document.querySelector(".compaction-status button").click()');
+  await until(
+    () =>
+      evaluate(
+        'document.querySelector(".chat-summary details").open && document.activeElement === document.querySelector(".chat-summary summary")',
+      ),
+    'native summary opened from the completion notice',
+  );
   await writeFile(output, Buffer.from(await screenshot(), 'base64'));
   await evaluate('document.querySelector(".model-switch").click()');
   await evaluate(

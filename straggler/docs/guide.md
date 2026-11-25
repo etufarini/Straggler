@@ -333,26 +333,58 @@ messages still go to the selected service. Export keeps the existing conversatio
 version 1 format and contains no keys. No cloud request runs at startup or merely
 by opening Settings or the model selector.
 
-### Compact a long chat manually
+### Compact a long chat
 
-Choose **Compact chat** from the open chat’s menu or the **Context** popover. At
-75% of the context capacity, a reminder offers the same action; **Dismiss** hides
-that reminder for this chat until the app restarts. Nothing compacts automatically.
-When a draft exceeds the available context, **Compact and continue** keeps the draft,
-summarizes earlier messages and sends it after success. If you edit the draft while
-the summary is being generated, Straggler keeps it for review instead of sending it.
+Turn on **Summarize long chats automatically** under **Settings → Chat defaults**.
+The option is off by default. When you send at 75% of estimated context capacity
+or above, Straggler can summarize earlier turns before sending. This also applies
+to chats already above the threshold when you enable it. Capacity must be known.
+Choosing the setting or opening a chat never starts a request.
+
+Choose **Summarize earlier messages** from the open chat’s menu or the **Context**
+popover. After the first summary, choose **Summarize more messages** when other
+turns are old enough to summarize, even below the automatic threshold. **Context**
+explains when the action is unavailable and still lets you read the saved summary.
+While the model works, the status above the message box shows **Summarizing
+earlier messages…** or **Summarizing more messages…**. Use the square stop button
+to cancel.
+For a draft with little room for a reply,
+**Summarize and send** appears when the draft, instructions, included files, recent
+turns and a bounded summary are estimated to fit. With automatic compaction
+available for that draft, use **Send**.
+
+Straggler checks the assembled request before saving the summary and can use
+the space available for a shorter reply. If the draft changes during compaction
+or the request still needs room, Straggler keeps the draft and the previous chat
+and offers ways to free space.
 
 The active local or cloud model summarizes older turns in bounded blocks. Recent
-exchanges remain whole, with roughly 25% of known capacity reserved for them; with
-unknown capacity, the latest four messages are kept. The previous summary is included
-when compacting again. Original messages, files and project instructions stay saved;
-files retain their own context/search settings. Reasoning is not summarized. Cloud
+exchanges usually have roughly 25% of known capacity reserved for them. With
+unknown capacity, the latest four messages are normally kept. If that reserve
+would keep every message after the current summary, **Summarize more messages**
+can include older turns while keeping the latest answered exchange and any
+messages after it in full. Each update includes the previous summary. Original
+messages, files and project instructions stay saved. Files retain their own
+context/search settings. Reasoning is not summarized. Cloud
 compaction uses the same first-send acknowledgement and sends the earlier message
 text to that service. No web search or tools run during compaction.
+Local compaction turns off reasoning when the server supports the control. If a
+local request reaches a generation or context limit, Straggler can retry up to
+twice with a smaller block and, where space allows, a larger output budget. Only
+completed blocks contribute to the saved summary.
 
-**Stop response** cancels generation without changing the chat. Completed summaries
-are committed through normal atomic storage; storage errors keep the previous chat.
-The divider **Earlier messages summarized** opens the summary. Its menu offers
+Once the summary is saved, choose **View summary** above the message box or
+in **Context** to read what the model will use alongside recent messages. The
+expandable **Earlier messages summarized** row stays in the chat after reopening.
+**Context** shows the token difference for the latest compaction when available,
+using the same draft and files for both counts.
+An update moves the row after the last message it covers once the new summary
+is saved. If the comparison finds no savings, Straggler keeps the previous
+summary and reports **No measurable space freed**.
+
+**Stop summarizing** cancels the summary and keeps the chat and draft. Completed
+summaries are committed through normal atomic storage. Storage errors keep the
+previous chat. The summary menu offers
 **Edit summary** in raw Markdown and **Remove summary** to use original messages again.
 Editing or regenerating a covered message removes the summary and announces why.
 A branch strictly after the divider copies the summary; a branch before it does not.
@@ -484,18 +516,29 @@ uses part of this budget before the model can answer.
 
 | Indicator | What it measures and what happens at the limit |
 | --- | --- |
-| Chat context counter | Estimates the current prompt and draft against the running server's `n_ctx`. Sending is blocked when the prompt exceeds known capacity; preflight also checks the assembled request. |
+| Chat context counter | Estimates the next prompt and shows room for a reply as soon as the model is ready, including before the first send. The assembled request is checked again before sending. |
 | Project meter | Reserves 25% of the running context for conversation and replies. It warns at 75% of the remaining project budget and blocks new chats and sending above 100% of that budget. |
 
-The chat counter uses the running server's capacity, rather than a draft setting
-or the model's training context. Backend tokenizer/template counts are used where
-available. Approximate counts are marked; the project meter uses **≈** for a
-fallback estimate of four characters per token.
+The chat counter uses the running server's `n_ctx` or the capacity advertised by
+the selected cloud model. It counts the instructions, retained chat history and
+summary, included files, and the current draft. Where available, the local backend
+applies the chat template and counts the tokens. Approximate counts are marked with
+**≈**. Image tokens are estimated. Selected file excerpts and web search results
+can add tokens on send. Cloud estimates are calculated locally.
 
-If capacity is unknown, it is shown as unavailable and sending remains possible;
-the backend can still reject the request. Straggler never silently truncates
-content. To make room, exclude or remove files, or apply a larger supported
-context and restart the server. A larger context may require more memory.
+The reply-space suggestion uses one eighth of the active context window, up to
+2,048 tokens. A shorter **Longest reply** setting reduces the target. The
+suggestion warns when an ordinary send may leave room for a shorter reply.
+After compaction on send, Straggler can use a shorter reply budget if the full
+target doesn’t fit. It reserves at least 128 tokens, or the reply target if that
+is smaller. With the local setting of `0` for prompt-only evaluation, no room for
+a reply is required.
+
+If capacity is unknown, the popover still shows the token count and sending
+remains possible. The backend can still reject the request. Straggler never
+silently truncates content. To make room, exclude or remove files, or apply a
+larger supported context and restart the server. A larger context may require more
+memory.
 
 ### Change, archive or delete a project
 
@@ -608,11 +651,12 @@ environment through unchanged.
 
 ### Chat defaults
 
-This is the first section in **All models**. System prompt, reasoning, reply style,
-seven sampling values, seed and longest reply apply to models on this computer and
-in the cloud. New chats inherit the default system prompt; chats can override
-system prompt and reasoning from the message box. Reasoning applies only when the
-model advertises it. Default reasoning effort remains local in **Model settings**.
+This is the first section in **All models**. Automatic compaction, system prompt,
+reasoning, reply style, seven sampling values, seed and longest reply apply to
+models on this computer and in the cloud. New chats inherit the default system
+prompt. Chats can override system prompt and reasoning from the message box.
+Reasoning applies only when the model advertises it. Default reasoning effort
+remains local in **Model settings**.
 
 Choices save immediately. Text and numeric fields save when they lose focus and
 after 600ms without typing. Invalid text stays visible with its validation error

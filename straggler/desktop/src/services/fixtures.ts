@@ -1,4 +1,5 @@
 import { chatDefaults, chatDefaultKeys, generationKeys } from '../domain/chatDefaults';
+import { summaryInstruction } from '../domain/compaction';
 import type { SystemPromptPreset, PresetText } from '../domain/systemPrompts';
 import { availablePresetName } from '../domain/systemPrompts';
 import { searchText } from '../domain/chatSearch';
@@ -839,11 +840,21 @@ export function createFixture(scenario: Scenario) {
           request.messages.some((message: { content: string }) => message.content.includes('[A1]'))
         )
           delta.content += '\n\nThe attachment supports this answer [A1].';
-        if (request.maxOutputTokens) {
+        let summaryTruncated = false;
+        if (request.messages.some(({ content }) => content.startsWith(summaryInstruction))) {
           delta.content =
             localStorage.getItem('straggler-fixture-summary-response') ||
             'Goals and decisions retained. Continue the open questions.';
           delta.reasoning = 'Internal reasoning is not part of the summary.';
+          const truncation = localStorage.getItem('straggler-fixture-summary-truncation');
+          if (truncation) {
+            const key = 'straggler-fixture-summary-attempts';
+            const attempts = JSON.parse(localStorage.getItem(key) || '[]');
+            summaryTruncated = truncation === 'always' || attempts.length === 0;
+            attempts.push({ ...request, truncated: summaryTruncated });
+            localStorage.setItem(key, JSON.stringify(attempts));
+            if (summaryTruncated) delta.content = 'Truncated summary fixture';
+          }
         }
         if (scenario === 'burst-stream') {
           delta.content =
@@ -883,7 +894,9 @@ export function createFixture(scenario: Scenario) {
                 ? 'error'
                 : scenario === 'interrupted'
                   ? 'interrupted'
-                  : 'complete',
+                  : summaryTruncated
+                    ? 'length'
+                    : 'complete',
           error:
             scenario === 'cloud-error'
               ? 'The cloud service has no credit left.'

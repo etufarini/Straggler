@@ -2,7 +2,9 @@ import { expect, test } from 'vitest';
 import { newConversation } from '../src/domain/types';
 import type { Conversation, Message } from '../src/domain/types';
 import {
+  compactionBudget,
   compactionPlan,
+  draftCompactionCandidate,
   summaryAfterChange,
   summaryChunk,
   summaryRequest,
@@ -58,6 +60,42 @@ test('chunks are UTF-8 safe, preserve all source text and include the previous s
   expect(joined).toBe(plan.source);
   expect(summaryRequest('Summary', 'Source', false)).toHaveLength(1);
   expect(summaryRequest('Summary', 'Source', true)[0].role).toBe('system');
+});
+test('continuation budgets leave room for the reply and exclude unchanged summary boundaries', () => {
+  expect(compactionBudget(4096, 4800, 3841, 512)).toBeNull();
+  expect(compactionBudget(4096, 4800, 3840, 512)).toEqual({ initial: 128, maximum: 128 });
+  expect(compactionBudget(4096, 4800, 3840, 0)).toEqual({ initial: 256, maximum: 256 });
+  expect(compactionBudget(4096, 3000, 2950, 512)).toBeNull();
+  const original = chat();
+  const projected = draftCompactionCandidate(original, 800);
+  expect(projected?.summary?.throughMessageId).toBe('5');
+  expect(draftCompactionCandidate(projected!, 800)).toBeNull();
+});
+test('a manual update can advance below the usual reserve and keep the latest answered exchange', () => {
+  const original = chat();
+  original.summary = {
+    throughMessageId: '3',
+    text: 'Previous decisions',
+    model: 'fixture',
+    createdAt: 1,
+  };
+  const capacity = 131072;
+  expect(draftCompactionCandidate(original, capacity)).toBeNull();
+  expect(compactionPlan(original, 800, 'manual')).toEqual(compactionPlan(original, 800));
+
+  // An unanswered prompt and an empty stopped reply must stay with the latest answered turn.
+  original.messages.push(
+    { id: '8', role: 'user', content: 'Pending question', reasoning: '', status: 'complete' },
+    { id: '9', role: 'assistant', content: '', reasoning: '', status: 'stopped' },
+  );
+  const manual = compactionPlan(original, capacity, 'manual');
+  expect(manual.hasNewText).toBe(true);
+  expect(manual.throughMessageId).toBe('5');
+  expect(manual.source).toContain('Previous decisions');
+  expect(manual.source).toContain('Turn 5:');
+  expect(manual.source).not.toMatch(/Turn [367]:|Pending question/);
+  original.summary.throughMessageId = manual.throughMessageId!;
+  expect(compactionPlan(original, capacity, 'manual').hasNewText).toBe(false);
 });
 test('request-only summaries replace covered turns, follow the prefix or use the last user fallback, and exports retain originals', () => {
   const original = chat();
