@@ -718,6 +718,8 @@ export function useConversation(
       return server.phase === 'loading'
         ? 'Available when the model is ready.'
         : 'Start the local server or choose a cloud model.';
+    if (cloud?.outputLimitSupported === false)
+      return 'Choose a model that supports a response token limit to summarize earlier messages.';
     if (active.messages.length < 4)
       return 'A chat needs at least four messages to create a summary.';
     if (!contextSize && active.messages.length <= 4 && !active.summary)

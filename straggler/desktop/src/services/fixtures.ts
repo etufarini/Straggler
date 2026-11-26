@@ -796,8 +796,17 @@ export function createFixture(scenario: Scenario) {
         const rejection = localStorage.getItem('straggler-fixture-context-rejection');
         const contextError =
           'HTTP 400: {"error":{"code":400,"type":"exceed_context_size_error","message":"request (5000 tokens) exceeds the available context size (4096 tokens), try increasing it","n_prompt_tokens":5000,"n_ctx":4096}}';
-        if (rejection === 'true' || (rejection === 'reply' && !summarizing))
+        if (rejection === 'true' || (rejection === 'reply' && !summarizing)) {
+          if (request.temporaryId && !request.cloud) {
+            return {
+              status: 'error',
+              content: '',
+              reasoning: '',
+              error: 'exceed_context_size_error: The prompt exceeds the available context size.',
+            };
+          }
           throw new Error(contextError);
+        }
         if (scenario === 'compute-error') throw new Error('Compute error.');
         if (scenario === 'model-error') throw new Error('Unsupported chat template');
         generatingConversation = request.conversationId ?? null;

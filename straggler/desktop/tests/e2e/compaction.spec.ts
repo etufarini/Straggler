@@ -783,6 +783,77 @@ test('temporary cloud compaction keeps saved history unchanged', async ({ page }
   );
 });
 
+test('a temporary local context rejection restores the draft and removes the attempted turn', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  await expect(page.locator('.local-badge')).toHaveText('Ready');
+  await page.getByRole('button', { name: 'Temporary', exact: true }).click();
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  const send = page.getByRole('button', { name: 'Send message', exact: true });
+  for (const [index, letter] of ['A', 'B'].entries()) {
+    await composer.fill(letter.repeat(4000));
+    await send.click();
+    await expect(page.getByRole('button', { name: 'Copy response' })).toHaveCount(index + 1);
+    await expect(send).toBeVisible();
+  }
+  const original = await page.locator('.message').allTextContents();
+  await page.evaluate(() => localStorage.setItem('straggler-fixture-context-rejection', 'reply'));
+  const draft = 'D'.repeat(10400);
+  await composer.fill(draft);
+  await page.getByRole('button', { name: 'Summarize and send', exact: true }).click();
+  await expect(page.getByText('The model ran out of context.', { exact: false })).toBeVisible();
+  await expect(composer).toHaveText(draft);
+  await expect(page.locator('.chat-summary')).toHaveCount(0);
+  expect(await page.locator('.message').allTextContents()).toEqual(original);
+  await expect(page.locator('.conversation-row')).toHaveCount(0);
+});
+
+test('an OpenRouter model without response limits skips compaction and can still send', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('straggler-fixture-cloud-no-output-limit', 'true');
+    localStorage.setItem(
+      'straggler-fixture-chat-defaults-cloud-ready',
+      '{"chat_auto_compact":"on"}',
+    );
+  });
+  await seed(page, 'cloud-ready', 'long');
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  await composer.fill('D'.repeat(18000));
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'This message needs more room' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Summarize and send', exact: true })).toHaveCount(
+    0,
+  );
+
+  await composer.fill('D'.repeat(8000));
+  await page.getByRole('button', { name: 'Context', exact: true }).click();
+  const context = page.getByRole('dialog', { name: 'Context' });
+  const progress = context.getByRole('progressbar');
+  const fraction =
+    Number(await progress.getAttribute('value')) / Number(await progress.getAttribute('max'));
+  expect(fraction).toBeGreaterThanOrEqual(0.75);
+  expect(fraction).toBeLessThan(1);
+  await expect(context.getByRole('button', { name: 'Summarize earlier messages' })).toBeDisabled();
+  await expect(context).toContainText('Choose a model that supports a response token limit');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.locator('.assistant .markdown').last()).toContainText('selected cloud fixture');
+  await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
+  await expect(page.locator('.chat-summary')).toHaveCount(0);
+  const requests = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('straggler-fixture-cloud-requests')!),
+  );
+  expect(requests).toEqual([
+    { providerId: 'openrouter', method: 'POST', path: '/chat/completions' },
+  ]);
+});
+
 test('automatic compaction is opt-in, persists, and starts at the next send for an already long chat', async ({
   page,
 }) => {

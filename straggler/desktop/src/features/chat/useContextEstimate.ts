@@ -98,11 +98,18 @@ export function useContextEstimate(
   const includesImages = imageTokens > 0;
   const tokens = estimate.tokens + imageTokens;
   const usage = available ? contextWindowUsage(tokens, capacity) : null;
-  const replyTarget = usage ? replyTargetTokens(usage.capacity, settings?.max_tokens, !!cloud) : 0;
+  const outputLimitSupported = cloud?.outputLimitSupported !== false;
+  const replyTarget = usage
+    ? replyTargetTokens(
+        usage.capacity,
+        outputLimitSupported ? settings?.max_tokens : undefined,
+        !!cloud,
+      )
+    : 0;
   const replyShortfall = usage ? Math.max(0, replyTarget - usage.remaining) : 0;
   const overflow = available && !!capacity && estimate.tokens + Math.min(1, replyTarget) > capacity;
   const atCompactionThreshold = !!usage && usage.level !== 'normal';
-  const canPlanDraft = !!(usage && draft && draftChat.messages.length >= 4);
+  const canPlanDraft = outputLimitSupported && !!(usage && draft && draftChat.messages.length >= 4);
   const shouldPlanDraft =
     canPlanDraft &&
     (replyShortfall > 0 || atCompactionThreshold) &&

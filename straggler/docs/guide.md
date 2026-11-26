@@ -374,7 +374,9 @@ messages after it in full. Each update includes the previous summary. Original
 messages, files and project instructions stay saved. Files retain their own
 context/search settings. Reasoning is not summarized. Cloud
 compaction uses the same first-send acknowledgement and sends the earlier message
-text to that service. No web search or tools run during compaction.
+text to that service. No web search or tools run during compaction. Choose a
+different model for compaction if the selected cloud model reports that it
+cannot set a response token limit. You can still send ordinary messages.
 Local compaction turns off reasoning when the server supports the control. If a
 local request reaches a generation or context limit, Straggler can retry up to
 twice with a smaller block and, where space allows, a larger output budget. Only
