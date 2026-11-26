@@ -362,7 +362,8 @@ Straggler checks the assembled request before saving the summary and can use
 the space available for a shorter reply. If the draft changes during compaction
 or the request still needs room, Straggler keeps the draft and the previous
 summary and offers ways to free space. A response that started streaming before
-a context rejection is kept as a partial reply.
+a context rejection stays visible with its original message. Future prompts and
+summaries skip that exchange, so you can send a shorter draft.
 
 The active local or cloud model summarizes older turns in bounded blocks. Recent
 exchanges usually have roughly 25% of known capacity reserved for them. With

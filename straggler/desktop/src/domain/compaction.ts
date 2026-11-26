@@ -1,5 +1,6 @@
 import type { Conversation, Message } from './types';
 import { approximateTokens } from './attachments';
+import { withoutRejectedPartialExchanges } from './chat';
 import { systemPromptError } from './systemPrompts';
 
 export interface CompactionResult {
@@ -27,6 +28,16 @@ function summaryBoundary(chat: Conversation, messages = chat.messages): number {
   const { summary } = chat;
   return summary ? messages.findIndex((message) => message.id === summary.throughMessageId) : -1;
 }
+
+function compactionHistory(chat: Conversation) {
+  const firstUncovered = summaryBoundary(chat) + 1;
+  const messages = [
+    ...chat.messages.slice(0, firstUncovered),
+    ...withoutRejectedPartialExchanges(chat.messages.slice(firstUncovered)),
+  ];
+  return { messages, firstUncovered };
+}
+
 export function summaryAfterChange(chat: Conversation, messageId: string) {
   const changed = chat.messages.findIndex((message) => message.id === messageId);
   return changed >= 0 && changed <= summaryBoundary(chat) ? undefined : chat.summary;
@@ -83,8 +94,7 @@ export function compactionPlan(
   capacity?: number | null,
   selection: 'standard' | 'manual' | number = 'standard',
 ) {
-  const messages = chat.messages;
-  const firstUncovered = summaryBoundary(chat) + 1;
+  const { messages, firstUncovered } = compactionHistory(chat);
   let keepFrom = Math.max(
     typeof selection === 'number' ? selection : recentExchangeBoundary(messages, capacity),
     firstUncovered,
@@ -158,9 +168,8 @@ export async function selectDraftCompaction(
   countRetained: (candidate: Conversation) => Promise<number>,
   stopped: () => boolean,
 ): Promise<DraftCompaction | null> {
-  const { messages } = chat;
+  const { messages, firstUncovered } = compactionHistory(chat);
   if (messages.length < 4) return null;
-  const firstUncovered = summaryBoundary(chat) + 1;
   const firstText = messages.findIndex(
     (message, index) => index >= firstUncovered && message.content.trim(),
   );

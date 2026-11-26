@@ -678,7 +678,7 @@ export function useConversation(
                 'The model ran out of context. Shorten your draft or review included files to make room for a reply.',
               kind: 'space-after-compaction',
             });
-        } else {
+        } else if (!hasPartial) {
           rejectedDraft.current = { chatId: current.id, userId: user.id };
         }
       }

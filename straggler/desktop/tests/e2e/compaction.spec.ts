@@ -679,6 +679,7 @@ for (const mode of ['manual', 'automatic', 'partial'] as const) {
     const original = await saved(page);
     const draft = 'D'.repeat(26000);
     const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    const send = page.getByRole('button', { name: 'Send message', exact: true });
     await composer.fill(draft);
     await page
       .getByRole('button', {
@@ -687,7 +688,7 @@ for (const mode of ['manual', 'automatic', 'partial'] as const) {
       })
       .click();
     await expect(page.getByText('The model ran out of context.', { exact: false })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeVisible();
+    await expect(send).toBeVisible();
     await expect(composer).toHaveText(draft);
     const retained = await saved(page);
     expect(retained.summary).toEqual(original.summary);
@@ -697,6 +698,19 @@ for (const mode of ['manual', 'automatic', 'partial'] as const) {
         status: 'error',
         content: expect.stringContaining('A **local** answer.'),
       });
+      await page.evaluate(() => localStorage.removeItem('straggler-fixture-context-rejection'));
+      const shortened = 'Shortened question';
+      await composer.fill(shortened);
+      await expect(send).toBeEnabled();
+      await send.click();
+      await expect.poll(async () => (await saved(page)).messages.at(-1)?.status).toBe('complete');
+
+      const request = await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('straggler-fixture-request')!),
+      );
+      expect(request.messages.at(-1)).toEqual({ role: 'user', content: shortened });
+      expect(JSON.stringify(request.messages).includes(draft)).toBe(false);
+      expect((await saved(page)).messages.slice(0, -2)).toEqual(retained.messages);
     } else {
       expect(retained).toEqual(original);
     }

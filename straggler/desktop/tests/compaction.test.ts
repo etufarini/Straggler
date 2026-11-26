@@ -61,6 +61,34 @@ test('chunks are UTF-8 safe, preserve all source text and include the previous s
   expect(summaryRequest('Summary', 'Source', false)).toHaveLength(1);
   expect(summaryRequest('Summary', 'Source', true)[0].role).toBe('system');
 });
+
+test('a rejected partial exchange does not change the next summary boundary or source', () => {
+  const original = chat();
+  original.summary = {
+    throughMessageId: '1',
+    text: 'Previous decisions',
+    model: 'fixture',
+    createdAt: 1,
+  };
+  const rejected: Message[] = [
+    { id: 'rejected', role: 'user', content: 'Oversized draft', reasoning: '', status: 'complete' },
+    {
+      id: 'partial',
+      role: 'assistant',
+      content: 'Partial reply',
+      reasoning: '',
+      status: 'error',
+      error: 'exceed_context_size_error',
+    },
+  ];
+  const afterRetry = {
+    ...original,
+    messages: [...original.messages.slice(0, 4), ...rejected, ...original.messages.slice(4)],
+  };
+
+  expect(compactionPlan(afterRetry)).toEqual(compactionPlan(original));
+});
+
 test('continuation budgets leave room for the reply and require a token saving', () => {
   expect(compactionBudget(4096, 4800, 3841, 512)).toBeNull();
   expect(compactionBudget(4096, 4800, 3840, 512)).toEqual({ initial: 128, maximum: 128 });

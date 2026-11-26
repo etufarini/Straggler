@@ -1,5 +1,6 @@
 import { summarizedMessages } from './compaction';
 import { attachmentBlocks, composeRequest } from './attachments';
+import { withoutRejectedPartialExchanges } from './chat';
 import { ownSystemPrompt } from './projects';
 import type { Project } from './projects';
 import type { Conversation, Message, ProjectPassage, Settings } from './types';
@@ -172,7 +173,7 @@ export function assembleProjectRequest(
       : systemPrompt;
   const retained = summarizedMessages(conversation, messages);
   const turns = composeRequest(
-    retained,
+    withoutRejectedPartialExchanges(retained),
     prefix,
     attachmentPassages === undefined ? (conversation.attachments ?? []) : [],
     includeReasoning,

@@ -1,3 +1,4 @@
+import { isContextRejection } from './errors';
 import type { ChatOptions, Message, Settings } from './types';
 
 export const compactionThresholdPercent = 75;
@@ -24,6 +25,25 @@ export function historyForDraft(messages: Message[], rejectedUserId?: string) {
   if (!rejectedUserId) return messages;
   const index = messages.findIndex((message) => message.id === rejectedUserId);
   return index < 0 ? messages : messages.slice(0, index);
+}
+
+function isRejectedPartialReply(message: Message | undefined) {
+  return (
+    message?.role === 'assistant' &&
+    message.status === 'error' &&
+    !!(message.content || message.reasoning) &&
+    !!message.error &&
+    isContextRejection(message.error)
+  );
+}
+
+export function withoutRejectedPartialExchanges(messages: Message[]) {
+  // Keep the failed exchange visible in history while allowing a shorter retry.
+  return messages.filter(
+    (message, index) =>
+      !isRejectedPartialReply(message) &&
+      !(message.role === 'user' && isRejectedPartialReply(messages[index + 1])),
+  );
 }
 
 export function replyTargetTokens(capacity: number, maxTokens?: string, cloud = false) {
