@@ -35,22 +35,22 @@ function summaryOutputLimit(capacity: number) {
   return Math.max(1, Math.min(2048, Math.floor(capacity / 4)));
 }
 
+function isExchangeStart(messages: Message[], index: number) {
+  return messages[index].role === 'user' && messages[index - 1]?.role !== 'user';
+}
+
 function latestAnsweredExchangeStart(messages: Message[]) {
   let hasReply = false;
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index];
-    if (message.role === 'assistant' && message.content.trim()) hasReply = true;
-    if (message.role === 'user' && hasReply) return index;
+    if (message.role === 'assistant' && message.status !== 'error' && message.content.trim())
+      hasReply = true;
+    if (hasReply && isExchangeStart(messages, index)) return index;
   }
   return 0;
 }
 
-export function compactionPlan(
-  chat: Conversation,
-  capacity?: number | null,
-  mode: 'standard' | 'manual' = 'standard',
-) {
-  const messages = chat.messages;
+function recentExchangeBoundary(messages: Message[], capacity?: number | null) {
   let keepFrom = Math.max(0, messages.length - 4);
   if (capacity) {
     const allowance = Math.floor(capacity * 0.25);
@@ -58,7 +58,7 @@ export function compactionPlan(
     keepFrom = messages.length;
     while (keepFrom > 0) {
       let start = keepFrom - 1;
-      while (start > 0 && messages[start].role !== 'user') start--;
+      while (start > 0 && !isExchangeStart(messages, start)) start--;
       const size = approximateTokens(
         messages
           .slice(start, keepFrom)
@@ -71,14 +71,30 @@ export function compactionPlan(
     }
     // Leave some earlier history available for a first summary when every turn fits.
     if (keepFrom === 0 && messages.length >= 4) {
-      keepFrom = messages.findIndex((message, index) => index > 0 && message.role === 'user');
+      keepFrom = messages.findIndex((_, index) => index > 0 && isExchangeStart(messages, index));
       if (keepFrom < 0) keepFrom = messages.length - 2;
     }
   }
+  return keepFrom;
+}
+
+export function compactionPlan(
+  chat: Conversation,
+  capacity?: number | null,
+  selection: 'standard' | 'manual' | number = 'standard',
+) {
+  const messages = chat.messages;
   const firstUncovered = summaryBoundary(chat) + 1;
-  keepFrom = Math.max(keepFrom, firstUncovered);
+  let keepFrom = Math.max(
+    typeof selection === 'number' ? selection : recentExchangeBoundary(messages, capacity),
+    firstUncovered,
+  );
   let covered = messages.slice(firstUncovered, keepFrom);
-  if (mode === 'manual' && chat.summary && !covered.some((message) => message.content.trim())) {
+  if (
+    selection === 'manual' &&
+    chat.summary &&
+    !covered.some((message) => message.content.trim())
+  ) {
     // A large context window can keep every uncovered turn in the usual recent reserve.
     keepFrom = Math.max(keepFrom, latestAnsweredExchangeStart(messages));
     covered = messages.slice(firstUncovered, keepFrom);
@@ -104,16 +120,6 @@ export function compactionPlan(
   };
 }
 
-export function draftCompactionCandidate(chat: Conversation, capacity: number) {
-  if (chat.messages.length < 4) return null;
-  const plan = compactionPlan(chat, capacity);
-  if (!plan.hasNewText || !plan.throughMessageId) return null;
-  return {
-    ...chat,
-    summary: { throughMessageId: plan.throughMessageId, text: '', model: '', createdAt: 0 },
-  };
-}
-
 export function minimumCompactionReply(replyTarget: number) {
   return Math.min(128, replyTarget);
 }
@@ -136,6 +142,78 @@ export function compactionBudget(
     initial: Math.min(usualLimit, maximum, Math.max(minimumSummary, room - replyTarget)),
     maximum,
   };
+}
+
+export interface DraftCompaction {
+  keepFrom: number;
+  initial: number;
+  maximum: number;
+}
+
+export async function selectDraftCompaction(
+  chat: Conversation,
+  capacity: number,
+  originalTokens: number,
+  replyTarget: number,
+  countRetained: (candidate: Conversation) => Promise<number>,
+  stopped: () => boolean,
+): Promise<DraftCompaction | null> {
+  const { messages } = chat;
+  if (messages.length < 4) return null;
+  const firstUncovered = summaryBoundary(chat) + 1;
+  const firstText = messages.findIndex(
+    (message, index) => index >= firstUncovered && message.content.trim(),
+  );
+  if (firstText < 0) return null;
+  const latest = Math.max(firstUncovered, latestAnsweredExchangeStart(messages));
+  const start = Math.max(
+    firstUncovered,
+    Math.min(recentExchangeBoundary(messages, capacity), latest),
+  );
+  const end = capacity - originalTokens < replyTarget ? latest : start;
+  const boundaries: number[] = [];
+  for (let keepFrom = start; keepFrom <= end; keepFrom++) {
+    if (keepFrom > firstText && (keepFrom === start || isExchangeStart(messages, keepFrom)))
+      boundaries.push(keepFrom);
+  }
+  async function measure(index: number) {
+    if (stopped()) return null;
+    const keepFrom = boundaries[index];
+    const retainedTokens = await countRetained({
+      ...chat,
+      summary: { throughMessageId: messages[keepFrom - 1].id, text: '', model: '', createdAt: 0 },
+    });
+    if (stopped()) return null;
+    const budget = compactionBudget(capacity, originalTokens, retainedTokens, replyTarget);
+    return {
+      plan: budget ? { keepFrom, ...budget } : null,
+      fitsTarget: !!budget && capacity - retainedTokens - budget.initial >= replyTarget,
+    };
+  }
+  if (!boundaries.length) return null;
+  const first = await measure(0);
+  if (!first || first.fitsTarget || boundaries.length === 1) return first?.plan ?? null;
+  const last = await measure(boundaries.length - 1);
+  if (!last) return null;
+  if (!last.plan || (!last.fitsTarget && first.plan)) return first.plan;
+
+  // Removing whole exchanges generally reduces the prompt. Confirm each candidate with
+  // the tokenizer, and keep the earliest measured fit without scanning every exchange.
+  let lower = 0;
+  let upper = boundaries.length - 1;
+  let best = last.plan;
+  while (upper - lower > 1) {
+    const middle = Math.floor((lower + upper) / 2);
+    const measured = await measure(middle);
+    if (!measured) return null;
+    if (measured.plan && (!last.fitsTarget || measured.fitsTarget)) {
+      best = measured.plan;
+      upper = middle;
+    } else {
+      lower = middle;
+    }
+  }
+  return best;
 }
 
 // Bound work even when the service does not advertise a context capacity.

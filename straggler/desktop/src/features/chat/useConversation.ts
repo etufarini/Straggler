@@ -6,7 +6,7 @@ import {
   summaryRequest,
   summaryTextError,
 } from '../../domain/compaction';
-import type { CompactionReport, CompactionResult } from '../../domain/compaction';
+import type { CompactionReport, CompactionResult, DraftCompaction } from '../../domain/compaction';
 import {
   approximatePromptTokens,
   approximateTokens,
@@ -27,7 +27,12 @@ import {
   projectService,
 } from '../../services/desktop';
 import { fileName, newConversation } from '../../domain/types';
-import { inheritedChatOptions, replyTargetTokens, resolveChatOptions } from '../../domain/chat';
+import {
+  historyForDraft,
+  inheritedChatOptions,
+  replyTargetTokens,
+  resolveChatOptions,
+} from '../../domain/chat';
 import { replaceMessage, regenerationHistory } from '../../domain/messageActions';
 import { materializeImport } from '../../domain/conversationImport';
 import type { ImportedConversation } from '../../domain/conversationImport';
@@ -61,9 +66,10 @@ const summaryCanceled = 'Summary canceled.';
 type CompactionContext = {
   compareCompaction: (before: Conversation, after: Conversation) => Promise<CompactionResult>;
   recordCompaction: (conversation: Conversation, report: CompactionReport) => void;
-  measureCompactionBudget: (
+  measureDraftCompaction: (
     automatic: boolean,
-  ) => Promise<{ initial: number; maximum: number } | null>;
+    stopped: () => boolean,
+  ) => Promise<DraftCompaction | null>;
 };
 type CompactionContinuation = 'draft' | 'automatic';
 type CompactedDraft = {
@@ -343,8 +349,11 @@ export function useConversation(
         !replacement &&
         (!compacted || submittedInputRevision !== draftRevision) &&
         inputRevision.current === submittedInputRevision
-      )
+      ) {
         setInput(text);
+        return true;
+      }
+      return false;
     }
     const user: Message = {
       id: crypto.randomUUID(),
@@ -366,7 +375,11 @@ export function useConversation(
       reasoning: '',
       status: 'streaming',
     };
-    const original = compacted?.chat ?? chatRef.current;
+    const previous = chatRef.current;
+    const original = compacted?.chat ?? previous;
+    const previousRejection = rejectedDraft.current;
+    const rejectedUserId =
+      previousRejection?.chatId === original.id ? previousRejection.userId : undefined;
     let current: Conversation = {
       ...original,
       updatedAt: Date.now(),
@@ -377,15 +390,7 @@ export function useConversation(
       title:
         original.messages.length || original.titleCustomized ? original.title : text.slice(0, 80),
       messages: [
-        ...(replacement ?? [
-          ...(rejectedDraft.current?.chatId === original.id
-            ? original.messages.slice(
-                0,
-                original.messages.findIndex((value) => value.id === rejectedDraft.current?.userId),
-              )
-            : original.messages),
-          user,
-        ]),
+        ...(replacement ?? [...historyForDraft(original.messages, rejectedUserId), user]),
         // Incoming deltas must not mutate a snapshot React is still rendering.
         { ...assistant },
       ],
@@ -556,6 +561,9 @@ export function useConversation(
     setWebSearchOn(false);
     setContextError(null);
     rejectedDraft.current = null;
+    const proposedSummary = compacted ? current.summary : undefined;
+    // Keep the saved summary in the initial and partial snapshots until the backend responds.
+    if (proposedSummary) current = { ...current, summary: previous.summary };
     if (!replacement && !compacted) updateChat(current);
     const onDelta = new Channel<Delta>();
     const summaryRemoved = !!chatRef.current.summary && !current.summary;
@@ -604,7 +612,6 @@ export function useConversation(
       // Persist the user's message before asking the server to generate.
       await save(current);
       updateChat(current);
-      if (compacted) compacted.recordCompaction(compacted.chat, compacted.report);
       setEditor(null);
       generationStarted = true;
       if (replacement && summaryRemoved)
@@ -643,28 +650,58 @@ export function useConversation(
           ...(cloud ? {} : { runId: server.runId }),
         };
       if (response.error) assistant.error = response.error;
-      if (response.error && isContextRejection(response.error) && !replacement) {
-        rejectedDraft.current = { chatId: current.id, userId: user.id };
-        restoreSubmittedInput();
-      }
     } catch (e) {
       assistant.status = 'error';
       if (generationStarted) assistant.error = errorDetail(e).message;
-      if (compacted && !generationStarted) restoreSubmittedInput();
-      if (generationStarted && isContextRejection(errorDetail(e).message) && !replacement) {
-        rejectedDraft.current = { chatId: current.id, userId: user.id };
+      if (compacted && !generationStarted) {
+        rejectedDraft.current = previousRejection;
         restoreSubmittedInput();
       }
     } finally {
       // Ignore any queued IPC deltas once the final snapshot has arrived.
-      requestRef.current = null;
+      onDelta.onmessage = () => {};
       if (streamFrame.current !== null) cancelAnimationFrame(streamFrame.current);
       streamFrame.current = null;
       snapshotResponse();
+      const hasPartial = !!(assistant.content || assistant.reasoning);
+      const contextRejected = !!assistant.error && isContextRejection(assistant.error);
+      if (contextRejected && !replacement) {
+        const restored = restoreSubmittedInput();
+        if (compacted) {
+          if (!hasPartial) {
+            current = previous;
+            rejectedDraft.current = previousRejection;
+          }
+          if (restored)
+            setContextError({
+              message:
+                'The model ran out of context. Shorten your draft or review included files to make room for a reply.',
+              kind: 'space-after-compaction',
+            });
+        } else {
+          rejectedDraft.current = { chatId: current.id, userId: user.id };
+        }
+      }
       if ((!replacement && !compacted) || generationStarted) {
         updateChat(current);
-        await save(current).catch(() => {});
+        if (
+          compacted &&
+          proposedSummary &&
+          !contextRejected &&
+          (hasPartial || assistant.status === 'complete' || assistant.status === 'length')
+        ) {
+          const accepted = { ...current, summary: proposedSummary };
+          await save(accepted)
+            .then(() => {
+              updateChat(accepted);
+              compacted.recordCompaction(accepted, compacted.report);
+            })
+            .catch(() => {});
+        } else {
+          await save(current).catch(() => {});
+        }
       }
+      requestRef.current = null;
       setGenerating(false);
     }
   }
@@ -796,7 +833,7 @@ export function useConversation(
 
   async function performCompaction(
     target: Conversation,
-    { compareCompaction, recordCompaction, measureCompactionBudget }: CompactionContext,
+    { compareCompaction, recordCompaction, measureDraftCompaction }: CompactionContext,
     continuation?: CompactionContinuation,
   ) {
     if (compactReason(target)) return;
@@ -806,13 +843,6 @@ export function useConversation(
     if (compactReason(target) || (continuation && revision !== inputRevision.current)) return;
     const original = structuredClone(chatRef.current);
     const automatic = continuation === 'automatic';
-    const plan = compactionPlan(original, contextSize, continuation ? 'standard' : 'manual');
-    if (!plan.hasNewText || !plan.throughMessageId) {
-      setSummaryError({
-        message: 'There are no earlier messages to summarize while keeping the recent chat.',
-      });
-      return;
-    }
     requestRef.current = crypto.randomUUID();
     setSummaryError(null);
     setGenerating(true);
@@ -836,24 +866,36 @@ export function useConversation(
       return true;
     }
     try {
-      const budget = await (continuation ? measureCompactionBudget(automatic) : undefined);
+      const draftPlan = continuation
+        ? await measureDraftCompaction(
+            automatic,
+            () => cancelledRef.current === requestRef.current || revision !== inputRevision.current,
+          )
+        : null;
       if (requestRef.current && cancelledRef.current === requestRef.current)
         return reportCompactionStopped();
-      if (continuation && revision !== inputRevision.current) return;
-      if (continuation && !budget) {
+      if (draftChanged()) return;
+      if (continuation && !draftPlan) {
         if (!automatic) {
           reportDraftNeedsRoom();
           return;
         }
         useOriginal = true;
       } else {
+        const plan = compactionPlan(original, contextSize, draftPlan?.keepFrom ?? 'manual');
+        if (!plan.hasNewText || !plan.throughMessageId) {
+          setSummaryError({
+            message: 'There are no earlier messages to summarize while keeping the recent chat.',
+          });
+          return;
+        }
         setSummarizing(true);
         await flushSaves();
         const result = await generateCompactionSummary(
           original,
           plan,
-          budget?.initial ?? plan.outputLimit,
-          budget?.maximum ?? Infinity,
+          draftPlan?.initial ?? plan.outputLimit,
+          draftPlan?.maximum ?? Infinity,
         );
         if ('stopped' in result || cancelledRef.current === requestRef.current)
           return reportCompactionStopped();
@@ -1227,6 +1269,8 @@ export function useConversation(
     acceptStoredConversation,
     updateChatMetadata,
     contextError,
+    rejectedUserId:
+      rejectedDraft.current?.chatId === chat.id ? rejectedDraft.current.userId : undefined,
     branchChat,
     branchError,
     importChat,

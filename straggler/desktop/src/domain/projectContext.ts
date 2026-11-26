@@ -4,6 +4,8 @@ import { ownSystemPrompt } from './projects';
 import type { Project } from './projects';
 import type { Conversation, Message, ProjectPassage, Settings } from './types';
 
+type PromptSettings = Pick<Settings, 'chat_system_prompt'>;
+
 export const projectContextThresholds = { close: 0.75, over: 1 } as const;
 export const projectTokenEstimateCharacters = 4;
 
@@ -69,7 +71,7 @@ export function projectContextState(
 
 export function resolveProjectSystemPrompt(
   conversation: Conversation,
-  settings?: Settings,
+  settings?: PromptSettings,
   project?: Project,
 ): string {
   if (conversation.projectId) {
@@ -80,13 +82,13 @@ export function resolveProjectSystemPrompt(
   return ownSystemPrompt(conversation) ?? settings?.chat_system_prompt ?? '';
 }
 
-export function projectSystemPrefix(project: Project, settings?: Settings): string {
+export function projectSystemPrefix(project: Project, settings?: PromptSettings): string {
   const instructions = projectInstructions(project, settings);
   const files = attachmentBlocks(project.files.filter((file) => file.included));
   return [instructions, files].filter((part) => part.length > 0).join('\n\n');
 }
 
-export function projectInstructions(project: Project, settings?: Settings): string {
+export function projectInstructions(project: Project, settings?: PromptSettings): string {
   return project.instructions.trim() ? project.instructions : (settings?.chat_system_prompt ?? '');
 }
 
@@ -157,7 +159,7 @@ export function shrinkPassages(sources: ProjectPassage[]): ProjectPassage[] {
 export function assembleProjectRequest(
   conversation: Conversation,
   messages: Message[],
-  settings?: Settings,
+  settings?: PromptSettings,
   project?: Project,
   passages?: ProjectPassage[],
   attachmentPassages?: ProjectPassage[],

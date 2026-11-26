@@ -130,6 +130,7 @@ export function useWorkspace() {
   const contextEstimate = useContextEstimate(
     conversation.chat,
     conversation.input,
+    conversation.rejectedUserId,
     config?.settings,
     server,
     serverDetails,

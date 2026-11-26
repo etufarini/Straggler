@@ -5,7 +5,7 @@ import { settingsSection } from './settings';
 async function seed(
   page: Page,
   scenario = 'normal',
-  size: 'short' | 'long' | 'over-16k' | 'small-savings' = 'short',
+  size: 'short' | 'long' | 'over-16k' | 'small-savings' | 'adaptive' = 'short',
 ) {
   await page.addInitScript(
     ({ scenario, size }) => {
@@ -21,25 +21,32 @@ async function seed(
             createdAt: 1,
             updatedAt: 1,
             model: null,
-            messages: Array.from({ length: 8 }, (_, index) => ({
-              id: `40000000-0000-4000-8000-00000000001${index}`,
-              role: index % 2 ? 'assistant' : 'user',
-              content:
-                `Turn ${index}. ` +
-                (size === 'over-16k'
-                  ? 'Context facts. '.repeat(620)
-                  : size === 'long'
-                    ? 'Context facts. '.repeat(160)
+            messages: Array.from({ length: 8 }, (_, index) => {
+              const repeatedFacts = {
+                'over-16k': 620,
+                long: 160,
+                short: 0,
+                'small-savings': 0,
+                adaptive: [16, 176, 32, 32][Math.floor(index / 2)],
+              }[size];
+              return {
+                id: `40000000-0000-4000-8000-00000000001${index}`,
+                role: index % 2 ? 'assistant' : 'user',
+                content:
+                  `Turn ${index}. ` +
+                  (repeatedFacts
+                    ? 'Context facts. '.repeat(repeatedFacts)
                     : 'Keep these decisions.') +
-                (size === 'small-savings' && index < 2
-                  ? ' Preserve the initial project goals.'
-                  : '') +
-                (size === 'short' && index < 2
-                  ? ' Preserve the project goals and the agreed acceptance criteria.'
-                  : ''),
-              reasoning: index % 2 ? 'Private reasoning omitted' : '',
-              status: 'complete',
-            })),
+                  (size === 'small-savings' && index < 2
+                    ? ' Preserve the initial project goals.'
+                    : '') +
+                  (size === 'short' && index < 2
+                    ? ' Preserve the project goals and the agreed acceptance criteria.'
+                    : ''),
+                reasoning: index % 2 ? 'Private reasoning omitted' : '',
+                status: 'complete',
+              };
+            }),
           },
         ]),
       );
@@ -474,6 +481,51 @@ test('full context compacts in bounded blocks and continues the preserved draft'
   ).not.toContain('Turn 0.');
 });
 
+for (const automatic of [false, true]) {
+  test(`recovers a full draft by advancing the saved summary with ${automatic ? 'automatic compaction' : 'Summarize and send'}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((automatic) => {
+      localStorage.setItem('straggler-fixture-context-size', '8192');
+      if (automatic)
+        localStorage.setItem(
+          'straggler-fixture-chat-defaults-normal',
+          '{"chat_auto_compact":"on"}',
+        );
+    }, automatic);
+    await seed(page, 'normal', 'adaptive');
+    await menuCompact(page);
+    await expect(page.locator('.chat-summary')).toBeVisible();
+    const original = await saved(page);
+    expect(original.summary.throughMessageId).toBe(original.messages[1].id);
+
+    const draft = 'D'.repeat(26000);
+    const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    await composer.fill(draft);
+    await page
+      .getByRole('button', { name: automatic ? 'Send message' : 'Summarize and send', exact: true })
+      .click();
+    await expect(page.locator('.assistant .markdown').last()).toContainText('local answer');
+    await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
+    await expect(composer).toBeEmpty();
+
+    const updated = await saved(page);
+    expect(updated.summary.throughMessageId).toBe(original.messages[3].id);
+    expect(updated.messages.slice(0, -2)).toEqual(original.messages);
+    expect(updated.messages.at(-2).content).toBe(draft);
+    const request = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('straggler-fixture-request')!),
+    );
+    expect(request.maxOutputTokens).toBeUndefined();
+    const prompt = request.messages
+      .map((message: { content: string }) => message.content)
+      .join('\n');
+    expect(prompt).not.toContain('Turn 3.');
+    expect(prompt).toContain('Turn 4.');
+    expect(prompt).toContain('Turn 7.');
+  });
+}
+
 test('a full 16K chat recovers from a truncated summary and sends every older turn to the summarizer', async ({
   page,
 }) => {
@@ -604,6 +656,52 @@ test('a summary that still leaves too little room keeps the original chat and dr
   await expect(composer).toHaveText(draft);
   expect(await saved(page)).toEqual(original);
 });
+
+for (const mode of ['manual', 'automatic', 'partial'] as const) {
+  test(`a backend context rejection during ${mode} continuation keeps the previous summary`, async ({
+    page,
+  }) => {
+    await page.addInitScript((mode) => {
+      localStorage.setItem('straggler-fixture-context-size', '8192');
+      localStorage.setItem(
+        'straggler-fixture-context-rejection',
+        mode === 'partial' ? 'partial-reply' : 'reply',
+      );
+      if (mode === 'automatic')
+        localStorage.setItem(
+          'straggler-fixture-chat-defaults-normal',
+          '{"chat_auto_compact":"on"}',
+        );
+    }, mode);
+    await seed(page, 'normal', 'adaptive');
+    await menuCompact(page);
+    await expect(page.locator('.chat-summary')).toBeVisible();
+    const original = await saved(page);
+    const draft = 'D'.repeat(26000);
+    const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    await composer.fill(draft);
+    await page
+      .getByRole('button', {
+        name: mode === 'automatic' ? 'Send message' : 'Summarize and send',
+        exact: true,
+      })
+      .click();
+    await expect(page.getByText('The model ran out of context.', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeVisible();
+    await expect(composer).toHaveText(draft);
+    const retained = await saved(page);
+    expect(retained.summary).toEqual(original.summary);
+    if (mode === 'partial') {
+      expect(retained.messages.slice(0, -2)).toEqual(original.messages);
+      expect(retained.messages.at(-1)).toMatchObject({
+        status: 'error',
+        content: expect.stringContaining('A **local** answer.'),
+      });
+    } else {
+      expect(retained).toEqual(original);
+    }
+  });
+}
 
 test('cloud summary generation uses the active destination without search or reasoning history', async ({
   page,

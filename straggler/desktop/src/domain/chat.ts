@@ -1,4 +1,4 @@
-import type { ChatOptions, Settings } from './types';
+import type { ChatOptions, Message, Settings } from './types';
 
 export const compactionThresholdPercent = 75;
 
@@ -19,6 +19,12 @@ export const inheritedChatOptions: ChatOptions = {
   reasoning: null,
   effort: null,
 };
+
+export function historyForDraft(messages: Message[], rejectedUserId?: string) {
+  if (!rejectedUserId) return messages;
+  const index = messages.findIndex((message) => message.id === rejectedUserId);
+  return index < 0 ? messages : messages.slice(0, index);
+}
 
 export function replyTargetTokens(capacity: number, maxTokens?: string, cloud = false) {
   // Leave room for ordinary replies while keeping small windows usable. Longest reply can

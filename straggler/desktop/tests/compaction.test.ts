@@ -4,7 +4,7 @@ import type { Conversation, Message } from '../src/domain/types';
 import {
   compactionBudget,
   compactionPlan,
-  draftCompactionCandidate,
+  selectDraftCompaction,
   summaryAfterChange,
   summaryChunk,
   summaryRequest,
@@ -61,17 +61,101 @@ test('chunks are UTF-8 safe, preserve all source text and include the previous s
   expect(summaryRequest('Summary', 'Source', false)).toHaveLength(1);
   expect(summaryRequest('Summary', 'Source', true)[0].role).toBe('system');
 });
-test('continuation budgets leave room for the reply and exclude unchanged summary boundaries', () => {
+test('continuation budgets leave room for the reply and require a token saving', () => {
   expect(compactionBudget(4096, 4800, 3841, 512)).toBeNull();
   expect(compactionBudget(4096, 4800, 3840, 512)).toEqual({ initial: 128, maximum: 128 });
   expect(compactionBudget(4096, 4800, 3840, 0)).toEqual({ initial: 256, maximum: 256 });
   expect(compactionBudget(4096, 3000, 2950, 512)).toBeNull();
-  const original = chat();
-  const projected = draftCompactionCandidate(original, 800);
-  expect(projected?.summary?.throughMessageId).toBe('5');
-  expect(draftCompactionCandidate(projected!, 800)).toBeNull();
 });
-test('a manual update can advance below the usual reserve and keep the latest answered exchange', () => {
+
+test('draft planning advances only as far as needed for the full reply target', async () => {
+  const original = chat();
+  const measured: string[] = [];
+  const counts = new Map([
+    ['1', 3950],
+    ['3', 3400],
+    ['5', 3200],
+  ]);
+  const plan = await selectDraftCompaction(
+    original,
+    4096,
+    4200,
+    512,
+    async ({ summary }) => {
+      const id = summary!.throughMessageId;
+      measured.push(id);
+      return counts.get(id)!;
+    },
+    () => false,
+  );
+  expect(plan).toEqual({ keepFrom: 4, initial: 184, maximum: 568 });
+  expect(measured).toEqual(['1', '5', '3']);
+});
+
+test('draft planning bounds tokenizer calls across a long conversation', async () => {
+  const original = chat();
+  original.messages = Array.from({ length: 2000 }, (_, index): Message => ({
+    id: String(index),
+    role: index % 2 ? 'assistant' : 'user',
+    content: 'x'.repeat(120),
+    reasoning: '',
+    status: 'complete',
+  }));
+  const capacity = 131072;
+  async function measureDraftWithRoom(room: number) {
+    const draftTokens = capacity - room;
+    const measured: number[] = [];
+    const plan = await selectDraftCompaction(
+      original,
+      capacity,
+      draftTokens + 31 * original.messages.length,
+      2048,
+      async ({ summary }) => {
+        const keepFrom = Number(summary!.throughMessageId) + 1;
+        measured.push(keepFrom);
+        return draftTokens + 31 * (original.messages.length - keepFrom);
+      },
+      () => false,
+    );
+    return { plan, measured };
+  }
+  expect(await measureDraftWithRoom(50)).toEqual({ plan: null, measured: [926, 1998] });
+  const { plan, measured } = await measureDraftWithRoom(6000);
+  expect(plan?.keepFrom).toBe(1878);
+  expect(measured.length).toBeLessThanOrEqual(12);
+});
+
+test('draft planning keeps the latest answered exchange and pending messages for a shorter reply', async () => {
+  const original = chat();
+  original.summary = {
+    throughMessageId: '1',
+    text: 'Previous decisions',
+    model: 'fixture',
+    createdAt: 1,
+  };
+  original.messages.splice(6, 0, { ...original.messages[6], id: 'followup' });
+  original.messages.push(
+    { id: '8', role: 'user', content: 'Pending question', reasoning: '', status: 'complete' },
+    { id: '9', role: 'assistant', content: 'Failed reply', reasoning: '', status: 'error' },
+  );
+  const measured: string[] = [];
+  const plan = await selectDraftCompaction(
+    original,
+    4096,
+    4200,
+    512,
+    async ({ summary }) => {
+      const id = summary!.throughMessageId;
+      measured.push(id);
+      return id === '3' ? 3700 : 3585;
+    },
+    () => false,
+  );
+  expect(plan).toEqual({ keepFrom: 4, initial: 128, maximum: 268 });
+  expect(measured).toEqual(['3', '5']);
+});
+
+test('a manual update can advance below the usual reserve and keep the latest answered exchange', async () => {
   const original = chat();
   original.summary = {
     throughMessageId: '3',
@@ -80,7 +164,18 @@ test('a manual update can advance below the usual reserve and keep the latest an
     createdAt: 1,
   };
   const capacity = 131072;
-  expect(draftCompactionCandidate(original, capacity)).toBeNull();
+  expect(
+    await selectDraftCompaction(
+      original,
+      capacity,
+      1000,
+      2048,
+      async () => {
+        throw new Error('Measured beyond the usual reserve even though the reply fits.');
+      },
+      () => false,
+    ),
+  ).toBeNull();
   expect(compactionPlan(original, 800, 'manual')).toEqual(compactionPlan(original, 800));
 
   // An unanswered prompt and an empty stopped reply must stay with the latest answered turn.

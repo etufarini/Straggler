@@ -353,10 +353,16 @@ For a draft with little room for a reply,
 turns and a bounded summary are estimated to fit. With automatic compaction
 available for that draft, use **Send**.
 
+When the draft leaves too little room for the target reply, Straggler checks
+whether summarizing more exchanges would help. It keeps the latest answered
+exchange and any messages after it. If the target still cannot fit, it looks
+for room for a shorter reply.
+
 Straggler checks the assembled request before saving the summary and can use
 the space available for a shorter reply. If the draft changes during compaction
-or the request still needs room, Straggler keeps the draft and the previous chat
-and offers ways to free space.
+or the request still needs room, Straggler keeps the draft and the previous
+summary and offers ways to free space. A response that started streaming before
+a context rejection is kept as a partial reply.
 
 The active local or cloud model summarizes older turns in bounded blocks. Recent
 exchanges usually have roughly 25% of known capacity reserved for them. With

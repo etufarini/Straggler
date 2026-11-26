@@ -1,9 +1,9 @@
 import type { ActiveCloud } from '../../domain/cloudModels';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { approximatePromptTokens, estimateImageTokens } from '../../domain/attachments';
-import { contextWindowUsage, replyTargetTokens } from '../../domain/chat';
-import { compactionBudget, draftCompactionCandidate } from '../../domain/compaction';
-import type { CompactionReport, CompactionResult } from '../../domain/compaction';
+import { contextWindowUsage, historyForDraft, replyTargetTokens } from '../../domain/chat';
+import { selectDraftCompaction } from '../../domain/compaction';
+import type { CompactionReport, CompactionResult, DraftCompaction } from '../../domain/compaction';
 import { assembleProjectRequest } from '../../domain/projectContext';
 import type { Project } from '../../domain/projects';
 import { estimatePromptTokens } from '../../services/desktop';
@@ -42,6 +42,7 @@ function useLocalPromptCount(key: string | null, run: string | undefined, enable
 export function useContextEstimate(
   chat: Conversation,
   input: string,
+  rejectedUserId: string | undefined,
   settings: Settings | undefined,
   server: ServerStatus,
   details: ServerDetails | null,
@@ -58,23 +59,34 @@ export function useContextEstimate(
     : server.runId;
   const capacity = contextSize || null;
   const draft = input.trim();
-  function promptFor(conversation: Conversation) {
-    return assembleProjectRequest(
-      conversation,
-      draft
-        ? [
-            ...conversation.messages,
-            { id: 'draft', role: 'user', content: draft, reasoning: '', status: 'complete' },
-          ]
-        : conversation.messages,
-      settings,
-      project,
-      searchFiles ? [] : undefined,
-      searchFiles ? [] : undefined,
-      searchWeb && cloud?.kind === 'deepseek' && details?.toolsSupported === true,
-    );
-  }
-  const messages = unavailable ? [] : promptFor(chat);
+  const defaultPrompt = settings?.chat_system_prompt ?? '';
+  const draftChat = useMemo(() => {
+    const messages = historyForDraft(chat.messages, rejectedUserId);
+    return messages === chat.messages ? chat : { ...chat, messages };
+  }, [chat, rejectedUserId]);
+  const includeReasoning =
+    searchWeb && cloud?.kind === 'deepseek' && details?.toolsSupported === true;
+  const promptFor = useCallback(
+    (conversation: Conversation) => {
+      const history = historyForDraft(conversation.messages, rejectedUserId);
+      return assembleProjectRequest(
+        conversation,
+        draft
+          ? [
+              ...history,
+              { id: 'draft', role: 'user', content: draft, reasoning: '', status: 'complete' },
+            ]
+          : history,
+        { chat_system_prompt: defaultPrompt },
+        project,
+        searchFiles ? [] : undefined,
+        searchFiles ? [] : undefined,
+        includeReasoning,
+      );
+    },
+    [draft, rejectedUserId, defaultPrompt, project, searchFiles, includeReasoning],
+  );
+  const messages = unavailable ? [] : promptFor(draftChat);
   const key = JSON.stringify(messages);
   const canMeasureLocally = available && !cloud;
   const localCount = useLocalPromptCount(key, server.runId, canMeasureLocally);
@@ -90,51 +102,72 @@ export function useContextEstimate(
   const replyShortfall = usage ? Math.max(0, replyTarget - usage.remaining) : 0;
   const overflow = available && !!capacity && estimate.tokens + Math.min(1, replyTarget) > capacity;
   const atCompactionThreshold = !!usage && usage.level !== 'normal';
-  const candidate =
-    capacity &&
-    usage &&
-    draft &&
-    (replyShortfall > 0 ||
-      atCompactionThreshold ||
-      (settings?.chat_auto_compact === 'on' && canMeasureLocally && !localCount))
-      ? draftCompactionCandidate(chat, capacity)
-      : null;
-  const retainedPrompt = candidate ? promptFor(candidate) : null;
-  const retainedKey = retainedPrompt ? JSON.stringify(retainedPrompt) : null;
-  const retainedCount = useLocalPromptCount(retainedKey, server.runId, canMeasureLocally);
-  function budgetFor(originalTokens: number, retainedTokens: number) {
-    return capacity
-      ? compactionBudget(
-          capacity,
-          originalTokens + imageTokens,
-          retainedTokens + imageTokens,
-          replyTarget,
-        )
-      : null;
-  }
-  const canMakeRoomByCompacting =
-    !!retainedPrompt &&
-    (!canMeasureLocally || (!!localCount && !!retainedCount)) &&
-    !!budgetFor(estimate.tokens, retainedCount?.tokens ?? approximatePromptTokens(retainedPrompt));
+  const canPlanDraft = !!(usage && draft && draftChat.messages.length >= 4);
+  const shouldPlanDraft =
+    canPlanDraft &&
+    (replyShortfall > 0 || atCompactionThreshold) &&
+    (!canMeasureLocally || !!localCount);
+  const planDraft = useCallback(
+    async (originalTokens: number, stopped: () => boolean) => {
+      if (!capacity) return null;
+      return selectDraftCompaction(
+        draftChat,
+        capacity,
+        originalTokens + imageTokens,
+        replyTarget,
+        async (candidate) => {
+          const prompt = promptFor(candidate);
+          const tokens = canMeasureLocally
+            ? (await estimatePromptTokens(prompt)).tokens
+            : approximatePromptTokens(prompt);
+          return tokens + imageTokens;
+        },
+        stopped,
+      );
+    },
+    [draftChat, capacity, imageTokens, replyTarget, promptFor, canMeasureLocally],
+  );
+  const [measuredPlan, setMeasuredPlan] = useState<{
+    planner: typeof planDraft;
+    backend: typeof backend;
+    originalTokens: number;
+    plan: DraftCompaction | null;
+  } | null>(null);
+  const originalTokens = estimate.tokens;
+  useEffect(() => {
+    if (!shouldPlanDraft) return;
+    let disposed = false;
+    void planDraft(originalTokens, () => disposed).then((plan) => {
+      if (!disposed) setMeasuredPlan({ planner: planDraft, backend, originalTokens, plan });
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [shouldPlanDraft, planDraft, originalTokens, backend]);
+  const planned =
+    shouldPlanDraft &&
+    measuredPlan?.planner === planDraft &&
+    measuredPlan.backend === backend &&
+    measuredPlan.originalTokens === originalTokens
+      ? measuredPlan.plan
+      : undefined;
+  const canMakeRoomByCompacting = !!planned;
   const shouldMeasureAutoCompaction =
-    !!retainedPrompt &&
-    ((atCompactionThreshold && canMakeRoomByCompacting) ||
-      (canMeasureLocally && (!localCount || (atCompactionThreshold && !retainedCount))));
+    canPlanDraft &&
+    ((atCompactionThreshold && planned !== null) || (canMeasureLocally && !localCount));
 
-  async function measureCompactionBudget(automatic: boolean) {
-    if (!retainedPrompt) return null;
+  async function measureDraftCompaction(automatic: boolean, stopped: () => boolean) {
+    if (!canPlanDraft) return null;
     const original = canMeasureLocally
       ? (localCount ?? (await estimatePromptTokens(messages)))
       : estimate;
+    if (stopped()) return null;
     if (
       automatic &&
       contextWindowUsage(original.tokens + imageTokens, capacity)?.level === 'normal'
     )
       return null;
-    const retainedTokens = canMeasureLocally
-      ? (retainedCount ?? (await estimatePromptTokens(retainedPrompt))).tokens
-      : approximatePromptTokens(retainedPrompt);
-    return budgetFor(original.tokens, retainedTokens);
+    return planned === undefined ? planDraft(original.tokens, stopped) : planned;
   }
   const [lastCompaction, setLastCompaction] = useState<ContextCompaction | null>(null);
   const summary = chat.summary;
@@ -201,7 +234,7 @@ export function useContextEstimate(
     canMakeRoomByCompacting,
     atCompactionThreshold,
     shouldMeasureAutoCompaction,
-    measureCompactionBudget,
+    measureDraftCompaction,
     compaction,
     compareCompaction,
     recordCompaction,
