@@ -756,6 +756,37 @@ test('summary storage failure preserves the previous chat and reports the failed
   await expect(page.locator('.chat-summary')).toHaveCount(0);
 });
 
+test('a failed summary commit preserves the completed reply with the previous summary', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('straggler-fixture-context-size', '8192'));
+  await seed(page, 'normal', 'adaptive');
+  await menuCompact(page);
+  await expect(page.locator('.chat-summary')).toBeVisible();
+  const original = await saved(page);
+  await page.evaluate((boundary: string) => {
+    localStorage.setItem('straggler-fixture-fail-summary-save', boundary);
+  }, original.messages[3].id);
+
+  const draft = 'D'.repeat(26000);
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill(draft);
+  await page.getByRole('button', { name: 'Summarize and send', exact: true }).click();
+  const feedback = page.getByText('Couldn’t summarize earlier messages', { exact: true });
+  await expect(page.locator('.assistant .markdown').last()).toContainText('local answer');
+  await expect(page.getByRole('button', { name: 'Stop response' })).toHaveCount(0);
+  const conversation = await saved(page);
+  expect(conversation.summary).toEqual(original.summary);
+  expect(conversation.messages.slice(0, -2)).toEqual(original.messages);
+  expect(conversation.messages.at(-2).content).toBe(draft);
+  expect(conversation.messages.at(-1)).toMatchObject({
+    status: 'complete',
+    content: expect.stringContaining('A **local** answer.'),
+  });
+  await expect(feedback).toBeVisible();
+  await page.getByText('Technical details', { exact: true }).click();
+  await expect(page.getByText('Disk is full', { exact: true })).toBeVisible();
+});
+
 test('temporary cloud compaction keeps saved history unchanged', async ({ page }) => {
   await seed(page, 'cloud-ready');
   const original = await saved(page, 'cloud-ready');

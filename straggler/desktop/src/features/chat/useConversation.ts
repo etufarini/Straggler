@@ -691,12 +691,18 @@ export function useConversation(
           (hasPartial || assistant.status === 'complete' || assistant.status === 'length')
         ) {
           const accepted = { ...current, summary: proposedSummary };
-          await save(accepted)
-            .then(() => {
-              updateChat(accepted);
-              compacted.recordCompaction(accepted, compacted.report);
-            })
-            .catch(() => {});
+          try {
+            await save(accepted);
+            updateChat(accepted);
+            compacted.recordCompaction(accepted, compacted.report);
+          } catch (error) {
+            // The reply can still be saved independently of the proposed summary.
+            await save(current).catch(() => {});
+            setSummaryError({
+              message: 'Couldn’t save the updated summary. The previous context stays in use.',
+              details: errorDetail(error).message,
+            });
+          }
         } else {
           await save(current).catch(() => {});
         }

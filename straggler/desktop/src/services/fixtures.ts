@@ -675,6 +675,11 @@ export function createFixture(scenario: Scenario) {
         const conversation = structuredClone(args.conversation as Conversation);
         const index = history.findIndex((value) => value.id === conversation.id);
         const previous = history[index];
+        const rejectedSummary = localStorage.getItem('straggler-fixture-fail-summary-save');
+        if (rejectedSummary && conversation.summary?.throughMessageId === rejectedSummary) {
+          localStorage.removeItem('straggler-fixture-fail-summary-save');
+          throw new Error('Disk is full');
+        }
         if (conversation.projectId && projectFixture.find(conversation.projectId).archived)
           throw new Error('Restore the project before making changes.');
         if (previous?.projectId && projectFixture.find(previous.projectId).archived)
