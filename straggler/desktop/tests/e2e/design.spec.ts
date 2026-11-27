@@ -157,28 +157,47 @@ test('system prompt popover restores focus, dismisses outside, and persists a ch
   );
 });
 
-test('context thresholds use response data and missing metrics remain unavailable', async ({
+test('context uses the draft before sending and updates without response metrics', async ({
   page,
 }) => {
-  for (const [scenario, level, percent] of [
-    ['normal', 'normal', '5%'],
-    ['context-high', 'high', '82%'],
-    ['context-full', 'full', '96%'],
-    ['no-metrics', 'unknown', '—'],
-  ]) {
-    await page.goto(`/?scenario=${scenario}`);
-    await page.getByRole('button', { name: 'Launch server', exact: true }).click();
-    await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Measure this response');
-    await page.getByRole('button', { name: 'Send message' }).click();
-    await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
-    const counter = page.locator(`.context-menu.ctx-${level}`);
-    await expect(counter).toContainText(percent);
-    await counter.getByRole('button', { name: 'Context', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: 'Context' })).toContainText(
-      scenario === 'no-metrics' ? 'Available once the server is running.' : '4,096 tokens',
-    );
-    await page.keyboard.press('Escape');
-  }
+  await page.goto('/?scenario=no-metrics');
+  const counter = page.getByRole('button', { name: 'Context', exact: true });
+  await counter.click();
+  const popover = page.getByRole('dialog', { name: 'Context' });
+  await expect(popover).toContainText('Start the local server or choose a cloud model.');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+  await composer.fill('a'.repeat(13000));
+  await expect(page.locator('.context-menu.ctx-high').getByRole('button')).toHaveText('79%');
+  await composer.fill('a'.repeat(15200));
+  await expect(page.locator('.context-menu.ctx-full').getByRole('button')).toHaveText('93%');
+  await composer.fill('Measure this prompt');
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await expect(page.getByRole('button', { name: 'Copy response' })).toBeVisible();
+  await counter.click();
+  const progress = popover.getByRole('progressbar', { name: 'Context for next message' });
+  await expect(progress).toHaveAttribute('max', '4096');
+  await expect.poll(async () => Number(await progress.getAttribute('value'))).toBeGreaterThan(5);
+  await expect(popover).toContainText('tokens available for the reply');
+});
+
+test('context shows an approximate token count when capacity and tokenization are unavailable', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('straggler-fixture-context-unavailable', 'true');
+    localStorage.setItem('straggler-fixture-tokenize-unavailable', 'true');
+  });
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('abc def ghi!');
+  await page.getByRole('button', { name: 'Context', exact: true }).click();
+  const popover = page.getByRole('dialog', { name: 'Context' });
+  await expect(popover).toContainText('≈3 tokens');
+  await expect(popover).toContainText('The local context capacity is unavailable.');
+  await expect(popover.getByRole('progressbar')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled();
 });
 
 test('reasoning uses advertised efforts and request-time overrides without a restart', async ({
