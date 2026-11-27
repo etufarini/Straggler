@@ -194,13 +194,19 @@ export default function ChatPanel({
       label: controller.largerContextPending ? 'Review and restart' : 'Context settings',
       run: () => reviewSettings('model', 'context-size'),
     });
-  const contextRecovery = recoveryActions.map(({ label, run }) => (
-    <button key={label} type="button" onClick={run}>
-      {label}
-    </button>
-  ));
   const contextError = controller.contextError;
-  const needsContextRecovery = contextError ? contextError.kind !== 'other' : context.overflow;
+  const recoveryError = contextError?.kind === 'other' ? null : contextError;
+  const needsContextRecovery = context.overflow || !!recoveryError;
+  const contextBlocked = context.overflow || recoveryError?.kind === 'space';
+  const showContextRecovery =
+    !generating &&
+    !controller.compactOnSend &&
+    (needsContextRecovery ||
+      (!contextError && !controller.summaryError && context.replyShortfall > 0));
+  const contextRecoveryActions =
+    hasDraft && controller.canCompactDraft && !controller.summaryError
+      ? [{ label: 'Summarize and send', run: () => void controller.compact(chat, true) }]
+      : recoveryActions;
   const replyShortfall = context.replyShortfall.toLocaleString('en-US');
   return (
     <>
@@ -672,37 +678,26 @@ export default function ChatPanel({
             {controller.summaryError.message} Original messages are kept.
           </Feedback>
         )}
-        {!controller.generating &&
-          !controller.compactOnSend &&
-          (needsContextRecovery ||
-            (!contextError && !controller.summaryError && context.replyShortfall > 0)) && (
-            <Feedback
-              severity={
-                needsContextRecovery && contextError?.kind !== 'space-after-compaction'
-                  ? 'error'
-                  : 'warning'
-              }
-              title={
-                needsContextRecovery ? 'This message needs more room' : 'Little room for the reply'
-              }
-              actions={
-                hasDraft && controller.canCompactDraft && !controller.summaryError ? (
-                  <button type="button" onClick={() => void controller.compact(chat, true)}>
-                    Summarize and send
-                  </button>
-                ) : (
-                  contextRecovery
-                )
-              }
-            >
-              {contextError?.message ||
-                (needsContextRecovery
-                  ? context.usage?.remaining === 0
-                    ? 'The prompt fills the entire context window. Free space for a reply.'
-                    : `The prompt and attachments exceed the ${context.capacity?.toLocaleString('en-US')}-token context.`
-                  : `Free ${context.approximate ? 'about ' : ''}${replyShortfall} tokens for a ${context.replyTarget.toLocaleString('en-US')}-token reply.`)}
-            </Feedback>
-          )}
+        {showContextRecovery && (
+          <Feedback
+            severity={contextBlocked ? 'error' : 'warning'}
+            title={
+              needsContextRecovery ? 'This message needs more room' : 'Little room for the reply'
+            }
+            actions={contextRecoveryActions.map(({ label, run }) => (
+              <button key={label} type="button" onClick={run}>
+                {label}
+              </button>
+            ))}
+          >
+            {recoveryError?.message ||
+              (needsContextRecovery
+                ? context.usage?.remaining === 0
+                  ? 'The prompt fills the entire context window. Free space for a reply.'
+                  : `The prompt and attachments exceed the ${context.capacity?.toLocaleString('en-US')}-token context.`
+                : `Free ${context.approximate ? 'about ' : ''}${replyShortfall} tokens for a ${context.replyTarget.toLocaleString('en-US')}-token reply.`)}
+          </Feedback>
+        )}
         {contextError?.kind === 'other' && (
           <Feedback title="Couldn’t send the message">{contextError.message}</Feedback>
         )}
@@ -816,7 +811,8 @@ export default function ChatPanel({
               <ContextCounter
                 controller={controller}
                 onViewSummary={viewSummary}
-                recoveryActions={recoveryActions}
+                blocked={contextBlocked}
+                recoveryActions={showContextRecovery ? contextRecoveryActions : []}
               />
               {generating ? (
                 <button

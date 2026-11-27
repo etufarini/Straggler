@@ -16,7 +16,6 @@
   --ui-reasoning-edge: #3b4c71;
   --ui-accent-edge: #4f86ff;
   --ui-chip-active: #22306a;
-  --ui-context-normal: #6aa2ff;
   --ui-list-hover: #5b74c4;
   --ui-list-focus: #9db4ff;
   --ui-list-surface: #1a2550;
@@ -1871,13 +1870,13 @@ input[type='checkbox'] {
   outline-offset: 2px;
 }
 .context-menu {
-  --ctx-color: var(--ui-context-normal);
+  --ctx-color: var(--ui-muted);
 }
-.context-menu.ctx-high {
-  --ctx-color: #f2c46d;
+.context-menu.ctx-warning {
+  --ctx-color: var(--ui-warning);
 }
-.context-menu.ctx-full {
-  --ctx-color: #ff7a8a;
+.context-menu.ctx-error {
+  --ctx-color: var(--ui-error);
 }
 .context-menu .composer-chip {
   color: var(--ctx-color);
@@ -1896,6 +1895,9 @@ input[type='checkbox'] {
 }
 .context-ring circle:last-child {
   stroke: var(--ctx-color);
+}
+.ctx-percent {
+  font-variant-numeric: tabular-nums;
 }
 .ctx-figures {
   display: flex;
@@ -1922,13 +1924,15 @@ input[type='checkbox'] {
   background: var(--ui-raised-2);
   overflow: hidden;
 }
-.context-bar::-webkit-progress-bar {
+.context-bar::-webkit-meter-bar {
+  height: 100%;
+  border: 0;
   background: var(--ui-raised-2);
 }
-.context-bar::-webkit-progress-value {
+.context-bar::-webkit-meter-optimum-value {
   background: var(--ctx-color);
 }
-.context-bar::-moz-progress-bar {
+.context-bar::-moz-meter-bar {
   background: var(--ctx-color);
 }
 .ctx-tech {
@@ -4501,7 +4505,6 @@ body[data-model='cloud'] {
   --ui-quote-edge: #97738f;
   --ui-reasoning-edge: #886480;
   --ui-chip-border: #7c5473;
-  --ui-context-normal: #e5c6dd;
   --ui-select-check: #e5c6dd;
   --ui-inline-code: #e2c8dc;
   --ui-list-hover: #7c5473;
