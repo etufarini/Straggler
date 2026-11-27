@@ -8,7 +8,7 @@ import type { WorkspaceController } from '../../app/useWorkspace';
 const formatNumber = (value: number) => value.toLocaleString('en-US');
 
 export function compactionResultLabel(result: CompactionResult, applied: boolean) {
-  if (!applied) return 'No measurable space freed';
+  if (!applied) return 'No tokens saved. Summary skipped.';
   const { before, after, approximate } = result;
   const difference = `${approximate ? '≈' : ''}${formatNumber(before - after)}`;
   return `Earlier messages summarized · ${difference} tokens freed`;

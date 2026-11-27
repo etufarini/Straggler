@@ -142,14 +142,14 @@ for (const size of ['equal', 'larger'] as const) {
     await composer.fill(draft);
     await menuCompact(page);
     const status = page.locator('.compaction-status');
-    await expect(status.getByRole('status')).toHaveText('No measurable space freed');
+    await expect(status.getByRole('status')).toHaveText('No tokens saved. Summary skipped.');
     await expect(status.getByRole('button', { name: 'View summary' })).toHaveCount(0);
     await expect(page.locator('.chat-summary')).toHaveCount(0);
     await expect(composer).toHaveText(draft);
     expect(await saved(page)).toEqual(original);
     await page.getByRole('button', { name: 'Context', exact: true }).click();
     const context = page.getByRole('dialog', { name: 'Context' });
-    await expect(context).toContainText('No measurable space freed');
+    await expect(context).toContainText('No tokens saved. Summary skipped.');
     await expect(context.getByRole('button', { name: 'View summary' })).toHaveCount(0);
   });
 }
@@ -206,7 +206,7 @@ test('the next manual compaction becomes available after a reply and advances th
   const update = context.getByRole('button', { name: 'Summarize more messages', exact: true });
   await counter.click();
   await expect(update).toBeDisabled();
-  await expect(update).toHaveAccessibleDescription('No more earlier messages to summarize yet.');
+  await expect(update).toHaveAccessibleDescription('No older messages to summarize yet.');
   await context.getByRole('button', { name: 'View summary' }).click();
   await expect(summary.locator('summary')).toBeFocused();
   await page.getByRole('button', { name: 'Options for Compact me', exact: true }).click();
@@ -215,9 +215,7 @@ test('the next manual compaction becomes available after a reply and advances th
     exact: true,
   });
   await expect(sidebarUpdate).toBeDisabled();
-  await expect(sidebarUpdate).toHaveAccessibleDescription(
-    'No more earlier messages to summarize yet.',
-  );
+  await expect(sidebarUpdate).toHaveAccessibleDescription('No older messages to summarize yet.');
   await sidebarUpdate.press('Escape');
 
   await page.evaluate(() => localStorage.setItem('straggler-fixture-response-paused', 'true'));
@@ -305,7 +303,7 @@ test('manual compaction advances after short replies in a large context window',
   expect(source).not.toContain('Latest question');
   await counter.click();
   await expect(update).toBeDisabled();
-  await expect(update).toHaveAccessibleDescription('No more earlier messages to summarize yet.');
+  await expect(update).toHaveAccessibleDescription('No older messages to summarize yet.');
 });
 
 test('a successive summary that grows the context leaves the saved summary and draft in place', async ({
@@ -331,13 +329,13 @@ test('a successive summary that grows the context leaves the saved summary and d
   await counter.click();
   await context.getByRole('button', { name: 'Summarize more messages' }).click();
   await expect(page.locator('.compaction-status').getByRole('status')).toHaveText(
-    'No measurable space freed',
+    'No tokens saved. Summary skipped.',
   );
   expect(await saved(page)).toEqual(original);
   await expect(composer).toHaveText(draft);
   await expect(page.locator('article.message').nth(5).locator('.chat-summary')).toBeVisible();
   await counter.click();
-  await expect(context).toContainText('No measurable space freed');
+  await expect(context).toContainText('No tokens saved. Summary skipped.');
   await context.getByRole('button', { name: 'View summary' }).click();
   await expect(page.locator('.chat-summary')).toContainText(original.summary.text);
 });
@@ -384,7 +382,7 @@ for (const shorter of [true, false]) {
         expect(updated.summary.throughMessageId).toBe(original.messages[7].id);
         await expect(composer).toBeEmpty();
       } else {
-        await expect(result).toHaveText('No measurable space freed');
+        await expect(result).toHaveText('No tokens saved. Summary skipped.');
         await expect(
           page
             .getByRole('status')

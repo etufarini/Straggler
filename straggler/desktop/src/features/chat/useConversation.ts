@@ -745,7 +745,7 @@ export function useConversation(
         active === chat && manualSummaryPlan
           ? manualSummaryPlan
           : compactionPlan(active, contextSize, 'manual');
-      if (!plan.hasNewText) return 'No more earlier messages to summarize yet.';
+      if (!plan.hasNewText) return 'No older messages to summarize yet.';
     }
   }
 

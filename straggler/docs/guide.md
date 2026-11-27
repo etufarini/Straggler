@@ -344,7 +344,8 @@ Choosing the setting or opening a chat never starts a request.
 Choose **Summarize earlier messages** from the open chat’s menu or the **Context**
 popover. After the first summary, choose **Summarize more messages** when other
 turns are old enough to summarize, even below the automatic threshold. **Context**
-explains when the action is unavailable and still lets you read the saved summary.
+shows **No older messages to summarize yet.** when only recent messages remain.
+You can still read the saved summary there.
 While the model works, the status above the message box shows **Summarizing
 earlier messages…** or **Summarizing more messages…**. Use the square stop button
 to cancel.
@@ -391,8 +392,8 @@ summarized** row stays in the chat after reopening.
 using the same draft and files for both counts.
 An update moves the row after the last message it covers once the new summary
 is saved. Straggler applies a new or updated summary only when the comparison
-finds a token saving. Otherwise, it reports **No measurable space freed** and
-uses the previous context.
+finds a token saving. Otherwise, it reports **No tokens saved. Summary skipped.**
+and uses the previous context.
 
 **Stop summarizing** cancels the summary and keeps the chat and draft. Completed
 summaries are committed through normal atomic storage. Storage errors keep the
