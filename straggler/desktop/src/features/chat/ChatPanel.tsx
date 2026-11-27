@@ -207,7 +207,6 @@ export default function ChatPanel({
     hasDraft && controller.canCompactDraft && !controller.summaryError
       ? [{ label: 'Summarize and send', run: () => void controller.compact(chat, true) }]
       : recoveryActions;
-  const replyShortfall = context.replyShortfall.toLocaleString('en-US');
   return (
     <>
       {project && (
@@ -678,26 +677,6 @@ export default function ChatPanel({
             {controller.summaryError.message} Original messages are kept.
           </Feedback>
         )}
-        {showContextRecovery && (
-          <Feedback
-            severity={contextBlocked ? 'error' : 'warning'}
-            title={
-              needsContextRecovery ? 'This message needs more room' : 'Little room for the reply'
-            }
-            actions={contextRecoveryActions.map(({ label, run }) => (
-              <button key={label} type="button" onClick={run}>
-                {label}
-              </button>
-            ))}
-          >
-            {recoveryError?.message ||
-              (needsContextRecovery
-                ? context.usage?.remaining === 0
-                  ? 'The prompt fills the entire context window. Free space for a reply.'
-                  : `The prompt and attachments exceed the ${context.capacity?.toLocaleString('en-US')}-token context.`
-                : `Free ${context.approximate ? 'about ' : ''}${replyShortfall} tokens for a ${context.replyTarget.toLocaleString('en-US')}-token reply.`)}
-          </Feedback>
-        )}
         {contextError?.kind === 'other' && (
           <Feedback title="Couldn’t send the message">{contextError.message}</Feedback>
         )}
@@ -742,6 +721,22 @@ export default function ChatPanel({
             </button>
           )}
         </div>
+        {showContextRecovery && contextBlocked && (
+          <div className="context-recovery" role="alert">
+            <p>
+              <strong>This message needs more room.</strong>{' '}
+              {recoveryError?.message ??
+                (context.usage?.remaining === 0
+                  ? 'The prompt fills the entire context window. Free space for a reply.'
+                  : `The prompt and attachments exceed the ${context.capacity?.toLocaleString('en-US')}-token context.`)}
+            </p>
+            {contextRecoveryActions.map(({ label, run }) => (
+              <button key={label} type="button" className="text-button" onClick={run}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <form
           ref={composerRef}
           className={`composer${controller.attachments.dragged.length > 0 ? ' is-dragover' : ''}`}
@@ -813,6 +808,7 @@ export default function ChatPanel({
                 onViewSummary={viewSummary}
                 blocked={contextBlocked}
                 recoveryActions={showContextRecovery ? contextRecoveryActions : []}
+                recoveryMessage={showContextRecovery ? recoveryError?.message : undefined}
               />
               {generating ? (
                 <button

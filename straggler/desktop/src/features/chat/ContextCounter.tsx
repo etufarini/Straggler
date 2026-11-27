@@ -19,11 +19,13 @@ export default function ContextCounter({
   blocked,
   onViewSummary,
   recoveryActions,
+  recoveryMessage,
 }: {
   controller: WorkspaceController;
   blocked: boolean;
   onViewSummary: () => void;
   recoveryActions: { label: string; run: () => void }[];
+  recoveryMessage?: string;
 }) {
   const {
     available,
@@ -43,7 +45,7 @@ export default function ContextCounter({
   const compactReason = controller.compactReason();
   const compactReasonId = useId();
   const comparison = compaction?.result;
-  const showRecovery = blocked || replyShortfall > 0;
+  const showRecovery = blocked || replyShortfall > 0 || !!recoveryMessage;
   let status: { tone: 'warning' | 'error'; label: string } | undefined;
   if (controller.compactOnSend) {
     status = { tone: 'warning', label: 'Will summarize on send' };
@@ -54,6 +56,11 @@ export default function ContextCounter({
   } else if (controller.contextEstimate.atCompactionThreshold) {
     status = { tone: 'warning', label: 'Getting full' };
   }
+  const ringDash = usage?.percent
+    ? `${Math.min(100, usage.percent)} 100`
+    : status
+      ? '4 4'
+      : '0 100';
   const usageLabel = !available
     ? 'Usage unavailable'
     : usage
@@ -73,13 +80,7 @@ export default function ContextCounter({
         <>
           <svg className="context-ring" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="9" />
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              pathLength="100"
-              strokeDasharray={`${Math.min(100, usage?.percent ?? 0)} 100`}
-            />
+            <circle cx="12" cy="12" r="9" pathLength="100" strokeDasharray={ringDash} />
           </svg>
           <span>{status?.label ?? 'Context'}</span>
           <span className="ctx-percent">{percent}</span>
@@ -115,7 +116,7 @@ export default function ContextCounter({
                         ? 'available for the reply'
                         : 'available'}
                   </p>
-                  {replyShortfall > 0 && !controller.compactOnSend && (
+                  {replyShortfall > 0 && !controller.compactOnSend && !recoveryMessage && (
                     <p className="popover-note">
                       Free {approximate ? 'about ' : ''}
                       {formatNumber(replyShortfall)} tokens for a {formatNumber(replyTarget)}-token
@@ -165,6 +166,7 @@ export default function ContextCounter({
               </p>
             )
           )}
+          {recoveryMessage && <p className="popover-note">{recoveryMessage}</p>}
           {compaction && (
             <p className="popover-note ctx-compaction">
               <strong>{compactionResultLabel(compaction.result, compaction.applied)}</strong>

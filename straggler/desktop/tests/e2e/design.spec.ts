@@ -179,6 +179,11 @@ test('context uses the draft before sending and updates without response metrics
   await expect(counter).toHaveAccessibleDescription(/^Little room for the reply · 93%/);
   await expect(counter.getByText('Little room for the reply', { exact: true })).toBeVisible();
   await expect(contextMenu).toHaveClass('composer-menu context-menu ctx-warning');
+  await expect(page.locator('.context-recovery')).toHaveCount(0);
+  await counter.click();
+  await expect(popover).toContainText('Free 216 tokens for a 512-token reply.');
+  await expect(popover.getByRole('button', { name: 'Shorten draft', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
   await composer.fill('a'.repeat(16500));
   await expect(counter).toHaveAccessibleDescription(/^Free up space/);
   await expect(counter.getByText('Free up space', { exact: true })).toBeVisible();
@@ -197,6 +202,40 @@ test('context uses the draft before sending and updates without response metrics
   await expect(meter).toHaveAttribute('max', '4096');
   await expect.poll(async () => Number(await meter.getAttribute('value'))).toBeGreaterThan(5);
   await expect(popover).toContainText('tokens available for the reply');
+});
+
+test('context tones color the ring and the recovery line matches the composer width', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=normal');
+  await page.getByRole('button', { name: 'Launch server', exact: true }).click();
+  const counter = page.getByRole('button', { name: 'Context', exact: true });
+  const ring = counter.locator('.context-ring circle').last();
+  const neutralText = await counter.evaluate((button) => getComputedStyle(button).color);
+  const neutralStroke = await ring.evaluate((circle) => getComputedStyle(circle).stroke);
+  const message = page.getByRole('textbox', { name: 'Message', exact: true });
+  await message.fill('a'.repeat(13000));
+  await expect(ring).not.toHaveCSS('stroke', neutralStroke);
+  await expect(counter).toHaveCSS('color', neutralText);
+  const amberStroke = await ring.evaluate((circle) => getComputedStyle(circle).stroke);
+
+  await message.fill('a'.repeat(16500));
+  await expect(ring).not.toHaveCSS('stroke', amberStroke);
+  await expect(ring).not.toHaveCSS('stroke', neutralStroke);
+  await expect(counter).toHaveCSS('color', neutralText);
+  const recovery = page.locator('.context-recovery');
+  await expect(recovery).toHaveCSS('color', neutralText);
+  const composer = page.locator('.composer');
+  for (const width of [1440, 760]) {
+    await page.setViewportSize({ width, height: 820 });
+    await expect
+      .poll(async () => {
+        const line = await recovery.boundingBox();
+        const box = await composer.boundingBox();
+        return line && box && [Math.abs(line.x - box.x), Math.abs(line.width - box.width)];
+      })
+      .toEqual([0, 0]);
+  }
 });
 
 test('context shows an approximate token count when capacity and tokenization are unavailable', async ({

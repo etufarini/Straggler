@@ -539,12 +539,12 @@ applies the chat template and counts the tokens. Approximate counts are marked w
 **≈**. Image tokens are estimated. Selected file excerpts and web search results
 can add tokens on send. Cloud estimates are calculated locally.
 
-The counter turns amber at 75% or when little room remains for the planned reply.
-Open **Context** to see how much room is left and whether earlier messages can
-be summarized. **Will summarize on send** appears when automatic compaction
-is enabled and the draft is eligible. A red **Free up space** label means the
-draft needs an action before it can be sent. The popover offers **Summarize and
-send** when available, or actions such as shortening the draft or reviewing files.
+The context ring turns amber at 75% or when little room remains for the planned
+reply. Open **Context** for the remaining space and the available actions.
+**Will summarize on send** appears when automatic compaction is enabled and the
+draft is eligible. A red ring and **Free up space** mean the draft needs an action
+before it can be sent. The line above the message box offers **Summarize and send**
+when available, or actions such as shortening the draft or reviewing files.
 
 The reply-space suggestion uses one eighth of the active context window, up to
 2,048 tokens. A shorter **Longest reply** setting reduces the target. The
